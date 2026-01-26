@@ -44,6 +44,61 @@
   75% { transform: rotate(1deg); }
 }
 
+/* Hero SVG Decoration Animations */
+
+@keyframes sketch-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sketch-pulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes sketch-float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-3px) translateX(1px); }
+  50% { transform: translateY(0px) translateX(2px); }
+  75% { transform: translateY(3px) translateX(1px); }
+}
+
+@keyframes sketch-float-alt {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  33% { transform: translateY(2px) translateX(-1px) rotate(1deg); }
+  66% { transform: translateY(-2px) translateX(1px) rotate(-1deg); }
+}
+
+@keyframes sketch-draw-circle {
+  from {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  to {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 0;
+    opacity: var(--final-opacity);
+  }
+}
+
+@keyframes sketch-dot-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: var(--final-opacity);
+    transform: scale(1);
+  }
+}
+
 /* Scroll-triggered reveal */
 .reveal {
   opacity: 0;
@@ -74,5 +129,30 @@
     opacity: 1;
     transform: none;
     transition: none;
+  }
+  .hero-deco-circle-outer,
+  .hero-deco-circle-inner {
+    animation: none !important;
+    opacity: 0.3 !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+
+  .hero-deco-circle-inner {
+    opacity: 0.2 !important;
+  }
+
+  .hero-deco-dot {
+    animation: none !important;
+  }
+
+  .hero-deco-dot-1,
+  .hero-deco-dot-2,
+  .hero-deco-dot-3 {
+    opacity: 0.4 !important;
+  }
+
+  .hero-deco-dot-4 {
+    opacity: 0.3 !important;
   }
 }

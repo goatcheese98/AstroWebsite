@@ -10,46 +10,47 @@ import { SITE } from '../../lib/constants';
       <p class="hero__greeting text-hand text-muted">Hi, I'm</p>
       <h1 class="hero__name">{SITE.author}</h1>
       <p class="hero__title">
-        <span class="hero__title-text" id="hero-title">Software Engineer</span>
+        <span class="hero__title-text" id="hero-title">Business & Product Analyst</span>
       </p>
       <p class="hero__pitch">
-        I build things for the web with care for craft, performance, and accessibility. Currently exploring the intersection of design and engineering.
+        I transform complex data into actionable insights and drive strategic decision-making. UBC MBAN candidate with experience in wealth management analytics, data visualization, and cross-functional collaboration.
       </p>
       <div class="hero__actions">
         <SketchButton href="/#projects">
           View Projects
           <SketchArrow direction="down" size={20} />
         </SketchButton>
-        <SketchButton href={SITE.socialLinks.github || '#'} variant="secondary" target="_blank" rel="noopener">
-          GitHub
+        <SketchButton href={SITE.socialLinks.linkedin || '#'} variant="secondary" target="_blank" rel="noopener">
+          LinkedIn
         </SketchButton>
       </div>
     </div>
 
     <div class="hero__deco" aria-hidden="true">
-      <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
-        <!-- Hand-drawn circle decoration -->
+      <svg width="200" height="200" viewBox="0 0 200 200" fill="none" class="hero-deco-svg">
         <path
+          class="hero-deco-circle-outer"
           d="M100,20 C140,18 175,45 180,85 C185,125 165,165 125,178 C85,191 40,175 25,140 C10,105 20,55 55,35 C75,23 90,20 100,20"
           stroke="var(--color-stroke-muted)"
           stroke-width="1.5"
           fill="none"
           opacity="0.3"
+          pathLength="1000"
         />
-        <!-- Inner squiggly circle -->
         <path
+          class="hero-deco-circle-inner"
           d="M100,50 C125,48 150,65 152,90 C154,115 138,140 115,148 C92,156 65,145 55,122 C45,99 55,65 78,53 C88,48 95,49 100,50"
           stroke="var(--color-accent)"
           stroke-width="1"
           fill="none"
           opacity="0.2"
           stroke-dasharray="4 4"
+          pathLength="1000"
         />
-        <!-- Decorative dots -->
-        <circle cx="60" cy="40" r="3" fill="var(--color-fill-1)" opacity="0.4" />
-        <circle cx="150" cy="60" r="4" fill="var(--color-fill-3)" opacity="0.4" />
-        <circle cx="140" cy="150" r="3" fill="var(--color-fill-4)" opacity="0.4" />
-        <circle cx="45" cy="130" r="5" fill="var(--color-fill-5)" opacity="0.3" />
+        <circle class="hero-deco-dot hero-deco-dot-1" cx="60" cy="40" r="3" fill="var(--color-fill-1)" opacity="0.4" />
+        <circle class="hero-deco-dot hero-deco-dot-2" cx="150" cy="60" r="4" fill="var(--color-fill-3)" opacity="0.4" />
+        <circle class="hero-deco-dot hero-deco-dot-3" cx="140" cy="150" r="3" fill="var(--color-fill-4)" opacity="0.4" />
+        <circle class="hero-deco-dot hero-deco-dot-4" cx="45" cy="130" r="5" fill="var(--color-fill-5)" opacity="0.3" />
       </svg>
     </div>
   </div>
@@ -127,5 +128,58 @@ import { SITE } from '../../lib/constants';
     .hero__deco {
       display: none;
     }
+  }
+
+  /* SVG Animation Styles */
+  .hero-deco-svg {
+    transform-origin: center center;
+  }
+
+  .hero-deco-circle-outer {
+    --final-opacity: 0.3;
+    transform-origin: center;
+    animation:
+      sketch-draw-circle 2s ease-out 0.2s both,
+      sketch-orbit 12s linear 2.5s infinite;
+  }
+
+  .hero-deco-circle-inner {
+    --final-opacity: 0.2;
+    transform-origin: center;
+    animation:
+      sketch-draw-circle 2s ease-out 0.6s both,
+      sketch-pulse 4s ease-in-out 2.5s infinite;
+  }
+
+  .hero-deco-dot {
+    transform-origin: center;
+  }
+
+  .hero-deco-dot-1 {
+    --final-opacity: 0.4;
+    animation:
+      sketch-dot-appear 0.6s ease-out 1s both,
+      sketch-float 3.5s ease-in-out 1.8s infinite;
+  }
+
+  .hero-deco-dot-2 {
+    --final-opacity: 0.4;
+    animation:
+      sketch-dot-appear 0.6s ease-out 1.2s both,
+      sketch-float-alt 4.2s ease-in-out 2s infinite;
+  }
+
+  .hero-deco-dot-3 {
+    --final-opacity: 0.4;
+    animation:
+      sketch-dot-appear 0.6s ease-out 1.4s both,
+      sketch-float 3.8s ease-in-out 2.2s infinite;
+  }
+
+  .hero-deco-dot-4 {
+    --final-opacity: 0.3;
+    animation:
+      sketch-dot-appear 0.6s ease-out 1.6s both,
+      sketch-float-alt 5s ease-in-out 2.4s infinite;
   }
 </style>
