@@ -170,6 +170,20 @@ import { SKILLS } from "../lib/constants";
 
   // Run on page load
   init();
+
+  // Re-render chart when theme changes
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'data-theme') {
+        renderSkillsChart();
+      }
+    });
+  });
+
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
 </script>
 
 <script>
