@@ -1,9 +1,8 @@
 ---
-import { ClientRouter } from 'astro:transitions';
-import '../styles/sketch-theme.css';
-import '../styles/global.css';
-import '../styles/animations.css';
-import '../styles/utilities.css';
+import "../styles/sketch-theme.css";
+import "../styles/global.css";
+import "../styles/animations.css";
+import "../styles/utilities.css";
 
 interface Props {
   title: string;
@@ -12,9 +11,14 @@ interface Props {
 }
 
 const { title, description, ogImage } = Astro.props;
-const siteTitle = title ? `${title} | Rohan Jasani` : 'Rohan Jasani';
-const siteDescription = description || 'Personal portfolio of Rohan Jasani — developer, builder, thinker.';
-const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://rohanjasani.dev');
+const siteTitle = title ? `${title} | Rohan Jasani` : "Rohan Jasani";
+const siteDescription =
+  description ||
+  "Personal portfolio of Rohan Jasani — developer, builder, thinker.";
+const canonicalURL = new URL(
+  Astro.url.pathname,
+  Astro.site || "https://rohanjasani.dev",
+);
 ---
 
 <!doctype html>
@@ -32,9 +36,27 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://rohanjas
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!-- Font preloading -->
-    <link rel="preload" href="/fonts/Excalifont-Regular.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/Virgil.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/ComicShanns-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link
+      rel="preload"
+      href="/fonts/Excalifont-Regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/Virgil.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/ComicShanns-Regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
 
     <!-- Open Graph -->
     <meta property="og:title" content={siteTitle} />
@@ -49,17 +71,26 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://rohanjas
     <meta name="twitter:description" content={siteDescription} />
 
     <!-- Theme color -->
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
-
-    <ClientRouter />
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#121212"
+      media="(prefers-color-scheme: dark)"
+    />
 
     <!-- Inline theme init to prevent FOUC -->
     <script is:inline>
-      (function() {
-        var saved = localStorage.getItem('theme');
-        var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', saved || preferred);
+      (function () {
+        var saved = localStorage.getItem("theme");
+        var preferred = window.matchMedia("(prefers-color-scheme: dark)")
+          .matches
+          ? "dark"
+          : "light";
+        document.documentElement.setAttribute("data-theme", saved || preferred);
       })();
     </script>
   </head>
@@ -67,12 +98,20 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://rohanjas
     <!-- SVG filter for hand-drawn borders (zero JS) -->
     <svg style="position: absolute; width: 0; height: 0;" aria-hidden="true">
       <filter id="sketch-filter">
-        <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="3" seed="2" />
-        <feDisplacementMap in="SourceGraphic" scale="3" />
+        <feTurbulence
+          type="turbulence"
+          baseFrequency="0.02"
+          numOctaves="3"
+          seed="2"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" scale="3"></feDisplacementMap>
       </filter>
       <filter id="sketch-filter-strong">
-        <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" seed="5" />
-        <feDisplacementMap in="SourceGraphic" scale="5" />
+        <feTurbulence
+          type="turbulence"
+          baseFrequency="0.03"
+          numOctaves="4"
+          seed="5"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" scale="5"></feDisplacementMap>
       </filter>
     </svg>
 

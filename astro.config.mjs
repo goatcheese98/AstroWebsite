@@ -1,6 +1,5 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
-import preact from '@astrojs/preact';
 import sitemap from '@astrojs/sitemap';
 
 const target = process.env.DEPLOY_TARGET || 'static';
@@ -17,7 +16,7 @@ export default defineConfig({
   site: process.env.SITE_URL || 'https://rohanjasani.dev',
   output: isCloudflare ? 'hybrid' : 'static',
   adapter,
-  integrations: [preact(), sitemap()],
+  integrations: [sitemap()],
   build: {
     assets: 'assets',
   },

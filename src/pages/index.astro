@@ -1,24 +1,15 @@
 ---
-import PageLayout from '../layouts/PageLayout.astro';
-import Hero from '../components/sections/Hero.astro';
-import Projects from '../components/sections/Projects.astro';
-import Experience from '../components/sections/Experience.astro';
-import Contact from '../components/sections/Contact.astro';
-import SketchDivider from '../components/sketch/SketchDivider.astro';
-import SkillsChart from '../components/islands/SkillsChart';
-import AnnotationGroup from '../components/islands/AnnotationGroup';
-import { SKILLS } from '../lib/constants';
+import PageLayout from "../layouts/PageLayout.astro";
+import Hero from "../components/sections/Hero.astro";
+import Projects from "../components/sections/Projects.astro";
+import Experience from "../components/sections/Experience.astro";
+import Contact from "../components/sections/Contact.astro";
+import SketchDivider from "../components/sketch/SketchDivider.astro";
+import { SKILLS } from "../lib/constants";
 ---
 
 <PageLayout title="Home">
   <Hero />
-
-  <AnnotationGroup
-    client:idle
-    annotations={[
-      { selector: '#hero-title', type: 'underline', color: 'var(--color-accent)' },
-    ]}
-  />
 
   <SketchDivider variant="wavy" />
   <Projects />
@@ -27,9 +18,12 @@ import { SKILLS } from '../lib/constants';
 
   <section class="skills section-gap container" id="skills" aria-label="Skills">
     <h2 class="text-2xl text-hand text-center">Skills</h2>
-    <p class="text-muted text-hand text-center mt-sm mb-lg">Tools and technologies I work with.</p>
+    <p class="text-muted text-hand text-center mt-sm mb-lg">
+      Tools and technologies I work with.
+    </p>
     <div class="skills__chart">
-      <SkillsChart client:visible skills={SKILLS} />
+      <svg id="skills-svg" width="100%" aria-label="Skills chart" role="img"
+      ></svg>
     </div>
   </section>
 
@@ -38,29 +32,167 @@ import { SKILLS } from '../lib/constants';
 </PageLayout>
 
 <script>
+  import { annotate, annotationGroup } from "rough-notation";
+  import rough from "roughjs";
+
+  const SKILLS = [
+    { name: "TypeScript", level: 90, fillColor: "var(--color-fill-2)" },
+    { name: "React / Preact", level: 85, fillColor: "var(--color-fill-3)" },
+    { name: "Astro", level: 80, fillColor: "var(--color-fill-4)" },
+    { name: "CSS / Design", level: 75, fillColor: "var(--color-fill-5)" },
+    { name: "Node.js", level: 85, fillColor: "var(--color-fill-1)" },
+    { name: "Rust", level: 60, fillColor: "var(--color-fill-2)" },
+    { name: "SQL / Databases", level: 70, fillColor: "var(--color-fill-3)" },
+    { name: "DevOps / CI/CD", level: 65, fillColor: "var(--color-fill-4)" },
+  ];
+
+  const BAR_HEIGHT = 28;
+  const BAR_GAP = 16;
+  const LABEL_WIDTH = 130;
+  const CHART_PADDING = 10;
+
+  function initAnnotations() {
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const style = getComputedStyle(document.documentElement);
+    const accentColor = style.getPropertyValue("--color-accent").trim();
+
+    const el = document.querySelector("#hero-title");
+    if (!el) return;
+
+    const annotation = annotate(el as HTMLElement, {
+      type: "underline",
+      color: accentColor,
+      animationDuration: reducedMotion ? 0 : 800,
+      multiline: true,
+      strokeWidth: 2,
+    });
+
+    if (!reducedMotion) {
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            annotation.show();
+            observer.disconnect();
+          }
+        },
+        { threshold: 0.3 },
+      );
+      observer.observe(el);
+    } else {
+      annotation.show();
+    }
+  }
+
+  function renderSkillsChart() {
+    const svg = document.getElementById("skills-svg");
+    if (!svg) return;
+
+    // Clear previous content
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
+    }
+
+    const chartHeight =
+      SKILLS.length * (BAR_HEIGHT + BAR_GAP) + CHART_PADDING * 2;
+    const chartWidth = 500;
+
+    svg.setAttribute("height", String(chartHeight));
+    svg.setAttribute("viewBox", `0 0 ${chartWidth} ${chartHeight}`);
+    svg.setAttribute("preserveAspectRatio", "xMinYMin meet");
+
+    const rc = rough.svg(svg as unknown as SVGSVGElement);
+    const style = getComputedStyle(document.documentElement);
+    const stroke = style.getPropertyValue("--color-stroke").trim();
+    const text = style.getPropertyValue("--color-text").trim();
+    const muted = style.getPropertyValue("--color-text-muted").trim();
+
+    const barAreaWidth = chartWidth - LABEL_WIDTH - CHART_PADDING * 2;
+
+    SKILLS.forEach((skill, i) => {
+      const y = CHART_PADDING + i * (BAR_HEIGHT + BAR_GAP);
+      const barWidth = (skill.level / 100) * barAreaWidth;
+
+      let fillColor = style.getPropertyValue("--color-fill-1").trim();
+      if (skill.fillColor) {
+        const varMatch = skill.fillColor.match(/var\(([^)]+)\)/);
+        if (varMatch) {
+          fillColor = style.getPropertyValue(varMatch[1]).trim() || fillColor;
+        } else {
+          fillColor = skill.fillColor;
+        }
+      }
+
+      const bar = rc.rectangle(LABEL_WIDTH, y, barWidth, BAR_HEIGHT, {
+        roughness: 1.5,
+        bowing: 1,
+        strokeWidth: 1.5,
+        stroke,
+        fill: fillColor,
+        fillStyle: "hachure",
+        fillWeight: 1.5,
+        hachureGap: 5,
+      });
+      svg.appendChild(bar);
+
+      const label = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "text",
+      );
+      label.setAttribute("x", String(LABEL_WIDTH - 10));
+      label.setAttribute("y", String(y + BAR_HEIGHT / 2 + 5));
+      label.setAttribute("text-anchor", "end");
+      label.setAttribute("fill", text);
+      label.setAttribute("font-size", "14");
+      label.setAttribute("font-family", "'Excalifont', 'Virgil', cursive");
+      label.textContent = skill.name;
+      svg.appendChild(label);
+
+      const pct = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "text",
+      );
+      pct.setAttribute("x", String(LABEL_WIDTH + barWidth + 8));
+      pct.setAttribute("y", String(y + BAR_HEIGHT / 2 + 5));
+      pct.setAttribute("fill", muted);
+      pct.setAttribute("font-size", "12");
+      pct.setAttribute("font-family", "'Comic Shanns', monospace");
+      pct.textContent = `${skill.level}%`;
+      svg.appendChild(pct);
+    });
+  }
+
+  function init() {
+    initAnnotations();
+    renderSkillsChart();
+  }
+
+  // Run on page load
+  init();
+</script>
+
+<script>
   // Scroll-triggered reveal animations
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
+          entry.target.classList.add("visible");
           observer.unobserve(entry.target);
         }
       });
     },
-    { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
   );
 
   function initReveal() {
-    document.querySelectorAll('.reveal').forEach((el) => {
+    document.querySelectorAll(".reveal").forEach((el) => {
       observer.observe(el);
     });
   }
 
   initReveal();
-
-  // Re-init on view transitions
-  document.addEventListener('astro:after-swap', initReveal);
 </script>
 
 <style>

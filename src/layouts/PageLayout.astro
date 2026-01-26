@@ -1,8 +1,8 @@
 ---
-import BaseLayout from './BaseLayout.astro';
-import Header from '../components/core/Header.astro';
-import Footer from '../components/core/Footer.astro';
-import SkipLink from '../components/core/SkipLink.astro';
+import BaseLayout from "./BaseLayout.astro";
+import Header from "../components/core/Header.astro";
+import Footer from "../components/core/Footer.astro";
+import SkipLink from "../components/core/SkipLink.astro";
 
 interface Props {
   title: string;
@@ -16,7 +16,7 @@ const { title, description, ogImage } = Astro.props;
 <BaseLayout title={title} description={description} ogImage={ogImage}>
   <SkipLink />
   <Header />
-  <main id="main-content" transition:name="main-content">
+  <main id="main-content">
     <slot />
   </main>
   <Footer />
