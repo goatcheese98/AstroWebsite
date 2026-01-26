@@ -1,16 +1,22 @@
 import { useState, useRef, useEffect } from "react";
+import { nanoid } from "nanoid";
 
 interface Message {
     id: string;
     role: "user" | "assistant";
     content: string;
+    drawingCommand?: any;
 }
+
+type ModelType = "claude-sonnet-4-20250514" | "claude-haiku-4-20250514";
 
 export default function AIChatSidebar() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [model, setModel] = useState<ModelType>("claude-sonnet-4-20250514");
+    const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -20,6 +26,32 @@ export default function AIChatSidebar() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    const executeDrawingCommand = (elementsArray: any[]) => {
+        try {
+            console.log("🎨 Executing drawing command with elements:", elementsArray);
+
+            if (!Array.isArray(elementsArray)) {
+                console.error("❌ Invalid drawing data: not an array");
+                return false;
+            }
+
+            console.log(`✨ Dispatching ${elementsArray.length} elements to canvas`);
+
+            // Dispatch custom event to the Excalidraw canvas
+            // The canvas expects { elements: [...] }
+            const event = new CustomEvent("excalidraw:draw", {
+                detail: { elements: elementsArray },
+            });
+            window.dispatchEvent(event);
+
+            console.log("✅ Drawing command dispatched successfully");
+            return true;
+        } catch (err) {
+            console.error("❌ Failed to execute drawing command:", err);
+            return false;
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,18 +66,95 @@ export default function AIChatSidebar() {
         setMessages((prev) => [...prev, userMessage]);
         setInput("");
         setIsLoading(true);
+        setError(null);
 
-        // Placeholder response - replace with actual AI API call
-        setTimeout(() => {
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    messages: [...messages, userMessage].map((m) => ({
+                        role: m.role,
+                        content: m.content,
+                    })),
+                    model,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to get response");
+            }
+
+            // Check if the response contains a drawing command
+            let drawingCommand = null;
+            let displayMessage = data.message;
+
+            // Try multiple patterns to find JSON
+            let jsonMatch = null;
+
+            // Pattern 1: ```json ... ```
+            jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/);
+
+            // Pattern 2: ``` ... ``` (without language specifier)
+            if (!jsonMatch) {
+                jsonMatch = data.message.match(/```\s*\n([\s\S]*?)\n```/);
+            }
+
+            // Pattern 3: Look for raw JSON array starting with [
+            if (!jsonMatch) {
+                const rawJsonMatch = data.message.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+                if (rawJsonMatch) {
+                    jsonMatch = [rawJsonMatch[0], rawJsonMatch[0]];
+                }
+            }
+
+            if (jsonMatch) {
+                try {
+                    const jsonString = jsonMatch[1].trim();
+                    console.log("📄 Attempting to parse JSON:", jsonString);
+
+                    // Parse the JSON to get the array
+                    const parsedData = JSON.parse(jsonString);
+                    console.log("✅ Parsed JSON successfully:", parsedData);
+
+                    // Check if it's an array (skeleton elements)
+                    if (Array.isArray(parsedData)) {
+                        drawingCommand = parsedData;
+
+                        // Execute the drawing command with the array
+                        const success = executeDrawingCommand(parsedData);
+
+                        if (success) {
+                            // Replace the JSON block with a success message
+                            displayMessage = data.message.replace(jsonMatch[0], "\n\n✅ **Drawing added to canvas!**\n");
+                        } else {
+                            displayMessage = data.message.replace(jsonMatch[0], "\n\n⚠️ **Failed to add drawing**\n");
+                        }
+                    } else {
+                        console.error("❌ Parsed JSON is not an array:", parsedData);
+                    }
+                } catch (err) {
+                    console.error("Failed to parse drawing command:", err);
+                    console.log("Attempted to parse:", jsonMatch[1]);
+                }
+            }
+
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content:
-                    "I'm your AI canvas assistant! I can help you brainstorm ideas, analyze your drawings, or suggest improvements. (API integration coming soon)",
+                content: displayMessage,
+                drawingCommand,
             };
             setMessages((prev) => [...prev, assistantMessage]);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Something went wrong");
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
     if (isCollapsed) {
@@ -123,6 +232,34 @@ export default function AIChatSidebar() {
                 </button>
             </div>
 
+            {/* Model Selector */}
+            <div
+                style={{
+                    padding: "8px 16px",
+                    borderBottom: "1px solid var(--color-stroke-muted)",
+                    background: "var(--color-bg)",
+                }}
+            >
+                <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value as ModelType)}
+                    style={{
+                        width: "100%",
+                        padding: "6px 10px",
+                        border: "1px solid var(--color-stroke-muted)",
+                        borderRadius: "6px",
+                        background: "var(--color-surface)",
+                        fontFamily: "var(--font-body)",
+                        fontSize: "12px",
+                        color: "var(--color-text)",
+                        cursor: "pointer",
+                    }}
+                >
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet (Balanced)</option>
+                    <option value="claude-haiku-4-20250514">Claude Haiku (Fast)</option>
+                </select>
+            </div>
+
             {/* Messages */}
             <div
                 style={{
@@ -145,9 +282,9 @@ export default function AIChatSidebar() {
                         }}
                     >
                         <p style={{ fontSize: "32px", marginBottom: "12px" }}>🎨</p>
-                        <p>Start a conversation about your canvas!</p>
+                        <p>Ask me to draw on your canvas!</p>
                         <p style={{ fontSize: "12px", marginTop: "8px" }}>
-                            Ask for ideas, feedback, or assistance
+                            Try: "Draw a flowchart for user login"
                         </p>
                     </div>
                 )}
@@ -171,6 +308,7 @@ export default function AIChatSidebar() {
                             fontSize: "14px",
                             lineHeight: "1.5",
                             color: "var(--color-text)",
+                            whiteSpace: "pre-wrap",
                         }}
                     >
                         {message.content}
@@ -192,6 +330,21 @@ export default function AIChatSidebar() {
                         Thinking...
                     </div>
                 )}
+                {error && (
+                    <div
+                        style={{
+                            alignSelf: "center",
+                            padding: "10px 14px",
+                            borderRadius: "8px",
+                            background: "var(--color-fill-4)",
+                            fontFamily: "var(--font-body)",
+                            fontSize: "12px",
+                            color: "var(--color-text)",
+                        }}
+                    >
+                        ⚠️ {error}
+                    </div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
 
@@ -210,7 +363,7 @@ export default function AIChatSidebar() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask about your canvas..."
+                    placeholder="Ask me to draw something..."
                     style={{
                         flex: 1,
                         padding: "10px 14px",
