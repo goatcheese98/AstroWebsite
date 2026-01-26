@@ -67,13 +67,52 @@ export default function ExcalidrawCanvas() {
             }
         };
 
+        // Handle requests for canvas state
+        const handleGetState = () => {
+            if (excalidrawAPI) {
+                const elements = excalidrawAPI.getSceneElements();
+                const appState = excalidrawAPI.getAppState();
+
+                window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
+                    detail: {
+                        elements,
+                        appState,
+                    },
+                }));
+            }
+        };
+
         console.log("👂 Canvas listening for draw commands");
         window.addEventListener("excalidraw:draw", handleDrawCommand);
+        window.addEventListener("excalidraw:get-state", handleGetState);
 
         return () => {
             console.log("👋 Canvas stopped listening for draw commands");
             window.removeEventListener("excalidraw:draw", handleDrawCommand);
+            window.removeEventListener("excalidraw:get-state", handleGetState);
         };
+    }, [excalidrawAPI]);
+
+    // Broadcast canvas state changes
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+
+        const broadcastState = () => {
+            const elements = excalidrawAPI.getSceneElements();
+            const appState = excalidrawAPI.getAppState();
+
+            window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
+                detail: {
+                    elements,
+                    appState,
+                },
+            }));
+        };
+
+        // Broadcast state periodically (when canvas changes)
+        const interval = setInterval(broadcastState, 1000);
+
+        return () => clearInterval(interval);
     }, [excalidrawAPI]);
 
     return (
@@ -96,6 +135,7 @@ export default function ExcalidrawCanvas() {
                 initialData={{
                     appState: {
                         viewBackgroundColor: "transparent",
+                        gridSize: 0, // Remove grid dots (0 = no grid)
                     },
                 }}
             />

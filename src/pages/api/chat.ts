@@ -43,7 +43,7 @@ export const POST: APIRoute = async ({ request }) => {
             });
         }
 
-        const { messages, model = 'claude-sonnet-4-20250514' } = body;
+        const { messages, model = 'claude-sonnet-4-20250514', canvasState } = body;
 
         if (!messages || !Array.isArray(messages)) {
             return new Response(JSON.stringify({ error: 'Messages array is required' }), {
@@ -56,10 +56,16 @@ export const POST: APIRoute = async ({ request }) => {
         const allowedModels = ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'];
         const selectedModel = allowedModels.includes(model) ? model : 'claude-sonnet-4-20250514';
 
+        // Build context about canvas state
+        let canvasContext = '';
+        if (canvasState && canvasState.description) {
+            canvasContext = `\n\n## Current Canvas State\n${canvasState.description}\n\nYou can see what's already on the canvas and can add to it, modify it, or provide feedback about it.`;
+        }
+
         const response = await client.messages.create({
             model: selectedModel,
             max_tokens: 4096,
-            system: `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.
+            system: `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.${canvasContext}
 
 ## CRITICAL: Output Format
 

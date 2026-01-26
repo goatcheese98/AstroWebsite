@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { nanoid } from "nanoid";
 
 interface Message {
     id: string;
@@ -17,6 +16,7 @@ export default function AIChatSidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [model, setModel] = useState<ModelType>("claude-sonnet-4-20250514");
     const [error, setError] = useState<string | null>(null);
+    const [canvasState, setCanvasState] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -26,6 +26,23 @@ export default function AIChatSidebar() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Listen for canvas state updates
+    useEffect(() => {
+        const handleCanvasUpdate = (event: any) => {
+            console.log("📊 Canvas state updated:", event.detail);
+            setCanvasState(event.detail);
+        };
+
+        window.addEventListener("excalidraw:state-update", handleCanvasUpdate);
+
+        // Request initial canvas state
+        window.dispatchEvent(new CustomEvent("excalidraw:get-state"));
+
+        return () => {
+            window.removeEventListener("excalidraw:state-update", handleCanvasUpdate);
+        };
+    }, []);
 
     const executeDrawingCommand = (elementsArray: any[]) => {
         try {
@@ -53,6 +70,48 @@ export default function AIChatSidebar() {
         }
     };
 
+    const getCanvasDescription = () => {
+        if (!canvasState || !canvasState.elements || canvasState.elements.length === 0) {
+            return "The canvas is currently empty.";
+        }
+
+        const elementCounts: Record<string, number> = {};
+        const textContents: string[] = [];
+        const labels: string[] = [];
+
+        canvasState.elements.forEach((el: any) => {
+            elementCounts[el.type] = (elementCounts[el.type] || 0) + 1;
+
+            // Extract text content from text elements
+            if (el.type === 'text' && el.text) {
+                textContents.push(`"${el.text}"`);
+            }
+
+            // Extract labels from shapes
+            if (el.label && el.label.text) {
+                labels.push(`"${el.label.text}"`);
+            }
+        });
+
+        const descriptions = Object.entries(elementCounts).map(
+            ([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`
+        );
+
+        let description = `Current canvas contains: ${descriptions.join(', ')} (${canvasState.elements.length} total elements)`;
+
+        // Add text content if any
+        if (textContents.length > 0) {
+            description += `\n\nText elements on canvas: ${textContents.join(', ')}`;
+        }
+
+        // Add labels if any
+        if (labels.length > 0) {
+            description += `\n\nLabels on shapes: ${labels.join(', ')}`;
+        }
+
+        return description;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -69,6 +128,9 @@ export default function AIChatSidebar() {
         setError(null);
 
         try {
+            // Include canvas state in the request
+            const canvasDescription = getCanvasDescription();
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
@@ -80,6 +142,11 @@ export default function AIChatSidebar() {
                         content: m.content,
                     })),
                     model,
+                    canvasState: {
+                        description: canvasDescription,
+                        elementCount: canvasState?.elements?.length || 0,
+                        elements: canvasState?.elements || [],
+                    },
                 }),
             });
 
@@ -130,9 +197,15 @@ export default function AIChatSidebar() {
 
                         if (success) {
                             // Replace the JSON block with a success message
-                            displayMessage = data.message.replace(jsonMatch[0], "\n\n✅ **Drawing added to canvas!**\n");
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                "\n\n✅ **Drawing added to canvas!**\n"
+                            );
                         } else {
-                            displayMessage = data.message.replace(jsonMatch[0], "\n\n⚠️ **Failed to add drawing**\n");
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                "\n\n⚠️ **Failed to add drawing**\n"
+                            );
                         }
                     } else {
                         console.error("❌ Parsed JSON is not an array:", parsedData);
@@ -232,6 +305,22 @@ export default function AIChatSidebar() {
                 </button>
             </div>
 
+            {/* Canvas State Indicator */}
+            {canvasState && canvasState.elements && canvasState.elements.length > 0 && (
+                <div
+                    style={{
+                        padding: "8px 16px",
+                        background: "var(--color-fill-2)",
+                        borderBottom: "1px solid var(--color-stroke-muted)",
+                        fontSize: "12px",
+                        color: "var(--color-text)",
+                        fontFamily: "var(--font-body)",
+                    }}
+                >
+                    📊 Canvas: {canvasState.elements.length} element{canvasState.elements.length !== 1 ? 's' : ''}
+                </div>
+            )}
+
             {/* Model Selector */}
             <div
                 style={{
@@ -284,7 +373,7 @@ export default function AIChatSidebar() {
                         <p style={{ fontSize: "32px", marginBottom: "12px" }}>🎨</p>
                         <p>Ask me to draw on your canvas!</p>
                         <p style={{ fontSize: "12px", marginTop: "8px" }}>
-                            Try: "Draw a flowchart for user login"
+                            I can see what's on the canvas and help you modify it
                         </p>
                     </div>
                 )}
@@ -363,7 +452,7 @@ export default function AIChatSidebar() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask me to draw something..."
+                    placeholder="Ask me to draw or modify the canvas..."
                     style={{
                         flex: 1,
                         padding: "10px 14px",
