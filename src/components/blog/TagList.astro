@@ -1,0 +1,44 @@
+---
+import SketchBadge from '../ui/SketchBadge.astro';
+
+interface Props {
+  tags: string[];
+  activeTag?: string;
+}
+
+const { tags, activeTag } = Astro.props;
+const uniqueTags = [...new Set(tags)].sort();
+---
+
+<nav class="tag-list" aria-label="Filter by tag">
+  <span class="tag-list__label text-hand text-sm text-muted">Tags:</span>
+  <div class="tag-list__tags">
+    {uniqueTags.map((tag) => (
+      <SketchBadge
+        class={activeTag === tag ? 'tag--active' : ''}
+        fillColor={activeTag === tag ? 'var(--color-fill-1)' : undefined}
+      >
+        {tag}
+      </SketchBadge>
+    ))}
+  </div>
+</nav>
+
+<style>
+  .tag-list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .tag-list__tags {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+  }
+
+  :global(.tag--active) {
+    font-weight: 700;
+  }
+</style>

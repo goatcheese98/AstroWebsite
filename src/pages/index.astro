@@ -1,0 +1,71 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import Hero from '../components/sections/Hero.astro';
+import Projects from '../components/sections/Projects.astro';
+import Experience from '../components/sections/Experience.astro';
+import Contact from '../components/sections/Contact.astro';
+import SketchDivider from '../components/sketch/SketchDivider.astro';
+import SkillsChart from '../components/islands/SkillsChart';
+import AnnotationGroup from '../components/islands/AnnotationGroup';
+import { SKILLS } from '../lib/constants';
+---
+
+<PageLayout title="Home">
+  <Hero />
+
+  <AnnotationGroup
+    client:idle
+    annotations={[
+      { selector: '#hero-title', type: 'underline', color: 'var(--color-accent)' },
+    ]}
+  />
+
+  <SketchDivider variant="wavy" />
+  <Projects />
+  <SketchDivider variant="zigzag" />
+  <Experience />
+
+  <section class="skills section-gap container" id="skills" aria-label="Skills">
+    <h2 class="text-2xl text-hand text-center">Skills</h2>
+    <p class="text-muted text-hand text-center mt-sm mb-lg">Tools and technologies I work with.</p>
+    <div class="skills__chart">
+      <SkillsChart client:visible skills={SKILLS} />
+    </div>
+  </section>
+
+  <SketchDivider variant="wavy" />
+  <Contact />
+</PageLayout>
+
+<script>
+  // Scroll-triggered reveal animations
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+  );
+
+  function initReveal() {
+    document.querySelectorAll('.reveal').forEach((el) => {
+      observer.observe(el);
+    });
+  }
+
+  initReveal();
+
+  // Re-init on view transitions
+  document.addEventListener('astro:after-swap', initReveal);
+</script>
+
+<style>
+  .skills__chart {
+    max-width: 550px;
+    margin-inline: auto;
+  }
+</style>

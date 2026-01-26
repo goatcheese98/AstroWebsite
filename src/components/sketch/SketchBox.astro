@@ -1,0 +1,32 @@
+---
+interface Props {
+  as?: string;
+  fillColor?: string;
+  class?: string;
+}
+
+const { as: Tag = 'div', fillColor, class: className } = Astro.props;
+---
+
+<Tag
+  class:list={['sketch-box', className]}
+  style={fillColor ? `--fill: ${fillColor}` : undefined}
+>
+  <slot />
+</Tag>
+
+<style>
+  .sketch-box {
+    border: 2px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    background: var(--fill, var(--color-surface));
+    filter: url(#sketch-filter);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .sketch-box:hover {
+    transform: translate(-1px, -2px) rotate(-0.3deg);
+    box-shadow: var(--shadow-md);
+  }
+</style>

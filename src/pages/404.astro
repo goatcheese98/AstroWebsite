@@ -1,0 +1,64 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import SketchBox from '../components/sketch/SketchBox.astro';
+import SketchButton from '../components/ui/SketchButton.astro';
+---
+
+<PageLayout title="404 - Page Not Found">
+  <div class="container section-gap not-found">
+    <SketchBox class="not-found__card" fillColor="var(--color-fill-4)">
+      <div class="not-found__content">
+        <h1 class="not-found__code text-hand">404</h1>
+        <p class="not-found__text text-hand">
+          Oops! This page got lost in the sketches.
+        </p>
+        <svg class="not-found__doodle" width="120" height="80" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+          <path d="M10,60 Q30,10 60,40 T110,30" stroke="var(--color-stroke-muted)" stroke-width="2" fill="none" />
+          <circle cx="110" cy="30" r="5" fill="var(--color-accent)" opacity="0.5" />
+          <path d="M15,65 L5,70 M15,65 L10,55" stroke="var(--color-stroke-muted)" stroke-width="1.5" />
+        </svg>
+        <SketchButton href="/">
+          &larr; Go Home
+        </SketchButton>
+      </div>
+    </SketchBox>
+  </div>
+</PageLayout>
+
+<style>
+  .not-found {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+  }
+
+  .not-found__card {
+    max-width: 450px;
+    width: 100%;
+  }
+
+  .not-found__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+  }
+
+  .not-found__code {
+    font-size: clamp(4rem, 10vw, 8rem);
+    line-height: 1;
+    color: var(--color-accent);
+  }
+
+  .not-found__text {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+  }
+
+  .not-found__doodle {
+    opacity: 0.6;
+  }
+</style>

@@ -1,0 +1,71 @@
+---
+import SketchBox from '../sketch/SketchBox.astro';
+import SketchBadge from '../ui/SketchBadge.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  pubDate: Date;
+  tags: string[];
+  slug: string;
+}
+
+const { title, description, pubDate, tags, slug } = Astro.props;
+
+const formattedDate = pubDate.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<article class="post-card">
+  <a href={`/blog/${slug}`} class="post-card__link">
+    <SketchBox class="post-card__box">
+      <time class="post-card__date text-xs text-muted" datetime={pubDate.toISOString()}>
+        {formattedDate}
+      </time>
+      <h3 class="post-card__title text-hand">{title}</h3>
+      <p class="post-card__desc text-sm text-muted">{description}</p>
+      <div class="post-card__tags">
+        {tags.map((tag) => (
+          <SketchBadge>{tag}</SketchBadge>
+        ))}
+      </div>
+    </SketchBox>
+  </a>
+</article>
+
+<style>
+  .post-card__link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .post-card__link:hover {
+    text-decoration: none;
+  }
+
+  .post-card__date {
+    font-family: var(--font-mono);
+  }
+
+  .post-card__title {
+    font-size: var(--text-xl);
+    margin-top: var(--space-xs);
+    color: var(--color-text);
+  }
+
+  .post-card__desc {
+    margin-top: var(--space-xs);
+    line-height: 1.6;
+  }
+
+  .post-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+  }
+</style>

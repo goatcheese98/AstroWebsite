@@ -1,0 +1,69 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+const toc = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
+---
+
+{toc.length > 0 && (
+  <nav class="toc" aria-label="Table of Contents">
+    <h2 class="toc__title text-hand">Contents</h2>
+    <ul class="toc__list">
+      {toc.map((heading) => (
+        <li class:list={['toc__item', { 'toc__item--sub': heading.depth === 3 }]}>
+          <a href={`#${heading.slug}`} class="toc__link">
+            {heading.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style>
+  .toc {
+    border: 2px solid var(--color-stroke-muted);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+    filter: url(#sketch-filter);
+    background: var(--color-surface);
+  }
+
+  .toc__title {
+    font-size: var(--text-base);
+    margin-bottom: var(--space-sm);
+  }
+
+  .toc__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .toc__item--sub {
+    padding-left: var(--space-md);
+  }
+
+  .toc__link {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .toc__link:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-underline-offset: 3px;
+  }
+</style>

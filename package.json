@@ -1,0 +1,23 @@
+{
+  "name": "astroweb",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "build:cf": "DEPLOY_TARGET=cloudflare astro build",
+    "deploy:cf": "DEPLOY_TARGET=cloudflare astro build && wrangler deploy",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.12",
+    "@astrojs/preact": "^4.1.3",
+    "@astrojs/rss": "^4.0.15",
+    "@astrojs/sitemap": "^3.7.0",
+    "astro": "^5.16.15",
+    "preact": "^10.28.2",
+    "rough-notation": "^0.5.1",
+    "roughjs": "^4.6.6"
+  }
+}

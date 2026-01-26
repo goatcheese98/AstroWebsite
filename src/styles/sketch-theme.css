@@ -1,0 +1,77 @@
+:root {
+  /* Typography */
+  --font-hand: 'Excalifont', 'Virgil', cursive;
+  --font-mono: 'Cascadia Code', 'Comic Shanns', monospace;
+  --font-body: 'Comic Shanns', system-ui, sans-serif;
+
+  /* Fluid sizing */
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+  --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+  --text-2xl: clamp(2rem, 1.5rem + 2.5vw, 3rem);
+  --text-3xl: clamp(2.5rem, 1.8rem + 3.5vw, 4rem);
+
+  /* Spacing */
+  --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+  --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+  --space-md: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+  --space-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
+  --space-xl: clamp(2rem, 1.5rem + 2.5vw, 4rem);
+  --space-2xl: clamp(3rem, 2rem + 5vw, 6rem);
+
+  /* Layout */
+  --max-width: 1100px;
+  --content-padding: var(--space-md);
+
+  /* Rough.js defaults */
+  --rough-roughness: 1.5;
+  --rough-bowing: 1;
+  --rough-stroke-width: 2;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+
+  /* Shadows */
+  --shadow-sm: 2px 2px 0 var(--color-stroke-muted);
+  --shadow-md: 3px 3px 0 var(--color-stroke-muted);
+}
+
+[data-theme="light"] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #1e1e1e;
+  --color-text-muted: #666666;
+  --color-stroke: #1e1e1e;
+  --color-stroke-muted: #c4c4c4;
+  --color-accent: #1971c2;
+  --color-accent-hover: #1864ab;
+  --color-fill-1: #a5d8ff;
+  --color-fill-2: #b2f2bb;
+  --color-fill-3: #ffec99;
+  --color-fill-4: #ffc9c9;
+  --color-fill-5: #d0bfff;
+  --dot-color: #e0e0e0;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --color-bg: #121212;
+  --color-surface: #1e1e1e;
+  --color-text: #e0e0e0;
+  --color-text-muted: #999999;
+  --color-stroke: #e0e0e0;
+  --color-stroke-muted: #555555;
+  --color-accent: #4dabf7;
+  --color-accent-hover: #74c0fc;
+  --color-fill-1: #1c3a5e;
+  --color-fill-2: #1e4a2e;
+  --color-fill-3: #4a3e1e;
+  --color-fill-4: #4a1e1e;
+  --color-fill-5: #3a2e5e;
+  --dot-color: #2a2a2a;
+  color-scheme: dark;
+}

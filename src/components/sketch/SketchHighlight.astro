@@ -1,0 +1,23 @@
+---
+interface Props {
+  color?: string;
+  class?: string;
+}
+
+const { color = 'var(--color-fill-3)', class: className } = Astro.props;
+---
+
+<span class:list={['sketch-highlight', className]} style={`--highlight-color: ${color}`}>
+  <slot />
+</span>
+
+<style>
+  .sketch-highlight {
+    background: linear-gradient(
+      to bottom,
+      transparent 50%,
+      var(--highlight-color) 50%
+    );
+    padding-inline: 2px;
+  }
+</style>

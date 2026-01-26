@@ -1,0 +1,38 @@
+---
+interface Props {
+  direction?: 'right' | 'down' | 'left' | 'up';
+  size?: number;
+  class?: string;
+}
+
+const { direction = 'right', size = 40, class: className } = Astro.props;
+
+const rotations = {
+  right: 0,
+  down: 90,
+  left: 180,
+  up: 270,
+};
+---
+
+<svg
+  class:list={['sketch-arrow', className]}
+  width={size}
+  height={size}
+  viewBox="0 0 40 40"
+  fill="none"
+  stroke="var(--color-stroke)"
+  stroke-width="2"
+  style={`transform: rotate(${rotations[direction]}deg)`}
+  aria-hidden="true"
+>
+  <path d="M5,20 Q15,18 25,20 T35,20" />
+  <path d="M28,14 L35,20 L28,26" />
+</svg>
+
+<style>
+  .sketch-arrow {
+    display: inline-block;
+    opacity: 0.6;
+  }
+</style>

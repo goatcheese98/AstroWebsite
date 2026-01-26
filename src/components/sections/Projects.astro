@@ -1,0 +1,99 @@
+---
+import SketchBox from '../sketch/SketchBox.astro';
+import SketchBadge from '../ui/SketchBadge.astro';
+import SketchButton from '../ui/SketchButton.astro';
+import { PROJECTS } from '../../lib/constants';
+---
+
+<section class="projects section-gap" id="projects" aria-label="Projects">
+  <div class="container">
+    <h2 class="projects__heading text-2xl">Projects</h2>
+    <p class="projects__subhead text-muted mt-sm mb-lg">A few things I've built.</p>
+
+    <div class="projects__grid">
+      {PROJECTS.map((project) => (
+        <SketchBox class="project-card" fillColor={project.fillColor}>
+          <div class="project-card__inner">
+            {project.featured && (
+              <span class="project-card__featured">Featured</span>
+            )}
+            <h3 class="project-card__title text-hand">{project.title}</h3>
+            <p class="project-card__desc">{project.description}</p>
+            <div class="project-card__tags">
+              {project.tags.map((tag) => (
+                <SketchBadge>{tag}</SketchBadge>
+              ))}
+            </div>
+            <div class="project-card__links">
+              {project.demoUrl && (
+                <SketchButton href={project.demoUrl} size="sm" target="_blank" rel="noopener">
+                  Demo
+                </SketchButton>
+              )}
+              {project.codeUrl && (
+                <SketchButton href={project.codeUrl} variant="secondary" size="sm" target="_blank" rel="noopener">
+                  Code
+                </SketchButton>
+              )}
+            </div>
+          </div>
+        </SketchBox>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .projects__heading {
+    text-align: center;
+  }
+
+  .projects__subhead {
+    text-align: center;
+    font-family: var(--font-hand);
+  }
+
+  .projects__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: var(--space-lg);
+  }
+
+  .project-card__inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    height: 100%;
+  }
+
+  .project-card__featured {
+    font-family: var(--font-hand);
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .project-card__title {
+    font-size: var(--text-xl);
+  }
+
+  .project-card__desc {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    flex: 1;
+  }
+
+  .project-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .project-card__links {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+</style>

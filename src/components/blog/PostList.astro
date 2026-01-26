@@ -1,0 +1,46 @@
+---
+import PostCard from './PostCard.astro';
+
+interface Props {
+  posts: Array<{
+    id: string;
+    data: {
+      title: string;
+      description: string;
+      pubDate: Date;
+      tags: string[];
+      draft?: boolean;
+    };
+  }>;
+}
+
+const { posts } = Astro.props;
+
+const published = posts
+  .filter((post) => !post.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<div class="post-list">
+  {published.length === 0 ? (
+    <p class="text-muted text-hand text-center">No posts yet. Check back soon!</p>
+  ) : (
+    published.map((post) => (
+      <PostCard
+        title={post.data.title}
+        description={post.data.description}
+        pubDate={post.data.pubDate}
+        tags={post.data.tags}
+        slug={post.id}
+      />
+    ))
+  )}
+</div>
+
+<style>
+  .post-list {
+    display: grid;
+    gap: var(--space-lg);
+    grid-template-columns: 1fr;
+  }
+</style>

@@ -1,0 +1,99 @@
+---
+import ThemeToggle from './ThemeToggle.astro';
+import { NAV_LINKS } from '../../lib/constants';
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="header">
+  <nav class="header__nav container" aria-label="Main navigation">
+    <a href="/" class="header__logo text-hand">
+      RJ
+    </a>
+
+    <ul class="header__links" role="list">
+      {NAV_LINKS.map((link) => (
+        <li>
+          <a
+            href={link.href}
+            class:list={['header__link', { active: currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href)) }]}
+          >
+            {link.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    <ThemeToggle />
+  </nav>
+</header>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--color-bg);
+    border-bottom: 2px solid var(--color-stroke-muted);
+    filter: url(#sketch-filter);
+  }
+
+  .header__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-block: var(--space-sm);
+    gap: var(--space-md);
+  }
+
+  .header__logo {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .header__logo:hover {
+    text-decoration: none;
+    transform: rotate(-2deg);
+    display: inline-block;
+  }
+
+  .header__links {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .header__link {
+    font-family: var(--font-hand);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    transition: color 0.15s ease;
+  }
+
+  .header__link:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-underline-offset: 4px;
+  }
+
+  .header__link.active {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  @media (max-width: 640px) {
+    .header__links {
+      gap: var(--space-sm);
+    }
+    .header__link {
+      font-size: var(--text-xs);
+      padding: var(--space-xs);
+    }
+  }
+</style>

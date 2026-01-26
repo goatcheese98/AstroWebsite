@@ -1,0 +1,56 @@
+---
+import SketchBox from '../sketch/SketchBox.astro';
+import SketchButton from '../ui/SketchButton.astro';
+import { SITE } from '../../lib/constants';
+---
+
+<section class="contact section-gap" id="contact" aria-label="Contact">
+  <div class="container">
+    <SketchBox class="contact__card" fillColor="var(--color-fill-1)">
+      <div class="contact__inner">
+        <h2 class="text-2xl text-hand text-center">Get in Touch</h2>
+        <p class="text-muted text-center mt-sm">
+          Want to chat about a project, collaboration, or just say hi?
+        </p>
+        <div class="contact__actions mt-lg">
+          {SITE.socialLinks.email && (
+            <SketchButton href={SITE.socialLinks.email}>
+              Say Hello
+            </SketchButton>
+          )}
+          {SITE.socialLinks.github && (
+            <SketchButton href={SITE.socialLinks.github} variant="secondary" target="_blank" rel="noopener">
+              GitHub
+            </SketchButton>
+          )}
+          {SITE.socialLinks.linkedin && (
+            <SketchButton href={SITE.socialLinks.linkedin} variant="secondary" target="_blank" rel="noopener">
+              LinkedIn
+            </SketchButton>
+          )}
+        </div>
+      </div>
+    </SketchBox>
+  </div>
+</section>
+
+<style>
+  .contact__card {
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  .contact__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-lg);
+  }
+
+  .contact__actions {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>

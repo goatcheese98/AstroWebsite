@@ -1,0 +1,72 @@
+---
+interface Props {
+  href?: string;
+  variant?: 'primary' | 'secondary';
+  size?: 'sm' | 'md';
+  class?: string;
+  [key: string]: any;
+}
+
+const { href, variant = 'primary', size = 'md', class: className, ...rest } = Astro.props;
+const Tag = href ? 'a' : 'button';
+---
+
+<Tag
+  href={href}
+  class:list={['sketch-btn', `sketch-btn--${variant}`, `sketch-btn--${size}`, className]}
+  {...rest}
+>
+  <slot />
+</Tag>
+
+<style>
+  .sketch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-family: var(--font-hand);
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-decoration: none;
+    border: 2px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    filter: url(#sketch-filter);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .sketch-btn:hover {
+    transform: translate(-1px, -2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+  }
+
+  .sketch-btn:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+
+  .sketch-btn:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .sketch-btn--primary {
+    background: var(--color-fill-1);
+    color: var(--color-text);
+  }
+
+  .sketch-btn--secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .sketch-btn--md {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .sketch-btn--sm {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
+  }
+</style>

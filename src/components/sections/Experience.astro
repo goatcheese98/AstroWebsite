@@ -1,0 +1,147 @@
+---
+import SketchHighlight from '../sketch/SketchHighlight.astro';
+import { EXPERIENCES } from '../../lib/constants';
+---
+
+<section class="experience section-gap" id="experience" aria-label="Experience">
+  <div class="container">
+    <h2 class="experience__heading text-2xl text-center">Experience</h2>
+    <p class="experience__subhead text-muted text-center text-hand mt-sm mb-lg">Where I've worked.</p>
+
+    <div class="timeline">
+      {EXPERIENCES.map((exp, i) => (
+        <div class="timeline__item reveal">
+          <div class="timeline__marker" aria-hidden="true">
+            <div class:list={['timeline__dot', { 'timeline__dot--active': exp.current }]} />
+          </div>
+          <div class="timeline__content">
+            <div class="timeline__header">
+              <h3 class="timeline__role text-hand">
+                {exp.current ? (
+                  <SketchHighlight>{exp.role}</SketchHighlight>
+                ) : (
+                  exp.role
+                )}
+              </h3>
+              <span class="timeline__period text-sm text-muted">{exp.period}</span>
+            </div>
+            <p class="timeline__company text-hand text-accent">{exp.company}</p>
+            <p class="timeline__desc text-muted">{exp.description}</p>
+            <ul class="timeline__highlights">
+              {exp.highlights.map((highlight) => (
+                <li class="timeline__highlight">{highlight}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .text-accent {
+    color: var(--color-accent);
+  }
+
+  .timeline {
+    position: relative;
+    max-width: 700px;
+    margin-inline: auto;
+    padding-left: 40px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--color-stroke-muted);
+    filter: url(#sketch-filter);
+  }
+
+  .timeline__item {
+    position: relative;
+    padding-bottom: var(--space-xl);
+  }
+
+  .timeline__item:last-child {
+    padding-bottom: 0;
+  }
+
+  .timeline__marker {
+    position: absolute;
+    left: -40px;
+    top: 4px;
+    width: 30px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .timeline__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--color-stroke);
+    background: var(--color-bg);
+    filter: url(#sketch-filter);
+  }
+
+  .timeline__dot--active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  .timeline__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .timeline__role {
+    font-size: var(--text-lg);
+  }
+
+  .timeline__company {
+    font-size: var(--text-base);
+    margin-top: var(--space-xs);
+  }
+
+  .timeline__desc {
+    font-size: var(--text-sm);
+    margin-top: var(--space-xs);
+  }
+
+  .timeline__highlights {
+    margin-top: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .timeline__highlight {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    padding-left: 1.2em;
+    position: relative;
+  }
+
+  .timeline__highlight::before {
+    content: '~';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+    font-family: var(--font-hand);
+  }
+
+  @media (max-width: 640px) {
+    .timeline__header {
+      flex-direction: column;
+      gap: 0;
+    }
+  }
+</style>

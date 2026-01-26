@@ -1,0 +1,35 @@
+---
+interface Props {
+  href: string;
+  external?: boolean;
+  class?: string;
+}
+
+const { href, external = false, class: className } = Astro.props;
+const externalAttrs = external ? { target: '_blank', rel: 'noopener' } : {};
+---
+
+<a href={href} class:list={['sketch-link', className]} {...externalAttrs}>
+  <slot />
+</a>
+
+<style>
+  .sketch-link {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1.5px;
+    transition: color 0.15s ease;
+  }
+
+  .sketch-link:hover {
+    color: var(--color-accent-hover);
+  }
+
+  .sketch-link:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+</style>

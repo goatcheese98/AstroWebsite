@@ -1,0 +1,30 @@
+---
+/**
+ * WhiteboardBg - Decorative dot-grid overlay for sections.
+ * The main body already has the dot-grid background, so this is for
+ * sections that need a surface background with the grid pattern on top.
+ */
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={['whiteboard-bg', className]} aria-hidden="true">
+  <slot />
+</div>
+
+<style>
+  .whiteboard-bg {
+    background-color: var(--color-surface);
+    background-image: radial-gradient(
+      circle,
+      var(--dot-color) 1px,
+      transparent 1px
+    );
+    background-size: 20px 20px;
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+</style>

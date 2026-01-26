@@ -1,0 +1,28 @@
+---
+interface Props {
+  size?: number;
+  class?: string;
+}
+
+const { size = 24, class: className } = Astro.props;
+---
+
+<span class:list={['sketch-icon', className]} style={`--icon-size: ${size}px`} aria-hidden="true">
+  <slot />
+</span>
+
+<style>
+  .sketch-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    filter: url(#sketch-filter);
+  }
+
+  .sketch-icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+</style>

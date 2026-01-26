@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/schemas/config/v2.json",
+  "name": "astroweb",
+  "compatibility_date": "2025-01-20",
+  "main": "./dist/server/index.js",
+  "assets": {
+    "directory": "./dist/client/",
+    "binding": "ASSETS"
+  }
+}

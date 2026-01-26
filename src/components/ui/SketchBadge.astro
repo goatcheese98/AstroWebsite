@@ -1,0 +1,29 @@
+---
+interface Props {
+  fillColor?: string;
+  class?: string;
+}
+
+const { fillColor, class: className } = Astro.props;
+---
+
+<span
+  class:list={['sketch-badge', className]}
+  style={fillColor ? `--badge-fill: ${fillColor}` : undefined}
+>
+  <slot />
+</span>
+
+<style>
+  .sketch-badge {
+    display: inline-block;
+    font-family: var(--font-hand);
+    font-size: var(--text-xs);
+    padding: 2px 8px;
+    border: 1.5px solid var(--color-stroke);
+    border-radius: var(--radius-sm);
+    background: var(--badge-fill, var(--color-surface));
+    filter: url(#sketch-filter);
+    white-space: nowrap;
+  }
+</style>

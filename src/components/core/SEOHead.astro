@@ -1,0 +1,60 @@
+---
+import { SITE } from '../../lib/constants';
+
+interface Props {
+  title: string;
+  description: string;
+  ogImage?: string;
+  type?: 'website' | 'article';
+  publishedDate?: Date;
+}
+
+const { title, description, ogImage, type = 'website', publishedDate } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || SITE.siteUrl);
+const ogImageUrl = ogImage ? new URL(ogImage, Astro.site || SITE.siteUrl).href : undefined;
+---
+
+<!-- Primary Meta -->
+<link rel="canonical" href={canonicalURL} />
+<meta name="author" content={SITE.author} />
+
+<!-- Open Graph -->
+<meta property="og:type" content={type} />
+<meta property="og:url" content={canonicalURL} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:site_name" content={SITE.title} />
+{ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+{publishedDate && <meta property="article:published_time" content={publishedDate.toISOString()} />}
+
+<!-- Twitter -->
+<meta name="twitter:card" content={ogImageUrl ? 'summary_large_image' : 'summary'} />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+{ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
+
+<!-- JSON-LD -->
+<script type="application/ld+json" set:html={JSON.stringify(
+  type === 'article'
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: title,
+        description: description,
+        author: {
+          '@type': 'Person',
+          name: SITE.author,
+          url: SITE.siteUrl,
+        },
+        datePublished: publishedDate?.toISOString(),
+        url: canonicalURL.href,
+      }
+    : {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: SITE.author,
+        url: SITE.siteUrl,
+        jobTitle: 'Software Engineer',
+        sameAs: Object.values(SITE.socialLinks).filter(Boolean),
+      }
+)} />
