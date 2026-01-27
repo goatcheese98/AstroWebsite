@@ -1,0 +1,318 @@
+/**
+ * SVG Library Configuration
+ * Metadata for all SVG icons in the library
+ */
+
+export interface SVGMetadata {
+    id: string;
+    name: string;
+    category: "icons" | "business" | "arrows" | "shapes";
+    path: string;
+    tags: string[];
+    description: string;
+}
+
+export const svgLibrary: SVGMetadata[] = [
+    // Icons Category
+    {
+        id: "user",
+        name: "User",
+        category: "icons",
+        path: "/svg-library/icons/user.svg",
+        tags: ["user", "person", "profile", "account"],
+        description: "User profile icon",
+    },
+    {
+        id: "users",
+        name: "Users",
+        category: "icons",
+        path: "/svg-library/icons/users.svg",
+        tags: ["users", "team", "group", "people"],
+        description: "Multiple users icon",
+    },
+    {
+        id: "database",
+        name: "Database",
+        category: "icons",
+        path: "/svg-library/icons/database.svg",
+        tags: ["database", "data", "storage", "server"],
+        description: "Database icon",
+    },
+    {
+        id: "cloud",
+        name: "Cloud",
+        category: "icons",
+        path: "/svg-library/icons/cloud.svg",
+        tags: ["cloud", "storage", "online", "sync"],
+        description: "Cloud storage icon",
+    },
+    {
+        id: "server",
+        name: "Server",
+        category: "icons",
+        path: "/svg-library/icons/server.svg",
+        tags: ["server", "backend", "infrastructure", "hardware"],
+        description: "Server icon",
+    },
+    {
+        id: "api",
+        name: "API",
+        category: "icons",
+        path: "/svg-library/icons/api.svg",
+        tags: ["api", "interface", "endpoint", "integration"],
+        description: "API endpoint icon",
+    },
+    {
+        id: "mobile",
+        name: "Mobile",
+        category: "icons",
+        path: "/svg-library/icons/mobile.svg",
+        tags: ["mobile", "phone", "smartphone", "app"],
+        description: "Mobile device icon",
+    },
+    {
+        id: "desktop",
+        name: "Desktop",
+        category: "icons",
+        path: "/svg-library/icons/desktop.svg",
+        tags: ["desktop", "computer", "monitor", "pc"],
+        description: "Desktop computer icon",
+    },
+    {
+        id: "settings",
+        name: "Settings",
+        category: "icons",
+        path: "/svg-library/icons/settings.svg",
+        tags: ["settings", "config", "gear", "preferences"],
+        description: "Settings gear icon",
+    },
+    {
+        id: "lock",
+        name: "Lock",
+        category: "icons",
+        path: "/svg-library/icons/lock.svg",
+        tags: ["lock", "security", "private", "secure"],
+        description: "Security lock icon",
+    },
+    {
+        id: "key",
+        name: "Key",
+        category: "icons",
+        path: "/svg-library/icons/key.svg",
+        tags: ["key", "password", "auth", "access"],
+        description: "Key authentication icon",
+    },
+    {
+        id: "bell",
+        name: "Bell",
+        category: "icons",
+        path: "/svg-library/icons/bell.svg",
+        tags: ["bell", "notification", "alert", "reminder"],
+        description: "Notification bell icon",
+    },
+
+    // Business Category
+    {
+        id: "bar-chart",
+        name: "Bar Chart",
+        category: "business",
+        path: "/svg-library/business/bar-chart.svg",
+        tags: ["chart", "graph", "analytics", "data", "bar"],
+        description: "Bar chart for data visualization",
+    },
+    {
+        id: "line-chart",
+        name: "Line Chart",
+        category: "business",
+        path: "/svg-library/business/line-chart.svg",
+        tags: ["chart", "graph", "analytics", "data", "line", "trend"],
+        description: "Line chart showing trends",
+    },
+    {
+        id: "pie-chart",
+        name: "Pie Chart",
+        category: "business",
+        path: "/svg-library/business/pie-chart.svg",
+        tags: ["chart", "graph", "analytics", "data", "pie", "distribution"],
+        description: "Pie chart for proportions",
+    },
+    {
+        id: "dashboard",
+        name: "Dashboard",
+        category: "business",
+        path: "/svg-library/business/dashboard.svg",
+        tags: ["dashboard", "metrics", "analytics", "overview"],
+        description: "Dashboard overview icon",
+    },
+    {
+        id: "report",
+        name: "Report",
+        category: "business",
+        path: "/svg-library/business/report.svg",
+        tags: ["report", "document", "file", "analysis"],
+        description: "Report document icon",
+    },
+    {
+        id: "target",
+        name: "Target",
+        category: "business",
+        path: "/svg-library/business/target.svg",
+        tags: ["target", "goal", "kpi", "objective"],
+        description: "Target/goal icon",
+    },
+    {
+        id: "growth",
+        name: "Growth",
+        category: "business",
+        path: "/svg-library/business/growth.svg",
+        tags: ["growth", "increase", "trend", "upward"],
+        description: "Growth trend icon",
+    },
+    {
+        id: "money",
+        name: "Money",
+        category: "business",
+        path: "/svg-library/business/money.svg",
+        tags: ["money", "dollar", "revenue", "finance"],
+        description: "Money/revenue icon",
+    },
+
+    // Arrows Category
+    {
+        id: "arrow-right",
+        name: "Arrow Right",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-right.svg",
+        tags: ["arrow", "right", "next", "forward"],
+        description: "Right pointing arrow",
+    },
+    {
+        id: "arrow-left",
+        name: "Arrow Left",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-left.svg",
+        tags: ["arrow", "left", "back", "previous"],
+        description: "Left pointing arrow",
+    },
+    {
+        id: "arrow-up",
+        name: "Arrow Up",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-up.svg",
+        tags: ["arrow", "up", "increase", "upload"],
+        description: "Upward arrow",
+    },
+    {
+        id: "arrow-down",
+        name: "Arrow Down",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-down.svg",
+        tags: ["arrow", "down", "decrease", "download"],
+        description: "Downward arrow",
+    },
+    {
+        id: "arrow-curved-right",
+        name: "Curved Arrow Right",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-curved-right.svg",
+        tags: ["arrow", "curved", "right", "turn"],
+        description: "Curved arrow turning right",
+    },
+    {
+        id: "arrow-bidirectional",
+        name: "Bidirectional Arrow",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-bidirectional.svg",
+        tags: ["arrow", "bidirectional", "both", "sync"],
+        description: "Two-way arrow",
+    },
+    {
+        id: "arrow-circle",
+        name: "Circular Arrow",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-circle.svg",
+        tags: ["arrow", "circle", "cycle", "refresh", "loop"],
+        description: "Circular refresh arrow",
+    },
+    {
+        id: "arrow-branch",
+        name: "Branch Arrow",
+        category: "arrows",
+        path: "/svg-library/arrows/arrow-branch.svg",
+        tags: ["arrow", "branch", "split", "fork"],
+        description: "Branching arrow for decisions",
+    },
+
+    // Shapes Category
+    {
+        id: "shape-process",
+        name: "Process Box",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-process.svg",
+        tags: ["flowchart", "process", "box", "rectangle"],
+        description: "Flowchart process box",
+    },
+    {
+        id: "shape-decision",
+        name: "Decision Diamond",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-decision.svg",
+        tags: ["flowchart", "decision", "diamond", "choice"],
+        description: "Flowchart decision diamond",
+    },
+    {
+        id: "shape-data",
+        name: "Data Parallelogram",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-data.svg",
+        tags: ["flowchart", "data", "input", "output"],
+        description: "Flowchart data shape",
+    },
+    {
+        id: "shape-terminal",
+        name: "Terminal",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-terminal.svg",
+        tags: ["flowchart", "terminal", "start", "end"],
+        description: "Flowchart start/end terminal",
+    },
+    {
+        id: "shape-document",
+        name: "Document",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-document.svg",
+        tags: ["flowchart", "document", "file", "paper"],
+        description: "Document shape",
+    },
+    {
+        id: "shape-cylinder",
+        name: "Cylinder",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-cylinder.svg",
+        tags: ["flowchart", "cylinder", "database", "storage"],
+        description: "Cylinder database shape",
+    },
+    {
+        id: "shape-cloud",
+        name: "Cloud Shape",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-cloud.svg",
+        tags: ["flowchart", "cloud", "service", "online"],
+        description: "Cloud computing shape",
+    },
+    {
+        id: "shape-hexagon",
+        name: "Hexagon",
+        category: "shapes",
+        path: "/svg-library/shapes/shape-hexagon.svg",
+        tags: ["flowchart", "hexagon", "preparation", "setup"],
+        description: "Hexagon preparation shape",
+    },
+];
+
+export const categories = [
+    { id: "icons", label: "Icons", count: svgLibrary.filter((s) => s.category === "icons").length },
+    { id: "business", label: "Business", count: svgLibrary.filter((s) => s.category === "business").length },
+    { id: "arrows", label: "Arrows", count: svgLibrary.filter((s) => s.category === "arrows").length },
+    { id: "shapes", label: "Shapes", count: svgLibrary.filter((s) => s.category === "shapes").length },
+] as const;

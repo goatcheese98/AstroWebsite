@@ -1,7 +1,7 @@
 ---
-import SketchButton from '../ui/SketchButton.astro';
-import SketchArrow from '../sketch/SketchArrow.astro';
-import { SITE } from '../../lib/constants';
+import SketchButton from "../ui/SketchButton.astro";
+import SketchArrow from "../sketch/SketchArrow.astro";
+import { SITE } from "../../lib/constants";
 ---
 
 <section class="hero section-gap" aria-label="Introduction">
@@ -10,47 +10,84 @@ import { SITE } from '../../lib/constants';
       <p class="hero__greeting text-hand text-muted">Hi, I'm</p>
       <h1 class="hero__name">{SITE.author}</h1>
       <p class="hero__title">
-        <span class="hero__title-text" id="hero-title">Business & Product Analyst</span>
+        <span class="hero__title-text" id="hero-title"
+          >Business & Product Analyst</span
+        >
       </p>
       <p class="hero__pitch">
-        I transform complex data into actionable insights and drive strategic decision-making. UBC MBAN candidate with experience in wealth management analytics, data visualization, and cross-functional collaboration.
+        I transform complex data into actionable insights and drive strategic
+        decision-making. UBC MBAN candidate with experience in wealth management
+        analytics, data visualization, and cross-functional collaboration.
       </p>
       <div class="hero__actions">
         <SketchButton href="/#projects">
           View Projects
           <SketchArrow direction="down" size={20} />
         </SketchButton>
-        <SketchButton href={SITE.socialLinks.linkedin || '#'} variant="secondary" target="_blank" rel="noopener">
+        <SketchButton
+          href={SITE.socialLinks.linkedin || "#"}
+          variant="secondary"
+          target="_blank"
+          rel="noopener"
+        >
           LinkedIn
         </SketchButton>
       </div>
     </div>
 
     <div class="hero__deco" aria-hidden="true">
-      <svg width="200" height="200" viewBox="0 0 200 200" fill="none" class="hero-deco-svg">
+      <svg
+        width="300"
+        height="300"
+        viewBox="0 0 300 300"
+        fill="none"
+        class="hero-deco-svg"
+      >
         <path
           class="hero-deco-circle-outer"
-          d="M100,20 C140,18 175,45 180,85 C185,125 165,165 125,178 C85,191 40,175 25,140 C10,105 20,55 55,35 C75,23 90,20 100,20"
+          d="M150,30 C210,27 262.5,67.5 270,127.5 C277.5,187.5 247.5,247.5 187.5,267 C127.5,286.5 60,262.5 37.5,210 C15,157.5 30,82.5 82.5,52.5 C112.5,34.5 135,30 150,30"
           stroke="var(--color-stroke-muted)"
-          stroke-width="1.5"
+          stroke-width="2"
           fill="none"
           opacity="0.3"
-          pathLength="1000"
-        />
+          pathLength="1000"></path>
         <path
           class="hero-deco-circle-inner"
-          d="M100,50 C125,48 150,65 152,90 C154,115 138,140 115,148 C92,156 65,145 55,122 C45,99 55,65 78,53 C88,48 95,49 100,50"
+          d="M150,75 C187.5,72 225,97.5 228,135 C231,172.5 207,210 172.5,222 C138,234 97.5,217.5 82.5,183 C67.5,148.5 82.5,97.5 117,79.5 C132,72 142.5,73.5 150,75"
           stroke="var(--color-accent)"
-          stroke-width="1"
+          stroke-width="1.5"
           fill="none"
           opacity="0.2"
-          stroke-dasharray="4 4"
-          pathLength="1000"
-        />
-        <circle class="hero-deco-dot hero-deco-dot-1" cx="60" cy="40" r="3" fill="var(--color-fill-1)" opacity="0.4" />
-        <circle class="hero-deco-dot hero-deco-dot-2" cx="150" cy="60" r="4" fill="var(--color-fill-3)" opacity="0.4" />
-        <circle class="hero-deco-dot hero-deco-dot-3" cx="140" cy="150" r="3" fill="var(--color-fill-4)" opacity="0.4" />
-        <circle class="hero-deco-dot hero-deco-dot-4" cx="45" cy="130" r="5" fill="var(--color-fill-5)" opacity="0.3" />
+          stroke-dasharray="6 6"
+          pathLength="1000"></path>
+        <circle
+          class="hero-deco-dot hero-deco-dot-1"
+          cx="90"
+          cy="60"
+          r="5"
+          fill="var(--color-fill-1)"
+          opacity="0.4"></circle>
+        <circle
+          class="hero-deco-dot hero-deco-dot-2"
+          cx="225"
+          cy="90"
+          r="6"
+          fill="var(--color-fill-3)"
+          opacity="0.4"></circle>
+        <circle
+          class="hero-deco-dot hero-deco-dot-3"
+          cx="210"
+          cy="225"
+          r="5"
+          fill="var(--color-fill-4)"
+          opacity="0.4"></circle>
+        <circle
+          class="hero-deco-dot hero-deco-dot-4"
+          cx="67.5"
+          cy="195"
+          r="7"
+          fill="var(--color-fill-5)"
+          opacity="0.3"></circle>
       </svg>
     </div>
   </div>

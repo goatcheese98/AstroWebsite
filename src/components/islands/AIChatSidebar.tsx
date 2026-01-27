@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { analyzeCanvasLayout, formatSpatialDescription } from "../../lib/canvas-spatial-analysis";
 
 interface Message {
     id: string;
@@ -109,6 +110,13 @@ export default function AIChatSidebar() {
             description += `\n\nLabels on shapes: ${labels.join(', ')}`;
         }
 
+        // Add spatial analysis
+        if (canvasState.appState) {
+            const spatialData = analyzeCanvasLayout(canvasState.elements, canvasState.appState);
+            const spatialDescription = formatSpatialDescription(spatialData);
+            description += `\n\n📍 Spatial Layout:\n${spatialDescription}`;
+        }
+
         return description;
     };
 
@@ -126,6 +134,65 @@ export default function AIChatSidebar() {
         setInput("");
         setIsLoading(true);
         setError(null);
+
+        // Check for /generate-image command
+        const imageCommandMatch = userMessage.content.match(/^\/generate-image\s+(.+)$/i);
+        if (imageCommandMatch) {
+            const prompt = imageCommandMatch[1];
+
+            try {
+                // Show loading message
+                const loadingMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: "🎨 Generating image...",
+                };
+                setMessages((prev) => [...prev, loadingMsg]);
+
+                // Call image generation API
+                const response = await fetch("/api/generate-image", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        prompt,
+                        model: "gemini-2.5-flash-image",
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.details || data.error || "Image generation failed");
+                }
+
+                // Remove loading message and add success message
+                setMessages((prev) => prev.filter((m) => m.id !== loadingMsg.id));
+
+                // Note: The actual implementation depends on Gemini API response format
+                // This is a placeholder - adjust based on actual API response
+                const successMsg: Message = {
+                    id: (Date.now() + 2).toString(),
+                    role: "assistant",
+                    content: `✅ Image generated successfully!\n\nNote: Image generation via Gemini API requires additional setup. The API endpoint has been created, but you'll need to verify the response format and implement image insertion based on the actual Gemini API response structure.`,
+                };
+                setMessages((prev) => [...prev, successMsg]);
+
+                // TODO: Dispatch event to insert generated image into canvas
+                // This will be implemented once we verify the Gemini API response format
+                // window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
+                //     detail: { imageData: data.imageData, type: "generated" },
+                // }));
+
+            } catch (err) {
+                setMessages((prev) => prev.filter((m) => m.content === "🎨 Generating image..."));
+                setError(err instanceof Error ? err.message : "Image generation failed");
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
 
         try {
             // Include canvas state in the request
@@ -452,7 +519,7 @@ export default function AIChatSidebar() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask me to draw or modify the canvas..."
+                    placeholder="Ask me to draw... or try /generate-image"
                     style={{
                         flex: 1,
                         padding: "10px 14px",

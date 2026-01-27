@@ -196,11 +196,22 @@ Return a JSON array inside a code block. Each element is a simplified "skeleton"
 - **Gray**: backgroundColor: "#e9ecef", strokeColor: "#495057"
 
 ## Layout Guidelines
-1. Start at x: 100, y: 100
-2. Space elements 50-100px apart horizontally
-3. Space elements 150-200px apart vertically
-4. Standard sizes: rectangles 200x100, circles 150x150
-5. Use consistent spacing for clean layouts
+
+### Intelligent Positioning:
+When the canvas state includes spatial layout information, use it to position new elements intelligently:
+- **Empty canvas**: Start at position (100, 100)
+- **Existing content**: Use the "Suggested position" provided in the spatial layout data
+- **"Place to the right"**: Use the rightX/rightY coordinates from empty spaces
+- **"Place below"**: Use the belowX/belowY coordinates from empty spaces
+- **"Place in center"**: Use the viewport center coordinates
+- NEVER overlap existing elements - always check the bounding box and place new elements outside it
+
+### Standard Spacing:
+1. Space elements 50-100px apart horizontally
+2. Space elements 150-200px apart vertically
+3. Standard sizes: rectangles 200x100, circles 150x150
+4. Use consistent spacing for clean layouts
+5. Pay attention to existing element positions and build upon them logically
 
 ## Response Format
 Provide a brief explanation, then the JSON array:

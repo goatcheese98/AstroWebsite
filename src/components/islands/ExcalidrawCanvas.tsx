@@ -82,14 +82,142 @@ export default function ExcalidrawCanvas() {
             }
         };
 
+        // Handle SVG insertion from library
+        const handleInsertSVG = async (event: any) => {
+            console.log("📚 Inserting SVG from library:", event.detail);
+
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                return;
+            }
+
+            const { svgPath } = event.detail;
+
+            try {
+                // Fetch the SVG content
+                const response = await fetch(svgPath);
+                const svgText = await response.text();
+
+                // Get viewport center for positioning
+                const appState = excalidrawAPI.getAppState();
+                const centerX = appState.scrollX + appState.width / 2;
+                const centerY = appState.scrollY + appState.height / 2;
+
+                // Create an image element from the SVG
+                const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
+                const svgUrl = URL.createObjectURL(svgBlob);
+
+                // Load image to get dimensions
+                const img = new Image();
+                img.onload = () => {
+                    // Create Excalidraw image element
+                    const imageElement = convertToExcalidrawElements([
+                        {
+                            type: "image",
+                            x: centerX - 50, // Center the 100x100 image
+                            y: centerY - 50,
+                            width: 100,
+                            height: 100,
+                            fileId: svgPath, // Use path as unique ID
+                        },
+                    ]);
+
+                    // Add to canvas
+                    const currentElements = excalidrawAPI.getSceneElements();
+                    const files = excalidrawAPI.getFiles();
+
+                    // Add the SVG as a file
+                    const newFiles = {
+                        ...files,
+                        [svgPath]: {
+                            mimeType: "image/svg+xml",
+                            id: svgPath,
+                            dataURL: svgUrl,
+                            created: Date.now(),
+                        },
+                    };
+
+                    excalidrawAPI.updateScene({
+                        elements: [...currentElements, ...imageElement],
+                    });
+
+                    excalidrawAPI.addFiles(Object.values(newFiles));
+
+                    console.log("✅ SVG inserted successfully");
+                };
+                img.src = svgUrl;
+            } catch (err) {
+                console.error("❌ Error inserting SVG:", err);
+            }
+        };
+
+        // Handle image insertion (from Nano Banana or other sources)
+        const handleInsertImage = async (event: any) => {
+            console.log("🖼️ Inserting image into canvas:", event.detail);
+
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                return;
+            }
+
+            const { imageData, type } = event.detail;
+
+            try {
+                // Get viewport center for positioning
+                const appState = excalidrawAPI.getAppState();
+                const centerX = appState.scrollX + appState.width / 2;
+                const centerY = appState.scrollY + appState.height / 2;
+
+                // Create unique file ID
+                const fileId = `generated-${Date.now()}`;
+
+                // Create Excalidraw image element
+                const imageElement = convertToExcalidrawElements([
+                    {
+                        type: "image",
+                        x: centerX - 100, // Center the 200x200 image
+                        y: centerY - 100,
+                        width: 200,
+                        height: 200,
+                        fileId: fileId,
+                    },
+                ]);
+
+                // Add to canvas
+                const currentElements = excalidrawAPI.getSceneElements();
+
+                // Add the image as a file
+                const newFile = {
+                    mimeType: "image/png",
+                    id: fileId,
+                    dataURL: imageData, // Should be base64 or blob URL
+                    created: Date.now(),
+                };
+
+                excalidrawAPI.updateScene({
+                    elements: [...currentElements, ...imageElement],
+                });
+
+                excalidrawAPI.addFiles([newFile]);
+
+                console.log("✅ Image inserted successfully");
+            } catch (err) {
+                console.error("❌ Error inserting image:", err);
+            }
+        };
+
         console.log("👂 Canvas listening for draw commands");
         window.addEventListener("excalidraw:draw", handleDrawCommand);
         window.addEventListener("excalidraw:get-state", handleGetState);
+        window.addEventListener("excalidraw:insert-svg", handleInsertSVG);
+        window.addEventListener("excalidraw:insert-image", handleInsertImage);
 
         return () => {
             console.log("👋 Canvas stopped listening for draw commands");
             window.removeEventListener("excalidraw:draw", handleDrawCommand);
             window.removeEventListener("excalidraw:get-state", handleGetState);
+            window.removeEventListener("excalidraw:insert-svg", handleInsertSVG);
+            window.removeEventListener("excalidraw:insert-image", handleInsertImage);
         };
     }, [excalidrawAPI]);
 
