@@ -6,8 +6,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "build:cf": "DEPLOY_TARGET=cloudflare astro build",
-    "deploy:cf": "DEPLOY_TARGET=cloudflare astro build && wrangler deploy",
+    "deploy": "astro build && wrangler pages deploy dist --project-name=astroweb",
     "astro": "astro"
   },
   "dependencies": {

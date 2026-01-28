@@ -2,21 +2,12 @@
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import react from '@astrojs/react';
-
-const target = process.env.DEPLOY_TARGET || 'static';
-const isCloudflare = target === 'cloudflare';
-
-/** @type {import('astro/config').AstroUserConfig['adapter']} */
-let adapter;
-if (isCloudflare) {
-  const cloudflare = (await import('@astrojs/cloudflare')).default;
-  adapter = cloudflare();
-}
+import cloudflare from '@astrojs/cloudflare';
 
 export default defineConfig({
   site: process.env.SITE_URL || 'https://rohanjasani.dev',
-  output: isCloudflare ? 'hybrid' : 'static',
-  adapter,
+  output: 'server',
+  adapter: cloudflare(),
   integrations: [sitemap(), react()],
   build: {
     assets: 'assets',
