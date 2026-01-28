@@ -251,7 +251,99 @@ Provide a brief explanation, then the JSON array:
 ]
 \`\`\`"
 
-MARKDOWN NOTES: Create documentation notes using transparent rectangles with customData.type="markdown". Example: {"type":"rectangle","x":600,"y":100,"width":450,"height":350,"strokeColor":"transparent","backgroundColor":"transparent","customData":{"type":"markdown","content":"# Docs\\n\\n- Item 1\\n- Item 2"}}. Use for: documentation, lists, requirements, explanations. You can combine shapes AND markdown in single responses!
+## Markdown Notes
+
+Create rich documentation notes using transparent rectangles with customData.type="markdown". These render as overlays with full markdown support (headings, lists, code blocks, tables, etc.).
+
+### Markdown Note Structure:
+\`\`\`json
+{
+  "type": "rectangle",
+  "x": 600,
+  "y": 100,
+  "width": 500,
+  "height": 400,
+  "strokeColor": "transparent",
+  "backgroundColor": "transparent",
+  "fillStyle": "solid",
+  "roughness": 0,
+  "strokeWidth": 0,
+  "locked": true,
+  "customData": {
+    "type": "markdown",
+    "content": "# Title\\n\\nMarkdown content here"
+  }
+}
+\`\`\`
+
+### Example 1: Project Requirements Note
+\`\`\`json
+[
+  {
+    "type": "rectangle",
+    "x": 100,
+    "y": 100,
+    "width": 500,
+    "height": 400,
+    "strokeColor": "transparent",
+    "backgroundColor": "transparent",
+    "locked": true,
+    "customData": {
+      "type": "markdown",
+      "content": "# Project Requirements\\n\\n## Core Features\\n- User authentication\\n- Real-time chat\\n- File uploads\\n\\n## Tech Stack\\n- React + TypeScript\\n- Node.js backend\\n- PostgreSQL database"
+    }
+  }
+]
+\`\`\`
+
+### Example 2: Code Snippet Note
+\`\`\`json
+[
+  {
+    "type": "rectangle",
+    "x": 300,
+    "y": 200,
+    "width": 450,
+    "height": 300,
+    "strokeColor": "transparent",
+    "backgroundColor": "transparent",
+    "locked": true,
+    "customData": {
+      "type": "markdown",
+      "content": "# API Endpoint\\n\\n\`\`\`typescript\\napp.post('/api/users', async (req, res) => {\\n  const user = await db.users.create(req.body);\\n  res.json(user);\\n});\\n\`\`\`\\n\\n**Method**: POST  \\n**Auth**: Required"
+    }
+  }
+]
+\`\`\`
+
+### Example 3: Meeting Notes
+\`\`\`json
+[
+  {
+    "type": "rectangle",
+    "x": 200,
+    "y": 150,
+    "width": 600,
+    "height": 350,
+    "strokeColor": "transparent",
+    "backgroundColor": "transparent",
+    "locked": true,
+    "customData": {
+      "type": "markdown",
+      "content": "# Team Standup\\n\\n## Updates\\n- **Alice**: Completed login flow\\n- **Bob**: Working on API endpoints\\n- **Carol**: Designing dashboard\\n\\n## Blockers\\n- Need database schema review\\n- Waiting on design assets"
+    }
+  }
+]
+\`\`\`
+
+### Guidelines for Markdown Notes:
+- Always use transparent stroke/background (notes render as overlays)
+- Set \`locked: true\` to prevent Excalidraw selection
+- Typical dimensions: 400-600px wide, 300-500px tall
+- Markdown supports: headings, lists, bold, italic, code blocks, tables
+- Escape newlines in JSON as \\n
+- Place notes using spatial analysis (avoid overlapping with diagrams)
+- **You can combine shapes AND markdown in single responses!**
 
 IMPORTANT: Output ONLY the JSON array in a code block. Do not include extra properties - the conversion function will add them automatically.`,
       messages: messages.map((msg: { role: string; content: string }) => ({

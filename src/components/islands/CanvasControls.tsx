@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { exportCanvasWithMarkdown } from "../../lib/excalidraw-export-utils";
+import type { MarkdownNoteRef } from "../../lib/excalidraw-export-utils";
 
 interface CanvasControlsProps {
     onOpenChat: () => void;
@@ -22,33 +24,49 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
             const api = (window as any).excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
-                return;
-            }
-
-            const elements = api.getSceneElements();
-            if (elements.length === 0) {
-                showMessage("Canvas is empty");
                 setExporting(null);
                 return;
             }
 
-            const appState = api.getAppState();
-            const files = api.getFiles();
+            const elements = api.getSceneElements();
+            const markdownElements = elements.filter((el: any) => el.customData?.type === "markdown");
+            const hasMarkdownNotes = markdownElements.length > 0;
 
-            const { exportToCanvas } = await import("@excalidraw/excalidraw");
-            const canvas = await exportToCanvas({ elements, appState, files });
+            // Get markdown note refs if available
+            const getMarkdownRefs = (window as any).getMarkdownNoteRefs;
+            const markdownNoteRefs = getMarkdownRefs ? getMarkdownRefs() : new Map<string, MarkdownNoteRef>();
 
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = `canvas-${Date.now()}.png`;
-                    link.click();
-                    URL.revokeObjectURL(url);
-                    showMessage("✓ PNG downloaded");
-                }
-            });
+            // Use enhanced export if there are markdown notes with refs
+            if (hasMarkdownNotes && markdownNoteRefs.size > 0) {
+                const blob = await exportCanvasWithMarkdown(api, markdownNoteRefs, "png");
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `canvas-${Date.now()}.png`;
+                link.click();
+                URL.revokeObjectURL(url);
+                showMessage("✓ PNG downloaded with notes");
+            } else {
+                // Fall back to standard export
+                const appState = api.getAppState();
+                const files = api.getFiles();
+
+                const { exportToCanvas } = await import("@excalidraw/excalidraw");
+                const canvas = await exportToCanvas({ elements, appState, files });
+
+                canvas.toBlob((blob: Blob | null) => {
+                    if (blob) {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `canvas-${Date.now()}.png`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        showMessage("✓ PNG downloaded");
+                    }
+                });
+            }
         } catch (error) {
             console.error("Export PNG error:", error);
             showMessage("✗ Export failed");
@@ -102,15 +120,11 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
             const api = (window as any).excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
+                setExporting(null);
                 return;
             }
 
             const elements = api.getSceneElements();
-            if (elements.length === 0) {
-                showMessage("Canvas is empty");
-                setExporting(null);
-                return;
-            }
 
             if (!navigator.clipboard || !navigator.clipboard.write) {
                 showMessage("✗ Clipboard not supported");
@@ -118,25 +132,43 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 return;
             }
 
-            const appState = api.getAppState();
-            const files = api.getFiles();
+            const markdownElements = elements.filter((el: any) => el.customData?.type === "markdown");
+            const hasMarkdownNotes = markdownElements.length > 0;
 
-            const { exportToCanvas } = await import("@excalidraw/excalidraw");
-            const canvas = await exportToCanvas({ elements, appState, files });
+            // Get markdown note refs if available
+            const getMarkdownRefs = (window as any).getMarkdownNoteRefs;
+            const markdownNoteRefs = getMarkdownRefs ? getMarkdownRefs() : new Map<string, MarkdownNoteRef>();
 
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    try {
-                        await navigator.clipboard.write([
-                            new ClipboardItem({ "image/png": blob }),
-                        ]);
-                        showMessage("✓ Copied to clipboard");
-                    } catch (err) {
-                        console.error("Clipboard write error:", err);
-                        showMessage("✗ Clipboard copy failed");
-                    }
-                }
-            });
+            let blob: Blob;
+
+            // Use enhanced export if there are markdown notes with refs
+            if (hasMarkdownNotes && markdownNoteRefs.size > 0) {
+                blob = await exportCanvasWithMarkdown(api, markdownNoteRefs, "png");
+            } else {
+                // Fall back to standard export
+                const appState = api.getAppState();
+                const files = api.getFiles();
+
+                const { exportToCanvas } = await import("@excalidraw/excalidraw");
+                const canvas = await exportToCanvas({ elements, appState, files });
+
+                blob = await new Promise<Blob>((resolve, reject) => {
+                    canvas.toBlob((b: Blob | null) => {
+                        if (b) resolve(b);
+                        else reject(new Error("Failed to create blob"));
+                    });
+                });
+            }
+
+            try {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ "image/png": blob }),
+                ]);
+                showMessage("✓ Copied to clipboard");
+            } catch (err) {
+                console.error("Clipboard write error:", err);
+                showMessage("✗ Clipboard copy failed");
+            }
         } catch (error) {
             console.error("Copy to clipboard error:", error);
             showMessage("✗ Copy failed");

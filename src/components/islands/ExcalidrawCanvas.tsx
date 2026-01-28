@@ -2,6 +2,7 @@ import "@excalidraw/excalidraw/index.css";
 import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { MarkdownNote } from "./MarkdownNote";
+import type { MarkdownNoteRef } from "./MarkdownNote";
 import { nanoid } from "nanoid";
 
 export default function ExcalidrawCanvas() {
@@ -11,6 +12,7 @@ export default function ExcalidrawCanvas() {
     // Use refs to avoid triggering re-renders from RAF loop
     const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
     const markdownElementsRef = useRef<any[]>([]);
+    const markdownNoteRefsRef = useRef<Map<string, MarkdownNoteRef>>(new Map());
 
     // State for triggering React re-renders (updated at controlled intervals)
     const [, forceUpdate] = useState({});
@@ -297,6 +299,12 @@ export default function ExcalidrawCanvas() {
         return () => clearInterval(interval);
     }, [excalidrawAPI]);
 
+    // Expose markdown note refs for export functionality
+    useEffect(() => {
+        // Store refs in window object for access by export functions
+        (window as any).getMarkdownNoteRefs = () => markdownNoteRefsRef.current;
+    }, []);
+
     const addMarkdownNote = useCallback(() => {
         if (!excalidrawAPI) return;
 
@@ -311,10 +319,10 @@ export default function ExcalidrawCanvas() {
         const element = {
             id,
             type: "rectangle",
-            x: sceneX - 200,
-            y: sceneY - 150,
-            width: 400,
-            height: 300,
+            x: sceneX - 250,
+            y: sceneY - 175,
+            width: 500,
+            height: 350,
             strokeColor: "transparent",
             backgroundColor: "transparent",
             fillStyle: "solid",
@@ -323,7 +331,7 @@ export default function ExcalidrawCanvas() {
             locked: true, // Prevent Excalidraw selection handles
             customData: {
                 type: "markdown",
-                content: "# ✨ New Note\n\nDouble-click to edit.\nMarkdown is supported!"
+                content: "# 📝 New Note\n\nDouble-click to edit this note.\n\n## Markdown Supported\n- **Bold** and *italic* text\n- Lists and checkboxes\n- Code blocks with syntax highlighting\n- Tables, links, and more!\n\n```javascript\nconst example = \"Hello World\";\n```"
             }
         };
 
@@ -401,6 +409,13 @@ export default function ExcalidrawCanvas() {
             {/* Markdown Overlays - read from ref for live updates */}
             {markdownElements.map(element => (
                 <MarkdownNote
+                    ref={(ref) => {
+                        if (ref) {
+                            markdownNoteRefsRef.current.set(element.id, ref);
+                        } else {
+                            markdownNoteRefsRef.current.delete(element.id);
+                        }
+                    }}
                     key={element.id}
                     element={element}
                     appState={viewStateRef.current}

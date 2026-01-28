@@ -1,6 +1,8 @@
+import { nanoid } from "nanoid";
+
 // Helper to generate unique IDs for Excalidraw elements
 export function generateId(): string {
-    return Math.random().toString(36).substring(2, 15);
+    return nanoid();
 }
 
 // Helper to create a basic Excalidraw element template
@@ -35,5 +37,41 @@ export function createExcalidrawElement(
         link: null,
         locked: false,
         ...options,
+    };
+}
+
+/**
+ * Creates a markdown note element for the Excalidraw canvas
+ * @param x - X position
+ * @param y - Y position
+ * @param content - Markdown content
+ * @param options - Optional size and other properties
+ */
+export function createMarkdownNote(
+    x: number,
+    y: number,
+    content: string,
+    options?: {
+        width?: number;
+        height?: number;
+    }
+) {
+    return {
+        id: generateId(),
+        type: "rectangle" as const,
+        x,
+        y,
+        width: options?.width || 500,
+        height: options?.height || 400,
+        strokeColor: "transparent",
+        backgroundColor: "transparent",
+        fillStyle: "solid" as const,
+        roughness: 0,
+        strokeWidth: 0,
+        locked: true,
+        customData: {
+            type: "markdown",
+            content,
+        },
     };
 }
