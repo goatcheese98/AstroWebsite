@@ -41,8 +41,8 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
     // Calculate coordinates
     const x = (element.x + appState.scrollX) * appState.zoom.value;
     const y = (element.y + appState.scrollY) * appState.zoom.value;
-    const width = element.width * appState.zoom.value;
-    const height = element.height * appState.zoom.value;
+    const width = element.width; // Use original dimensions
+    const height = element.height; // Use original dimensions
     const angle = element.angle || 0;
 
     const containerStyle: React.CSSProperties = {
@@ -51,11 +51,12 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         left: `${x}px`,
         width: `${width}px`,
         height: `${height}px`,
-        transform: `rotate(${angle}rad)`,
-        transformOrigin: "center center",
+        transform: `rotate(${angle}rad) scale(${appState.zoom.value})`, // Apply zoom via transform
+        transformOrigin: "top left",
         pointerEvents: "none",
         zIndex: isEditing ? 100 : 10,
     };
+
 
     const contentStyle: React.CSSProperties = {
         width: "100%",
@@ -66,10 +67,10 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         borderRadius: "8px",
         padding: "16px",
         paddingTop: "32px",
-        overflow: "auto", // Enable scrolling
+        overflow: "auto",
         boxShadow: isSelected ? "0 8px 16px -2px rgba(99, 102, 241, 0.2)" : "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
         pointerEvents: "auto",
-        cursor: isDragging ? "grabbing" : "default", // Default cursor to allow scrolling
+        cursor: isDragging ? "grabbing" : "default",
         outline: "none",
     };
 
