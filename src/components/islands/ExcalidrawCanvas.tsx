@@ -1,10 +1,20 @@
 import "@excalidraw/excalidraw/index.css";
 import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { MarkdownNote } from "./MarkdownNote";
+import { nanoid } from "nanoid";
 
 export default function ExcalidrawCanvas() {
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
+
+    // Use refs to avoid triggering re-renders from RAF loop
+    const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
+    const markdownElementsRef = useRef<any[]>([]);
+
+    // State for triggering React re-renders (updated at controlled intervals)
+    const [, forceUpdate] = useState({});
+    const [markdownElements, setMarkdownElements] = useState<any[]>([]);
 
     useEffect(() => {
         // Get initial theme from document
@@ -25,6 +35,50 @@ export default function ExcalidrawCanvas() {
 
         return () => observer.disconnect();
     }, []);
+
+    // RAF polling loop - no setState, just ref updates
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+
+        let rafId: number;
+        let lastUpdateTime = 0;
+        const UPDATE_INTERVAL = 50; // Update React state max every 50ms (20fps)
+
+        const pollExcalidrawState = (timestamp: number) => {
+            try {
+                const elements = excalidrawAPI.getSceneElements();
+                const appState = excalidrawAPI.getAppState();
+
+                // Always update refs (no re-render)
+                viewStateRef.current = {
+                    scrollX: appState.scrollX,
+                    scrollY: appState.scrollY,
+                    zoom: appState.zoom,
+                };
+
+                const mdElements = elements.filter(
+                    (el: any) => el.customData?.type === "markdown" && !el.isDeleted
+                );
+                markdownElementsRef.current = mdElements;
+
+                // Only trigger React update at controlled intervals
+                if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
+                    setMarkdownElements([...mdElements]); // Create new array to trigger render
+                    lastUpdateTime = timestamp;
+                }
+            } catch (err) {
+                console.error("Error polling Excalidraw state:", err);
+            }
+
+            rafId = requestAnimationFrame(pollExcalidrawState);
+        };
+
+        rafId = requestAnimationFrame(pollExcalidrawState);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [excalidrawAPI]);
 
     // Listen for drawing commands from the AI chat
     useEffect(() => {
@@ -243,6 +297,62 @@ export default function ExcalidrawCanvas() {
         return () => clearInterval(interval);
     }, [excalidrawAPI]);
 
+    const addMarkdownNote = useCallback(() => {
+        if (!excalidrawAPI) return;
+
+        const appState = excalidrawAPI.getAppState();
+        const viewportCenterX = appState.width / 2;
+        const viewportCenterY = appState.height / 2;
+
+        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+        const id = nanoid();
+        const element = {
+            id,
+            type: "rectangle",
+            x: sceneX - 200,
+            y: sceneY - 150,
+            width: 400,
+            height: 300,
+            strokeColor: "transparent",
+            backgroundColor: "transparent",
+            fillStyle: "solid",
+            roughness: 0,
+            strokeWidth: 0,
+            customData: {
+                type: "markdown",
+                content: "# ✨ New Note\n\nDouble-click to edit.\nMarkdown is supported!"
+            }
+        };
+
+        const elements = excalidrawAPI.getSceneElements();
+        const skeleton: any = element;
+        excalidrawAPI.updateScene({
+            elements: [...elements, ...convertToExcalidrawElements([skeleton])],
+        });
+    }, [excalidrawAPI]);
+
+    const updateMarkdownContent = useCallback((id: string, text: string) => {
+        if (!excalidrawAPI) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((el: any) => {
+            if (el.id === id) {
+                return {
+                    ...el,
+                    customData: {
+                        ...el.customData,
+                        content: text
+                    }
+                };
+            }
+            return el;
+        });
+
+        excalidrawAPI.updateScene({ elements: updatedElements });
+    }, [excalidrawAPI]);
+
     return (
         <div
             style={{
@@ -266,7 +376,36 @@ export default function ExcalidrawCanvas() {
                         gridSize: 0, // Remove grid dots (0 = no grid)
                     },
                 }}
+                // NO onChange handler - we use RAF polling instead!
+                renderTopRightUI={() => (
+                    <button
+                        style={{
+                            background: "var(--color-primary, #6366f1)",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            padding: "6px 12px",
+                            fontSize: "0.8rem",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                        }}
+                        onClick={addMarkdownNote}
+                    >
+                        + Add Note
+                    </button>
+                )}
             />
+
+            {/* Markdown Overlays - read from ref for live updates */}
+            {markdownElements.map(element => (
+                <MarkdownNote
+                    key={element.id}
+                    element={element}
+                    appState={viewStateRef.current}
+                    onChange={updateMarkdownContent}
+                />
+            ))}
         </div>
     );
 }
