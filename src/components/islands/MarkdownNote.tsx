@@ -1,6 +1,7 @@
-import React, { useState, useRef, memo } from "react";
+import React, { useState, useRef, memo, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import html2canvas from "html2canvas";
 
 interface MarkdownNoteProps {
     element: any; // ExcalidrawElement
@@ -17,16 +18,66 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
     const [content, setContent] = useState(element.customData?.content || "# Double click to edit");
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [snapshot, setSnapshot] = useState<string | null>(element.customData?.snapshot || null);
+    const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
     const dragStartRef = useRef<{ x: number; y: number; elementX: number; elementY: number } | null>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
 
-    // Calculate coordinates - Excalidraw elements rotate around their center
+    // Calculate coordinates
     const x = (element.x + appState.scrollX) * appState.zoom.value;
     const y = (element.y + appState.scrollY) * appState.zoom.value;
     const width = element.width * appState.zoom.value;
     const height = element.height * appState.zoom.value;
     const angle = element.angle || 0;
 
-    // Container style - rotates around center to match Excalidraw
+    // Generate snapshot when content changes
+    useEffect(() => {
+        if (!isHovered && !isEditing && contentRef.current && !snapshot) {
+            generateSnapshot();
+        }
+    }, [content, isHovered, isEditing]);
+
+    const generateSnapshot = async () => {
+        if (!contentRef.current || isGeneratingSnapshot) return;
+
+        setIsGeneratingSnapshot(true);
+        try {
+            const canvas = await html2canvas(contentRef.current, {
+                backgroundColor: '#ffffff',
+                scale: 1, // Lower scale for performance
+                logging: false,
+                useCORS: true,
+            });
+
+            const dataUrl = canvas.toDataURL('image/png', 0.8); // 80% quality
+            setSnapshot(dataUrl);
+
+            // Save snapshot to customData for persistence
+            const api = (window as any).excalidrawAPI;
+            if (api) {
+                const elements = api.getSceneElements();
+                const updatedElements = elements.map((el: any) => {
+                    if (el.id === element.id) {
+                        return {
+                            ...el,
+                            customData: {
+                                ...el.customData,
+                                snapshot: dataUrl,
+                            }
+                        };
+                    }
+                    return el;
+                });
+                api.updateScene({ elements: updatedElements });
+            }
+        } catch (err) {
+            console.error('Failed to generate snapshot:', err);
+        } finally {
+            setIsGeneratingSnapshot(false);
+        }
+    };
+
+    // Container style
     const containerStyle: React.CSSProperties = {
         position: "absolute",
         top: `${y}px`,
@@ -34,12 +85,15 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         width: `${width}px`,
         height: `${height}px`,
         transform: `rotate(${angle}rad)`,
-        transformOrigin: "center center", // Match Excalidraw's rotation
-        pointerEvents: "none", // Container is non-interactive
+        transformOrigin: "center center",
+        pointerEvents: "none",
         zIndex: isEditing ? 100 : 10,
     };
 
-    // Inner content style - the actual visible card
+    // Use image when available and not hovering/editing
+    const useSnapshot = false; // TEMPORARILY DISABLED for performance testing
+    // const useSnapshot = snapshot && !isHovered && !isEditing;
+
     const contentStyle: React.CSSProperties = {
         width: "100%",
         height: "100%",
@@ -48,10 +102,10 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         border: isEditing ? "2px solid #3b82f6" : "1px solid #e5e7eb",
         borderRadius: "8px",
         padding: "16px",
-        paddingTop: "28px", // Make room for drag handle
-        overflow: "auto",
+        paddingTop: "28px",
+        overflow: "hidden", // Changed from auto to prevent scrollbars in snapshot
         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-        pointerEvents: "auto", // Content is interactive
+        pointerEvents: "auto",
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
@@ -63,6 +117,7 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         setIsEditing(false);
         if (content !== element.customData?.content) {
             onChange(element.id, content);
+            setSnapshot(null); // Invalidate snapshot to regenerate
         }
     };
 
@@ -78,7 +133,6 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
 
         setIsDragging(true);
 
-        // Store initial positions in scene coordinates
         dragStartRef.current = {
             x: e.clientX,
             y: e.clientY,
@@ -86,7 +140,6 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
             elementY: element.y,
         };
 
-        // Add global listeners
         document.addEventListener('mousemove', handleDragMove as any);
         document.addEventListener('mouseup', handleDragEnd as any);
     };
@@ -97,7 +150,6 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         const dx = (e.clientX - dragStartRef.current.x) / appState.zoom.value;
         const dy = (e.clientY - dragStartRef.current.y) / appState.zoom.value;
 
-        // Update element position via Excalidraw API
         const api = (window as any).excalidrawAPI;
         if (api) {
             const elements = api.getSceneElements();
@@ -119,7 +171,6 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         setIsDragging(false);
         dragStartRef.current = null;
 
-        // Remove global listeners
         document.removeEventListener('mousemove', handleDragMove as any);
         document.removeEventListener('mouseup', handleDragEnd as any);
     };
@@ -131,7 +182,7 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
             onMouseLeave={() => setIsHovered(false)}
             className="markdown-note-container"
         >
-            {/* Drag handle - positioned absolutely within the container */}
+            {/* Drag handle */}
             {!isEditing && (isHovered || isDragging) && (
                 <div
                     onMouseDown={handleDragStart}
@@ -170,30 +221,48 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
                 onDoubleClick={handleDoubleClick}
                 className="markdown-note-overlay"
             >
-                {isEditing ? (
-                    <textarea
-                        autoFocus
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        onBlur={handleBlur}
-                        onKeyDown={handleKeyDown}
+                {useSnapshot ? (
+                    // LOD Mode: Show cached image for performance
+                    <img
+                        src={snapshot}
+                        alt="Markdown preview"
                         style={{
                             width: "100%",
                             height: "100%",
-                            border: "none",
-                            outline: "none",
-                            resize: "none",
-                            fontFamily: "monospace",
-                            fontSize: "14px",
-                            backgroundColor: "transparent",
-                            color: "inherit",
-                            padding: 0,
+                            objectFit: "cover",
+                            objectPosition: "top left",
+                            imageRendering: "auto",
                         }}
-                        onPointerDown={(e) => e.stopPropagation()}
                     />
                 ) : (
-                    <div className="markdown-preview prose prose-sm dark:prose-invert">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                    // Interactive Mode: Show live React component
+                    <div ref={contentRef} style={{ width: "100%", height: "100%" }}>
+                        {isEditing ? (
+                            <textarea
+                                autoFocus
+                                value={content}
+                                onChange={(e) => setContent(e.target.value)}
+                                onBlur={handleBlur}
+                                onKeyDown={handleKeyDown}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    border: "none",
+                                    outline: "none",
+                                    resize: "none",
+                                    fontFamily: "monospace",
+                                    fontSize: "14px",
+                                    backgroundColor: "transparent",
+                                    color: "inherit",
+                                    padding: 0,
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                            />
+                        ) : (
+                            <div className="markdown-preview prose prose-sm dark:prose-invert">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -42,7 +42,7 @@ export default function ExcalidrawCanvas() {
 
         let rafId: number;
         let lastUpdateTime = 0;
-        const UPDATE_INTERVAL = 50; // Update React state max every 50ms (20fps)
+        const UPDATE_INTERVAL = 8; // Update React state at ~120fps for ultra-smooth overlay sync
 
         const pollExcalidrawState = (timestamp: number) => {
             try {
