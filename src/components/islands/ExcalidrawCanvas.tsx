@@ -320,6 +320,7 @@ export default function ExcalidrawCanvas() {
             fillStyle: "solid",
             roughness: 0,
             strokeWidth: 0,
+            locked: true, // Prevent Excalidraw selection handles
             customData: {
                 type: "markdown",
                 content: "# ✨ New Note\n\nDouble-click to edit.\nMarkdown is supported!"
