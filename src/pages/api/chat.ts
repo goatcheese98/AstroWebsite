@@ -7,65 +7,65 @@ export const prerender = false;
 const apiKey = import.meta.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 
 if (!apiKey) {
-    console.error('❌ ANTHROPIC_API_KEY is not set in environment variables');
+  console.error('❌ ANTHROPIC_API_KEY is not set in environment variables');
 } else {
-    console.log(`✅ ANTHROPIC_API_KEY loaded: ${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`);
+  console.log(`✅ ANTHROPIC_API_KEY loaded: ${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`);
 }
 
 const client = new Anthropic({
-    apiKey: apiKey || 'dummy-key', // Fallback to prevent initialization error
+  apiKey: apiKey || 'dummy-key', // Fallback to prevent initialization error
 });
 
 export const POST: APIRoute = async ({ request }) => {
+  try {
+    // Check if API key is available
+    if (!apiKey) {
+      return new Response(JSON.stringify({
+        error: 'API key not configured',
+        details: 'ANTHROPIC_API_KEY environment variable is missing',
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Parse request body
+    let body;
     try {
-        // Check if API key is available
-        if (!apiKey) {
-            return new Response(JSON.stringify({
-                error: 'API key not configured',
-                details: 'ANTHROPIC_API_KEY environment variable is missing',
-            }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+      body = await request.json();
+    } catch (parseError) {
+      return new Response(JSON.stringify({
+        error: 'Invalid JSON in request body',
+        details: parseError instanceof Error ? parseError.message : 'Malformed JSON',
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-        // Parse request body
-        let body;
-        try {
-            body = await request.json();
-        } catch (parseError) {
-            return new Response(JSON.stringify({
-                error: 'Invalid JSON in request body',
-                details: parseError instanceof Error ? parseError.message : 'Malformed JSON',
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+    const { messages, model = 'claude-sonnet-4-20250514', canvasState } = body;
 
-        const { messages, model = 'claude-sonnet-4-20250514', canvasState } = body;
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: 'Messages array is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-        if (!messages || !Array.isArray(messages)) {
-            return new Response(JSON.stringify({ error: 'Messages array is required' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+    // Validate model - only allow Sonnet and Haiku
+    const allowedModels = ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'];
+    const selectedModel = allowedModels.includes(model) ? model : 'claude-sonnet-4-20250514';
 
-        // Validate model - only allow Sonnet and Haiku
-        const allowedModels = ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'];
-        const selectedModel = allowedModels.includes(model) ? model : 'claude-sonnet-4-20250514';
+    // Build context about canvas state
+    let canvasContext = '';
+    if (canvasState && canvasState.description) {
+      canvasContext = `\n\n## Current Canvas State\n${canvasState.description}\n\nYou can see what's already on the canvas and can add to it, modify it, or provide feedback about it.`;
+    }
 
-        // Build context about canvas state
-        let canvasContext = '';
-        if (canvasState && canvasState.description) {
-            canvasContext = `\n\n## Current Canvas State\n${canvasState.description}\n\nYou can see what's already on the canvas and can add to it, modify it, or provide feedback about it.`;
-        }
-
-        const response = await client.messages.create({
-            model: selectedModel,
-            max_tokens: 4096,
-            system: `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.${canvasContext}
+    const response = await client.messages.create({
+      model: selectedModel,
+      max_tokens: 4096,
+      system: `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.${canvasContext}
 
 ## CRITICAL: Output Format
 
@@ -251,31 +251,33 @@ Provide a brief explanation, then the JSON array:
 ]
 \`\`\`"
 
+MARKDOWN NOTES: Create documentation notes using transparent rectangles with customData.type="markdown". Example: {"type":"rectangle","x":600,"y":100,"width":450,"height":350,"strokeColor":"transparent","backgroundColor":"transparent","customData":{"type":"markdown","content":"# Docs\\n\\n- Item 1\\n- Item 2"}}. Use for: documentation, lists, requirements, explanations. You can combine shapes AND markdown in single responses!
+
 IMPORTANT: Output ONLY the JSON array in a code block. Do not include extra properties - the conversion function will add them automatically.`,
-            messages: messages.map((msg: { role: string; content: string }) => ({
-                role: msg.role as 'user' | 'assistant',
-                content: msg.content,
-            })),
-        });
+      messages: messages.map((msg: { role: string; content: string }) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      })),
+    });
 
-        const textContent = response.content.find((block) => block.type === 'text');
-        const assistantMessage = textContent?.type === 'text' ? textContent.text : 'I apologize, but I could not generate a response.';
+    const textContent = response.content.find((block) => block.type === 'text');
+    const assistantMessage = textContent?.type === 'text' ? textContent.text : 'I apologize, but I could not generate a response.';
 
-        return new Response(JSON.stringify({
-            message: assistantMessage,
-            model: selectedModel,
-        }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    } catch (error) {
-        console.error('Claude API error:', error);
-        return new Response(JSON.stringify({
-            error: 'Failed to get AI response',
-            details: error instanceof Error ? error.message : 'Unknown error',
-        }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
+    return new Response(JSON.stringify({
+      message: assistantMessage,
+      model: selectedModel,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Claude API error:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to get AI response',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 };

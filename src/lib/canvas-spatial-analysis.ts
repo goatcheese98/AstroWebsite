@@ -228,3 +228,34 @@ export function calculateRelativePosition(
             return spatialData.suggestedPosition;
     }
 }
+
+/**
+ * Extracts markdown notes from canvas elements
+ */
+export function extractMarkdownNotes(elements: any[]): {
+    id: string;
+    content: string;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+}[] {
+    return elements
+        .filter(el => el.customData?.type === 'markdown' && !el.isDeleted)
+        .map(el => ({
+            id: el.id,
+            content: el.customData.content || '',
+            position: { x: el.x, y: el.y },
+            size: { width: el.width, height: el.height },
+        }));
+}
+
+/**
+ * Formats markdown notes into AI-readable context
+ */
+export function formatMarkdownContext(notes: ReturnType<typeof extractMarkdownNotes>): string {
+    if (notes.length === 0) return '';
+
+    return `\n\n### Markdown Notes on Canvas (${notes.length})\n` +
+        notes.map((note, idx) =>
+            `\n**Note ${idx + 1}** (at x:${Math.round(note.position.x)}, y:${Math.round(note.position.y)}):\n${note.content}\n`
+        ).join('\n');
+}

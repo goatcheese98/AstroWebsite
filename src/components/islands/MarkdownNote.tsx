@@ -118,17 +118,18 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
                     elementY: element.y,
                 };
 
+                // Clean up threshold listeners and add drag listeners
                 document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
                 document.addEventListener('mousemove', handleDragMove as any);
+                document.addEventListener('mouseup', handleDragEnd as any);
             }
         };
 
         const handleMouseUp = () => {
-            if (!hasDragged) {
-                // Was just a click, not a drag
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-            }
+            // Clean up if no drag started (just a click)
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -296,9 +297,12 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         }
     };
 
-    // Handle delete key for selected notes
-    const handleDeleteKey = React.useCallback((e: KeyboardEvent) => {
-        if ((e.key === "Delete" || e.key === "Backspace") && isSelected && !isEditing) {
+    // Handle delete key for selected notes and ESC to deselect
+    const handleGlobalKeyDown = React.useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape" && isSelected) {
+            e.preventDefault();
+            setIsSelected(false);
+        } else if ((e.key === "Delete" || e.key === "Backspace") && isSelected && !isEditing) {
             e.preventDefault();
             deleteElement();
         }
@@ -323,17 +327,17 @@ export const MarkdownNote: React.FC<MarkdownNoteProps> = memo(({
         }
     }, [element.id]);
 
-    // Add keyboard listener for delete and click outside listener
+    // Add keyboard listener for delete/ESC and click outside listener
     useEffect(() => {
         if (isSelected) {
-            document.addEventListener('keydown', handleDeleteKey);
+            document.addEventListener('keydown', handleGlobalKeyDown);
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => {
-            document.removeEventListener('keydown', handleDeleteKey);
+            document.removeEventListener('keydown', handleGlobalKeyDown);
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isSelected, handleDeleteKey, handleClickOutside]);
+    }, [isSelected, handleGlobalKeyDown, handleClickOutside]);
 
     // Define handles - corners always shown, edges only on proximity
     const handleSize = 10;

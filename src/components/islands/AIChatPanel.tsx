@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { analyzeCanvasLayout, formatSpatialDescription } from "../../lib/canvas-spatial-analysis";
+import { analyzeCanvasLayout, formatSpatialDescription, extractMarkdownNotes, formatMarkdownContext } from "../../lib/canvas-spatial-analysis";
 
 interface Message {
     id: string;
@@ -139,6 +139,13 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
             const spatialData = analyzeCanvasLayout(canvasState.elements, canvasState.appState);
             const spatialDescription = formatSpatialDescription(spatialData);
             description += `\n\n📍 Spatial Layout:\n${spatialDescription}`;
+        }
+
+        // Add markdown notes context
+        const markdownNotes = extractMarkdownNotes(canvasState.elements);
+        if (markdownNotes.length > 0) {
+            const markdownContext = formatMarkdownContext(markdownNotes);
+            description += markdownContext;
         }
 
         return description;
@@ -331,7 +338,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
                         title="Text mode - Draw with AI"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                     </button>
                     <button
@@ -340,7 +347,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
                         title="Image mode - Generate with Nano Banana"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
                     </button>
                 </div>
