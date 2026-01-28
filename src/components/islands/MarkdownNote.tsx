@@ -5,112 +5,6 @@ import html2canvas from "html2canvas";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-// Copy button component for code blocks
-const CodeBlockWithCopy: React.FC<{ code: string; language: string; isDark: boolean }> = ({ code, language, isDark }) => {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        console.log('Copy button clicked!'); // Debug log
-        e.stopPropagation();
-        e.preventDefault();
-
-        try {
-            await navigator.clipboard.writeText(code);
-            console.log('Code copied successfully!'); // Debug log
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            console.error('Failed to copy:', err);
-            // Fallback for older browsers
-            const textarea = document.createElement('textarea');
-            textarea.value = code;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                console.log('Code copied via fallback!'); // Debug log
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            } catch (fallbackErr) {
-                console.error('Fallback copy failed:', fallbackErr);
-            }
-            document.body.removeChild(textarea);
-        }
-    };
-
-    return (
-        <div style={{ position: 'relative', marginBottom: '1em' }} onDoubleClick={(e) => e.stopPropagation()}>
-            <button
-                type="button"
-                onClick={handleCopy}
-                onMouseDown={(e) => {
-                    e.stopPropagation();
-                }}
-                onDoubleClick={(e) => {
-                    e.stopPropagation();
-                }}
-                className="copy-code-button"
-                style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: copied
-                        ? (isDark ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
-                        : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
-                    border: `1px solid ${copied
-                        ? (isDark ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.3)')
-                        : (isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)')}`,
-                    borderRadius: '4px',
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: copied ? (isDark ? '#4ade80' : '#16a34a') : (isDark ? '#fff' : '#333'),
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    zIndex: 10,
-                    transition: 'all 0.2s ease',
-                    pointerEvents: 'auto',
-                }}
-                title="Copy code"
-            >
-                {copied ? (
-                    <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        Copied!
-                    </>
-                ) : (
-                    <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                        Copy
-                    </>
-                )}
-            </button>
-            <SyntaxHighlighter
-                style={isDark ? oneDark : oneLight}
-                language={language}
-                PreTag="div"
-                customStyle={{
-                    margin: 0,
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    lineHeight: '1.5',
-                }}
-            >
-                {code}
-            </SyntaxHighlighter>
-        </div>
-    );
-};
-
 interface MarkdownNoteProps {
     element: any;
     appState: any;
@@ -420,16 +314,21 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
+        console.log('Double-click detected on markdown note'); // Debug log
+
         // Only block double-click if directly clicking on these specific interactive elements
         const target = e.target as HTMLElement;
         const tagName = target.tagName.toLowerCase();
+        console.log('Clicked element:', tagName, target); // Debug log
 
         // Block only for actual interactive elements, not their containers
         if (tagName === 'a' || tagName === 'input' || tagName === 'button') {
+            console.log('Blocked double-click on interactive element:', tagName);
             return;
         }
 
         e.stopPropagation();
+        console.log('Entering edit mode'); // Debug log
         setIsEditing(true);
     };
 
@@ -516,6 +415,7 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 // Clear hover states when panning
                 setIsHovered(false);
                 setEdgeProximity({ top: false, right: false, bottom: false, left: false });
+                setHoveredEdge(null); // Also clear hovered edge
                 clearTimeout(panTimeout);
                 panTimeout = setTimeout(() => setIsCanvasPanning(false), 150);
             }
@@ -528,6 +428,7 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 // Clear hover states when panning
                 setIsHovered(false);
                 setEdgeProximity({ top: false, right: false, bottom: false, left: false });
+                setHoveredEdge(null); // Also clear hovered edge
             }
         };
 
@@ -536,15 +437,25 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             panTimeout = setTimeout(() => setIsCanvasPanning(false), 100);
         };
 
+        // Add scroll detection to clear hover states immediately
+        const handleScroll = () => {
+            // Clear all hover and proximity states when scrolling
+            setIsHovered(false);
+            setEdgeProximity({ top: false, right: false, bottom: false, left: false });
+            setHoveredEdge(null);
+        };
+
         window.addEventListener('wheel', handleWheel, { passive: true });
         window.addEventListener('mousedown', handleMouseDown);
         window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
         return () => {
             clearTimeout(panTimeout);
             window.removeEventListener('wheel', handleWheel);
             window.removeEventListener('mousedown', handleMouseDown);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('scroll', handleScroll, { capture: true });
         };
     }, []);
 
@@ -573,6 +484,37 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
     useImperativeHandle(ref, () => ({
         exportAsImage
     }), [exportAsImage]);
+
+    // Simplified double-click handler using native event listener
+    useEffect(() => {
+        const contentDiv = contentRef.current;
+        if (!contentDiv || isEditing) return;
+
+        const handleNativeDoubleClick = (e: MouseEvent) => {
+            // Prevent text selection and event bubbling FIRST
+            e.preventDefault();
+            e.stopPropagation();
+
+            const target = e.target as HTMLElement;
+            console.log('Native double-click detected:', target.tagName, target); // Debug log
+
+            // Don't trigger edit mode if double-clicking on interactive elements
+            if (target.closest('button') || target.closest('a') || target.closest('input')) {
+                console.log('Blocked double-click on interactive element');
+                return;
+            }
+
+            console.log('Entering edit mode from native listener'); // Debug log
+            setIsEditing(true);
+        };
+
+        // Use capture phase to catch the event before it reaches child elements
+        contentDiv.addEventListener('dblclick', handleNativeDoubleClick, true);
+
+        return () => {
+            contentDiv.removeEventListener('dblclick', handleNativeDoubleClick, true);
+        };
+    }, [isEditing]);
 
     // Fade-in animation for new notes
     useEffect(() => {
@@ -715,7 +657,6 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             {/* Content card - draggable from center area */}
             <div
                 style={contentStyle}
-                onDoubleClick={handleDoubleClick}
                 onMouseDown={(e) => {
                     // Don't trigger drag if clicking on buttons or interactive elements
                     const target = e.target as HTMLElement;
@@ -751,7 +692,16 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                             onPointerDown={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        <div className="markdown-preview">
+                        <div
+                            className="markdown-preview"
+                            style={{
+                                pointerEvents: 'auto',
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                MozUserSelect: 'none',
+                                msUserSelect: 'none'
+                            }}
+                        >
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -761,7 +711,19 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                         const code = String(children).replace(/\n$/, '');
 
                                         return !inline && match ? (
-                                            <CodeBlockWithCopy code={code} language={match[1]} isDark={isDark} />
+                                            <SyntaxHighlighter
+                                                style={isDark ? oneDark : oneLight}
+                                                language={match[1]}
+                                                PreTag="div"
+                                                customStyle={{
+                                                    margin: '0 0 1em 0',
+                                                    borderRadius: '6px',
+                                                    fontSize: '13px',
+                                                    lineHeight: '1.5',
+                                                }}
+                                            >
+                                                {code}
+                                            </SyntaxHighlighter>
                                         ) : (
                                             <code
                                                 style={{
@@ -966,6 +928,19 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                     overflow-wrap: break-word;
                 }
 
+                /* Make text elements transparent to pointer events, so clicks bubble up */
+                .markdown-preview * {
+                    pointer-events: none;
+                    user-select: none;
+                }
+
+                /* Re-enable pointer events for interactive elements */
+                .markdown-preview a,
+                .markdown-preview input[type="checkbox"] {
+                    pointer-events: auto;
+                    cursor: pointer;
+                }
+
                 .markdown-preview > *:first-child {
                     margin-top: 0 !important;
                 }
@@ -991,40 +966,6 @@ export const MarkdownNote = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
                 .markdown-preview code {
                     word-break: break-word;
-                }
-
-                /* Copy button hover effect */
-                .copy-code-button {
-                    opacity: 0.8;
-                    pointer-events: auto !important;
-                    user-select: none;
-                    -webkit-user-select: none;
-                }
-
-                .copy-code-button:hover {
-                    opacity: 1 !important;
-                    transform: scale(1.05) !important;
-                }
-
-                .copy-code-button:active {
-                    transform: scale(0.98) !important;
-                }
-
-                [data-theme="light"] .copy-code-button:hover:not(:active) {
-                    background: rgba(0, 0, 0, 0.08) !important;
-                }
-
-                [data-theme="dark"] .copy-code-button:hover:not(:active) {
-                    background: rgba(255, 255, 255, 0.18) !important;
-                }
-
-                /* Ensure code blocks don't block button clicks */
-                .markdown-preview pre {
-                    position: relative;
-                }
-
-                .markdown-preview button {
-                    pointer-events: auto !important;
                 }
 
                 /* Better scrollbar for markdown notes */
