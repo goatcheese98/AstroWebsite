@@ -5,6 +5,7 @@ interface Message {
     id: string;
     role: "user" | "assistant";
     content: string;
+    imageUrl?: string;
     drawingCommand?: any;
 }
 
@@ -120,6 +121,25 @@ export default function AIChatSidebar() {
         return description;
     };
 
+    const handleCopyImage = async (imageUrl: string) => {
+        try {
+            // Convert data URL to blob
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+
+            // Copy to clipboard
+            await navigator.clipboard.write([
+                new ClipboardItem({ [blob.type]: blob })
+            ]);
+
+            // Show feedback (you could add a toast notification here)
+            console.log("✅ Image copied to clipboard");
+        } catch (err) {
+            console.error("❌ Failed to copy image:", err);
+            setError("Failed to copy image to clipboard");
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
@@ -167,23 +187,25 @@ export default function AIChatSidebar() {
                     throw new Error(data.details || data.error || "Image generation failed");
                 }
 
-                // Remove loading message and add success message
+                // Remove loading message
                 setMessages((prev) => prev.filter((m) => m.id !== loadingMsg.id));
 
-                // Note: The actual implementation depends on Gemini API response format
-                // This is a placeholder - adjust based on actual API response
+                // Create data URL from base64 image
+                const imageUrl = `data:${data.mimeType || 'image/png'};base64,${data.imageData}`;
+
+                // Add success message with image
                 const successMsg: Message = {
                     id: (Date.now() + 2).toString(),
                     role: "assistant",
-                    content: `✅ Image generated successfully!\n\nNote: Image generation via Gemini API requires additional setup. The API endpoint has been created, but you'll need to verify the response format and implement image insertion based on the actual Gemini API response structure.`,
+                    content: `✅ Image generated: "${prompt}"`,
+                    imageUrl: imageUrl,
                 };
                 setMessages((prev) => [...prev, successMsg]);
 
-                // TODO: Dispatch event to insert generated image into canvas
-                // This will be implemented once we verify the Gemini API response format
-                // window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                //     detail: { imageData: data.imageData, type: "generated" },
-                // }));
+                // Insert the image into the canvas
+                window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
+                    detail: { imageData: imageUrl, type: "generated" },
+                }));
 
             } catch (err) {
                 setMessages((prev) => prev.filter((m) => m.content === "🎨 Generating image..."));
@@ -468,6 +490,50 @@ export default function AIChatSidebar() {
                         }}
                     >
                         {message.content}
+                        {message.imageUrl && (
+                            <div style={{ position: "relative", marginTop: "10px", display: "inline-block" }}>
+                                <img
+                                    src={message.imageUrl}
+                                    alt="Generated image"
+                                    style={{
+                                        maxWidth: "100%",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e0e0e0",
+                                        display: "block"
+                                    }}
+                                />
+                                <button
+                                    onClick={() => handleCopyImage(message.imageUrl!)}
+                                    style={{
+                                        position: "absolute",
+                                        top: "8px",
+                                        right: "8px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        border: "1px solid #ddd",
+                                        borderRadius: "6px",
+                                        padding: "6px 10px",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                        fontWeight: "500",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "rgba(255, 255, 255, 1)";
+                                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                                        e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+                                    }}
+                                >
+                                    📋 Copy
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ))}
                 {isLoading && (

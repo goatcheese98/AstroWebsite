@@ -55,10 +55,10 @@ export const POST: APIRoute = async ({ request }) => {
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // Choose model based on quality preference
-        // gemini-2.5-flash-image: Lower cost, good quality
-        // gemini-3-pro-image: Higher cost (140-250 credits), best quality
-        const selectedModel = model === 'gemini-3-pro-image'
-            ? 'gemini-3-pro-image'
+        // gemini-2.5-flash-image: Lower cost ($0.039 per image), good quality
+        // gemini-3-pro-image-preview: Higher cost ($0.134-$0.24 per image), best quality
+        const selectedModel = model === 'gemini-3-pro-image-preview'
+            ? 'gemini-3-pro-image-preview'
             : 'gemini-2.5-flash-image';
 
         console.log(`🎨 Generating image with model: ${selectedModel}`);
@@ -87,23 +87,42 @@ export const POST: APIRoute = async ({ request }) => {
         const response = await result.response;
 
         // Extract image data from response
-        // Note: The actual response format may vary - adjust based on API documentation
-        const imageData = response.candidates?.[0]?.content?.parts?.[0];
+        // Gemini returns images in parts array with inlineData containing base64
+        const parts = response.candidates?.[0]?.content?.parts;
 
-        if (!imageData) {
+        if (!parts || parts.length === 0) {
             return new Response(JSON.stringify({
                 error: 'No image generated',
-                details: 'The model did not return image data',
+                details: 'The model did not return any content parts',
             }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
 
+        // Find the image part (should have inlineData with base64)
+        const imagePart = parts.find((part: any) => part.inlineData);
+
+        if (!imagePart || !imagePart.inlineData || !imagePart.inlineData.data) {
+            console.error('❌ No image data found in response parts:', JSON.stringify(parts, null, 2));
+            return new Response(JSON.stringify({
+                error: 'No image generated',
+                details: 'The model did not return image data in the expected format',
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        console.log('✅ Image generated successfully');
+        console.log(`📦 MIME type: ${imagePart.inlineData.mimeType}`);
+        console.log(`📏 Base64 data length: ${imagePart.inlineData.data.length} characters`);
+
         // Return base64 image data
         return new Response(JSON.stringify({
             success: true,
-            imageData: imageData,
+            imageData: imagePart.inlineData.data,
+            mimeType: imagePart.inlineData.mimeType || 'image/png',
             model: selectedModel,
         }), {
             status: 200,
@@ -117,12 +136,15 @@ export const POST: APIRoute = async ({ request }) => {
         let errorMessage = 'Failed to generate image';
         let errorDetails = error instanceof Error ? error.message : 'Unknown error';
 
-        if (errorDetails.includes('quota')) {
+        if (errorDetails.includes('quota') || errorDetails.includes('RESOURCE_EXHAUSTED')) {
             errorMessage = 'API quota exceeded';
-            errorDetails = 'You have exceeded your API usage quota. Please try again later.';
+            errorDetails = 'Image generation requires a paid billing account. Gemini image models have no free tier. Enable billing at https://aistudio.google.com/ to use this feature.';
         } else if (errorDetails.includes('invalid')) {
             errorMessage = 'Invalid request';
             errorDetails = 'The image generation request was invalid. Please check your prompt.';
+        } else if (errorDetails.includes('PERMISSION_DENIED') || errorDetails.includes('billing')) {
+            errorMessage = 'Billing not enabled';
+            errorDetails = 'This feature requires billing to be enabled. Visit https://aistudio.google.com/ to set up billing for image generation.';
         }
 
         return new Response(JSON.stringify({
