@@ -1,5 +1,10 @@
 import type { APIRoute } from 'astro';
 import Anthropic from '@anthropic-ai/sdk';
+import { validateChatRequest } from '@/lib/schemas';
+import type { ChatResponse, ChatErrorResponse } from '@/lib/schemas';
+import { CLAUDE_CONFIG } from '@/lib/api-config';
+import { getExcalidrawSystemPrompt, buildCanvasContext } from '@/lib/prompts/excalidraw-system-prompt';
+import { checkAuthentication } from '@/lib/api-auth';
 
 // Enable server-side rendering for this endpoint
 export const prerender = false;
@@ -9,7 +14,8 @@ const apiKey = import.meta.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KE
 if (!apiKey) {
   console.error('❌ ANTHROPIC_API_KEY is not set in environment variables');
 } else {
-  console.log(`✅ ANTHROPIC_API_KEY loaded: ${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`);
+  // Only log that key is loaded, never log the actual key
+  console.log('✅ ANTHROPIC_API_KEY loaded successfully');
 }
 
 const client = new Anthropic({
@@ -18,356 +24,92 @@ const client = new Anthropic({
 
 export const POST: APIRoute = async ({ request }) => {
   try {
+    // Check authentication (if enabled)
+    const authError = checkAuthentication(request);
+    if (authError) return authError;
+
     // Check if API key is available
     if (!apiKey) {
-      return new Response(JSON.stringify({
+      const errorResponse: ChatErrorResponse = {
         error: 'API key not configured',
         details: 'ANTHROPIC_API_KEY environment variable is missing',
-      }), {
+      };
+      return new Response(JSON.stringify(errorResponse), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Parse request body
-    let body;
+    // Parse and validate request body with Zod
+    let body: unknown;
     try {
       body = await request.json();
     } catch (parseError) {
-      return new Response(JSON.stringify({
+      const errorResponse: ChatErrorResponse = {
         error: 'Invalid JSON in request body',
         details: parseError instanceof Error ? parseError.message : 'Malformed JSON',
-      }), {
+      };
+      return new Response(JSON.stringify(errorResponse), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const { messages, model = 'claude-sonnet-4-20250514', canvasState } = body;
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'Messages array is required' }), {
-        status: 400,
+    // Validate with Zod schema (replaces all manual validation!)
+    const validation = validateChatRequest(body);
+    if (!validation.success) {
+      const errorResponse: ChatErrorResponse = {
+        error: validation.error,
+        details: validation.details,
+      };
+      return new Response(JSON.stringify(errorResponse), {
+        status: validation.statusCode,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Validate model - only allow Sonnet and Haiku
-    const allowedModels = ['claude-sonnet-4-20250514', 'claude-haiku-4-20250514'];
-    const selectedModel = allowedModels.includes(model) ? model : 'claude-sonnet-4-20250514';
+    // Extract validated data (already sanitized and type-safe!)
+    const { messages, model: selectedModel, canvasState } = validation.data;
 
-    // Build context about canvas state
-    let canvasContext = '';
-    if (canvasState && canvasState.description) {
-      canvasContext = `\n\n## Current Canvas State\n${canvasState.description}\n\nYou can see what's already on the canvas and can add to it, modify it, or provide feedback about it.`;
-    }
+    // Build canvas context for system prompt
+    const canvasContext = buildCanvasContext(canvasState);
 
+    // Call Claude API (messages are already validated and sanitized)
     const response = await client.messages.create({
       model: selectedModel,
-      max_tokens: 4096,
-      system: `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.${canvasContext}
-
-## CRITICAL: Output Format
-
-Return a JSON array inside a code block. Each element is a simplified "skeleton" that will be converted to a full Excalidraw element.
-
-### Rectangle Example:
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 200,
-    "height": 100,
-    "backgroundColor": "#a5d8ff",
-    "strokeColor": "#1971c2",
-    "label": {
-      "text": "Frontend"
-    }
-  }
-]
-\`\`\`
-
-### Ellipse Example:
-\`\`\`json
-[
-  {
-    "type": "ellipse",
-    "x": 400,
-    "y": 100,
-    "width": 150,
-    "height": 150,
-    "backgroundColor": "#b2f2bb",
-    "strokeColor": "#2f9e44"
-  }
-]
-\`\`\`
-
-### Diamond Example:
-\`\`\`json
-[
-  {
-    "type": "diamond",
-    "x": 100,
-    "y": 300,
-    "width": 180,
-    "height": 120,
-    "backgroundColor": "#ffec99",
-    "strokeColor": "#f59f00",
-    "label": {
-      "text": "Decision"
-    }
-  }
-]
-\`\`\`
-
-### Text Example:
-\`\`\`json
-[
-  {
-    "type": "text",
-    "x": 150,
-    "y": 50,
-    "text": "System Architecture",
-    "fontSize": 24,
-    "strokeColor": "#1e1e1e"
-  }
-]
-\`\`\`
-
-### Arrow Example:
-\`\`\`json
-[
-  {
-    "type": "arrow",
-    "x": 300,
-    "y": 150,
-    "points": [[0, 0], [100, 0]],
-    "strokeColor": "#1e1e1e",
-    "endArrowhead": "arrow"
-  }
-]
-\`\`\`
-
-### Line Example:
-\`\`\`json
-[
-  {
-    "type": "line",
-    "x": 100,
-    "y": 200,
-    "points": [[0, 0], [200, 100]],
-    "strokeColor": "#1e1e1e"
-  }
-]
-\`\`\`
-
-## Element Properties
-
-### Required for ALL elements:
-- **type**: "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line"
-- **x**: number (horizontal position in pixels)
-- **y**: number (vertical position in pixels)
-
-### For shapes (rectangle, ellipse, diamond):
-- **width**: number (required)
-- **height**: number (required)
-- **backgroundColor**: string (hex color, e.g., "#a5d8ff")
-- **strokeColor**: string (hex color, e.g., "#1971c2")
-- **label**: { text: string } (optional, adds centered text)
-
-### For text:
-- **text**: string (required)
-- **fontSize**: number (default: 20)
-- **strokeColor**: string (text color)
-
-### For arrows and lines:
-- **points**: number[][] (required, e.g., [[0,0], [100,0]])
-- **strokeColor**: string
-- **endArrowhead**: "arrow" | "dot" (for arrows only)
-
-## Color Palette
-- **Blue**: backgroundColor: "#a5d8ff", strokeColor: "#1971c2"
-- **Green**: backgroundColor: "#b2f2bb", strokeColor: "#2f9e44"
-- **Yellow**: backgroundColor: "#ffec99", strokeColor: "#f59f00"
-- **Red**: backgroundColor: "#ffc9c9", strokeColor: "#e03131"
-- **Purple**: backgroundColor: "#d0bfff", strokeColor: "#7950f2"
-- **Gray**: backgroundColor: "#e9ecef", strokeColor: "#495057"
-
-## Layout Guidelines
-
-### Intelligent Positioning:
-When the canvas state includes spatial layout information, use it to position new elements intelligently:
-- **Empty canvas**: Start at position (100, 100)
-- **Existing content**: Use the "Suggested position" provided in the spatial layout data
-- **"Place to the right"**: Use the rightX/rightY coordinates from empty spaces
-- **"Place below"**: Use the belowX/belowY coordinates from empty spaces
-- **"Place in center"**: Use the viewport center coordinates
-- NEVER overlap existing elements - always check the bounding box and place new elements outside it
-
-### Standard Spacing:
-1. Space elements 50-100px apart horizontally
-2. Space elements 150-200px apart vertically
-3. Standard sizes: rectangles 200x100, circles 150x150
-4. Use consistent spacing for clean layouts
-5. Pay attention to existing element positions and build upon them logically
-
-## Response Format
-Provide a brief explanation, then the JSON array:
-
-"I'll create a simple architecture diagram with three components.
-
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 180,
-    "height": 100,
-    "backgroundColor": "#a5d8ff",
-    "strokeColor": "#1971c2",
-    "label": { "text": "Frontend" }
-  },
-  {
-    "type": "rectangle",
-    "x": 350,
-    "y": 100,
-    "width": 180,
-    "height": 100,
-    "backgroundColor": "#b2f2bb",
-    "strokeColor": "#2f9e44",
-    "label": { "text": "API" }
-  },
-  {
-    "type": "arrow",
-    "x": 280,
-    "y": 150,
-    "points": [[0, 0], [70, 0]],
-    "strokeColor": "#1e1e1e",
-    "endArrowhead": "arrow"
-  }
-]
-\`\`\`"
-
-## Markdown Notes
-
-Create rich documentation notes using transparent rectangles with customData.type="markdown". These render as overlays with full markdown support (headings, lists, code blocks, tables, etc.).
-
-### Markdown Note Structure:
-\`\`\`json
-{
-  "type": "rectangle",
-  "x": 600,
-  "y": 100,
-  "width": 500,
-  "height": 400,
-  "strokeColor": "transparent",
-  "backgroundColor": "transparent",
-  "fillStyle": "solid",
-  "roughness": 0,
-  "strokeWidth": 0,
-  "locked": true,
-  "customData": {
-    "type": "markdown",
-    "content": "# Title\\n\\nMarkdown content here"
-  }
-}
-\`\`\`
-
-### Example 1: Project Requirements Note
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 500,
-    "height": 400,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# Project Requirements\\n\\n## Core Features\\n- User authentication\\n- Real-time chat\\n- File uploads\\n\\n## Tech Stack\\n- React + TypeScript\\n- Node.js backend\\n- PostgreSQL database"
-    }
-  }
-]
-\`\`\`
-
-### Example 2: Code Snippet Note
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 300,
-    "y": 200,
-    "width": 450,
-    "height": 300,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# API Endpoint\\n\\n\`\`\`typescript\\napp.post('/api/users', async (req, res) => {\\n  const user = await db.users.create(req.body);\\n  res.json(user);\\n});\\n\`\`\`\\n\\n**Method**: POST  \\n**Auth**: Required"
-    }
-  }
-]
-\`\`\`
-
-### Example 3: Meeting Notes
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 200,
-    "y": 150,
-    "width": 600,
-    "height": 350,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# Team Standup\\n\\n## Updates\\n- **Alice**: Completed login flow\\n- **Bob**: Working on API endpoints\\n- **Carol**: Designing dashboard\\n\\n## Blockers\\n- Need database schema review\\n- Waiting on design assets"
-    }
-  }
-]
-\`\`\`
-
-### Guidelines for Markdown Notes:
-- Always use transparent stroke/background (notes render as overlays)
-- Set \`locked: true\` to prevent Excalidraw selection
-- Typical dimensions: 400-600px wide, 300-500px tall
-- Markdown supports: headings, lists, bold, italic, code blocks, tables
-- Escape newlines in JSON as \\n
-- Place notes using spatial analysis (avoid overlapping with diagrams)
-- **You can combine shapes AND markdown in single responses!**
-
-IMPORTANT: Output ONLY the JSON array in a code block. Do not include extra properties - the conversion function will add them automatically.`,
-      messages: messages.map((msg: { role: string; content: string }) => ({
-        role: msg.role as 'user' | 'assistant',
+      max_tokens: CLAUDE_CONFIG.MAX_TOKENS,
+      system: getExcalidrawSystemPrompt(canvasContext),
+      messages: messages.map((msg) => ({
+        role: msg.role,
         content: msg.content,
       })),
     });
 
+    // Extract text response
     const textContent = response.content.find((block) => block.type === 'text');
     const assistantMessage = textContent?.type === 'text' ? textContent.text : 'I apologize, but I could not generate a response.';
 
-    return new Response(JSON.stringify({
+    const successResponse: ChatResponse = {
       message: assistantMessage,
       model: selectedModel,
-    }), {
+    };
+
+    return new Response(JSON.stringify(successResponse), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
     });
   } catch (error) {
     console.error('Claude API error:', error);
-    return new Response(JSON.stringify({
+
+    const errorResponse: ChatErrorResponse = {
       error: 'Failed to get AI response',
       details: error instanceof Error ? error.message : 'Unknown error',
-    }), {
+    };
+
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
