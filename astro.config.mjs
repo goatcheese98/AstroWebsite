@@ -12,4 +12,18 @@ export default defineConfig({
   build: {
     assets: 'assets',
   },
+  vite: {
+    optimizeDeps: {
+      include: [
+        '@excalidraw/excalidraw',
+        'nanoid',
+        'react',
+        'react-dom',
+      ],
+      exclude: [],
+    },
+    ssr: {
+      noExternal: ['@excalidraw/excalidraw'],
+    },
+  },
 });

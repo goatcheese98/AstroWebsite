@@ -7,8 +7,9 @@ const currentPath = Astro.url.pathname;
 
 <header class="header">
   <nav class="header__nav container" aria-label="Main navigation">
-    <a href="/" class="header__logo text-hand">
-      RJ
+    <a href="/" class="header__logo">
+      <span class="header__logo-text">RJ</span>
+      <span class="header__logo-dot"></span>
     </a>
 
     <ul class="header__links" role="list">
@@ -33,9 +34,15 @@ const currentPath = Astro.url.pathname;
     position: sticky;
     top: 0;
     z-index: 100;
-    background: var(--color-bg);
-    border-bottom: 2px solid var(--color-stroke-muted);
-    filter: url(#sketch-filter);
+    background: rgba(var(--color-bg-rgb, 250, 248, 245), 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-stroke-muted);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  [data-theme="dark"] .header {
+    background: rgba(15, 23, 42, 0.8);
   }
 
   .header__nav {
@@ -47,22 +54,51 @@ const currentPath = Astro.url.pathname;
   }
 
   .header__logo {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-hand);
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--color-text);
     text-decoration: none;
     letter-spacing: -0.02em;
+    position: relative;
+    transition: transform 0.2s ease;
   }
 
   .header__logo:hover {
     text-decoration: none;
-    transform: rotate(-2deg);
-    display: inline-block;
+    transform: rotate(-2deg) scale(1.05);
+  }
+
+  .header__logo-text {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header__logo-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--color-accent);
+    border-radius: 50%;
+    animation: logo-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes logo-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
   }
 
   .header__links {
     display: flex;
-    gap: var(--space-md);
+    gap: var(--space-xs);
+    background: var(--color-surface);
+    padding: var(--space-xs);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-stroke-muted);
   }
 
   .header__link {
@@ -71,29 +107,35 @@ const currentPath = Astro.url.pathname;
     color: var(--color-text-muted);
     text-decoration: none;
     padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    transition: color 0.15s ease;
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+    position: relative;
   }
 
   .header__link:hover {
     color: var(--color-text);
-    text-decoration: underline;
-    text-decoration-style: wavy;
-    text-underline-offset: 4px;
+    text-decoration: none;
+    background: var(--color-bg);
   }
 
   .header__link.active {
-    color: var(--color-accent);
-    font-weight: 700;
+    color: var(--color-text);
+    background: var(--color-fill-1);
+    font-weight: 600;
   }
 
   @media (max-width: 640px) {
-    .header__links {
-      gap: var(--space-sm);
+    .header__nav {
+      padding-block: var(--space-xs);
     }
+
+    .header__links {
+      gap: 0;
+    }
+
     .header__link {
       font-size: var(--text-xs);
-      padding: var(--space-xs);
+      padding: var(--space-2xs) var(--space-xs);
     }
   }
 </style>

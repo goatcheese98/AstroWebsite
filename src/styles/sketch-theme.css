@@ -4,25 +4,27 @@
   --font-mono: 'Cascadia Code', 'Comic Shanns', monospace;
   --font-body: 'Comic Shanns', system-ui, sans-serif;
 
-  /* Fluid sizing */
+  /* Fluid sizing - enhanced scale */
   --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
   --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
   --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
-  --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
-  --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
-  --text-2xl: clamp(2rem, 1.5rem + 2.5vw, 3rem);
-  --text-3xl: clamp(2.5rem, 1.8rem + 3.5vw, 4rem);
+  --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.375rem);
+  --text-xl: clamp(1.375rem, 1.2rem + 0.875vw, 1.75rem);
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.75vw, 2.5rem);
+  --text-3xl: clamp(2.5rem, 1.8rem + 3.5vw, 4.5rem);
+  --text-4xl: clamp(3rem, 2rem + 5vw, 6rem);
 
-  /* Spacing */
+  /* Spacing - enhanced scale */
+  --space-2xs: clamp(0.125rem, 0.1rem + 0.125vw, 0.25rem);
   --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
   --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
   --space-md: clamp(1rem, 0.8rem + 1vw, 1.5rem);
   --space-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
-  --space-xl: clamp(2rem, 1.5rem + 2.5vw, 4rem);
-  --space-2xl: clamp(3rem, 2rem + 5vw, 6rem);
+  --space-xl: clamp(2.5rem, 1.8rem + 3.5vw, 5rem);
+  --space-2xl: clamp(4rem, 2.5rem + 7.5vw, 8rem);
 
   /* Layout */
-  --max-width: 1100px;
+  --max-width: 1200px;
   --content-padding: var(--space-md);
 
   /* Rough.js defaults */
@@ -30,48 +32,69 @@
   --rough-bowing: 1;
   --rough-stroke-width: 2;
 
-  /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 16px;
+  /* Border radius - more organic */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
-  /* Shadows */
-  --shadow-sm: 2px 2px 0 var(--color-stroke-muted);
-  --shadow-md: 3px 3px 0 var(--color-stroke-muted);
+  /* Shadows - enhanced depth */
+  --shadow-sm: 
+    2px 2px 0 var(--color-stroke-muted),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 
+    4px 4px 0 var(--color-stroke-muted),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 
+    6px 6px 0 var(--color-stroke-muted),
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 30px var(--color-accent-glow);
 }
 
+/* Light theme - warm paper aesthetic */
 [data-theme="light"] {
-  --color-bg: #ffffff;
+  --color-bg: #faf8f5;
   --color-surface: #ffffff;
-  --color-text: #1e1e1e;
-  --color-text-muted: #666666;
-  --color-stroke: #1e1e1e;
-  --color-stroke-muted: #c4c4c4;
-  --color-accent: #1971c2;
-  --color-accent-hover: #1864ab;
-  --color-fill-1: #a5d8ff;
-  --color-fill-2: #b2f2bb;
-  --color-fill-3: #ffec99;
-  --color-fill-4: #ffc9c9;
-  --color-fill-5: #d0bfff;
-  --dot-color: #e0e0e0;
+  --color-surface-elevated: #ffffff;
+  --color-text: #1a1a2e;
+  --color-text-muted: #6b7280;
+  --color-stroke: #1a1a2e;
+  --color-stroke-muted: #d1d5db;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-glow: rgba(37, 99, 235, 0.15);
+  --color-fill-1: #dbeafe;
+  --color-fill-2: #dcfce7;
+  --color-fill-3: #fef3c7;
+  --color-fill-4: #fee2e2;
+  --color-fill-5: #e0e7ff;
+  --color-gradient-start: #2563eb;
+  --color-gradient-end: #3b82f6;
+  --dot-color: #e5e7eb;
+  --glow-opacity: 0.4;
   color-scheme: light;
 }
 
+/* Dark theme - deep slate aesthetic */
 [data-theme="dark"] {
-  --color-bg: #121212;
-  --color-surface: #1e1e1e;
-  --color-text: #e0e0e0;
-  --color-text-muted: #999999;
-  --color-stroke: #e0e0e0;
-  --color-stroke-muted: #555555;
-  --color-accent: #4dabf7;
-  --color-accent-hover: #74c0fc;
-  --color-fill-1: #1c3a5e;
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-elevated: #334155;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-stroke: #475569;
+  --color-stroke-muted: #334155;
+  --color-accent: #60a5fa;
+  --color-accent-hover: #93c5fd;
+  --color-accent-glow: rgba(96, 165, 250, 0.2);
+  --color-fill-1: #1e3a5f;
   --color-fill-2: #1e4a2e;
   --color-fill-3: #4a3e1e;
   --color-fill-4: #4a1e1e;
-  --color-fill-5: #3a2e5e;
-  --dot-color: #2a2a2a;
+  --color-fill-5: #1e1b4b;
+  --color-gradient-start: #60a5fa;
+  --color-gradient-end: #3b82f6;
+  --dot-color: #1e293b;
+  --glow-opacity: 0.3;
   color-scheme: dark;
 }

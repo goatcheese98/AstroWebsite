@@ -1,138 +1,191 @@
 ---
 import SketchButton from "../ui/SketchButton.astro";
 import SketchArrow from "../sketch/SketchArrow.astro";
+import PathfinderBot from "../islands/PathfinderBot";
 import { SITE } from "../../lib/constants";
+
+const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strategist"];
 ---
 
 <section class="hero section-gap" aria-label="Introduction">
-  <div class="hero__content container">
-    <div class="hero__text">
-      <p class="hero__greeting text-hand text-muted">Hi, I'm</p>
-      <h1 class="hero__name">{SITE.author}</h1>
-      <p class="hero__title">
-        <span class="hero__title-text" id="hero-title"
-          >Business & Product Analyst</span
-        >
-      </p>
-      <p class="hero__pitch">
-        I transform complex data into actionable insights and drive strategic
-        decision-making. UBC MBAN candidate with experience in wealth management
-        analytics, data visualization, and cross-functional collaboration.
-      </p>
-      <div class="hero__actions">
-        <SketchButton href="/#projects">
-          View Projects
-          <SketchArrow direction="down" size={20} />
-        </SketchButton>
-        <SketchButton
-          href={SITE.socialLinks.linkedin || "#"}
-          variant="secondary"
-          target="_blank"
-          rel="noopener"
-        >
-          LinkedIn
-        </SketchButton>
+  <div class="container">
+    <div class="hero__content">
+      <div class="hero__text">
+        <p class="hero__greeting">
+          <span class="hero__greeting-line">Hi, I'm</span>
+        </p>
+        <h1 class="hero__name">
+          <span class="gradient-text">{SITE.author}</span>
+        </h1>
+        <p class="hero__title">
+          <span class="hero__title-text" id="hero-title" data-titles={JSON.stringify(TITLES)}></span>
+          <span class="hero__title-cursor" aria-hidden="true">|</span>
+        </p>
+        <p class="hero__pitch">
+          I transform complex data into actionable insights and drive strategic
+          decision-making. UBC MBAN candidate with experience in wealth management
+          analytics, data visualization, and cross-functional collaboration.
+        </p>
+        <div class="hero__actions">
+          <SketchButton href="/#projects">
+            View Projects
+            <SketchArrow direction="down" size={20} />
+          </SketchButton>
+          <SketchButton
+            href={SITE.socialLinks.linkedin || "#"}
+            variant="secondary"
+            target="_blank"
+            rel="noopener"
+          >
+            LinkedIn
+          </SketchButton>
+        </div>
+      </div>
+
+      <div class="hero__deco" aria-hidden="true">
+        <PathfinderBot client:load />
       </div>
     </div>
-
-    <div class="hero__deco" aria-hidden="true">
-      <svg
-        width="300"
-        height="300"
-        viewBox="0 0 300 300"
-        fill="none"
-        class="hero-deco-svg"
-      >
-        <path
-          class="hero-deco-circle-outer"
-          d="M150,30 C210,27 262.5,67.5 270,127.5 C277.5,187.5 247.5,247.5 187.5,267 C127.5,286.5 60,262.5 37.5,210 C15,157.5 30,82.5 82.5,52.5 C112.5,34.5 135,30 150,30"
-          stroke="var(--color-stroke-muted)"
-          stroke-width="2"
-          fill="none"
-          opacity="0.3"
-          pathLength="1000"></path>
-        <path
-          class="hero-deco-circle-inner"
-          d="M150,75 C187.5,72 225,97.5 228,135 C231,172.5 207,210 172.5,222 C138,234 97.5,217.5 82.5,183 C67.5,148.5 82.5,97.5 117,79.5 C132,72 142.5,73.5 150,75"
-          stroke="var(--color-accent)"
-          stroke-width="1.5"
-          fill="none"
-          opacity="0.2"
-          stroke-dasharray="6 6"
-          pathLength="1000"></path>
-        <circle
-          class="hero-deco-dot hero-deco-dot-1"
-          cx="90"
-          cy="60"
-          r="5"
-          fill="var(--color-fill-1)"
-          opacity="0.4"></circle>
-        <circle
-          class="hero-deco-dot hero-deco-dot-2"
-          cx="225"
-          cy="90"
-          r="6"
-          fill="var(--color-fill-3)"
-          opacity="0.4"></circle>
-        <circle
-          class="hero-deco-dot hero-deco-dot-3"
-          cx="210"
-          cy="225"
-          r="5"
-          fill="var(--color-fill-4)"
-          opacity="0.4"></circle>
-        <circle
-          class="hero-deco-dot hero-deco-dot-4"
-          cx="67.5"
-          cy="195"
-          r="7"
-          fill="var(--color-fill-5)"
-          opacity="0.3"></circle>
-      </svg>
+  </div>
+  
+  <!-- Scroll indicator -->
+  <div class="hero__scroll-indicator" aria-hidden="true">
+    <div class="scroll-indicator__mouse">
+      <div class="scroll-indicator__wheel"></div>
     </div>
   </div>
 </section>
 
+<script>
+  // Typewriter effect that cycles through titles with backspace
+  function initTypewriter() {
+    const el = document.querySelector("#hero-title") as HTMLElement;
+    if (!el) return;
+    
+    const titles = JSON.parse(el.dataset.titles || '["Business Analyst"]');
+    let titleIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    let isPaused = false;
+    
+    const type = () => {
+      const currentTitle = titles[titleIndex];
+      
+      if (isPaused) {
+        isPaused = false;
+        setTimeout(() => {
+          isDeleting = true;
+          type();
+        }, 2000);
+        return;
+      }
+      
+      if (isDeleting) {
+        el.textContent = currentTitle.substring(0, charIndex - 1);
+        charIndex--;
+        
+        if (charIndex === 0) {
+          isDeleting = false;
+          titleIndex = (titleIndex + 1) % titles.length;
+          setTimeout(type, 300);
+        } else {
+          setTimeout(type, 40);
+        }
+      } else {
+        el.textContent = currentTitle.substring(0, charIndex + 1);
+        charIndex++;
+        
+        if (charIndex === currentTitle.length) {
+          isPaused = true;
+          setTimeout(type, 500);
+        } else {
+          setTimeout(type, 80 + Math.random() * 40);
+        }
+      }
+    };
+    
+    setTimeout(type, 500);
+  }
+
+  initTypewriter();
+</script>
+
 <style>
+  .hero {
+    position: relative;
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+
   .hero__content {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-xl);
-    min-height: 60vh;
+    position: relative;
+    z-index: 1;
   }
 
   .hero__text {
     max-width: 600px;
+    animation: fade-up 0.8s ease-out;
+    flex: 1;
   }
 
   .hero__greeting {
-    font-size: var(--text-lg);
+    font-family: var(--font-hand);
+    font-size: var(--text-xl);
+    color: var(--color-text-muted);
     margin-bottom: var(--space-xs);
   }
 
   .hero__name {
-    font-size: var(--text-3xl);
+    font-size: var(--text-4xl);
+    font-weight: 700;
     margin-bottom: var(--space-sm);
     line-height: 1.1;
+    letter-spacing: -0.03em;
   }
 
   .hero__title {
     font-family: var(--font-hand);
     font-size: var(--text-2xl);
-    color: var(--color-accent);
-    margin-bottom: var(--space-md);
+    color: var(--color-text);
+    margin-bottom: var(--space-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-height: 1.4em;
   }
 
   .hero__title-text {
     position: relative;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+  }
+
+  .hero__title-cursor {
+    color: var(--color-accent);
+    animation: blink 1s step-end infinite;
+    font-weight: 300;
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .hero__pitch {
     font-size: var(--text-lg);
     color: var(--color-text-muted);
-    line-height: 1.7;
-    margin-bottom: var(--space-lg);
+    line-height: 1.8;
+    margin-bottom: var(--space-xl);
     max-width: 50ch;
   }
 
@@ -144,18 +197,74 @@ import { SITE } from "../../lib/constants";
 
   .hero__deco {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 300px;
   }
 
-  @media (max-width: 768px) {
+  .hero__scroll-indicator {
+    position: absolute;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0.5;
+    animation: fade-up 0.8s ease-out 0.5s both;
+  }
+
+  .scroll-indicator__mouse {
+    width: 26px;
+    height: 40px;
+    border: 2px solid var(--color-text-muted);
+    border-radius: 13px;
+    position: relative;
+    filter: url(#sketch-filter);
+  }
+
+  .scroll-indicator__wheel {
+    width: 4px;
+    height: 8px;
+    background: var(--color-text-muted);
+    border-radius: 2px;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: scroll-wheel 1.5s ease-in-out infinite;
+  }
+
+  @keyframes scroll-wheel {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  }
+
+  /* Desktop: side by side */
+  @media (min-width: 901px) {
+    .hero__content {
+      flex-direction: row;
+    }
+  }
+
+  /* Mobile: stacked with constellation below text */
+  @media (max-width: 900px) {
     .hero__content {
       flex-direction: column;
       text-align: center;
-      min-height: auto;
+      gap: var(--space-2xl);
       padding-block: var(--space-xl);
+    }
+
+    .hero__text {
+      order: 1;
+      max-width: 100%;
     }
 
     .hero__pitch {
       max-width: none;
+      margin-inline: auto;
     }
 
     .hero__actions {
@@ -163,60 +272,22 @@ import { SITE } from "../../lib/constants";
     }
 
     .hero__deco {
-      display: none;
+      order: 2;
     }
   }
 
-  /* SVG Animation Styles */
-  .hero-deco-svg {
-    transform-origin: center center;
-  }
+  @media (max-width: 640px) {
+    .hero__name {
+      font-size: var(--text-3xl);
+    }
 
-  .hero-deco-circle-outer {
-    --final-opacity: 0.3;
-    transform-origin: center;
-    animation:
-      sketch-draw-circle 2s ease-out 0.2s both,
-      sketch-orbit 12s linear 2.5s infinite;
-  }
+    .hero__title {
+      font-size: var(--text-xl);
+      justify-content: center;
+    }
 
-  .hero-deco-circle-inner {
-    --final-opacity: 0.2;
-    transform-origin: center;
-    animation:
-      sketch-draw-circle 2s ease-out 0.6s both,
-      sketch-pulse 4s ease-in-out 2.5s infinite;
-  }
-
-  .hero-deco-dot {
-    transform-origin: center;
-  }
-
-  .hero-deco-dot-1 {
-    --final-opacity: 0.4;
-    animation:
-      sketch-dot-appear 0.6s ease-out 1s both,
-      sketch-float 3.5s ease-in-out 1.8s infinite;
-  }
-
-  .hero-deco-dot-2 {
-    --final-opacity: 0.4;
-    animation:
-      sketch-dot-appear 0.6s ease-out 1.2s both,
-      sketch-float-alt 4.2s ease-in-out 2s infinite;
-  }
-
-  .hero-deco-dot-3 {
-    --final-opacity: 0.4;
-    animation:
-      sketch-dot-appear 0.6s ease-out 1.4s both,
-      sketch-float 3.8s ease-in-out 2.2s infinite;
-  }
-
-  .hero-deco-dot-4 {
-    --final-opacity: 0.3;
-    animation:
-      sketch-dot-appear 0.6s ease-out 1.6s both,
-      sketch-float-alt 5s ease-in-out 2.4s infinite;
+    .hero__scroll-indicator {
+      display: none;
+    }
   }
 </style>

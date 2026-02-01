@@ -1,22 +1,75 @@
-import "@excalidraw/excalidraw/index.css";
-import { Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import { useEffect, useState, useRef, useCallback } from "react";
-import { MarkdownNote } from "./MarkdownNote";
-import type { MarkdownNoteRef } from "./MarkdownNote";
 import { nanoid } from "nanoid";
+
+// Dynamically import Excalidraw to avoid SSR issues
+let ExcalidrawModule: any = null;
+let convertToExcalidrawElements: any = null;
+
+const loadExcalidraw = async () => {
+  if (!ExcalidrawModule) {
+    const mod = await import("@excalidraw/excalidraw");
+    ExcalidrawModule = mod.Excalidraw;
+    convertToExcalidrawElements = mod.convertToExcalidrawElements;
+    // Import CSS
+    await import("@excalidraw/excalidraw/index.css");
+  }
+  return { Excalidraw: ExcalidrawModule, convertToExcalidrawElements };
+};
+
+// Lazy-loaded MarkdownNote
+let MarkdownNote: any = null;
+let MarkdownNoteRef: any = null;
+
+const loadMarkdownNote = async () => {
+  if (!MarkdownNote) {
+    const mod = await import("./MarkdownNote");
+    MarkdownNote = mod.MarkdownNote;
+    MarkdownNoteRef = mod.MarkdownNoteRef;
+  }
+  return { MarkdownNote, MarkdownNoteRef };
+};
 
 export default function ExcalidrawCanvas() {
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [ExcalidrawComponent, setExcalidrawComponent] = useState<any>(null);
+    const [MarkdownNoteComponent, setMarkdownNoteComponent] = useState<any>(null);
 
     // Use refs to avoid triggering re-renders from RAF loop
     const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
     const markdownElementsRef = useRef<any[]>([]);
-    const markdownNoteRefsRef = useRef<Map<string, MarkdownNoteRef>>(new Map());
+    const markdownNoteRefsRef = useRef<Map<string, any>>(new Map());
 
     // State for triggering React re-renders (updated at controlled intervals)
     const [, forceUpdate] = useState({});
     const [markdownElements, setMarkdownElements] = useState<any[]>([]);
+
+    // Load components on mount
+    useEffect(() => {
+        let mounted = true;
+        
+        const init = async () => {
+            try {
+                const [{ Excalidraw }, { MarkdownNote }] = await Promise.all([
+                    loadExcalidraw(),
+                    loadMarkdownNote()
+                ]);
+                
+                if (mounted) {
+                    setExcalidrawComponent(() => Excalidraw);
+                    setMarkdownNoteComponent(() => MarkdownNote);
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                console.error("Failed to load Excalidraw:", err);
+            }
+        };
+        
+        init();
+        
+        return () => { mounted = false; };
+    }, []);
 
     useEffect(() => {
         // Get initial theme from document
@@ -84,7 +137,7 @@ export default function ExcalidrawCanvas() {
 
     // Listen for drawing commands from the AI chat
     useEffect(() => {
-        const handleDrawCommand = (event: any) => {
+        const handleDrawCommand = async (event: any) => {
             console.log("🖼️ Canvas received draw command:", event.detail);
 
             if (!excalidrawAPI) {
@@ -97,263 +150,77 @@ export default function ExcalidrawCanvas() {
                 console.log(`📝 Converting ${elements.length} skeleton elements`);
 
                 try {
+                    // Ensure convertToExcalidrawElements is loaded
+                    const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+                    
                     // Convert skeleton elements to full Excalidraw elements
-                    const fullElements = convertToExcalidrawElements(elements);
-                    console.log("✨ Converted elements:", fullElements);
+                    const excalidrawElements = converter(elements);
+                    console.log("✅ Converted elements:", excalidrawElements);
 
-                    // Get current elements and add new ones
+                    // Get current scene elements
                     const currentElements = excalidrawAPI.getSceneElements();
-                    console.log(`📋 Current canvas has ${currentElements.length} elements`);
 
+                    // Add new elements to scene
                     excalidrawAPI.updateScene({
-                        elements: [...currentElements, ...fullElements],
+                        elements: [...currentElements, ...excalidrawElements],
                     });
 
-                    // Scroll to fit all content
-                    excalidrawAPI.scrollToContent([...currentElements, ...fullElements], {
-                        fitToContent: true,
-                    });
-
-                    console.log("✅ Canvas updated successfully");
+                    console.log("🎨 Scene updated with new elements");
                 } catch (err) {
-                    console.error("❌ Error converting/adding elements:", err);
+                    console.error("❌ Error converting elements:", err);
                 }
-            } else {
-                console.error("❌ Invalid elements data:", elements);
             }
         };
 
-        // Handle requests for canvas state
-        const handleGetState = () => {
-            if (excalidrawAPI) {
-                const elements = excalidrawAPI.getSceneElements();
-                const appState = excalidrawAPI.getAppState();
-
-                window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
-                    detail: {
-                        elements,
-                        appState,
-                    },
-                }));
-            }
-        };
-
-        // Handle SVG insertion from library
-        const handleInsertSVG = async (event: any) => {
-            console.log("📚 Inserting SVG from library:", event.detail);
-
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
-
-            const { svgPath } = event.detail;
-
-            try {
-                // Fetch the SVG content
-                const response = await fetch(svgPath);
-                const svgText = await response.text();
-
-                // Get viewport center for positioning
-                const appState = excalidrawAPI.getAppState();
-                const centerX = appState.scrollX + appState.width / 2;
-                const centerY = appState.scrollY + appState.height / 2;
-
-                // Create an image element from the SVG
-                const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
-                const svgUrl = URL.createObjectURL(svgBlob);
-
-                // Load image to get dimensions
-                const img = new Image();
-                img.onload = () => {
-                    // Create Excalidraw image element
-                    const imageElement = convertToExcalidrawElements([
-                        {
-                            type: "image",
-                            x: centerX - 50, // Center the 100x100 image
-                            y: centerY - 50,
-                            width: 100,
-                            height: 100,
-                            fileId: svgPath, // Use path as unique ID
-                        },
-                    ]);
-
-                    // Add to canvas
-                    const currentElements = excalidrawAPI.getSceneElements();
-                    const files = excalidrawAPI.getFiles();
-
-                    // Add the SVG as a file
-                    const newFiles = {
-                        ...files,
-                        [svgPath]: {
-                            mimeType: "image/svg+xml",
-                            id: svgPath,
-                            dataURL: svgUrl,
-                            created: Date.now(),
-                        },
-                    };
-
-                    excalidrawAPI.updateScene({
-                        elements: [...currentElements, ...imageElement],
-                    });
-
-                    excalidrawAPI.addFiles(Object.values(newFiles));
-
-                    console.log("✅ SVG inserted successfully");
-                };
-                img.src = svgUrl;
-            } catch (err) {
-                console.error("❌ Error inserting SVG:", err);
-            }
-        };
-
-        // Handle image insertion (from Nano Banana or other sources)
-        const handleInsertImage = async (event: any) => {
-            console.log("🖼️ Inserting image into canvas:", event.detail);
-
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
-
-            const { imageData, type } = event.detail;
-
-            try {
-                // Get viewport center for positioning
-                const appState = excalidrawAPI.getAppState();
-                const centerX = appState.scrollX + appState.width / 2;
-                const centerY = appState.scrollY + appState.height / 2;
-
-                // Create unique file ID
-                const fileId = `generated-${Date.now()}`;
-
-                // Create Excalidraw image element
-                const imageElement = convertToExcalidrawElements([
-                    {
-                        type: "image",
-                        x: centerX - 100, // Center the 200x200 image
-                        y: centerY - 100,
-                        width: 200,
-                        height: 200,
-                        fileId: fileId,
-                    },
-                ]);
-
-                // Add to canvas
-                const currentElements = excalidrawAPI.getSceneElements();
-
-                // Add the image as a file
-                const newFile = {
-                    mimeType: "image/png",
-                    id: fileId,
-                    dataURL: imageData, // Should be base64 or blob URL
-                    created: Date.now(),
-                };
-
-                excalidrawAPI.updateScene({
-                    elements: [...currentElements, ...imageElement],
-                });
-
-                excalidrawAPI.addFiles([newFile]);
-
-                console.log("✅ Image inserted successfully");
-            } catch (err) {
-                console.error("❌ Error inserting image:", err);
-            }
-        };
-
-        console.log("👂 Canvas listening for draw commands");
-        window.addEventListener("excalidraw:draw", handleDrawCommand);
-        window.addEventListener("excalidraw:get-state", handleGetState);
-        window.addEventListener("excalidraw:insert-svg", handleInsertSVG);
-        window.addEventListener("excalidraw:insert-image", handleInsertImage);
-
-        return () => {
-            console.log("👋 Canvas stopped listening for draw commands");
-            window.removeEventListener("excalidraw:draw", handleDrawCommand);
-            window.removeEventListener("excalidraw:get-state", handleGetState);
-            window.removeEventListener("excalidraw:insert-svg", handleInsertSVG);
-            window.removeEventListener("excalidraw:insert-image", handleInsertImage);
-        };
+        window.addEventListener("ai-draw-command", handleDrawCommand);
+        return () => window.removeEventListener("ai-draw-command", handleDrawCommand);
     }, [excalidrawAPI]);
 
-    // Broadcast canvas state changes
-    useEffect(() => {
+    // Handle creating new markdown element
+    const handleCreateMarkdown = useCallback(async () => {
         if (!excalidrawAPI) return;
 
-        const broadcastState = () => {
-            const elements = excalidrawAPI.getSceneElements();
-            const appState = excalidrawAPI.getAppState();
-
-            window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
-                detail: {
-                    elements,
-                    appState,
-                },
-            }));
-        };
-
-        // Broadcast state periodically (when canvas changes)
-        const interval = setInterval(broadcastState, 1000);
-
-        return () => clearInterval(interval);
-    }, [excalidrawAPI]);
-
-    // Expose markdown note refs for export functionality
-    useEffect(() => {
-        // Store refs in window object for access by export functions
-        (window as any).getMarkdownNoteRefs = () => markdownNoteRefsRef.current;
-    }, []);
-
-    const addMarkdownNote = useCallback(() => {
-        if (!excalidrawAPI) return;
-
-        const appState = excalidrawAPI.getAppState();
-        const viewportCenterX = appState.width / 2;
-        const viewportCenterY = appState.height / 2;
-
-        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-        const id = nanoid();
-        const element = {
-            id,
+        const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+        
+        const newElement = {
             type: "rectangle",
-            x: sceneX - 250,
-            y: sceneY - 175,
-            width: 500,
-            height: 350,
-            strokeColor: "transparent",
-            backgroundColor: "transparent",
-            fillStyle: "solid",
-            roughness: 0,
-            strokeWidth: 0,
-            locked: true, // Prevent Excalidraw selection handles
+            x: 100 - viewStateRef.current.scrollX,
+            y: 100 - viewStateRef.current.scrollY,
+            width: 300,
+            height: 200,
+            backgroundColor: "#fef3c7",
+            strokeColor: "#1f2937",
+            strokeWidth: 2,
+            roughness: 1,
+            opacity: 100,
+            id: nanoid(),
             customData: {
                 type: "markdown",
-                content: "# 📝 New Note\n\nDouble-click to edit this note.\n\n## Markdown Supported\n- **Bold** and *italic* text\n- Lists and checkboxes\n- Code blocks with syntax highlighting\n- Tables, links, and more!\n\n```javascript\nconst example = \"Hello World\";\n```"
-            }
+                content: "# New Note\n\nDouble-click to edit",
+            },
         };
 
-        const elements = excalidrawAPI.getSceneElements();
-        const skeleton: any = element;
+        const converted = converter([newElement]);
+        const currentElements = excalidrawAPI.getSceneElements();
+        
         excalidrawAPI.updateScene({
-            elements: [...elements, ...convertToExcalidrawElements([skeleton])],
+            elements: [...currentElements, ...converted],
         });
     }, [excalidrawAPI]);
 
-    const updateMarkdownContent = useCallback((id: string, text: string) => {
+    // Handle markdown content update
+    const handleMarkdownUpdate = useCallback((elementId: string, newContent: string) => {
         if (!excalidrawAPI) return;
 
         const elements = excalidrawAPI.getSceneElements();
         const updatedElements = elements.map((el: any) => {
-            if (el.id === id) {
+            if (el.id === elementId) {
                 return {
                     ...el,
                     customData: {
                         ...el.customData,
-                        content: text
-                    }
+                        content: newContent,
+                    },
                 };
             }
             return el;
@@ -362,66 +229,77 @@ export default function ExcalidrawCanvas() {
         excalidrawAPI.updateScene({ elements: updatedElements });
     }, [excalidrawAPI]);
 
-    return (
-        <div
-            style={{
-                width: "100%",
-                height: "100%",
-                position: "relative",
-            }}
-        >
-            <Excalidraw
-                excalidrawAPI={(api) => {
-                    setExcalidrawAPI(api);
-                    // Make API globally available for debugging
-                    if (typeof window !== "undefined") {
-                        (window as any).excalidrawAPI = api;
+    // Register markdown note ref
+    const registerMarkdownNoteRef = useCallback((id: string, ref: any) => {
+        markdownNoteRefsRef.current.set(id, ref);
+    }, []);
+
+    if (isLoading || !ExcalidrawComponent) {
+        return (
+            <div style={{ 
+                width: "100%", 
+                height: "100%", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center",
+                background: "var(--color-bg)"
+            }}>
+                <div style={{ textAlign: "center" }}>
+                    <div className="loading-spinner" style={{
+                        width: "40px",
+                        height: "40px",
+                        border: "3px solid var(--color-stroke-muted)",
+                        borderTopColor: "var(--color-accent)",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                        margin: "0 auto 1rem"
+                    }} />
+                    <p style={{ color: "var(--color-text-muted)" }}>Loading canvas...</p>
+                </div>
+                <style>{`
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
                     }
-                }}
+                `}</style>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <ExcalidrawComponent
                 theme={theme}
-                initialData={{
-                    appState: {
-                        viewBackgroundColor: "transparent",
-                        gridSize: 0, // Remove grid dots (0 = no grid)
+                excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
+                UIOptions={{
+                    canvasActions: {
+                        changeViewBackgroundColor: true,
+                        clearCanvas: true,
+                        loadScene: true,
+                        saveToActiveFile: true,
+                        toggleTheme: false,
+                        saveAsImage: true,
                     },
                 }}
-                // NO onChange handler - we use RAF polling instead!
-                renderTopRightUI={() => (
-                    <button
-                        style={{
-                            background: "var(--color-primary, #6366f1)",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            padding: "6px 12px",
-                            fontSize: "0.8rem",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                        }}
-                        onClick={addMarkdownNote}
-                    >
-                        + Add Note
-                    </button>
-                )}
+                onChange={(elements: any[], appState: any) => {
+                    // Update view state ref without triggering React renders
+                    viewStateRef.current = {
+                        scrollX: appState.scrollX,
+                        scrollY: appState.scrollY,
+                        zoom: appState.zoom,
+                    };
+                }}
             />
-
-            {/* Markdown Overlays - read from ref for live updates */}
-            {markdownElements.map(element => (
-                <MarkdownNote
-                    ref={(ref) => {
-                        if (ref) {
-                            markdownNoteRefsRef.current.set(element.id, ref);
-                        } else {
-                            markdownNoteRefsRef.current.delete(element.id);
-                        }
-                    }}
+            
+            {/* Render MarkdownNote overlays for each markdown element */}
+            {MarkdownNoteComponent && markdownElements.map((element) => (
+                <MarkdownNoteComponent
                     key={element.id}
                     element={element}
-                    appState={viewStateRef.current}
-                    onChange={updateMarkdownContent}
+                    viewState={viewStateRef.current}
+                    onUpdate={(content: string) => handleMarkdownUpdate(element.id, content)}
+                    registerRef={(ref: any) => registerMarkdownNoteRef(element.id, ref)}
                 />
             ))}
-        </div>
+        </>
     );
 }

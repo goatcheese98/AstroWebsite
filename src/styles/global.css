@@ -16,20 +16,22 @@ html {
 
 body {
   min-height: 100dvh;
-  line-height: 1.6;
-  -webkit-font-smoothing: auto;
-  -moz-osx-font-smoothing: auto;
-  text-rendering: optimizeSpeed;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--color-text);
   background-color: var(--color-bg);
-  background-image: radial-gradient(
-    circle,
-    var(--dot-color) 1px,
-    transparent 1px
-  );
-  background-size: 20px 20px;
+  background-image: 
+    radial-gradient(
+      circle,
+      var(--dot-color) 1px,
+      transparent 1px
+    );
+  background-size: 24px 24px;
+  background-attachment: fixed;
 }
 
 img,
@@ -62,17 +64,25 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-hand);
   line-height: 1.2;
   text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-gradient-start), var(--color-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 a {
   color: var(--color-accent);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 a:hover {
-  text-decoration-style: wavy;
-  text-decoration-line: underline;
-  text-underline-offset: 4px;
+  color: var(--color-accent-hover);
 }
 
 ul, ol {
@@ -116,24 +126,91 @@ code, pre {
   font-display: swap;
 }
 
-/* Scrollbar styling */
+/* Enhanced Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: var(--color-bg);
+  border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-stroke-muted);
-  border-radius: 4px;
+  border-radius: 5px;
+  border: 2px solid var(--color-bg);
+  transition: background 0.2s ease;
 }
 
-/* Selection */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Enhanced Selection */
 ::selection {
-  background: var(--color-fill-1);
-  color: var(--color-text);
+  background: var(--color-accent);
+  color: white;
+}
+
+/* Container utility */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: var(--content-padding);
+}
+
+/* Section spacing */
+.section-gap {
+  padding-block: var(--space-2xl);
+}
+
+/* Text utilities */
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-hand {
+  font-family: var(--font-hand);
+}
+
+.text-sm {
+  font-size: var(--text-sm);
+}
+
+.text-lg {
+  font-size: var(--text-lg);
+}
+
+.text-xl {
+  font-size: var(--text-xl);
+}
+
+.text-2xl {
+  font-size: var(--text-2xl);
+}
+
+/* Margin utilities */
+.mt-sm {
+  margin-top: var(--space-sm);
+}
+
+.mt-md {
+  margin-top: var(--space-md);
+}
+
+.mt-lg {
+  margin-top: var(--space-lg);
+}
+
+.mb-lg {
+  margin-bottom: var(--space-lg);
 }
 
 /* Sketch Components - Global to persist across View Transitions */
@@ -143,29 +220,53 @@ code, pre {
   padding: var(--space-md);
   background: var(--fill, var(--color-surface));
   filter: url(#sketch-filter);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sketch-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--color-accent-glow), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .sketch-box:hover {
-  transform: translate(-1px, -2px) rotate(-0.3deg);
-  box-shadow: var(--shadow-md);
+  transform: translate(-2px, -3px) rotate(-0.5deg);
+  box-shadow: var(--shadow-lg);
+}
+
+.sketch-box:hover::before {
+  opacity: 0.5;
 }
 
 .sketch-badge {
   display: inline-block;
   font-family: var(--font-hand);
   font-size: var(--text-xs);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border: 1.5px solid var(--color-stroke);
   border-radius: var(--radius-sm);
   background: var(--badge-fill, var(--color-surface));
   filter: url(#sketch-filter);
   white-space: nowrap;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sketch-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .sketch-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-xs);
   font-family: var(--font-hand);
   font-size: var(--text-base);
@@ -175,13 +276,30 @@ code, pre {
   border-radius: var(--radius-md);
   cursor: pointer;
   filter: url(#sketch-filter);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.2s ease,
+              background 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sketch-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .sketch-btn:hover {
-  transform: translate(-1px, -2px);
+  transform: translate(-2px, -3px);
   box-shadow: var(--shadow-md);
   text-decoration: none;
+}
+
+.sketch-btn:hover::before {
+  opacity: 1;
 }
 
 .sketch-btn:active {
@@ -191,7 +309,7 @@ code, pre {
 
 .sketch-btn:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .sketch-btn--primary {
@@ -214,29 +332,49 @@ code, pre {
 }
 
 .theme-toggle {
-  background: none;
+  background: var(--color-surface);
   border: 2px solid var(--color-stroke);
   border-radius: var(--radius-md);
   color: var(--color-text);
   cursor: pointer;
-  padding: 6px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   filter: url(#sketch-filter);
-  transition: transform 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.2s ease,
+              background 0.2s ease;
 }
 
 .theme-toggle:hover {
-  transform: rotate(15deg);
+  transform: rotate(15deg) scale(1.05);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-fill-1);
 }
 
 .theme-toggle:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 [data-theme="light"] .icon-sun { display: none; }
 [data-theme="light"] .icon-moon { display: block; }
 [data-theme="dark"] .icon-sun { display: block; }
 [data-theme="dark"] .icon-moon { display: none; }
+
+/* Focus visible improvements */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Smooth image loading */
+img {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+img[loading] {
+  opacity: 0;
+}

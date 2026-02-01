@@ -4,8 +4,8 @@ import Hero from "../components/sections/Hero.astro";
 import Projects from "../components/sections/Projects.astro";
 import Experience from "../components/sections/Experience.astro";
 import Contact from "../components/sections/Contact.astro";
+import BentoSkills from "../components/islands/BentoSkills";
 import SketchDivider from "../components/sketch/SketchDivider.astro";
-import { SKILLS } from "../lib/constants";
 ---
 
 <PageLayout title="Home">
@@ -16,14 +16,19 @@ import { SKILLS } from "../lib/constants";
   <SketchDivider variant="zigzag" />
   <Experience />
 
-  <section class="skills section-gap container" id="skills" aria-label="Skills">
-    <h2 class="text-2xl text-hand text-center">Technical Skills</h2>
-    <p class="text-muted text-hand text-center mt-sm mb-lg">
-      Analytics tools and programming languages I use to drive insights.
-    </p>
-    <div class="skills__chart">
-      <svg id="skills-svg" width="100%" aria-label="Skills chart" role="img"
-      ></svg>
+  <section class="skills section-gap" id="skills" aria-label="Skills">
+    <div class="container">
+      <div class="skills__header">
+        <h2 class="skills__heading">
+          <span class="gradient-text">Skills & Expertise</span>
+        </h2>
+        <p class="skills__subhead">
+          A generalist's toolkit spanning data, technology, and strategy
+        </p>
+        <div class="skills__header-line" aria-hidden="true"></div>
+      </div>
+      
+      <BentoSkills client:load />
     </div>
   </section>
 
@@ -32,24 +37,7 @@ import { SKILLS } from "../lib/constants";
 </PageLayout>
 
 <script>
-  import { annotate, annotationGroup } from "rough-notation";
-  import rough from "roughjs";
-
-  const SKILLS = [
-    { name: "Python", level: 90, fillColor: "var(--color-fill-1)" },
-    { name: "SQL", level: 85, fillColor: "var(--color-fill-2)" },
-    { name: "JavaScript", level: 80, fillColor: "var(--color-fill-3)" },
-    { name: "R", level: 75, fillColor: "var(--color-fill-4)" },
-    { name: "Tableau", level: 85, fillColor: "var(--color-fill-1)" },
-    { name: "Looker Studio", level: 80, fillColor: "var(--color-fill-2)" },
-    { name: "D3.js", level: 75, fillColor: "var(--color-fill-3)" },
-    { name: "PostgreSQL / MongoDB", level: 80, fillColor: "var(--color-fill-4)" },
-  ];
-
-  const BAR_HEIGHT = 28;
-  const BAR_GAP = 16;
-  const LABEL_WIDTH = 130;
-  const CHART_PADDING = 10;
+  import { annotate } from "rough-notation";
 
   function initAnnotations() {
     const reducedMotion = window.matchMedia(
@@ -85,105 +73,12 @@ import { SKILLS } from "../lib/constants";
     }
   }
 
-  function renderSkillsChart() {
-    const svg = document.getElementById("skills-svg");
-    if (!svg) return;
-
-    // Clear previous content
-    while (svg.firstChild) {
-      svg.removeChild(svg.firstChild);
-    }
-
-    const chartHeight =
-      SKILLS.length * (BAR_HEIGHT + BAR_GAP) + CHART_PADDING * 2;
-    const chartWidth = 500;
-
-    svg.setAttribute("height", String(chartHeight));
-    svg.setAttribute("viewBox", `0 0 ${chartWidth} ${chartHeight}`);
-    svg.setAttribute("preserveAspectRatio", "xMinYMin meet");
-
-    const rc = rough.svg(svg as unknown as SVGSVGElement);
-    const style = getComputedStyle(document.documentElement);
-    const stroke = style.getPropertyValue("--color-stroke").trim();
-    const text = style.getPropertyValue("--color-text").trim();
-    const muted = style.getPropertyValue("--color-text-muted").trim();
-
-    const barAreaWidth = chartWidth - LABEL_WIDTH - CHART_PADDING * 2;
-
-    SKILLS.forEach((skill, i) => {
-      const y = CHART_PADDING + i * (BAR_HEIGHT + BAR_GAP);
-      const barWidth = (skill.level / 100) * barAreaWidth;
-
-      let fillColor = style.getPropertyValue("--color-fill-1").trim();
-      if (skill.fillColor) {
-        const varMatch = skill.fillColor.match(/var\(([^)]+)\)/);
-        if (varMatch) {
-          fillColor = style.getPropertyValue(varMatch[1]).trim() || fillColor;
-        } else {
-          fillColor = skill.fillColor;
-        }
-      }
-
-      const bar = rc.rectangle(LABEL_WIDTH, y, barWidth, BAR_HEIGHT, {
-        roughness: 1.5,
-        bowing: 1,
-        strokeWidth: 1.5,
-        stroke,
-        fill: fillColor,
-        fillStyle: "hachure",
-        fillWeight: 1.5,
-        hachureGap: 5,
-      });
-      svg.appendChild(bar);
-
-      const label = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "text",
-      );
-      label.setAttribute("x", String(LABEL_WIDTH - 10));
-      label.setAttribute("y", String(y + BAR_HEIGHT / 2 + 5));
-      label.setAttribute("text-anchor", "end");
-      label.setAttribute("fill", text);
-      label.setAttribute("font-size", "14");
-      label.setAttribute("font-family", "'Excalifont', 'Virgil', cursive");
-      label.textContent = skill.name;
-      svg.appendChild(label);
-
-      const pct = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "text",
-      );
-      pct.setAttribute("x", String(LABEL_WIDTH + barWidth + 8));
-      pct.setAttribute("y", String(y + BAR_HEIGHT / 2 + 5));
-      pct.setAttribute("fill", muted);
-      pct.setAttribute("font-size", "12");
-      pct.setAttribute("font-family", "'Comic Shanns', monospace");
-      pct.textContent = `${skill.level}%`;
-      svg.appendChild(pct);
-    });
-  }
-
   function init() {
     initAnnotations();
-    renderSkillsChart();
   }
 
   // Run on page load
   init();
-
-  // Re-render chart when theme changes
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.attributeName === 'data-theme') {
-        renderSkillsChart();
-      }
-    });
-  });
-
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
 </script>
 
 <script>
@@ -201,7 +96,7 @@ import { SKILLS } from "../lib/constants";
   );
 
   function initReveal() {
-    document.querySelectorAll(".reveal").forEach((el) => {
+    document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right").forEach((el) => {
       observer.observe(el);
     });
   }
@@ -210,8 +105,35 @@ import { SKILLS } from "../lib/constants";
 </script>
 
 <style>
-  .skills__chart {
-    max-width: 550px;
+  .skills {
+    position: relative;
+  }
+
+  .skills__header {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+  }
+
+  .skills__heading {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-sm);
+  }
+
+  .skills__subhead {
+    font-family: var(--font-hand);
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-md);
+    max-width: 500px;
     margin-inline: auto;
+  }
+
+  .skills__header-line {
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-gradient-end));
+    border-radius: 2px;
+    margin: 0 auto;
+    filter: url(#sketch-filter);
   }
 </style>
