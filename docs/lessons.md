@@ -70,7 +70,7 @@ export const accounts = sqliteTable('accounts', {
   password: text('password_hash'),                   // For email/password auth
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  accessTokenExpiresAt: integer('expires_at', { mode: 'timestamp' }), // NOT 'expiresAt'
   tokenType: text('token_type'),
   scope: text('scope'),
   idToken: text('id_token'),
@@ -82,19 +82,29 @@ export const accounts = sqliteTable('accounts', {
 **CRITICAL Field Names:**
 - Use `accountId` (not `providerAccountId` or `account_id`)
 - Use `providerId` (not `provider` as property name)
+- Use `accessTokenExpiresAt` (not `expiresAt`) - **Required for OAuth**
 
 ### Verification Tokens Table
+
+**⚠️ CRITICAL:** Better Auth uses this table for OAuth state management. Must have these exact columns!
 
 ```typescript
 export const verificationTokens = sqliteTable('verification_tokens', {
   id: text('id').primaryKey().notNull(),
-  identifier: text('identifier').notNull(),
-  value: text('value').notNull(),
+  identifier: text('identifier').notNull(),  // REQUIRED for OAuth
+  value: text('value').notNull(),             // REQUIRED for OAuth
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 ```
+
+**Common Error:**
+```
+D1_ERROR: table verification_tokens has no column named identifier
+```
+
+**Fix:** Ensure your migration creates the table with the correct columns. Better Auth uses this table to store OAuth state (code verifier, callback URL) during the OAuth flow.
 
 ---
 
@@ -458,6 +468,36 @@ userAgent: text('user_agent'),
 **Cause:** Password doesn't meet minimum length (default: 8 characters).
 
 **Fix:** Enforce minimum 8 character passwords in your form validation.
+
+### Error: "table verification_tokens has no column named identifier"
+
+**Cause:** The `verification_tokens` table schema doesn't match Better Auth's requirements.
+
+**Fix:** The table MUST have these columns: `id`, `identifier`, `value`, `expires_at`, `created_at`, `updated_at`. Drop and recreate if needed:
+```sql
+DROP TABLE IF EXISTS verification_tokens;
+CREATE TABLE verification_tokens (
+  id TEXT PRIMARY KEY NOT NULL,
+  identifier TEXT NOT NULL,
+  value TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+```
+
+### Error: "unable_to_link_account" or "The field 'accessTokenExpiresAt' does not exist"
+
+**Cause:** The accounts table is missing the `accessTokenExpiresAt` field (not `expiresAt`).
+
+**Fix:** Change your Drizzle schema:
+```typescript
+// ❌ Wrong
+expiresAt: integer('expires_at', { mode: 'timestamp' }),
+
+// ✅ Correct
+accessTokenExpiresAt: integer('expires_at', { mode: 'timestamp' }),
+```
 
 ### Error: "MISSING_OR_NULL_ORIGIN"
 

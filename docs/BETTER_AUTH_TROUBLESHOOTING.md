@@ -227,8 +227,8 @@ src/
 | Better Auth Handler | ✅ Working | All endpoints functional |
 | Email/Password Auth | ✅ Working | Sign up, sign in, sign out |
 | Session Management | ✅ Working | Cookies + session data |
-| Google OAuth | ⚠️ Configured | Ready to test (credentials in .dev.vars) |
-| GitHub OAuth | ⚠️ Configured | Ready to test (credentials in .dev.vars) |
+| Google OAuth | ✅ Working | Tested and working |
+| GitHub OAuth | ⚠️ Configured | Ready to test (needs credentials in .dev.vars) |
 
 ---
 

@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { authClient } from '@/lib/auth-client';
 
 interface ImprovedSignupFormProps {
   redirectTo?: string;
@@ -100,7 +101,16 @@ export function ImprovedSignupForm({ redirectTo = '/dashboard', onSuccess }: Imp
 
   async function handleOAuthSignup(provider: 'google' | 'github' | 'apple') {
     setLoading(true);
-    window.location.href = `/api/auth/sign-in/${provider}`;
+    try {
+      await authClient.signIn.social({
+        provider,
+        callbackURL: redirectTo,
+      });
+    } catch (error) {
+      console.error('OAuth error:', error);
+      setError('Failed to sign up. Please try again.');
+      setLoading(false);
+    }
   }
 
   return (

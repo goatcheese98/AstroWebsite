@@ -39,7 +39,7 @@ export const accounts = sqliteTable('accounts', {
   password: text('password_hash'), // For email/password auth (hashed)
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  accessTokenExpiresAt: integer('expires_at', { mode: 'timestamp' }), // Better Auth uses 'accessTokenExpiresAt'
   tokenType: text('token_type'),
   scope: text('scope'),
   idToken: text('id_token'),
