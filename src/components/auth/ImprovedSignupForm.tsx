@@ -74,7 +74,7 @@ export function ImprovedSignupForm({ redirectTo = '/dashboard', onSuccess }: Imp
     }
 
     try {
-      const response = await fetch('/api/auth/sign-up', {
+      const response = await fetch('/api/auth/sign-up/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

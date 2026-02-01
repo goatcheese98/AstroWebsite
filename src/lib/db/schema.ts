@@ -6,12 +6,14 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 // Users table
+// IMPORTANT: Use camelCase for TypeScript property names, Drizzle maps to snake_case columns
 export const users = sqliteTable('users', {
   id: text('id').primaryKey().notNull(),
   email: text('email').unique().notNull(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
   name: text('name'),
-  image: text('avatar_url'),
+  image: text('avatar_url'), // Better Auth uses 'image', maps to 'avatar_url' column
+  password: text('password_hash'), // Better Auth uses 'password', maps to 'password_hash' column
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -20,25 +22,27 @@ export const users = sqliteTable('users', {
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey().notNull(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   token: text('token').unique().notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  ipAddress: text('ip_address'), // Better Auth expects this
+  userAgent: text('user_agent'), // Better Auth expects this
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
-// Accounts table (for OAuth providers)
+// Accounts table (for OAuth providers and email/password)
 export const accounts = sqliteTable('accounts', {
   id: text('id').primaryKey().notNull(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  accountId: text('account_id').notNull(),
-  providerId: text('provider_id').notNull(),
+  accountId: text('provider_account_id').notNull(), // Better Auth uses 'accountId'
+  providerId: text('provider').notNull(), // Better Auth uses 'providerId'
+  password: text('password_hash'), // For email/password auth (hashed)
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
-  idToken: text('id_token'),
   expiresAt: integer('expires_at', { mode: 'timestamp' }),
-  password: text('password'),
+  tokenType: text('token_type'),
+  scope: text('scope'),
+  idToken: text('id_token'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });

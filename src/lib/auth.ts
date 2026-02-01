@@ -39,16 +39,24 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
   const githubClientSecret = env?.GITHUB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET;
 
   return betterAuth({
-    // Base URL for authentication (required for OAuth redirects)
-    baseURL: authUrl,
+    // Base URL must point to where the Better Auth handler is mounted
+    // In our case: http://localhost:4321/api/auth (local) or https://yourdomain.com/api/auth (production)
+    baseURL: `${authUrl}/api/auth`,
 
     // Secret for signing tokens (required)
     secret: authSecret || 'fallback-secret-for-development-only',
 
     // Database adapter for Cloudflare D1 via Drizzle
+    // Map our custom table names to Better Auth's expected names
     database: drizzleAdapter(drizzleDb, {
       provider: 'sqlite',
-      usePlural: false, // Tables are singular: 'users', not 'user'
+      schema: {
+        ...schema,
+        user: schema.users,          // Map 'user' to 'users' table
+        session: schema.sessions,    // Map 'session' to 'sessions' table
+        account: schema.accounts,    // Map 'account' to 'accounts' table
+        verification: schema.verificationTokens, // Map 'verification' to 'verification_tokens' table
+      },
     }),
 
     // Email & Password authentication
@@ -93,6 +101,7 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
 
     // Security settings
     advanced: {
+      generateId: () => crypto.randomUUID(),
       cookiePrefix: 'astroweb',
       useSecureCookies: authUrl.startsWith('https'),
       crossSubDomainCookies: {
@@ -100,18 +109,8 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
       },
     },
 
-    // User schema
-    user: {
-      fields: {
-        email: 'email',
-        emailVerified: 'email_verified',
-        name: 'name',
-        image: 'avatar_url',
-      },
-      additionalFields: {
-        // Add any custom fields here
-      },
-    },
+    // User schema (fields already match Better Auth expectations via Drizzle schema)
+    // No custom field mapping needed - Drizzle schema handles the column name mapping
   });
 }
 

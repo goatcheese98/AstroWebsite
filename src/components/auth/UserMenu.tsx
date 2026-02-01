@@ -22,7 +22,7 @@ export function UserMenu() {
     // Fetch current session
     async function fetchSession() {
       try {
-        const response = await fetch('/api/auth/session', {
+        const response = await fetch('/api/auth/get-session', {
           credentials: 'include',
         });
 
@@ -68,7 +68,9 @@ export function UserMenu() {
     try {
       await fetch('/api/auth/sign-out', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({}),
       });
 
       // Redirect to home
