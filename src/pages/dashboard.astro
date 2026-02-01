@@ -1,0 +1,285 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { UserMenu } from '@/components/auth/UserMenu';
+---
+
+<BaseLayout title="Dashboard - AstroWeb" description="Your canvas dashboard">
+  <div class="dashboard-page">
+    <header class="dashboard-header">
+      <div class="dashboard-header-content">
+        <h1>Dashboard</h1>
+        <UserMenu client:load />
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-container">
+        <div class="dashboard-welcome">
+          <h2>Welcome back!</h2>
+          <p>Continue working on your canvases or create a new one.</p>
+        </div>
+
+        <div class="dashboard-actions">
+          <a href="/" class="action-card action-card-primary">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <h3>New Canvas</h3>
+            <p>Start creating with AI-powered tools</p>
+          </a>
+
+          <a href="/canvases" class="action-card">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <h3>My Canvases</h3>
+            <p>View and manage all your saved canvases</p>
+          </a>
+
+          <a href="/explore" class="action-card">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <h3>Explore Public</h3>
+            <p>Browse canvases shared by the community</p>
+          </a>
+        </div>
+
+        <div class="dashboard-stats">
+          <h3>Quick Stats</h3>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">--</div>
+              <div class="stat-label">Total Canvases</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">--</div>
+              <div class="stat-label">Public Canvases</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">--</div>
+              <div class="stat-label">Shared Links</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</BaseLayout>
+
+<script>
+  // Fetch user stats
+  async function loadStats() {
+    try {
+      const response = await fetch('/api/canvas/list?limit=100', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const total = data.canvases.length;
+        const publicCount = data.canvases.filter((c: any) => c.isPublic).length;
+
+        const statsGrid = document.getElementById('stats-grid');
+        if (statsGrid) {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="stat-value">${total}</div>
+              <div class="stat-label">Total Canvases</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${publicCount}</div>
+              <div class="stat-label">Public Canvases</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">--</div>
+              <div class="stat-label">Shared Links</div>
+            </div>
+          `;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  }
+
+  loadStats();
+</script>
+
+<style>
+  .dashboard-page {
+    min-height: 100vh;
+    background: #f9fafb;
+  }
+
+  .dashboard-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem 0;
+  }
+
+  .dashboard-header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+  }
+
+  .dashboard-main {
+    padding: 3rem 2rem;
+  }
+
+  .dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .dashboard-welcome {
+    margin-bottom: 3rem;
+  }
+
+  .dashboard-welcome h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+  }
+
+  .dashboard-welcome p {
+    color: #6b7280;
+    font-size: 1.125rem;
+    margin: 0;
+  }
+
+  .dashboard-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+
+  .action-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 2rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .action-card:hover {
+    border-color: #667eea;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.15);
+  }
+
+  .action-card svg {
+    color: #667eea;
+    margin-bottom: 1rem;
+  }
+
+  .action-card h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+  }
+
+  .action-card p {
+    color: #6b7280;
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  .action-card-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: transparent;
+  }
+
+  .action-card-primary svg {
+    color: white;
+  }
+
+  .action-card-primary h3,
+  .action-card-primary p {
+    color: white;
+  }
+
+  .action-card-primary:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 15px 30px rgba(102, 126, 234, 0.3);
+  }
+
+  .dashboard-stats {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    border: 1px solid #e5e7eb;
+  }
+
+  .dashboard-stats h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1.5rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .stat-card {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+
+  .stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-header-content {
+      padding: 0 1rem;
+    }
+
+    .dashboard-main {
+      padding: 2rem 1rem;
+    }
+
+    .dashboard-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
