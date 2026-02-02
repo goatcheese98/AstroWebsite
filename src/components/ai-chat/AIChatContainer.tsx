@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useElementSelection } from "./useElementSelection";
 import type { Message, PromptTemplate } from "./types";
+import type { GenerationOptions } from "./ImageGenerationModal";
 import { nanoid } from "nanoid";
 import PathfinderBotAvatar from "./PathfinderBotAvatar";
+import ImageGenerationModal from "./ImageGenerationModal";
+import TemplateModal from "./TemplateModal";
 
 // Quick prompt templates
 const PROMPT_TEMPLATES: PromptTemplate[] = [
@@ -65,12 +68,18 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [screenshotData, setScreenshotData] = useState<string | null>(null);
     const [isCapturing, setIsCapturing] = useState(false);
-    const [imageGenPrompt, setImageGenPrompt] = useState("");
-    const [showImageGenInput, setShowImageGenInput] = useState(false);
-    
+    const [showImageGenModal, setShowImageGenModal] = useState(false);
+    const [pendingGenerationOptions, setPendingGenerationOptions] = useState<GenerationOptions | null>(null);
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [imageHistory, setImageHistory] = useState<Array<{id: string; url: string; prompt: string; timestamp: Date}>>([]);
+    const [isCaptureForChat, setIsCaptureForChat] = useState(false);
+    const [chatScreenshotData, setChatScreenshotData] = useState<string | null>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const generationRequestIdRef = useRef<string | null>(null);
+    const chatRequestIdRef = useRef<string | null>(null);
 
     // Element selection hook
     const {
@@ -89,15 +98,29 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         },
     });
 
+    // Request initial canvas state once on mount
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("excalidraw:get-state"));
+        }, 100);
+        return () => clearTimeout(timeout);
+    }, []);
+
     // Listen for canvas state and selection changes
     useEffect(() => {
         const handleCanvasUpdate = (event: any) => {
+            // Only update if we have actual data
+            if (!event.detail) return;
+
+            // Always update canvas state to ensure proper synchronization
             setCanvasState(event.detail);
-            // Also sync selection from Excalidraw
+
+            // Sync selection from Excalidraw (without causing re-renders)
             if (event.detail?.appState?.selectedElementIds) {
                 const selectedIds = Object.entries(event.detail.appState.selectedElementIds)
                     .filter(([_, selected]) => selected)
                     .map(([id]) => id);
+
                 if (selectedIds.length > 0) {
                     selectElements(selectedIds);
                 }
@@ -105,53 +128,110 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         };
 
         window.addEventListener("excalidraw:state-update", handleCanvasUpdate);
-        window.dispatchEvent(new CustomEvent("excalidraw:get-state"));
 
         return () => {
             window.removeEventListener("excalidraw:state-update", handleCanvasUpdate);
         };
     }, [selectElements]);
 
-    // Auto-switch to "Selected" mode when elements are selected
+    // Auto-switch to "Selected" mode when elements are selected on canvas
     useEffect(() => {
         if (selectedElements.length > 0 && contextMode === "all") {
             setContextMode("selected");
         }
-    }, [selectedElements, contextMode]);
+    }, [selectedElements.length, contextMode]);
 
-    // Close image gen popup when clicking outside
+    // Listen for newly added elements from AI and select them
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (showImageGenInput) {
-                const target = event.target as HTMLElement;
-                // Check if click is outside the popup
-                if (!target.closest('[data-image-gen-popup]')) {
-                    setShowImageGenInput(false);
-                }
+        const handleElementsAdded = (event: any) => {
+            const { elementIds } = event.detail;
+            if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
+                console.log("📥 New elements added, selecting them:", elementIds);
+                // Add new elements to current selection
+                selectElements([...selectedElements, ...elementIds]);
             }
         };
 
-        if (showImageGenInput) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [showImageGenInput]);
+        window.addEventListener("excalidraw:elements-added", handleElementsAdded);
 
-    // Listen for screenshot capture events
+        return () => {
+            window.removeEventListener("excalidraw:elements-added", handleElementsAdded);
+        };
+    }, [selectElements, selectedElements]);
+
+    // Cleanup: Ensure onClose is called when component unmounts unexpectedly
+    useEffect(() => {
+        return () => {
+            // If component unmounts while still "open", notify parent
+            if (isOpen) {
+                console.warn("AIChatContainer unmounting while open - calling onClose");
+                onClose();
+            }
+        };
+    }, [isOpen, onClose]);
+
+    // Handle generation when options are ready from modal
+    useEffect(() => {
+        if (pendingGenerationOptions && !isCapturing && !generationRequestIdRef.current) {
+            setIsCapturing(true);
+
+            // Create unique request ID for this generation
+            const requestId = `generation-${Date.now()}`;
+            generationRequestIdRef.current = requestId;
+
+            console.log("🎨 Starting image generation with requestId:", requestId);
+
+            // Capture screenshot with the selected options
+            window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
+                detail: {
+                    elementIds: selectedElements.length > 0 ? selectedElements : undefined,
+                    quality: "high",
+                    backgroundColor: pendingGenerationOptions.backgroundColor !== "canvas"
+                        ? pendingGenerationOptions.backgroundColor
+                        : undefined,
+                    requestId: requestId,
+                }
+            }));
+        }
+    }, [pendingGenerationOptions, selectedElements]); // Removed isCapturing from dependencies to prevent loop
+
+    // Listen for screenshot capture events (for both generation and chat)
     useEffect(() => {
         const handleScreenshotCaptured = (event: any) => {
-            setIsCapturing(false);
-            if (event.detail.error) {
-                console.error("Screenshot error:", event.detail.error);
-                setError("Screenshot failed: " + event.detail.error);
-                setIsGeneratingImage(false);
+            // Handle image generation screenshots
+            if (generationRequestIdRef.current && event.detail.requestId === generationRequestIdRef.current) {
+                console.log("✅ Received screenshot for image generation:", event.detail.requestId);
+                setIsCapturing(false);
+
+                if (event.detail.error) {
+                    console.error("Screenshot error:", event.detail.error);
+                    setError("Screenshot failed: " + event.detail.error);
+                    setIsGeneratingImage(false);
+                    generationRequestIdRef.current = null;
+                    return;
+                }
+
+                setScreenshotData(event.detail.dataURL);
+                console.log(`📸 Screenshot captured: ${event.detail.elementCount} elements`);
                 return;
             }
-            setScreenshotData(event.detail.dataURL);
-            console.log(`📸 Screenshot captured: ${event.detail.elementCount} elements`);
+
+            // Handle chat screenshots
+            if (chatRequestIdRef.current && event.detail.requestId === chatRequestIdRef.current) {
+                console.log("✅ Received screenshot for chat:", event.detail.requestId);
+                setIsCaptureForChat(false);
+
+                if (event.detail.error) {
+                    console.error("Chat screenshot error:", event.detail.error);
+                    chatRequestIdRef.current = null;
+                    // Continue without screenshot
+                    setChatScreenshotData(null);
+                    return;
+                }
+
+                setChatScreenshotData(event.detail.dataURL);
+                console.log(`📸 Chat screenshot captured: ${event.detail.elementCount} elements`);
+            }
         };
 
         window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
@@ -162,41 +242,96 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
 
     // Generate image after screenshot is captured
     useEffect(() => {
-        if (screenshotData && !isGeneratingImage) {
+        if (screenshotData && !isGeneratingImage && generationRequestIdRef.current) {
+            console.log("🚀 Starting image generation...");
             generateImageFromScreenshot();
         }
     }, [screenshotData]);
 
+    // Continue sending chat message after screenshot is captured
+    useEffect(() => {
+        if (chatScreenshotData && !isLoading && input.trim()) {
+            console.log("📤 Screenshot ready, continuing with send...");
+            // Trigger the actual send by calling the send logic directly
+            // Don't call handleSend recursively - just set a flag
+            sendMessageWithScreenshot();
+        }
+    }, [chatScreenshotData]);
+
     // Image generation function using screenshot
-    const generateImageFromScreenshot = async () => {
-        if (!screenshotData) return;
+    const generateImageFromScreenshot = useCallback(async () => {
+        if (!screenshotData || !pendingGenerationOptions) return;
         
         setIsGeneratingImage(true);
         setError(null);
         
         try {
-            // Use user's prompt if provided, otherwise use default
-            let prompt = imageGenPrompt.trim();
-            
-            // Add context about the layout
-            prompt += "\n\nTransform this wireframe/layout reference into a realistic, polished design. ";
-            prompt += "Maintain the exact layout structure, proportions, and element positions shown in the reference image. ";
-            prompt += "If you cannot understand the layout or it's unclear, respond with 'I do not understand this layout' and explain why.";
-            
-            console.log('🎨 Generating image with prompt:', prompt.substring(0, 100) + '...');
-            
+            // Build comprehensive prompt with strict instructions
+            let systemInstructions = "You are an expert UI/UX designer tasked with transforming wireframes into photorealistic designs.\n\n";
+
+            // Add background color instruction FIRST (most important)
+            const bgColor = pendingGenerationOptions.backgroundColor;
+            if (bgColor && bgColor !== "canvas") {
+                systemInstructions += `CRITICAL: The background color MUST be exactly ${bgColor}. Do not deviate from this color under any circumstances.\n\n`;
+            }
+
+            // Add layout instructions based on strict ratio setting
+            if (pendingGenerationOptions.strictRatio) {
+                systemInstructions += `LAYOUT REQUIREMENTS (MANDATORY):
+1. Maintain EXACT element positions - do not move any elements from their locations in the wireframe
+2. Preserve PRECISE proportions - element sizes must match the wireframe exactly (1:1 ratio)
+3. Keep IDENTICAL spacing - gaps between elements must be the same as shown
+4. Follow the EXACT composition - overall layout structure cannot change
+5. Maintain relative sizes - if element A is 2x larger than element B in the wireframe, keep this ratio
+
+`;
+            } else {
+                systemInstructions += `LAYOUT REQUIREMENTS:
+1. Follow the general layout structure shown in the wireframe
+2. Element positions should be similar but can be adjusted for visual balance
+3. Proportions should be close to the reference but can be refined for aesthetics
+4. You have creative freedom to improve spacing and alignment
+
+`;
+            }
+
+            // Add the user's creative prompt
+            systemInstructions += `DESIGN VISION:\n${pendingGenerationOptions.prompt}\n\n`;
+
+            // Add quality and rendering instructions
+            systemInstructions += `RENDERING REQUIREMENTS:
+- Produce a photorealistic, high-quality design
+- Use modern design principles (proper shadows, gradients, depth)
+- Ensure professional polish and attention to detail
+- Make it look like a finished product, not a prototype
+${bgColor && bgColor !== "canvas" ? `- Background must be ${bgColor} with NO variations or gradients\n` : ""}
+- If the reference shows UI elements (buttons, cards, text), make them look realistic and functional
+
+IMPORTANT: Study the reference image carefully before generating. Your output MUST respect the layout constraints specified above.`;
+
+            console.log('🎨 Generating image with enhanced prompt');
+            console.log('🤖 Model:', pendingGenerationOptions.useProModel ? 'Gemini 3 Pro Image' : 'Gemini 2.5 Flash Image');
+            console.log('📐 Strict ratio:', pendingGenerationOptions.strictRatio);
+            console.log('🎨 Background:', bgColor || 'canvas default');
+
             const response = await fetch("/api/generate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    prompt,
-                    model: "gemini-2.5-flash-image",
+                    prompt: systemInstructions,
+                    model: pendingGenerationOptions.useProModel
+                        ? "gemini-3-pro-image-preview"
+                        : "gemini-2.5-flash-image",
                     imageData: screenshotData,
                     mode: "visual",
                 }),
             });
             
             const data = await response.json();
+            
+            // Close modal on success or error
+            setShowImageGenModal(false);
+            setPendingGenerationOptions(null);
             
             if (!response.ok) {
                 // Check for specific error cases
@@ -220,7 +355,15 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
             
             // Insert the generated image into canvas
             const imageDataUrl = `data:${data.mimeType};base64,${data.imageData}`;
-            
+
+            // Add to image history
+            setImageHistory(prev => [{
+                id: nanoid(),
+                url: imageDataUrl,
+                prompt: pendingGenerationOptions.prompt,
+                timestamp: new Date(),
+            }, ...prev]);
+
             // Calculate aspect ratio from base64 image
             const img = new Image();
             img.onload = () => {
@@ -228,10 +371,10 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                 const maxWidth = 600;
                 const width = Math.min(img.width, maxWidth);
                 const height = width / aspectRatio;
-                
+
                 window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                    detail: { 
-                        imageData: imageDataUrl, 
+                    detail: {
+                        imageData: imageDataUrl,
                         type: "png",
                         width,
                         height,
@@ -241,15 +384,16 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
             img.src = imageDataUrl;
             
             console.log('✅ Image generated and inserted');
-            setImageGenPrompt(""); // Clear prompt after success
         } catch (err) {
             console.error("Image generation error:", err);
             setError(err instanceof Error ? err.message : "Image generation failed");
         } finally {
             setIsGeneratingImage(false);
             setScreenshotData(null);
+            generationRequestIdRef.current = null; // Clear request ID
+            setPendingGenerationOptions(null); // Clear pending options to prevent re-trigger
         }
-    };
+    }, [screenshotData, pendingGenerationOptions]);
 
 
 
@@ -307,17 +451,32 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         setIsResizing(true);
     };
 
-    // Execute drawing command
-    const executeDrawingCommand = useCallback((elementsArray: any[]) => {
+    // Execute drawing command (creates new elements)
+    const executeDrawingCommand = useCallback((elementsArray: any[], isModification = false) => {
         try {
             if (!Array.isArray(elementsArray)) return false;
             const event = new CustomEvent("excalidraw:draw", {
-                detail: { elements: elementsArray },
+                detail: { elements: elementsArray, isModification },
             });
             window.dispatchEvent(event);
             return true;
         } catch (err) {
             console.error("Failed to execute drawing command:", err);
+            return false;
+        }
+    }, []);
+
+    // Execute update command (modifies existing elements)
+    const executeUpdateCommand = useCallback((elementsArray: any[]) => {
+        try {
+            if (!Array.isArray(elementsArray)) return false;
+            const event = new CustomEvent("excalidraw:update-elements", {
+                detail: { elements: elementsArray },
+            });
+            window.dispatchEvent(event);
+            return true;
+        } catch (err) {
+            console.error("Failed to execute update command:", err);
             return false;
         }
     }, []);
@@ -345,22 +504,39 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         setAiProvider(prev => prev === "kimi" ? "claude" : "kimi");
     };
 
-    // Send message
-    const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
-
+    // Actual message sending logic (extracted to prevent recursion)
+    const sendMessageWithScreenshot = useCallback(async () => {
         const userContent = input.trim();
-        
+        if (!userContent) return;
+
+        // Reset capture state
+        setIsCaptureForChat(false);
+
         // Build context based on mode
         let contextMessage = "";
+        let elementDataForPrompt = "";
+        let isModifyingElements = false;
+        
         if (contextMode === "selected" && selectedElements.length > 0) {
             const selectionContext = getSelectionContext();
             contextMessage = `\n\n[Working with ${selectedElements.length} selected elements:\n${selectionContext}]`;
+            
+            // Include full element data in the prompt for both providers
+            // This allows the AI to modify existing elements by returning the same IDs
+            if (canvasState?.elements) {
+                const selectedElementData = canvasState.elements.filter((el: any) => 
+                    selectedElements.includes(el.id)
+                );
+                if (selectedElementData.length > 0) {
+                    elementDataForPrompt = `\n\nSELECTED ELEMENTS DATA (JSON - MODIFY THESE, PRESERVE IDs):\n${JSON.stringify(selectedElementData, null, 2)}`;
+                    isModifyingElements = true;
+                }
+            }
         } else {
             contextMessage = `\n\n[Canvas has ${canvasState?.elements?.length || 0} total elements]`;
         }
 
-        const fullContent = userContent + contextMessage;
+        const fullContent = userContent + contextMessage + elementDataForPrompt;
 
         const userMessage: Message = {
             id: nanoid(),
@@ -383,6 +559,13 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         setIsLoading(true);
         setError(null);
 
+        // Store screenshot data to send with message
+        const screenshotToSend = chatScreenshotData;
+
+        // Clear screenshot data for next message
+        setChatScreenshotData(null);
+        chatRequestIdRef.current = null;
+
         try {
             const canvasDescription = getCanvasDescription();
             const selectionContext = selectedElements.length > 0 
@@ -395,6 +578,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                 selectedElements: selectedElements.length > 0 
                     ? `User has selected ${selectedElements.length} elements: ${getSelectionContext()}`
                     : "No specific elements selected",
+                isModifyingElements,
             };
 
             let response;
@@ -403,7 +587,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
             if (aiProvider === "kimi") {
                 // Kimi API
                 console.log('🌙 Sending to Kimi K2.5...');
-                
+
                 response = await fetch("/api/chat-kimi", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -414,6 +598,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         })),
                         model: "kimi-k2-0711-preview",
                         canvasState: canvasStateData,
+                        screenshot: screenshotToSend, // Include screenshot if available
                     }),
                 });
 
@@ -421,14 +606,25 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
 
                 if (!response.ok) {
                     console.error('❌ Kimi API error:', data);
-                    throw new Error(data.error || data.details || "Kimi API failed");
+
+                    // Check for rate limit / overload errors
+                    const errorMessage = data.details || data.error || "Kimi API failed";
+                    const isOverloaded = errorMessage.toLowerCase().includes('overload') ||
+                                       errorMessage.toLowerCase().includes('too many requests') ||
+                                       response.status === 429;
+
+                    if (isOverloaded) {
+                        throw new Error("Kimi is currently overloaded. Click the green badge above to switch to Claude instead.");
+                    }
+
+                    throw new Error(errorMessage);
                 }
-                
+
                 console.log('✅ Kimi response received');
             } else {
                 // Claude API
                 console.log('🎭 Sending to Claude...');
-                
+
                 response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -439,6 +635,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         })),
                         model: "claude-sonnet-4-20250514",
                         canvasState: canvasStateData,
+                        screenshot: screenshotToSend, // Include screenshot if available
                     }),
                 });
 
@@ -446,15 +643,27 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
 
                 if (!response.ok) {
                     console.error('❌ Claude API error:', data);
-                    throw new Error(data.error || data.details || "Claude API failed");
+
+                    // Check for rate limit errors
+                    const errorMessage = data.details || data.error || "Claude API failed";
+                    const isOverloaded = errorMessage.toLowerCase().includes('overload') ||
+                                       errorMessage.toLowerCase().includes('too many requests') ||
+                                       response.status === 429;
+
+                    if (isOverloaded) {
+                        throw new Error("Claude is currently overloaded. Try switching to Kimi using the badge above, or wait a moment and try again.");
+                    }
+
+                    throw new Error(errorMessage);
                 }
-                
+
                 console.log('✅ Claude response received');
             }
 
             // Parse drawing commands
             let displayMessage = data.message;
             let drawingCommand: any[] | null = null;
+            let isModification = false;
 
             const jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/) 
                 || data.message.match(/```\s*\n([\s\S]*?)\n```/)
@@ -465,13 +674,59 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                     const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
                     if (Array.isArray(parsed)) {
                         drawingCommand = parsed;
-                        const success = executeDrawingCommand(parsed);
-                        displayMessage = data.message.replace(
-                            jsonMatch[0],
-                            success 
-                                ? "\n\n✅ **Drawing added to canvas!**\n" 
-                                : "\n\n⚠️ **Failed to add drawing**\n"
-                        );
+                        
+                        // Separate elements into updates (have IDs matching selection) and new elements
+                        const selectedIds = new Set(selectedElements);
+                        const elementsToUpdate: any[] = [];
+                        const elementsToAdd: any[] = [];
+                        
+                        parsed.forEach((el: any) => {
+                            if (el.id && selectedIds.has(el.id)) {
+                                // Existing element to update
+                                elementsToUpdate.push(el);
+                            } else {
+                                // New element to add
+                                elementsToAdd.push(el);
+                            }
+                        });
+                        
+                        let updateSuccess = false;
+                        let addSuccess = false;
+                        
+                        // Update existing elements
+                        if (elementsToUpdate.length > 0) {
+                            updateSuccess = executeUpdateCommand(elementsToUpdate);
+                            isModification = true;
+                        }
+                        
+                        // Add new elements (pass isModification flag to preserve positioning)
+                        if (elementsToAdd.length > 0) {
+                            addSuccess = executeDrawingCommand(elementsToAdd, isModification || contextMode === "selected");
+                        }
+                        
+                        // Build appropriate success message
+                        if (elementsToUpdate.length > 0 && elementsToAdd.length > 0) {
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                (updateSuccess && addSuccess)
+                                    ? `\n\n✅ **${elementsToUpdate.length} element(s) updated, ${elementsToAdd.length} new element(s) added!**\n`
+                                    : "\n\n⚠️ **Some operations failed**\n"
+                            );
+                        } else if (elementsToUpdate.length > 0) {
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                updateSuccess
+                                    ? "\n\n✅ **Elements updated!**\n" 
+                                    : "\n\n⚠️ **Failed to update elements**\n"
+                            );
+                        } else {
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                addSuccess
+                                    ? "\n\n✅ **Drawing added to canvas!**\n" 
+                                    : "\n\n⚠️ **Failed to add drawing**\n"
+                            );
+                        }
                     }
                 } catch (err) {
                     console.error("Failed to parse drawing command:", err);
@@ -498,6 +753,38 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         } finally {
             setIsLoading(false);
         }
+    }, [input, contextMode, selectedElements, canvasState, chatScreenshotData, messages, aiProvider, getSelectionContext, getCanvasDescription, executeDrawingCommand, executeUpdateCommand]);
+
+    // Send message (with optional screenshot for selected elements)
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return;
+
+        // Skip screenshot for Kimi (doesn't support image input)
+        const isKimi = aiProvider === "kimi";
+        
+        // If in selected mode with elements and we don't have a screenshot yet, capture one first
+        // BUT skip screenshot capture for Kimi since it doesn't support images
+        if (!isKimi && contextMode === "selected" && selectedElements.length > 0 && !chatScreenshotData && !isCaptureForChat) {
+            setIsCaptureForChat(true);
+            const requestId = `chat-${Date.now()}`;
+            chatRequestIdRef.current = requestId;
+
+            console.log("📸 Capturing screenshot for chat with requestId:", requestId);
+
+            window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
+                detail: {
+                    elementIds: selectedElements,
+                    quality: "low", // Low quality for fast transmission
+                    requestId: requestId,
+                }
+            }));
+
+            // Wait for screenshot to be captured (will trigger sendMessageWithScreenshot via useEffect)
+            return;
+        }
+
+        // If we reach here, either we have a screenshot, don't need one, or we're using Kimi (no screenshot)
+        await sendMessageWithScreenshot();
     };
 
     // Handle template selection
@@ -512,8 +799,25 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
             });
             setInput(filled);
         }
+        setShowTemplateModal(false);
         setShowTemplates(false);
         inputRef.current?.focus();
+    };
+
+    // Copy image to clipboard
+    const copyImageToClipboard = async (imageUrl: string) => {
+        try {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type]: blob
+                })
+            ]);
+            console.log("✅ Image copied to clipboard");
+        } catch (err) {
+            console.error("Failed to copy image:", err);
+        }
     };
 
     // Keyboard shortcuts
@@ -535,19 +839,6 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
 
     return (
         <>
-            {/* Backdrop - Reduced blur */}
-            <div 
-                className="ai-chat-backdrop"
-                onClick={onClose}
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.2)",
-                    zIndex: 998,
-                    animation: "fadeIn 0.2s ease",
-                }}
-            />
-
             {/* Panel */}
             <div
                 ref={panelRef}
@@ -565,6 +856,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                     display: "flex",
                     flexDirection: "column",
                     animation: "slideIn 0.25s ease",
+                    pointerEvents: "auto", // Re-enable pointer events on the panel itself
                 }}
             >
                 {/* Resize Handle */}
@@ -609,15 +901,15 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                             {/* Clickable AI Provider Badge */}
                             <button
                                 onClick={toggleAIProvider}
-                                title={`Click to switch to ${aiProvider === "kimi" ? "Claude" : "Kimi"}`}
+                                title={`Click to switch to ${aiProvider === "kimi" ? "Claude (premium)" : "Kimi"}`}
                                 style={{
                                     fontSize: "10px",
                                     padding: "2px 6px",
-                                    background: aiProvider === "kimi" ? "#8b5cf6" : "#ec4899",
+                                    background: aiProvider === "kimi" ? "#10b981" : "#047857",
                                     color: "white",
                                     borderRadius: "4px",
                                     fontWeight: 500,
-                                    border: "none",
+                                    border: aiProvider === "kimi" ? "1px solid #059669" : "1px solid #065f46",
                                     cursor: "pointer",
                                     transition: "all 0.15s",
                                     display: "flex",
@@ -625,12 +917,10 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                                     gap: "3px",
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.opacity = "0.85";
-                                    e.currentTarget.style.transform = "scale(1.02)";
+                                    e.currentTarget.style.background = aiProvider === "kimi" ? "#059669" : "#065f46";
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.opacity = "1";
-                                    e.currentTarget.style.transform = "scale(1)";
+                                    e.currentTarget.style.background = aiProvider === "kimi" ? "#10b981" : "#047857";
                                 }}
                             >
                                 {aiProvider === "kimi" ? "Kimi K2.5" : "Claude"}
@@ -707,18 +997,21 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         border: "1px solid var(--color-stroke-muted, #e5e7eb)",
                     }}>
                         <button
-                            onClick={() => setContextMode("all")}
+                            onClick={() => {
+                                setContextMode("all");
+                                clearSelection(); // Clear selection when switching to "All" mode
+                            }}
                             style={{
                                 flex: 1,
                                 padding: "6px 12px",
                                 borderRadius: "6px",
-                                border: "none",
-                                background: contextMode === "all" 
-                                    ? "var(--color-accent, #6366f1)" 
-                                    : "transparent",
-                                color: contextMode === "all" 
-                                    ? "white" 
-                                    : "var(--color-text, #1f2937)",
+                                border: contextMode === "all" ? "1px solid #047857" : "1px solid #fca5a5",
+                                background: contextMode === "all"
+                                    ? "#059669"
+                                    : "#fee2e2",
+                                color: contextMode === "all"
+                                    ? "white"
+                                    : "#9ca3af",
                                 fontSize: "12px",
                                 fontWeight: 500,
                                 cursor: "pointer",
@@ -733,13 +1026,13 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                                 flex: 1,
                                 padding: "6px 12px",
                                 borderRadius: "6px",
-                                border: "none",
-                                background: contextMode === "selected" 
-                                    ? "var(--color-accent, #6366f1)" 
-                                    : "transparent",
-                                color: contextMode === "selected" 
-                                    ? "white" 
-                                    : "var(--color-text, #1f2937)",
+                                border: contextMode === "selected" ? "1px solid #059669" : "1px solid #fca5a5",
+                                background: contextMode === "selected"
+                                    ? "#10b981"
+                                    : "#fee2e2",
+                                color: contextMode === "selected"
+                                    ? "white"
+                                    : "#9ca3af",
                                 fontSize: "12px",
                                 fontWeight: 500,
                                 cursor: "pointer",
@@ -750,59 +1043,29 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         </button>
                     </div>
 
-                    {/* Element Selection Bar */}
+                    {/* Selection Tip */}
                     {contextMode === "selected" && (
                         <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            flexWrap: "wrap",
+                            marginTop: "10px",
+                            padding: "8px 12px",
+                            background: "var(--color-surface, #ffffff)",
+                            borderRadius: "6px",
+                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
                         }}>
-                            <button
-                                onClick={() => setSelectionMode(!isSelectionMode)}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "5px",
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    border: "1px solid",
-                                    borderColor: isSelectionMode 
-                                        ? "var(--color-accent, #6366f1)" 
-                                        : "var(--color-stroke-muted, #e5e7eb)",
-                                    background: isSelectionMode 
-                                        ? "var(--color-accent-light, #e0e7ff)" 
-                                        : "var(--color-surface, #ffffff)",
-                                    color: isSelectionMode 
-                                        ? "var(--color-accent, #6366f1)" 
-                                        : "var(--color-text, #1f2937)",
-                                    fontSize: "12px",
-                                    cursor: "pointer",
-                                    transition: "all 0.15s",
-                                }}
-                            >
+                            <div style={{
+                                fontSize: "11px",
+                                color: "var(--color-text-muted, #6b7280)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                            }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M4 4h16v16H4z" />
-                                    <path d="M9 9h6v6H9z" />
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                    <path d="M2 17l10 5 10-5"/>
+                                    <path d="M2 12l10 5 10-5"/>
                                 </svg>
-                                {isSelectionMode ? "Click canvas..." : "Select on canvas"}
-                            </button>
-
-                            {selectedElements.length > 0 && (
-                                <button
-                                    onClick={clearSelection}
-                                    style={{
-                                        padding: "5px 10px",
-                                        background: "transparent",
-                                        border: "none",
-                                        color: "var(--color-text-muted, #6b7280)",
-                                        fontSize: "12px",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Clear
-                                </button>
-                            )}
+                                💡 Hold <strong>Shift</strong> to multi-select items on canvas
+                            </div>
                         </div>
                     )}
 
@@ -858,31 +1121,6 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         </div>
                     )}
 
-                    {/* Image Generation Hint - Shows when elements are selected */}
-                    {contextMode === "selected" && selectedElements.length > 0 && (
-                        <div style={{
-                            marginTop: "12px",
-                            padding: "10px",
-                            background: "var(--color-surface, #ffffff)",
-                            borderRadius: "8px",
-                            border: "1px dashed var(--color-accent, #6366f1)",
-                        }}>
-                            <div style={{
-                                fontSize: "11px",
-                                color: "var(--color-text-muted, #6b7280)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                            }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--color-accent, #6366f1)" }}>
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                                Click <strong>"Generate Image"</strong> in the toolbar below to transform this layout into a realistic design
-                            </div>
-                        </div>
-                    )}
 
                     {/* All Elements Summary */}
                     {contextMode === "all" && canvasState?.elements?.length > 0 && (
@@ -904,6 +1142,124 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         </div>
                     )}
                 </div>
+
+                {/* Image History */}
+                {imageHistory.length > 0 && (
+                    <div style={{
+                        padding: "14px 18px",
+                        background: "var(--color-fill-1, #f3f4f6)",
+                        borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                    }}>
+                        <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "10px",
+                        }}>
+                            <div style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                color: "var(--color-text-muted, #6b7280)",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                            }}>
+                                Generated Images ({imageHistory.length})
+                            </div>
+                            <button
+                                onClick={() => setImageHistory([])}
+                                style={{
+                                    fontSize: "10px",
+                                    padding: "4px 8px",
+                                    background: "transparent",
+                                    border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                    borderRadius: "4px",
+                                    color: "var(--color-text-muted, #6b7280)",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "var(--color-error-bg, #fef2f2)";
+                                    e.currentTarget.style.borderColor = "var(--color-error, #ef4444)";
+                                    e.currentTarget.style.color = "var(--color-error, #ef4444)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.borderColor = "var(--color-stroke-muted, #e5e7eb)";
+                                    e.currentTarget.style.color = "var(--color-text-muted, #6b7280)";
+                                }}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <div style={{
+                            display: "flex",
+                            gap: "8px",
+                            overflowX: "auto",
+                            paddingBottom: "4px",
+                        }}>
+                            {imageHistory.map(img => {
+                                const [isHovered, setIsHovered] = React.useState(false);
+                                return (
+                                    <div
+                                        key={img.id}
+                                        onMouseEnter={() => setIsHovered(true)}
+                                        onMouseLeave={() => setIsHovered(false)}
+                                        style={{
+                                            position: "relative",
+                                            minWidth: "80px",
+                                            width: "80px",
+                                            height: "80px",
+                                            borderRadius: "8px",
+                                            overflow: "hidden",
+                                            border: "2px solid var(--color-stroke-muted, #e5e7eb)",
+                                            background: "var(--color-surface, #ffffff)",
+                                            transform: isHovered ? "scale(1.05)" : "scale(1)",
+                                            transition: "transform 0.15s",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <img
+                                            src={img.url}
+                                            alt={img.prompt}
+                                            title={img.prompt}
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => copyImageToClipboard(img.url)}
+                                            title="Copy image"
+                                            style={{
+                                                position: "absolute",
+                                                top: "4px",
+                                                right: "4px",
+                                                width: "24px",
+                                                height: "24px",
+                                                borderRadius: "4px",
+                                                border: "none",
+                                                background: "rgba(0, 0, 0, 0.7)",
+                                                color: "white",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                opacity: isHovered ? 1 : 0,
+                                                transition: "opacity 0.15s",
+                                            }}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Messages */}
                 <div style={{
@@ -995,96 +1351,6 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Quick Templates */}
-                {showTemplates && (
-                    <div style={{
-                        position: "absolute",
-                        bottom: "90px",
-                        left: "16px",
-                        right: "16px",
-                        background: "var(--color-surface, #ffffff)",
-                        border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                        borderRadius: "12px",
-                        boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
-                        padding: "14px",
-                        zIndex: 10,
-                    }}>
-                        <div style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: "10px",
-                        }}>
-                            <span style={{
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                color: "var(--color-text, #1f2937)",
-                            }}>
-                                Quick Templates
-                            </span>
-                            <button
-                                onClick={() => setShowTemplates(false)}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "var(--color-text-muted, #6b7280)",
-                                    padding: "4px",
-                                }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(2, 1fr)",
-                            gap: "8px",
-                        }}>
-                            {PROMPT_TEMPLATES.map(template => (
-                                <button
-                                    key={template.id}
-                                    onClick={() => handleTemplateSelect(template)}
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "flex-start",
-                                        gap: "3px",
-                                        padding: "10px",
-                                        background: "var(--color-fill-1, #f3f4f6)",
-                                        border: "1px solid transparent",
-                                        borderRadius: "8px",
-                                        cursor: "pointer",
-                                        transition: "all 0.15s",
-                                        textAlign: "left",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
-                                        e.currentTarget.style.background = "var(--color-accent-light, #e0e7ff)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = "transparent";
-                                        e.currentTarget.style.background = "var(--color-fill-1, #f3f4f6)";
-                                    }}
-                                >
-                                    <span style={{ fontSize: "18px" }}>{template.icon}</span>
-                                    <span style={{
-                                        fontSize: "12px",
-                                        fontWeight: 600,
-                                        color: "var(--color-text, #1f2937)",
-                                    }}>
-                                        {template.title}
-                                    </span>
-                                    <span style={{
-                                        fontSize: "10px",
-                                        color: "var(--color-text-muted, #6b7280)",
-                                    }}>
-                                        {template.description}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
 
                 {/* Input Area */}
                 <div style={{
@@ -1100,7 +1366,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         marginBottom: "10px",
                     }}>
                         <button
-                            onClick={() => setShowTemplates(!showTemplates)}
+                            onClick={() => setShowTemplateModal(true)}
                             style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -1112,166 +1378,105 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                                 fontSize: "11px",
                                 color: "var(--color-text-muted, #6b7280)",
                                 cursor: "pointer",
+                                transition: "all 0.15s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
+                                e.currentTarget.style.background = "var(--color-accent-light, #e0e7ff)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = "var(--color-stroke-muted, #e5e7eb)";
+                                e.currentTarget.style.background = "transparent";
                             }}
                         >
                             <span>⚡</span>
                             Templates
                         </button>
                         
-                        {/* Generate Image Button with Prompt */}
-                        <div style={{ position: "relative" }}>
-                            <button
-                                onClick={() => setShowImageGenInput(!showImageGenInput)}
-                                disabled={isGeneratingImage || isCapturing}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    padding: "5px 10px",
-                                    background: isGeneratingImage || isCapturing
-                                        ? "var(--color-fill-2, #e5e7eb)"
-                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "11px",
-                                    color: isGeneratingImage || isCapturing ? "var(--color-text-muted, #6b7280)" : "white",
-                                    cursor: isGeneratingImage || isCapturing ? "not-allowed" : "pointer",
-                                    transition: "all 0.15s",
-                                    fontWeight: 500,
-                                }}
-                            >
-                                {isCapturing ? (
-                                    <>
-                                        <div style={{
-                                            width: "10px",
-                                            height: "10px",
-                                            border: "2px solid rgba(255,255,255,0.3)",
-                                            borderTopColor: "white",
-                                            borderRadius: "50%",
-                                            animation: "spin 0.8s linear infinite",
-                                        }} />
-                                        Capturing...
-                                    </>
-                                ) : isGeneratingImage ? (
-                                    <>
-                                        <div style={{
-                                            width: "10px",
-                                            height: "10px",
-                                            border: "2px solid rgba(255,255,255,0.3)",
-                                            borderTopColor: "white",
-                                            borderRadius: "50%",
-                                            animation: "spin 0.8s linear infinite",
-                                        }} />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                            <circle cx="8.5" cy="8.5" r="1.5" />
-                                            <polyline points="21 15 16 10 5 21" />
-                                        </svg>
-                                        Generate Image
-                                    </>
-                                )}
-                            </button>
-                            
-                            {/* Image Generation Prompt Input Popup */}
-                            {showImageGenInput && (
-                                <div data-image-gen-popup style={{
-                                    position: "absolute",
-                                    bottom: "calc(100% + 8px)",
-                                    right: 0,
-                                    width: "280px",
-                                    padding: "12px",
-                                    background: "var(--color-surface, #ffffff)",
-                                    border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                                    borderRadius: "10px",
-                                    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.15)",
-                                    zIndex: 100,
-                                }}>
+                        {/* Generate Image Button - Opens Modal */}
+                        <button
+                            onClick={() => {
+                                if (selectedElements.length === 0) {
+                                    setError("Select items first");
+                                    setTimeout(() => setError(null), 2000);
+                                    return;
+                                }
+                                setShowImageGenModal(true);
+                                setError(null);
+                            }}
+                            title={selectedElements.length === 0 ? "Select elements on the canvas to generate an image" : "Generate realistic image from selected elements"}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "5px 10px",
+                                background: (isGeneratingImage || isCapturing || selectedElements.length === 0)
+                                    ? "#fee2e2"
+                                    : "#059669",
+                                border: selectedElements.length > 0 && !isGeneratingImage && !isCapturing
+                                    ? "1px solid #047857"
+                                    : "1px solid #fca5a5",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                color: (isGeneratingImage || isCapturing || selectedElements.length === 0)
+                                    ? "#9ca3af"
+                                    : "white",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                fontWeight: 500,
+                                boxShadow: selectedElements.length > 0 && !isGeneratingImage && !isCapturing
+                                    ? "0 0 0 3px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1)"
+                                    : "none",
+                                position: "relative" as const,
+                            }}
+                            onMouseEnter={(e) => {
+                                if (selectedElements.length > 0 && !isGeneratingImage && !isCapturing) {
+                                    e.currentTarget.style.background = "#047857";
+                                    e.currentTarget.style.boxShadow = "0 0 0 4px rgba(5, 150, 105, 0.15), 0 2px 6px rgba(0, 0, 0, 0.15)";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (selectedElements.length > 0 && !isGeneratingImage && !isCapturing) {
+                                    e.currentTarget.style.background = "#059669";
+                                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1)";
+                                }
+                            }}
+                        >
+                            {isCapturing ? (
+                                <>
                                     <div style={{
-                                        fontSize: "12px",
-                                        fontWeight: 600,
-                                        color: "var(--color-text, #1f2937)",
-                                        marginBottom: "8px",
-                                    }}>
-                                        🎨 Generate Image
-                                    </div>
-                                    <textarea
-                                        value={imageGenPrompt}
-                                        onChange={(e) => setImageGenPrompt(e.target.value)}
-                                        placeholder="Describe what you want to create... (e.g., 'modern SaaS dashboard with blue theme', 'iOS app interface', 'e-commerce product page')"
-                                        rows={3}
-                                        style={{
-                                            width: "100%",
-                                            padding: "8px 10px",
-                                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                                            borderRadius: "6px",
-                                            fontSize: "12px",
-                                            resize: "none",
-                                            marginBottom: "8px",
-                                            fontFamily: "inherit",
-                                        }}
-                                    />
+                                        width: "10px",
+                                        height: "10px",
+                                        border: "2px solid rgba(255,255,255,0.3)",
+                                        borderTopColor: "white",
+                                        borderRadius: "50%",
+                                        animation: "spin 0.8s linear infinite",
+                                    }} />
+                                    Capturing...
+                                </>
+                            ) : isGeneratingImage ? (
+                                <>
                                     <div style={{
-                                        display: "flex",
-                                        gap: "8px",
-                                    }}>
-                                        <button
-                                            onClick={() => setShowImageGenInput(false)}
-                                            style={{
-                                                flex: 1,
-                                                padding: "6px 10px",
-                                                background: "var(--color-fill-1, #f3f4f6)",
-                                                border: "none",
-                                                borderRadius: "6px",
-                                                fontSize: "11px",
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                if (!imageGenPrompt.trim()) {
-                                                    setError("Please describe what you want to generate");
-                                                    return;
-                                                }
-                                                
-                                                setShowImageGenInput(false);
-                                                setIsCapturing(true);
-                                                setError(null);
-                                                
-                                                // Capture screenshot
-                                                window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
-                                                    detail: { 
-                                                        elementIds: selectedElements.length > 0 ? selectedElements : undefined,
-                                                        quality: "high"
-                                                    }
-                                                }));
-                                            }}
-                                            disabled={!imageGenPrompt.trim()}
-                                            style={{
-                                                flex: 1,
-                                                padding: "6px 10px",
-                                                background: !imageGenPrompt.trim() 
-                                                    ? "var(--color-fill-2, #e5e7eb)" 
-                                                    : "var(--color-accent, #6366f1)",
-                                                color: !imageGenPrompt.trim() ? "var(--color-text-muted, #6b7280)" : "white",
-                                                border: "none",
-                                                borderRadius: "6px",
-                                                fontSize: "11px",
-                                                fontWeight: 600,
-                                                cursor: !imageGenPrompt.trim() ? "not-allowed" : "pointer",
-                                            }}
-                                        >
-                                            Generate
-                                        </button>
-                                    </div>
-                                </div>
+                                        width: "10px",
+                                        height: "10px",
+                                        border: "2px solid rgba(255,255,255,0.3)",
+                                        borderTopColor: "white",
+                                        borderRadius: "50%",
+                                        animation: "spin 0.8s linear infinite",
+                                    }} />
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                        <polyline points="21 15 16 10 5 21" />
+                                    </svg>
+                                    Generate Image
+                                </>
                             )}
-                        </div>
+                        </button>
                     </div>
 
                     {/* Input */}
@@ -1310,17 +1515,28 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                                 alignSelf: "flex-end",
                                 padding: "10px 18px",
                                 background: !input.trim() || isLoading
-                                    ? "var(--color-fill-2, #e5e7eb)"
-                                    : "var(--color-accent, #6366f1)",
+                                    ? "#fee2e2"
+                                    : "#059669",
                                 color: !input.trim() || isLoading
-                                    ? "var(--color-text-muted, #6b7280)"
+                                    ? "#9ca3af"
                                     : "white",
-                                border: "none",
+                                border: input.trim() && !isLoading ? "1px solid #047857" : "1px solid #fca5a5",
                                 borderRadius: "8px",
                                 fontSize: "13px",
                                 fontWeight: 600,
                                 cursor: !input.trim() || isLoading ? "not-allowed" : "pointer",
                                 transition: "all 0.15s",
+                                boxShadow: input.trim() && !isLoading ? "0 1px 3px rgba(0, 0, 0, 0.1)" : "none",
+                            }}
+                            onMouseEnter={(e) => {
+                                if (input.trim() && !isLoading) {
+                                    e.currentTarget.style.background = "#047857";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (input.trim() && !isLoading) {
+                                    e.currentTarget.style.background = "#059669";
+                                }
                             }}
                         >
                             Send
@@ -1350,6 +1566,33 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                     }
                 `}</style>
             </div>
+
+            {/* Image Generation Modal */}
+            <ImageGenerationModal
+                isOpen={showImageGenModal}
+                onClose={() => {
+                    setShowImageGenModal(false);
+                    setIsCapturing(false);
+                    setIsGeneratingImage(false);
+                    setPendingGenerationOptions(null);
+                }}
+                selectedElements={selectedElements}
+                elementSnapshots={elementSnapshots}
+                canvasState={canvasState}
+                onGenerate={(options) => {
+                    setPendingGenerationOptions(options);
+                }}
+                isGenerating={isGeneratingImage}
+                isCapturing={isCapturing}
+            />
+
+            {/* Template Modal */}
+            <TemplateModal
+                isOpen={showTemplateModal}
+                onClose={() => setShowTemplateModal(false)}
+                onSelect={handleTemplateSelect}
+                selectedElementsCount={selectedElements.length}
+            />
         </>
     );
 }

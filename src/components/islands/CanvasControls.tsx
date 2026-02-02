@@ -177,7 +177,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
         }
     };
 
-    // Hide all controls when any panel is open
+    // Hide controls when any panel is open (but state sync is now fixed)
     const isPanelOpen = isChatOpen || isAssetsOpen;
 
     return (

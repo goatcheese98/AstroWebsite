@@ -2,6 +2,8 @@
 
 export { default as AIChatContainer } from "./AIChatContainer";
 export { default as PathfinderBotAvatar } from "./PathfinderBotAvatar";
+export { default as ImageGenerationModal } from "./ImageGenerationModal";
+export { default as TemplateModal } from "./TemplateModal";
 export { useElementSelection } from "./useElementSelection";
 
 // Types
@@ -20,3 +22,5 @@ export type {
     CanvasSelectionEvent,
     ElementContext,
 } from "./types";
+
+export type { GenerationOptions } from "./ImageGenerationModal";

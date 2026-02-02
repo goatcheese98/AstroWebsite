@@ -57,6 +57,7 @@ export const CanvasStateSchema = z
   .object({
     description: z.string().max(10000).optional(),
     elements: z.array(z.unknown()).optional(), // Excalidraw elements
+    isModifyingElements: z.boolean().optional(), // Whether user is modifying existing elements
     spatialLayout: z
       .object({
         emptySpaces: z

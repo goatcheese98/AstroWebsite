@@ -70,20 +70,51 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Extract validated data (already sanitized and type-safe!)
     const { messages, model: selectedModel, canvasState } = validation.data;
+    const screenshot = (body as any).screenshot; // Screenshot is optional
 
     // Build canvas context for system prompt
     const canvasContext = buildCanvasContext(canvasState);
     const systemPrompt = getExcalidrawSystemPrompt(canvasContext);
+
+    // Prepare messages with optional screenshot
+    const formattedMessages = messages.map((msg, index) => {
+      // Add screenshot to the last user message if available
+      if (screenshot && index === messages.length - 1 && msg.role === 'user') {
+        // Extract base64 data from data URL
+        const base64Data = screenshot.split(',')[1];
+        const mediaType = screenshot.split(';')[0].split(':')[1] || 'image/png';
+
+        return {
+          role: msg.role,
+          content: [
+            {
+              type: 'image' as const,
+              source: {
+                type: 'base64' as const,
+                media_type: mediaType as 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp',
+                data: base64Data,
+              },
+            },
+            {
+              type: 'text' as const,
+              text: msg.content,
+            },
+          ],
+        };
+      }
+
+      return {
+        role: msg.role,
+        content: msg.content,
+      };
+    });
 
     // Call Claude API (messages are already validated and sanitized)
     const response = await client.messages.create({
       model: selectedModel,
       max_tokens: CLAUDE_CONFIG.MAX_TOKENS,
       system: systemPrompt,
-      messages: messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
+      messages: formattedMessages,
     });
 
     // Extract text response

@@ -58,7 +58,7 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    const { messages, model, canvasState } = body as any;
+    const { messages, model, canvasState, screenshot } = body as any;
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -80,6 +80,34 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log('🌙 Calling Kimi API with model:', model || KIMI_CONFIG.DEFAULT_MODEL);
     console.log('📊 Canvas context:', canvasContext?.substring(0, 100) + '...');
+    if (screenshot) console.log('📸 Including screenshot with request');
+
+    // Prepare messages with optional screenshot (OpenAI vision format)
+    const formattedMessages = messages.map((msg: any, index: number) => {
+      // Add screenshot to the last user message if available
+      if (screenshot && index === messages.length - 1 && msg.role === 'user') {
+        return {
+          role: msg.role,
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: screenshot, // Kimi supports data URLs directly
+              },
+            },
+            {
+              type: 'text',
+              text: msg.content,
+            },
+          ],
+        };
+      }
+
+      return {
+        role: msg.role,
+        content: msg.content,
+      };
+    });
 
     // Call Kimi/Moonshot API (OpenAI-compatible)
     const response = await fetch(`${KIMI_CONFIG.BASE_URL}/chat/completions`, {
@@ -92,10 +120,7 @@ export const POST: APIRoute = async ({ request }) => {
         model: model || KIMI_CONFIG.DEFAULT_MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages.map((msg: any) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          ...formattedMessages,
         ],
         temperature: KIMI_CONFIG.TEMPERATURE,
         max_tokens: KIMI_CONFIG.MAX_TOKENS,

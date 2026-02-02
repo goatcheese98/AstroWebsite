@@ -68,7 +68,6 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
 
     return (
         <>
-            <div className="panel-backdrop" onClick={onClose} />
             <div className="assets-panel" style={{ width: `${panelWidth}px` }}>
                 <div className="resize-handle" onMouseDown={handleResizeStart} />
                 <div className="panel-header">
@@ -125,14 +124,6 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                 </div>
 
                 <style>{`
-                    .panel-backdrop {
-                        position: fixed;
-                        inset: 0;
-                        background: rgba(0, 0, 0, 0.3);
-                        z-index: 998;
-                        backdrop-filter: blur(2px);
-                    }
-
                     .assets-panel {
                         position: fixed;
                         right: 0;

@@ -9,20 +9,24 @@ export default function CanvasApp() {
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
 
     const handleOpenChat = () => {
+        console.log("Opening AI Chat");
         setIsChatOpen(true);
         setIsAssetsOpen(false); // Close assets if open
     };
 
     const handleOpenAssets = () => {
+        console.log("Opening Assets");
         setIsAssetsOpen(true);
         setIsChatOpen(false); // Close chat if open
     };
 
     const handleCloseChat = () => {
+        console.log("Closing AI Chat");
         setIsChatOpen(false);
     };
 
     const handleCloseAssets = () => {
+        console.log("Closing Assets");
         setIsAssetsOpen(false);
     };
 
