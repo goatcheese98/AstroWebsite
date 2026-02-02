@@ -80,6 +80,7 @@ export default function ImageGenerationModal({
     
     const colorPickerRef = useRef<HTMLDivElement>(null);
     const hasCapturedPreview = useRef(false);
+    const receivedResponseRef = useRef(false);
 
     // Get effective background color
     const effectiveBackgroundColor = backgroundColor === "canvas" 
@@ -90,6 +91,7 @@ export default function ImageGenerationModal({
     useEffect(() => {
         if (isOpen && selectedElements.length > 0 && !hasCapturedPreview.current) {
             hasCapturedPreview.current = true;
+            receivedResponseRef.current = false;
             setIsLoadingPreview(true);
 
             // Create a unique request ID to match response
@@ -104,6 +106,9 @@ export default function ImageGenerationModal({
                     console.log("⏭️ Skipping - different requestId");
                     return;
                 }
+
+                // Mark that we received a response
+                receivedResponseRef.current = true;
 
                 if (event.detail?.error) {
                     console.error("❌ Preview capture error:", event.detail.error);
@@ -122,10 +127,9 @@ export default function ImageGenerationModal({
             // Set up listener BEFORE dispatching the event
             window.addEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
 
-            // Small delay to ensure canvas is ready
-            setTimeout(() => {
-                // Request preview capture with canvas background (no custom background for preview)
-                console.log("🚀 Dispatching screenshot request");
+            // Delay to ensure canvas is ready - try multiple times if needed
+            const attemptCapture = (attempt = 1) => {
+                console.log(`🚀 Dispatching screenshot request (attempt ${attempt})`);
                 window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
                     detail: {
                         elementIds: selectedElements,
@@ -133,14 +137,31 @@ export default function ImageGenerationModal({
                         requestId,
                     }
                 }));
-            }, 100);
+                
+                // If no response after 2 seconds, retry once
+                if (attempt === 1) {
+                    setTimeout(() => {
+                        if (isLoadingPreview) {
+                            console.log("🔄 Retrying screenshot capture...");
+                            attemptCapture(2);
+                        }
+                    }, 2000);
+                }
+            };
+            
+            setTimeout(() => attemptCapture(1), 300);
 
             // Timeout after 10 seconds in case capture fails
             const timeoutId = setTimeout(() => {
-                console.error("⏱️ Preview capture timed out after 10 seconds");
-                window.removeEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
-                setIsLoadingPreview(false);
-                setPreviewUrl(null);
+                // Only process timeout if we haven't received a response yet
+                if (!receivedResponseRef.current) {
+                    console.error("⏱️ Preview capture timed out after 10 seconds");
+                    window.removeEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
+                    setIsLoadingPreview(false);
+                    setPreviewUrl(null);
+                } else {
+                    console.log("⏱️ Timeout fired but response already received, ignoring");
+                }
             }, 10000);
 
             return () => {
@@ -156,6 +177,7 @@ export default function ImageGenerationModal({
             // Use setTimeout to reset after modal closes to avoid flickering
             setTimeout(() => {
                 hasCapturedPreview.current = false;
+                receivedResponseRef.current = false;
                 setPreviewUrl(null);
                 setIsLoadingPreview(false);
             }, 300); // Match modal animation duration

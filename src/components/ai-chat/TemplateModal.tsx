@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { PromptTemplate } from "./types";
 
 // Enhanced template library with categories
-const TEMPLATE_CATEGORIES = {
+const TEMPLATE_CATEGORIES: Record<string, PromptTemplate[]> = {
     "Design & UI": [
         {
             id: "ui-mockup",
