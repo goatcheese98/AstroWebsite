@@ -4,7 +4,11 @@ import SketchArrow from "../sketch/SketchArrow.astro";
 import PathfinderBot from "../islands/PathfinderBot";
 import { SITE } from "../../lib/constants";
 
-const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strategist"];
+const TITLES = [
+  "Business Analyst",
+  "Technical Generalist",
+  "Data Product Specialist",
+];
 ---
 
 <section class="hero section-gap" aria-label="Introduction">
@@ -18,13 +22,17 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
           <span class="gradient-text">{SITE.author}</span>
         </h1>
         <p class="hero__title">
-          <span class="hero__title-text" id="hero-title" data-titles={JSON.stringify(TITLES)}></span>
+          <span
+            class="hero__title-text"
+            id="hero-title"
+            data-titles={JSON.stringify(TITLES)}></span>
           <span class="hero__title-cursor" aria-hidden="true">|</span>
         </p>
         <p class="hero__pitch">
           I transform complex data into actionable insights and drive strategic
-          decision-making. UBC MBAN candidate with experience in wealth management
-          analytics, data visualization, and cross-functional collaboration.
+          decision-making. UBC MBAN candidate with experience in wealth
+          management analytics, data visualization, and cross-functional
+          collaboration.
         </p>
         <div class="hero__actions">
           <SketchButton href="/#projects">
@@ -47,7 +55,7 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
       </div>
     </div>
   </div>
-  
+
   <!-- Scroll indicator -->
   <div class="hero__scroll-indicator" aria-hidden="true">
     <div class="scroll-indicator__mouse">
@@ -61,16 +69,16 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
   function initTypewriter() {
     const el = document.querySelector("#hero-title") as HTMLElement;
     if (!el) return;
-    
+
     const titles = JSON.parse(el.dataset.titles || '["Business Analyst"]');
     let titleIndex = 0;
     let charIndex = 0;
     let isDeleting = false;
     let isPaused = false;
-    
+
     const type = () => {
       const currentTitle = titles[titleIndex];
-      
+
       if (isPaused) {
         isPaused = false;
         setTimeout(() => {
@@ -79,11 +87,11 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
         }, 2000);
         return;
       }
-      
+
       if (isDeleting) {
         el.textContent = currentTitle.substring(0, charIndex - 1);
         charIndex--;
-        
+
         if (charIndex === 0) {
           isDeleting = false;
           titleIndex = (titleIndex + 1) % titles.length;
@@ -94,7 +102,7 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
       } else {
         el.textContent = currentTitle.substring(0, charIndex + 1);
         charIndex++;
-        
+
         if (charIndex === currentTitle.length) {
           isPaused = true;
           setTimeout(type, 500);
@@ -103,7 +111,7 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
         }
       }
     };
-    
+
     setTimeout(type, 500);
   }
 
@@ -163,7 +171,11 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
 
   .hero__title-text {
     position: relative;
-    background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
+    background: linear-gradient(
+      135deg,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -177,8 +189,14 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
   }
 
   @keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
+    0%,
+    50% {
+      opacity: 1;
+    }
+    51%,
+    100% {
+      opacity: 0;
+    }
   }
 
   .hero__pitch {
@@ -237,8 +255,14 @@ const TITLES = ["Business Analyst", "Technical Generalist", "Data Product Strate
   }
 
   @keyframes scroll-wheel {
-    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-    100% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    0% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(12px);
+    }
   }
 
   /* Desktop: side by side */
