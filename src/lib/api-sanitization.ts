@@ -4,7 +4,7 @@
  */
 
 import { CLAUDE_CONFIG, GEMINI_CONFIG } from './api-config';
-import type { ChatMessage, CanvasState } from '@/types/api';
+import type { ChatMessage, CanvasState } from '@/lib/schemas';
 
 // ============================================================================
 // String Sanitization
@@ -192,23 +192,16 @@ export function sanitizeCanvasState(
   }
 
   // Sanitize description if present
-  const state = canvasState as Partial<CanvasState>;
+  const state = canvasState as CanvasState;
 
-  if (state.description !== undefined) {
-    if (typeof state.description !== 'string') {
-      return {
-        success: false,
-        error: 'Canvas state description must be a string',
-      };
-    }
-
+  if (state && typeof state.description === 'string') {
     // Sanitize description
     state.description = sanitizeString(state.description, 10000);
   }
 
   return {
     success: true,
-    data: state as CanvasState,
+    data: state,
   };
 }
 
@@ -275,7 +268,7 @@ export function containsProhibitedContent(input: string): boolean {
   const lower = input.toLowerCase();
 
   // Basic prohibited patterns (customize as needed)
-  const prohibitedPatterns = [
+  const prohibitedPatterns: RegExp[] = [
     // Add specific patterns you want to block
     // Example: /\b(spam|viagra)\b/i
   ];

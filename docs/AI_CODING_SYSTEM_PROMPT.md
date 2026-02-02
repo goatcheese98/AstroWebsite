@@ -106,7 +106,13 @@ Use these badges in the header to indicate file type:
 
 ### 1. The 300-Line Soft Limit
 
-**Rule:** No code file should exceed 300 lines (excluding header). 
+**Aspirational Goal:** No code file should exceed 300 lines (excluding header).
+
+**Practical Limits:**
+- UI Components: 150-350 lines
+- Custom Hooks: 200-450 lines (API integration is verbose)
+- Utilities: <100 lines
+- Orchestrators: <400 lines
 
 **When to split:**
 - Logic grows beyond 300 lines → Extract to custom hook
@@ -114,7 +120,7 @@ Use these badges in the header to indicate file type:
 - Constants clutter file → Move to `constants/` folder
 
 **Exceptions allowed for:**
-- Complex API integration logic (max 450 lines)
+- Complex API integration logic
 - Data-heavy configuration files
 - Generated code
 
@@ -196,7 +202,8 @@ src/components/[feature]/
 ```
 
 **Step 3:** Write header first
-- Fill out the personified template
+- Use the **comprehensive template** for files >150 lines
+- Use the **minimal template** for small utilities (<50 lines)
 - Define relationships before writing code
 - This acts as your specification
 
@@ -270,6 +277,28 @@ Before declaring refactoring complete:
 - `AIChatContainer.tsx` - Now 358 lines, only composes hooks/components
 
 **Result:** 7 specialized components, 5 focused hooks, 1 clean orchestrator
+
+---
+
+## 🧾 Minimal Header Template (for files <50 lines)
+
+```typescript
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║  🟡 utils.ts                    "The String Formatter"                       ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  👤 I format text. Pure functions, no side effects.                          ║
+ * ║  🎯 formatPhone(), slugify(), truncate()                                     ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ * @module utils
+ */
+```
+
+**When to use minimal header:**
+- Pure utility functions
+- Simple constants files
+- Type definitions only
+- Files with single, obvious responsibility
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 🔴 ANTI-PATTERNS (Things That Broke)
 
-### AP-005: The "Glaze Over" Secret Block
+### AP-001: The "Glaze Over" Secret Block (2026-02-01)
 
 **Context:** Pushing code after refactoring `docs/` and `src/`  
 **Mistake:** Hardcoded API keys for Anthropic, Google, and Moonshot in `docs/API_AND_SETUP.md`. Pushed without removing them.  
@@ -22,7 +22,7 @@
 
 ---
 
-### AP-001: The Moving Variable Problem
+### AP-002: The Moving Variable Problem
 
 **Context:** Refactoring `useImageGeneration` hook  
 **Mistake:** Removed `isCapturing` from hook return, but left references in 3 files (`AIChatContainer.tsx`, `ChatInput.tsx`, `ImageGenerationModal.tsx`)  
@@ -36,7 +36,7 @@
 
 ---
 
-### AP-002: The Lost Event Coordination
+### AP-003: The Lost Event Coordination
 
 **Context:** Image generation screenshot flow  
 **Mistake:** Created `useScreenshotCapture` hook to coordinate events, but `ImageGenerationModal` had its own internal screenshot capture. Two systems, no connection.  
@@ -51,7 +51,7 @@
 
 ---
 
-### AP-003: The Race Condition Timeout
+### AP-004: The Race Condition Timeout
 
 **Context:** Screenshot capture in `ImageGenerationModal`  
 **Mistake:** Set 10s timeout in useEffect. Screenshot succeeded, state updated, component re-rendered. Original timeout still fired (from old closure).  
@@ -68,7 +68,7 @@ const receivedResponseRef = useRef(false);
 
 ---
 
-### AP-004: The Broken Event Listener Chain
+### AP-005: The Broken Event Listener Chain
 
 **Context:** `useScreenshotCapture` listening to window events  
 **Mistake:** Added event listener in useEffect, but handler checked requestIds against internal ref. Event arrived, didn't match any known requestId (it was from modal), got ignored.  

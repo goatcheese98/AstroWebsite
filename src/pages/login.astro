@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { ImprovedLoginForm } from '@/components/auth/ImprovedLoginForm';
+import { LoginForm } from '@/components/auth/LoginForm';
 import '@/styles/auth-modern.css';
 ---
 
@@ -17,7 +17,7 @@ import '@/styles/auth-modern.css';
       </a>
 
       <div class="auth-card-3d">
-        <ImprovedLoginForm client:load />
+        <LoginForm client:load />
       </div>
     </div>
   </div>
