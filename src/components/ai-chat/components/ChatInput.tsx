@@ -58,7 +58,7 @@
  * │ onOpenImageGen      │ Callback to open image generation modal              │
  * │ isLoading           │ Whether AI is processing (disables send)             │
  * │ isGeneratingImage   │ Whether image generation is active                   │
- * │ isCapturing         │ Whether screenshot capture is active                 │
+ * │ selectedElements    │ Count of selected elements (for image gen button)    │
  * │ selectedElements    │ Count of selected elements (for image gen button)    │
  * │ contextMode         │ Current context mode (affects placeholder)           │
  * │ keyboardHandler     │ onKeyDown handler from useKeyboardShortcuts          │
@@ -96,8 +96,6 @@ export interface ChatInputProps {
     isLoading: boolean;
     /** Whether image generation is active */
     isGeneratingImage: boolean;
-    /** Whether screenshot capture is active */
-    isCapturing: boolean;
     /** Count of selected elements */
     selectedElementsCount: number;
     /** Current context mode (affects placeholder) */
@@ -118,7 +116,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onOpenImageGen,
         isLoading,
         isGeneratingImage,
-        isCapturing,
         selectedElementsCount,
         contextMode,
         onKeyDown,
@@ -126,7 +123,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         const hasInput = input.trim().length > 0;
         const canSend = hasInput && !isLoading;
         const hasSelection = selectedElementsCount > 0;
-        const isImageGenActive = isGeneratingImage || isCapturing;
+        const isImageGenActive = isGeneratingImage;
         
         // Context-aware placeholder
         const placeholder = contextMode === "selected" && hasSelection
@@ -222,19 +219,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             }
                         }}
                     >
-                        {isCapturing ? (
-                            <>
-                                <div style={{
-                                    width: "10px",
-                                    height: "10px",
-                                    border: "2px solid rgba(255,255,255,0.3)",
-                                    borderTopColor: "white",
-                                    borderRadius: "50%",
-                                    animation: "spin 0.8s linear infinite",
-                                }} />
-                                Capturing...
-                            </>
-                        ) : isGeneratingImage ? (
+                        {isGeneratingImage ? (
                             <>
                                 <div style={{
                                     width: "10px",

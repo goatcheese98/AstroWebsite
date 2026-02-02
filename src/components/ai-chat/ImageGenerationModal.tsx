@@ -49,7 +49,6 @@ interface ImageGenerationModalProps {
     canvasState: any;
     onGenerate: (options: GenerationOptions) => void;
     isGenerating: boolean;
-    isCapturing: boolean;
 }
 
 export interface GenerationOptions {
@@ -67,7 +66,6 @@ export default function ImageGenerationModal({
     canvasState,
     onGenerate,
     isGenerating,
-    isCapturing,
 }: ImageGenerationModalProps) {
     const [prompt, setPrompt] = useState("");
     const [backgroundColor, setBackgroundColor] = useState<string>("canvas");
@@ -216,14 +214,14 @@ export default function ImageGenerationModal({
     // Handle escape key
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && isOpen && !isGenerating && !isCapturing) {
+            if (e.key === "Escape" && isOpen && !isGenerating) {
                 onClose();
             }
         };
 
         window.addEventListener("keydown", handleEscape);
         return () => window.removeEventListener("keydown", handleEscape);
-    }, [isOpen, isGenerating, isCapturing, onClose]);
+    }, [isOpen, isGenerating, onClose]);
 
     const handleGenerate = () => {
         if (!prompt.trim()) return;
@@ -242,7 +240,7 @@ export default function ImageGenerationModal({
     };
 
     // Compute ready state - simple derived value
-    const isReady = prompt.trim().length > 0 && !isGenerating && !isCapturing;
+    const isReady = prompt.trim().length > 0 && !isGenerating;
 
     if (!isOpen) return null;
 
@@ -251,7 +249,7 @@ export default function ImageGenerationModal({
             {/* Backdrop */}
             <div 
                 className="image-gen-modal-backdrop"
-                onClick={!isGenerating && !isCapturing ? onClose : undefined}
+                onClick={!isGenerating ? onClose : undefined}
                 style={{
                     position: "fixed",
                     inset: 0,
@@ -331,15 +329,15 @@ export default function ImageGenerationModal({
                     </div>
                     <button
                         onClick={onClose}
-                        disabled={isGenerating || isCapturing}
+                        disabled={isGenerating}
                         style={{
                             background: "none",
                             border: "none",
-                            cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
+                            cursor: isGenerating ? "not-allowed" : "pointer",
                             padding: "8px",
                             borderRadius: "8px",
                             color: "var(--color-text-muted, #6b7280)",
-                            opacity: isGenerating || isCapturing ? 0.5 : 1,
+                            opacity: isGenerating ? 0.5 : 1,
                             transition: "all 0.15s",
                         }}
                     >
@@ -456,7 +454,7 @@ export default function ImageGenerationModal({
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="e.g., Modern SaaS dashboard with blue theme, clean UI, professional look..."
                             rows={3}
-                            disabled={isGenerating || isCapturing}
+                            disabled={isGenerating}
                             style={{
                                 width: "100%",
                                 padding: "12px 14px",
@@ -501,7 +499,7 @@ export default function ImageGenerationModal({
                                 <button
                                     key={preset.value}
                                     onClick={() => setBackgroundColor(preset.value)}
-                                    disabled={isGenerating || isCapturing}
+                                    disabled={isGenerating}
                                     style={{
                                         display: "flex",
                                         alignItems: "center",
@@ -515,8 +513,8 @@ export default function ImageGenerationModal({
                                         background: preset.value === "canvas" 
                                             ? "var(--color-fill-1, #f3f4f6)" 
                                             : preset.color,
-                                        cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
-                                        opacity: isGenerating || isCapturing ? 0.6 : 1,
+                                        cursor: isGenerating ? "not-allowed" : "pointer",
+                                        opacity: isGenerating ? 0.6 : 1,
                                         transition: "all 0.15s",
                                     }}
                                 >
@@ -546,7 +544,7 @@ export default function ImageGenerationModal({
                         <div style={{ position: "relative" }} ref={colorPickerRef}>
                             <button
                                 onClick={() => setShowColorPicker(!showColorPicker)}
-                                disabled={isGenerating || isCapturing}
+                                disabled={isGenerating}
                                 style={{
                                     display: "flex",
                                     alignItems: "center",
@@ -558,8 +556,8 @@ export default function ImageGenerationModal({
                                         ? "var(--color-accent, #6366f1)"
                                         : "var(--color-stroke-muted, #e5e7eb)",
                                     background: "var(--color-surface, #ffffff)",
-                                    cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
-                                    opacity: isGenerating || isCapturing ? 0.6 : 1,
+                                    cursor: isGenerating ? "not-allowed" : "pointer",
+                                    opacity: isGenerating ? 0.6 : 1,
                                     width: "100%",
                                     justifyContent: "flex-start",
                                 }}
@@ -726,7 +724,7 @@ export default function ImageGenerationModal({
                             </div>
                             <button
                                 onClick={() => setStrictRatio(!strictRatio)}
-                                disabled={isGenerating || isCapturing}
+                                disabled={isGenerating}
                                 style={{
                                     width: "48px",
                                     height: "26px",
@@ -736,8 +734,8 @@ export default function ImageGenerationModal({
                                         ? "var(--color-accent, #6366f1)" 
                                         : "var(--color-stroke-muted, #d1d5db)",
                                     position: "relative",
-                                    cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
-                                    opacity: isGenerating || isCapturing ? 0.6 : 1,
+                                    cursor: isGenerating ? "not-allowed" : "pointer",
+                                    opacity: isGenerating ? 0.6 : 1,
                                     transition: "background 0.2s",
                                 }}
                             >
@@ -800,7 +798,7 @@ export default function ImageGenerationModal({
                             </div>
                             <button
                                 onClick={() => setUseProModel(!useProModel)}
-                                disabled={isGenerating || isCapturing}
+                                disabled={isGenerating}
                                 style={{
                                     width: "48px",
                                     height: "26px",
@@ -810,8 +808,8 @@ export default function ImageGenerationModal({
                                         ? "#8b5cf6" 
                                         : "var(--color-stroke-muted, #d1d5db)",
                                     position: "relative",
-                                    cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
-                                    opacity: isGenerating || isCapturing ? 0.6 : 1,
+                                    cursor: isGenerating ? "not-allowed" : "pointer",
+                                    opacity: isGenerating ? 0.6 : 1,
                                     transition: "background 0.2s",
                                 }}
                             >
@@ -841,7 +839,7 @@ export default function ImageGenerationModal({
                 }}>
                     <button
                         onClick={onClose}
-                        disabled={isGenerating || isCapturing}
+                        disabled={isGenerating}
                         style={{
                             flex: 1,
                             padding: "12px 20px",
@@ -851,8 +849,8 @@ export default function ImageGenerationModal({
                             fontSize: "14px",
                             fontWeight: 500,
                             color: "var(--color-text, #1f2937)",
-                            cursor: isGenerating || isCapturing ? "not-allowed" : "pointer",
-                            opacity: isGenerating || isCapturing ? 0.6 : 1,
+                            cursor: isGenerating ? "not-allowed" : "pointer",
+                            opacity: isGenerating ? 0.6 : 1,
                             transition: "all 0.15s",
                         }}
                     >
@@ -880,19 +878,7 @@ export default function ImageGenerationModal({
                             gap: "8px",
                         }}
                     >
-                        {isCapturing ? (
-                            <>
-                                <div style={{
-                                    width: "16px",
-                                    height: "16px",
-                                    border: "2px solid rgba(255,255,255,0.3)",
-                                    borderTopColor: "white",
-                                    borderRadius: "50%",
-                                    animation: "spin 0.8s linear infinite",
-                                }} />
-                                Capturing...
-                            </>
-                        ) : isGenerating ? (
+                        {isGenerating ? (
                             <>
                                 <div style={{
                                     width: "16px",

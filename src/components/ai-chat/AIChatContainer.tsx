@@ -80,12 +80,11 @@
  * @module AIChatContainer
  */
 
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 
 // Hooks
 import { useAIChatState } from "./hooks/useAIChatState";
 import { useImageGeneration } from "./hooks/useImageGeneration";
-import { useScreenshotCapture } from "./hooks/useScreenshotCapture";
 import { useCanvasCommands } from "./hooks/useCanvasCommands";
 import { usePanelResize } from "./hooks/usePanelResize";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -175,25 +174,17 @@ export default function AIChatContainer({
     // Image generation
     const {
         isGeneratingImage,
-        isCapturing,
         imageHistory,
-        requestImageGeneration,
+        generateImage,
         copyImageToClipboard,
         clearHistory: clearImageHistory,
-        resetGeneration,
     } = useImageGeneration();
     
-    // Screenshot capture (only for chat - image gen modal handles its own)
-    const {
-        isCaptureForChat,
-        chatScreenshotData,
-        captureForChat,
-        clearChatScreenshot,
-    } = useScreenshotCapture({
-        onChatScreenshot: (result) => {
-            console.log("📸 Chat screenshot received:", result.requestId);
-        },
-    });
+    // Track pending image generation (screenshot coordination)
+    const pendingImageGenRef = useRef<{
+        options: any;
+        isCapturing: boolean;
+    } | null>(null);
     
     // Canvas commands
     const {
@@ -207,42 +198,24 @@ export default function AIChatContainer({
     // === 🚀 ACTIONS ===
     
     /**
-     * Handle the actual send after any screenshot is captured
-     */
-    const executeSend = useCallback(async () => {
-        await handleSendMessage({
-            screenshotData: chatScreenshotData,
-            selectedElements,
-            getSelectionContext,
-        });
-        
-        // Clear screenshot after sending
-        clearChatScreenshot();
-    }, [handleSendMessage, chatScreenshotData, selectedElements, getSelectionContext, clearChatScreenshot]);
-    
-    /**
-     * Handle sending a message with screenshot coordination
+     * Handle sending a message
      */
     const handleSend = useCallback(async () => {
         // Skip screenshot for Kimi (doesn't support images)
         const isKimi = aiProvider === "kimi";
         
-        // If in selected mode with elements and no screenshot yet, capture first
-        if (!isKimi && contextMode === "selected" && selectedElements.length > 0 && !chatScreenshotData && !isCaptureForChat) {
-            captureForChat(selectedElements);
-            return;
-        }
-        
-        // Send with screenshot data if available
-        await executeSend();
+        // For now, simplified send without screenshot coordination
+        // TODO: Add back screenshot capture for Claude provider
+        await handleSendMessage({
+            screenshotData: null,
+            selectedElements,
+            getSelectionContext,
+        });
     }, [
         aiProvider,
-        contextMode,
         selectedElements,
-        chatScreenshotData,
-        isCaptureForChat,
-        captureForChat,
-        executeSend,
+        handleSendMessage,
+        getSelectionContext,
     ]);
     
     // Keyboard shortcuts (must be after handleSend definition)
@@ -250,15 +223,85 @@ export default function AIChatContainer({
         onSend: handleSend,
         onClose,
         hasInput: input.trim().length > 0,
-        isLoading: isLoading || isCaptureForChat,
+        isLoading: isLoading,
     });
     
     /**
-     * Handle image generation request
+     * Handle image generation request from modal
+     * Triggers screenshot capture, then calls API
      */
-    const handleImageGeneration = useCallback((options: any) => {
-        requestImageGeneration(options);
-    }, [requestImageGeneration]);
+    const handleImageGenerationRequest = useCallback((options: any) => {
+        console.log("🎨 Image generation requested, capturing screenshot...");
+        
+        // Store options for when screenshot arrives
+        pendingImageGenRef.current = {
+            options,
+            isCapturing: true,
+        };
+        
+        // Dispatch screenshot capture event
+        const requestId = `generation-${Date.now()}`;
+        window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
+            detail: {
+                elementIds: selectedElements.length > 0 ? selectedElements : undefined,
+                quality: "high",
+                backgroundColor: options.backgroundColor !== "canvas" ? options.backgroundColor : undefined,
+                requestId,
+            }
+        }));
+    }, [selectedElements]);
+    
+    /**
+     * Listen for screenshot captures and trigger image generation
+     */
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleScreenshotCaptured = (event: any) => {
+            const { requestId, dataURL, error } = event.detail || {};
+            
+            // Only handle generation screenshots (not chat or preview)
+            if (!requestId?.startsWith("generation-")) return;
+            
+            console.log("📸 Generation screenshot received:", requestId);
+            
+            if (!pendingImageGenRef.current?.isCapturing) {
+                console.log("⏭️ No pending image generation, ignoring");
+                return;
+            }
+            
+            pendingImageGenRef.current.isCapturing = false;
+            
+            if (error) {
+                console.error("❌ Screenshot error:", error);
+                return;
+            }
+            
+            if (dataURL && pendingImageGenRef.current.options) {
+                console.log("🚀 Starting API call with screenshot...");
+                generateImage(
+                    dataURL,
+                    pendingImageGenRef.current.options,
+                    {
+                        onSuccess: () => {
+                            console.log("✅ Image generation complete");
+                            setShowImageModal(false);
+                            pendingImageGenRef.current = null;
+                        },
+                        onError: (err) => {
+                            console.error("❌ Image generation failed:", err);
+                            pendingImageGenRef.current = null;
+                        }
+                    }
+                );
+            }
+        };
+        
+        window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        return () => {
+            window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        };
+    }, [isOpen, generateImage]);
     
     // === 🎨 RENDER ===
     
@@ -315,7 +358,6 @@ export default function AIChatContainer({
                     onOpenImageGen={() => setShowImageModal(true)}
                     isLoading={isLoading}
                     isGeneratingImage={isGeneratingImage}
-                    isCapturing={isCapturing}
                     selectedElementsCount={selectedElements.length}
                     contextMode={contextMode}
                     onKeyDown={handleKeyDown}
@@ -327,14 +369,13 @@ export default function AIChatContainer({
                 isOpen={showImageModal}
                 onClose={() => {
                     setShowImageModal(false);
-                    resetGeneration();
+                    pendingImageGenRef.current = null;
                 }}
                 selectedElements={selectedElements}
                 elementSnapshots={elementSnapshots}
                 canvasState={canvasState}
-                onGenerate={handleImageGeneration}
+                onGenerate={handleImageGenerationRequest}
                 isGenerating={isGeneratingImage}
-                isCapturing={isCapturing}
             />
             
             <TemplateModal

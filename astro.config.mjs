@@ -13,6 +13,14 @@ export default defineConfig({
     assets: 'assets',
   },
   vite: {
+    build: {
+      minify: 'esbuild',
+    },
+    esbuild: {
+      // This removes all console.log and debugger statements from the production build
+      // but keeps them perfectly intact during 'npm run dev'
+      drop: ['console', 'debugger'],
+    },
     optimizeDeps: {
       include: [
         '@excalidraw/excalidraw',
