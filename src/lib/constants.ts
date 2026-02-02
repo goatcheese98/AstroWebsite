@@ -7,15 +7,13 @@ export const SITE: SiteMetadata = {
   siteUrl: 'https://rohanjasani.dev',
   socialLinks: {
     github: 'https://github.com/rohanjasani',
-    linkedin: 'https://www.linkedin.com/in/rohan-jasani-451a219b/',
+    linkedin: 'https://www.linkedin.com/in/rohan-jasani-dev/',
     email: 'mailto:jasani.rohan@gmail.com',
   },
 };
 
 export const NAV_LINKS: NavLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Projects', href: '/#projects' },
-  { label: 'Experience', href: '/#experience' },
   { label: 'AI Canvas', href: '/ai-canvas' },
   { label: 'Blog', href: '/blog' },
 ];

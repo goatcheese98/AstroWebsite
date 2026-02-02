@@ -15,6 +15,7 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
   <Projects />
   <SketchDivider variant="zigzag" />
   <Experience />
+  <SketchDivider variant="zigzag" />
 
   <section class="skills section-gap" id="skills" aria-label="Skills">
     <div class="container">
@@ -27,7 +28,7 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
         </p>
         <div class="skills__header-line" aria-hidden="true"></div>
       </div>
-      
+
       <BentoSkills client:load />
     </div>
   </section>
@@ -96,9 +97,11 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
   );
 
   function initReveal() {
-    document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right").forEach((el) => {
-      observer.observe(el);
-    });
+    document
+      .querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right")
+      .forEach((el) => {
+        observer.observe(el);
+      });
   }
 
   initReveal();
@@ -131,7 +134,11 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
   .skills__header-line {
     width: 60px;
     height: 4px;
-    background: linear-gradient(90deg, var(--color-accent), var(--color-gradient-end));
+    background: linear-gradient(
+      90deg,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
     border-radius: 2px;
     margin: 0 auto;
     filter: url(#sketch-filter);
