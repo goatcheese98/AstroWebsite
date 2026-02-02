@@ -8,11 +8,27 @@
 
 ## 🔴 ANTI-PATTERNS (Things That Broke)
 
+### AP-005: The "Glaze Over" Secret Block
+
+**Context:** Pushing code after refactoring `docs/` and `src/`  
+**Mistake:** Hardcoded API keys for Anthropic, Google, and Moonshot in `docs/API_AND_SETUP.md`. Pushed without removing them.  
+**Error:** `[remote rejected] main -> main (push declined due to repository rule violations)` from GitHub's Secret Scanning.  
+**Fix:**
+
+1. Replaced secrets with placeholders like `your_api_key_here`.
+2. Used `git reset --soft origin/main` to uncommit local "dirty" commits.
+3. Re-committed clean files to erase secret history from the push.  
+**Rule:** NEVER hardcode secrets in ANY file, including documentation. Check `git show [commit]` before pushing to verify no sensitive data is staged.
+
+---
+
 ### AP-001: The Moving Variable Problem
+
 **Context:** Refactoring `useImageGeneration` hook  
 **Mistake:** Removed `isCapturing` from hook return, but left references in 3 files (`AIChatContainer.tsx`, `ChatInput.tsx`, `ImageGenerationModal.tsx`)  
 **Error:** `ReferenceError: isCapturing is not defined`  
-**Fix:** 
+**Fix:**
+
 1. Search entire codebase for removed exports BEFORE finishing
 2. Run `npx tsc --noEmit` after hook changes
 3. Check all consumers of modified modules  
@@ -21,10 +37,12 @@
 ---
 
 ### AP-002: The Lost Event Coordination
+
 **Context:** Image generation screenshot flow  
 **Mistake:** Created `useScreenshotCapture` hook to coordinate events, but `ImageGenerationModal` had its own internal screenshot capture. Two systems, no connection.  
 **Result:** Preview screenshot captured, but generation API never called.  
 **Fix:** Parent (`AIChatContainer`) orchestrates flow:
+
 1. Modal calls `onGenerate(options)`
 2. Parent dispatches `excalidraw:capture-screenshot`
 3. Parent listens for response, calls `generateImage(screenshot, options)`
@@ -34,20 +52,24 @@
 ---
 
 ### AP-003: The Race Condition Timeout
+
 **Context:** Screenshot capture in `ImageGenerationModal`  
 **Mistake:** Set 10s timeout in useEffect. Screenshot succeeded, state updated, component re-rendered. Original timeout still fired (from old closure).  
 **Result:** "Timeout fired but response already received" - confusing UX  
 **Fix:** Use ref to track completion state:
+
 ```ts
 const receivedResponseRef = useRef(false);
 // On success: receivedResponseRef.current = true
 // In timeout: if (!receivedResponseRef.current) { showError() }
 ```  
+
 **Rule:** Any async timeout needs a "completed" flag to prevent stale closures from firing.
 
 ---
 
 ### AP-004: The Broken Event Listener Chain
+
 **Context:** `useScreenshotCapture` listening to window events  
 **Mistake:** Added event listener in useEffect, but handler checked requestIds against internal ref. Event arrived, didn't match any known requestId (it was from modal), got ignored.  
 **Result:** `⏭️ Ignoring screenshot for unknown requestId`  
@@ -59,8 +81,10 @@ const receivedResponseRef = useRef(false);
 ## 🟢 PATTERNS (Things That Worked)
 
 ### P-001: Parent Orchestration Pattern
+
 **When:** Multiple children need coordinated async operations  
-**How:** 
+**How:**
+
 - Child calls `onAction(options)` callback
 - Parent stores options in ref: `pendingRef.current = { options, status: 'pending' }`
 - Parent triggers async operation (screenshot, API call)
@@ -71,8 +95,10 @@ const receivedResponseRef = useRef(false);
 ---
 
 ### P-002: The Ref-Guarded Timeout
+
 **When:** Setting timeouts for async operations that might complete before timeout  
 **How:**
+
 ```ts
 const completedRef = useRef(false);
 
@@ -87,13 +113,16 @@ setTimeout(() => {
     }
 }, 10000);
 ```  
+
 **Used in:** `ImageGenerationModal` preview capture timeout
 
 ---
 
 ### P-003: Hook Simplification
+
 **When:** Hook is managing state it shouldn't  
-**How:** 
+**How:**
+
 - Original: `useImageGeneration` managed screenshot state AND API state
 - Problem: Screenshot was actually triggered by modal, not hook
 - Fix: Removed screenshot logic from hook. Hook only handles API.
@@ -103,9 +132,11 @@ setTimeout(() => {
 ---
 
 ### P-004: Personification Headers
+
 **When:** Creating any new file  
 **How:** Write header BEFORE writing code. It becomes your specification.  
 **Key sections:**
+
 - WHO AM I? → Defines single responsibility
 - MY NEIGHBORS → Shows dependencies (reveals coupling issues early)
 - IF I BREAK → Observability for debugging  
@@ -116,6 +147,7 @@ setTimeout(() => {
 ## 📝 CODEBASE-SPECIFIC NOTES
 
 ### Event Naming Convention
+
 - `excalidraw:capture-screenshot` - Request screenshot
 - `excalidraw:screenshot-captured` - Screenshot ready
 - `excalidraw:draw` - Add elements to canvas
@@ -125,17 +157,20 @@ setTimeout(() => {
 **Pattern:** Request events are verbs (`capture-screenshot`), response events are past tense (`screenshot-captured`).
 
 ### Request ID Format
+
 - `preview-${timestamp}` - For modal preview
 - `generation-${timestamp}` - For API generation
 - `chat-${timestamp}` - For chat context screenshots
 
 ### File Size Baselines (This Codebase)
+
 - UI Components: 150-350 lines acceptable
 - Custom Hooks: 200-450 lines acceptable (API integration is verbose)
 - Utilities: <100 lines ideal
 - Orchestrators: <400 lines acceptable
 
 ### Screenshot Flow (Current Architecture)
+
 ```
 ImageGenerationModal opens
     ↓
