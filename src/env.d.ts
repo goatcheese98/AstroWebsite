@@ -32,6 +32,7 @@ interface Env {
 
   // API Keys (already defined in .env)
   ANTHROPIC_API_KEY: string;
+  MOONSHOT_API_KEY: string;
   GOOGLE_GEMINI_API_KEY: string;
 
   // Auth settings (optional)

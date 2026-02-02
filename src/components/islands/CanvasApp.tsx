@@ -1,6 +1,7 @@
 import { useState } from "react";
 import CanvasControls from "./CanvasControls";
-import AIChatPanel from "./AIChatPanel";
+// import AIChatPanel from "./AIChatPanel"; // Original component (backup)
+import { AIChatContainer } from "../ai-chat"; // New enterprise component
 import MyAssetsPanel from "./MyAssetsPanel";
 
 export default function CanvasApp() {
@@ -33,7 +34,12 @@ export default function CanvasApp() {
                 isChatOpen={isChatOpen}
                 isAssetsOpen={isAssetsOpen}
             />
-            <AIChatPanel isOpen={isChatOpen} onClose={handleCloseChat} />
+            {/* Use new AIChatContainer with element selection feature */}
+            <AIChatContainer isOpen={isChatOpen} onClose={handleCloseChat} />
+            
+            {/* Original component (backup) */}
+            {/* <AIChatPanel isOpen={isChatOpen} onClose={handleCloseChat} /> */}
+            
             <MyAssetsPanel isOpen={isAssetsOpen} onClose={handleCloseAssets} />
         </>
     );
