@@ -43,6 +43,8 @@ const PROMPT_TEMPLATES: PromptTemplate[] = [
     }
 ];
 
+type AIProvider = "kimi" | "claude";
+
 interface AIChatContainerProps {
     isOpen: boolean;
     onClose: () => void;
@@ -59,6 +61,12 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
     const [showTemplates, setShowTemplates] = useState(false);
     const [canvasState, setCanvasState] = useState<any>(null);
     const [contextMode, setContextMode] = useState<"all" | "selected">("all");
+    const [aiProvider, setAiProvider] = useState<AIProvider>("kimi");
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [screenshotData, setScreenshotData] = useState<string | null>(null);
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [imageGenPrompt, setImageGenPrompt] = useState("");
+    const [showImageGenInput, setShowImageGenInput] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
@@ -103,6 +111,147 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
             window.removeEventListener("excalidraw:state-update", handleCanvasUpdate);
         };
     }, [selectElements]);
+
+    // Auto-switch to "Selected" mode when elements are selected
+    useEffect(() => {
+        if (selectedElements.length > 0 && contextMode === "all") {
+            setContextMode("selected");
+        }
+    }, [selectedElements, contextMode]);
+
+    // Close image gen popup when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (showImageGenInput) {
+                const target = event.target as HTMLElement;
+                // Check if click is outside the popup
+                if (!target.closest('[data-image-gen-popup]')) {
+                    setShowImageGenInput(false);
+                }
+            }
+        };
+
+        if (showImageGenInput) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showImageGenInput]);
+
+    // Listen for screenshot capture events
+    useEffect(() => {
+        const handleScreenshotCaptured = (event: any) => {
+            setIsCapturing(false);
+            if (event.detail.error) {
+                console.error("Screenshot error:", event.detail.error);
+                setError("Screenshot failed: " + event.detail.error);
+                setIsGeneratingImage(false);
+                return;
+            }
+            setScreenshotData(event.detail.dataURL);
+            console.log(`📸 Screenshot captured: ${event.detail.elementCount} elements`);
+        };
+
+        window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        return () => {
+            window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        };
+    }, []);
+
+    // Generate image after screenshot is captured
+    useEffect(() => {
+        if (screenshotData && !isGeneratingImage) {
+            generateImageFromScreenshot();
+        }
+    }, [screenshotData]);
+
+    // Image generation function using screenshot
+    const generateImageFromScreenshot = async () => {
+        if (!screenshotData) return;
+        
+        setIsGeneratingImage(true);
+        setError(null);
+        
+        try {
+            // Use user's prompt if provided, otherwise use default
+            let prompt = imageGenPrompt.trim();
+            
+            // Add context about the layout
+            prompt += "\n\nTransform this wireframe/layout reference into a realistic, polished design. ";
+            prompt += "Maintain the exact layout structure, proportions, and element positions shown in the reference image. ";
+            prompt += "If you cannot understand the layout or it's unclear, respond with 'I do not understand this layout' and explain why.";
+            
+            console.log('🎨 Generating image with prompt:', prompt.substring(0, 100) + '...');
+            
+            const response = await fetch("/api/generate-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt,
+                    model: "gemini-2.5-flash-image",
+                    imageData: screenshotData,
+                    mode: "visual",
+                }),
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                // Check for specific error cases
+                if (data.details?.includes('understand') || data.details?.includes('cannot')) {
+                    setError("I do not understand this prompt or context. Please provide clearer instructions about what you want to create.");
+                } else {
+                    throw new Error(data.details || data.error || "Image generation failed");
+                }
+                return;
+            }
+            
+            // Check if AI responded with text saying it doesn't understand
+            if (data.message && (
+                data.message.toLowerCase().includes('do not understand') ||
+                data.message.toLowerCase().includes('cannot understand') ||
+                data.message.toLowerCase().includes('unclear')
+            )) {
+                setError("I do not understand this prompt or context. Please provide clearer instructions about what you want to create.");
+                return;
+            }
+            
+            // Insert the generated image into canvas
+            const imageDataUrl = `data:${data.mimeType};base64,${data.imageData}`;
+            
+            // Calculate aspect ratio from base64 image
+            const img = new Image();
+            img.onload = () => {
+                const aspectRatio = img.width / img.height;
+                const maxWidth = 600;
+                const width = Math.min(img.width, maxWidth);
+                const height = width / aspectRatio;
+                
+                window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
+                    detail: { 
+                        imageData: imageDataUrl, 
+                        type: "png",
+                        width,
+                        height,
+                    },
+                }));
+            };
+            img.src = imageDataUrl;
+            
+            console.log('✅ Image generated and inserted');
+            setImageGenPrompt(""); // Clear prompt after success
+        } catch (err) {
+            console.error("Image generation error:", err);
+            setError(err instanceof Error ? err.message : "Image generation failed");
+        } finally {
+            setIsGeneratingImage(false);
+            setScreenshotData(null);
+        }
+    };
+
+
 
     // Sync selection with Excalidraw
     const syncWithExcalidrawSelection = useCallback(() => {
@@ -191,6 +340,11 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
         return `Canvas has ${canvasState.elements.length} elements: ${desc}`;
     }, [canvasState]);
 
+    // Toggle AI provider
+    const toggleAIProvider = () => {
+        setAiProvider(prev => prev === "kimi" ? "claude" : "kimi");
+    };
+
     // Send message
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -235,37 +389,68 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                 ? `\n\nCurrently selected elements (${selectedElements.length}):\n${getSelectionContext()}`
                 : "";
             
-            // PRIMARY: Kimi API (K2.5)
-            console.log('🌙 Sending to Kimi K2.5...');
-            
-            const response = await fetch("/api/chat-kimi", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    messages: [...messages, userMessage].map(m => ({
-                        role: m.role,
-                        content: fullContent,
-                    })),
-                    model: "kimi-k2-0711-preview",
-                    canvasState: {
-                        description: canvasDescription + selectionContext,
-                        elementCount: canvasState?.elements?.length || 0,
-                        selectedElements: selectedElements.length > 0 
-                            ? `User has selected ${selectedElements.length} elements: ${getSelectionContext()}`
-                            : "No specific elements selected",
-                    },
-                }),
-            });
+            const canvasStateData = {
+                description: canvasDescription + selectionContext,
+                elementCount: canvasState?.elements?.length || 0,
+                selectedElements: selectedElements.length > 0 
+                    ? `User has selected ${selectedElements.length} elements: ${getSelectionContext()}`
+                    : "No specific elements selected",
+            };
 
-            const data = await response.json();
+            let response;
+            let data;
 
-            if (!response.ok) {
-                // Log the error but don't fall back to Claude yet (for testing)
-                console.error('❌ Kimi API error:', data);
-                throw new Error(data.error || data.details || "Kimi API failed");
+            if (aiProvider === "kimi") {
+                // Kimi API
+                console.log('🌙 Sending to Kimi K2.5...');
+                
+                response = await fetch("/api/chat-kimi", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        messages: [...messages, userMessage].map(m => ({
+                            role: m.role,
+                            content: fullContent,
+                        })),
+                        model: "kimi-k2-0711-preview",
+                        canvasState: canvasStateData,
+                    }),
+                });
+
+                data = await response.json();
+
+                if (!response.ok) {
+                    console.error('❌ Kimi API error:', data);
+                    throw new Error(data.error || data.details || "Kimi API failed");
+                }
+                
+                console.log('✅ Kimi response received');
+            } else {
+                // Claude API
+                console.log('🎭 Sending to Claude...');
+                
+                response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        messages: [...messages, userMessage].map(m => ({
+                            role: m.role,
+                            content: fullContent,
+                        })),
+                        model: "claude-sonnet-4-20250514",
+                        canvasState: canvasStateData,
+                    }),
+                });
+
+                data = await response.json();
+
+                if (!response.ok) {
+                    console.error('❌ Claude API error:', data);
+                    throw new Error(data.error || data.details || "Claude API failed");
+                }
+                
+                console.log('✅ Claude response received');
             }
-            
-            console.log('✅ Kimi response received');
 
             // Parse drawing commands
             let displayMessage = data.message;
@@ -299,8 +484,8 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                 content: [{ type: "text", text: displayMessage }],
                 metadata: {
                     timestamp: new Date(),
-                    model: data.model || "kimi-k2-0711-preview",
-                    provider: "kimi",
+                    model: data.model || (aiProvider === "kimi" ? "kimi-k2-0711-preview" : "claude-sonnet-4-20250514"),
+                    provider: aiProvider,
                 },
                 reactions: [],
                 status: "sent",
@@ -421,16 +606,38 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                             }}>
                                 AI Assistant
                             </h2>
-                            <span style={{
-                                fontSize: "10px",
-                                padding: "2px 6px",
-                                background: "#8b5cf6",
-                                color: "white",
-                                borderRadius: "4px",
-                                fontWeight: 500,
-                            }}>
-                                Kimi K2.5
-                            </span>
+                            {/* Clickable AI Provider Badge */}
+                            <button
+                                onClick={toggleAIProvider}
+                                title={`Click to switch to ${aiProvider === "kimi" ? "Claude" : "Kimi"}`}
+                                style={{
+                                    fontSize: "10px",
+                                    padding: "2px 6px",
+                                    background: aiProvider === "kimi" ? "#8b5cf6" : "#ec4899",
+                                    color: "white",
+                                    borderRadius: "4px",
+                                    fontWeight: 500,
+                                    border: "none",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "3px",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                    e.currentTarget.style.transform = "scale(1.02)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                    e.currentTarget.style.transform = "scale(1)";
+                                }}
+                            >
+                                {aiProvider === "kimi" ? "Kimi K2.5" : "Claude"}
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <path d="M7 17L17 7M17 7H7M17 7V17" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <button
@@ -651,6 +858,32 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                         </div>
                     )}
 
+                    {/* Image Generation Hint - Shows when elements are selected */}
+                    {contextMode === "selected" && selectedElements.length > 0 && (
+                        <div style={{
+                            marginTop: "12px",
+                            padding: "10px",
+                            background: "var(--color-surface, #ffffff)",
+                            borderRadius: "8px",
+                            border: "1px dashed var(--color-accent, #6366f1)",
+                        }}>
+                            <div style={{
+                                fontSize: "11px",
+                                color: "var(--color-text-muted, #6b7280)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                            }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--color-accent, #6366f1)" }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                                Click <strong>"Generate Image"</strong> in the toolbar below to transform this layout into a realistic design
+                            </div>
+                        </div>
+                    )}
+
                     {/* All Elements Summary */}
                     {contextMode === "all" && canvasState?.elements?.length > 0 && (
                         <div style={{
@@ -717,6 +950,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                             <MessageBubble
                                 key={message.id}
                                 message={message}
+                                canvasState={canvasState}
                             />
                         ))
                     )}
@@ -742,7 +976,7 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                                 fontSize: "13px",
                                 color: "var(--color-text-muted, #6b7280)",
                             }}>
-                                Kimi is thinking...
+                                {aiProvider === "kimi" ? "Kimi is thinking..." : "Claude is thinking..."}
                             </span>
                         </div>
                     )}
@@ -883,6 +1117,161 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
                             <span>⚡</span>
                             Templates
                         </button>
+                        
+                        {/* Generate Image Button with Prompt */}
+                        <div style={{ position: "relative" }}>
+                            <button
+                                onClick={() => setShowImageGenInput(!showImageGenInput)}
+                                disabled={isGeneratingImage || isCapturing}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    padding: "5px 10px",
+                                    background: isGeneratingImage || isCapturing
+                                        ? "var(--color-fill-2, #e5e7eb)"
+                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    fontSize: "11px",
+                                    color: isGeneratingImage || isCapturing ? "var(--color-text-muted, #6b7280)" : "white",
+                                    cursor: isGeneratingImage || isCapturing ? "not-allowed" : "pointer",
+                                    transition: "all 0.15s",
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {isCapturing ? (
+                                    <>
+                                        <div style={{
+                                            width: "10px",
+                                            height: "10px",
+                                            border: "2px solid rgba(255,255,255,0.3)",
+                                            borderTopColor: "white",
+                                            borderRadius: "50%",
+                                            animation: "spin 0.8s linear infinite",
+                                        }} />
+                                        Capturing...
+                                    </>
+                                ) : isGeneratingImage ? (
+                                    <>
+                                        <div style={{
+                                            width: "10px",
+                                            height: "10px",
+                                            border: "2px solid rgba(255,255,255,0.3)",
+                                            borderTopColor: "white",
+                                            borderRadius: "50%",
+                                            animation: "spin 0.8s linear infinite",
+                                        }} />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                            <circle cx="8.5" cy="8.5" r="1.5" />
+                                            <polyline points="21 15 16 10 5 21" />
+                                        </svg>
+                                        Generate Image
+                                    </>
+                                )}
+                            </button>
+                            
+                            {/* Image Generation Prompt Input Popup */}
+                            {showImageGenInput && (
+                                <div data-image-gen-popup style={{
+                                    position: "absolute",
+                                    bottom: "calc(100% + 8px)",
+                                    right: 0,
+                                    width: "280px",
+                                    padding: "12px",
+                                    background: "var(--color-surface, #ffffff)",
+                                    border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                    borderRadius: "10px",
+                                    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.15)",
+                                    zIndex: 100,
+                                }}>
+                                    <div style={{
+                                        fontSize: "12px",
+                                        fontWeight: 600,
+                                        color: "var(--color-text, #1f2937)",
+                                        marginBottom: "8px",
+                                    }}>
+                                        🎨 Generate Image
+                                    </div>
+                                    <textarea
+                                        value={imageGenPrompt}
+                                        onChange={(e) => setImageGenPrompt(e.target.value)}
+                                        placeholder="Describe what you want to create... (e.g., 'modern SaaS dashboard with blue theme', 'iOS app interface', 'e-commerce product page')"
+                                        rows={3}
+                                        style={{
+                                            width: "100%",
+                                            padding: "8px 10px",
+                                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                            borderRadius: "6px",
+                                            fontSize: "12px",
+                                            resize: "none",
+                                            marginBottom: "8px",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                    <div style={{
+                                        display: "flex",
+                                        gap: "8px",
+                                    }}>
+                                        <button
+                                            onClick={() => setShowImageGenInput(false)}
+                                            style={{
+                                                flex: 1,
+                                                padding: "6px 10px",
+                                                background: "var(--color-fill-1, #f3f4f6)",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                fontSize: "11px",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                if (!imageGenPrompt.trim()) {
+                                                    setError("Please describe what you want to generate");
+                                                    return;
+                                                }
+                                                
+                                                setShowImageGenInput(false);
+                                                setIsCapturing(true);
+                                                setError(null);
+                                                
+                                                // Capture screenshot
+                                                window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
+                                                    detail: { 
+                                                        elementIds: selectedElements.length > 0 ? selectedElements : undefined,
+                                                        quality: "high"
+                                                    }
+                                                }));
+                                            }}
+                                            disabled={!imageGenPrompt.trim()}
+                                            style={{
+                                                flex: 1,
+                                                padding: "6px 10px",
+                                                background: !imageGenPrompt.trim() 
+                                                    ? "var(--color-fill-2, #e5e7eb)" 
+                                                    : "var(--color-accent, #6366f1)",
+                                                color: !imageGenPrompt.trim() ? "var(--color-text-muted, #6b7280)" : "white",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                fontSize: "11px",
+                                                fontWeight: 600,
+                                                cursor: !imageGenPrompt.trim() ? "not-allowed" : "pointer",
+                                            }}
+                                        >
+                                            Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Input */}
@@ -966,13 +1355,61 @@ export default function AIChatContainer({ isOpen, onClose, initialWidth = 400 }:
 }
 
 // Message Bubble Component
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, canvasState }: { message: Message; canvasState?: any }) {
     const isUser = message.role === "user";
+    const [copiedJson, setCopiedJson] = useState(false);
+    const [copiedSvg, setCopiedSvg] = useState(false);
     
     const textContent = message.content
         .filter(c => c.type === "text")
         .map(c => c.type === "text" ? c.text : "")
         .join("\n");
+
+    // Check if message has a drawing command
+    const hasDrawingCommand = !!message.drawingCommand && Array.isArray(message.drawingCommand);
+
+    // Copy JSON to clipboard
+    const copyJson = async () => {
+        if (!message.drawingCommand) return;
+        try {
+            const jsonStr = JSON.stringify(message.drawingCommand, null, 2);
+            await navigator.clipboard.writeText(jsonStr);
+            setCopiedJson(true);
+            setTimeout(() => setCopiedJson(false), 2000);
+        } catch (err) {
+            console.error("Failed to copy JSON:", err);
+        }
+    };
+
+    // Copy SVG to clipboard
+    const copySvg = async () => {
+        if (!message.drawingCommand) return;
+        try {
+            // Dynamically import exportToSvg
+            const { exportToSvg } = await import("@excalidraw/excalidraw");
+            
+            // Create minimal appState for export
+            const appState = {
+                exportBackground: true,
+                exportWithDarkMode: false,
+                exportScale: 1,
+                ...canvasState?.appState,
+            };
+
+            const svg = await exportToSvg({
+                elements: message.drawingCommand,
+                appState,
+                files: canvasState?.files || {},
+            });
+
+            const svgData = svg.outerHTML;
+            await navigator.clipboard.writeText(svgData);
+            setCopiedSvg(true);
+            setTimeout(() => setCopiedSvg(false), 2000);
+        } catch (err) {
+            console.error("Failed to copy SVG:", err);
+        }
+    };
 
     return (
         <div style={{
@@ -999,6 +1436,70 @@ function MessageBubble({ message }: { message: Message }) {
             }}>
                 {textContent}
             </div>
+            
+            {/* Copy buttons for drawing commands */}
+            {hasDrawingCommand && (
+                <div style={{
+                    display: "flex",
+                    gap: "6px",
+                    marginTop: "4px",
+                    marginLeft: isUser ? "auto" : "10px",
+                    marginRight: isUser ? "10px" : "auto",
+                }}>
+                    <button
+                        onClick={copyJson}
+                        title="Copy JSON"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "4px 8px",
+                            background: copiedJson ? "#dcfce7" : "var(--color-fill-1, #f3f4f6)",
+                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                            borderRadius: "6px",
+                            fontSize: "11px",
+                            color: copiedJson ? "#166534" : "var(--color-text-muted, #6b7280)",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        {copiedJson ? "Copied!" : "JSON"}
+                    </button>
+                    
+                    <button
+                        onClick={copySvg}
+                        title="Copy SVG"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "4px 8px",
+                            background: copiedSvg ? "#dcfce7" : "var(--color-fill-1, #f3f4f6)",
+                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                            borderRadius: "6px",
+                            fontSize: "11px",
+                            color: copiedSvg ? "#166534" : "var(--color-text-muted, #6b7280)",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        {copiedSvg ? "Copied!" : "SVG"}
+                    </button>
+                </div>
+            )}
+            
             <span style={{
                 fontSize: "10px",
                 color: "var(--color-text-muted, #6b7280)",

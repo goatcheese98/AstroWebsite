@@ -325,7 +325,7 @@ export default function ExcalidrawCanvas() {
                 return;
             }
 
-            const { imageData, type = "png" } = event.detail;
+            const { imageData, type = "png", width, height } = event.detail;
 
             try {
                 // Get viewport center for positioning
@@ -339,14 +339,19 @@ export default function ExcalidrawCanvas() {
                 // Create unique file ID
                 const fileId = `generated-${Date.now()}`;
 
-                // Create Excalidraw image element
+                // Calculate dimensions - use provided or default to natural aspect
+                // Default max width of 400px, maintain aspect ratio
+                const maxWidth = width || 400;
+                const maxHeight = height || 400;
+                
+                // Create Excalidraw image element with proper dimensions
                 const imageElement = converter([
                     {
                         type: "image",
-                        x: centerX - 100, // Center the 200x200 image
-                        y: centerY - 100,
-                        width: 200,
-                        height: 200,
+                        x: centerX - (maxWidth / 2), // Center the image
+                        y: centerY - (maxHeight / 2),
+                        width: maxWidth,
+                        height: maxHeight,
                         fileId: fileId,
                     },
                 ]);
@@ -378,6 +383,84 @@ export default function ExcalidrawCanvas() {
         
         return () => {
             window.removeEventListener("excalidraw:insert-image", handleInsertImage);
+        };
+    }, [excalidrawAPI]);
+
+    // Handle screenshot/capture requests for AI image generation
+    useEffect(() => {
+        const handleCaptureScreenshot = async (event: any) => {
+            console.log("📸 Capturing screenshot for image generation...");
+
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
+                    detail: { error: "Canvas not ready" },
+                }));
+                return;
+            }
+
+            try {
+                const { elementIds, quality = "high" } = event.detail || {};
+                
+                // Get all elements and filter if specific IDs provided
+                const allElements = excalidrawAPI.getSceneElements();
+                const appState = excalidrawAPI.getAppState();
+                
+                let elementsToCapture = allElements;
+                
+                // If specific element IDs provided, filter to just those
+                if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
+                    elementsToCapture = allElements.filter((el: any) => elementIds.includes(el.id));
+                }
+                
+                if (elementsToCapture.length === 0) {
+                    console.warn("⚠️ No elements to capture");
+                    window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
+                        detail: { error: "No elements to capture" },
+                    }));
+                    return;
+                }
+
+                // Dynamically import exportToCanvas
+                const { exportToCanvas } = await import("@excalidraw/excalidraw");
+                
+                // Export to canvas with appropriate quality
+                const canvas = await exportToCanvas({
+                    elements: elementsToCapture,
+                    appState: {
+                        ...appState,
+                        exportBackground: true,
+                        exportWithDarkMode: false,
+                        exportScale: quality === "high" ? 2 : 1,
+                    },
+                    files: excalidrawAPI.getFiles(),
+                });
+
+                // Convert to base64
+                const dataURL = canvas.toDataURL("image/png");
+                
+                console.log(`✅ Screenshot captured: ${dataURL.length} chars`);
+                
+                // Dispatch event with the screenshot
+                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
+                    detail: { 
+                        dataURL, 
+                        elementCount: elementsToCapture.length,
+                        elementIds: elementsToCapture.map((el: any) => el.id),
+                    },
+                }));
+            } catch (err) {
+                console.error("❌ Error capturing screenshot:", err);
+                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
+                    detail: { error: err instanceof Error ? err.message : "Unknown error" },
+                }));
+            }
+        };
+
+        window.addEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
+        
+        return () => {
+            window.removeEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
         };
     }, [excalidrawAPI]);
 

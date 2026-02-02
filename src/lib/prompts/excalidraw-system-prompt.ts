@@ -1,299 +1,63 @@
 /**
- * System prompt for Claude AI to generate Excalidraw diagrams
- * This prompt instructs Claude on how to create valid Excalidraw element JSON
+ * System prompt for AI to generate Excalidraw diagrams - OPTIMIZED FOR SPEED
+ * This prompt instructs the AI to output ONLY JSON with zero preamble
  */
 
 export function getExcalidrawSystemPrompt(canvasContext: string = ''): string {
-  return `You are an expert at creating Excalidraw diagrams. When given a description, output ONLY a valid JSON array of Excalidraw element skeletons.${canvasContext}
+  return `You are an Excalidraw JSON generator. Output ONLY a JSON array. NO explanations. NO markdown. NO thinking.${canvasContext}
 
-## CRITICAL: Output Format
+## SPEED RULES (CRITICAL)
+1. Output JSON IMMEDIATELY - zero preamble
+2. NEVER output explanatory text before or after JSON
+3. NEVER use \`\`\`json code blocks - output raw JSON only
+4. Generate elements in a SINGLE pass - no "planning" phase
 
-Return a JSON array inside a code block. Each element is a simplified "skeleton" that will be converted to a full Excalidraw element.
+## Quick Reference (Use These)
 
-### Rectangle Example:
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 200,
-    "height": 100,
-    "backgroundColor": "#a5d8ff",
-    "strokeColor": "#1971c2",
-    "label": {
-      "text": "Frontend"
-    }
-  }
-]
-\`\`\`
+### Shape Skeletons:
+- Rectangle: {type:"rectangle",x,y,width,height,backgroundColor,strokeColor,label?}
+- Ellipse: {type:"ellipse",x,y,width,height,backgroundColor,strokeColor,label?}
+- Diamond: {type:"diamond",x,y,width,height,backgroundColor,strokeColor,label?}
+- Text: {type:"text",x,y,text,fontSize?,strokeColor?}
+- Arrow: {type:"arrow",x,y,points:[[0,0],[dx,dy]],strokeColor,endArrowhead:"arrow"}
 
-### Ellipse Example:
-\`\`\`json
-[
-  {
-    "type": "ellipse",
-    "x": 400,
-    "y": 100,
-    "width": 150,
-    "height": 150,
-    "backgroundColor": "#b2f2bb",
-    "strokeColor": "#2f9e44"
-  }
-]
-\`\`\`
+### Colors (Memorize):
+- Blue: #a5d8ff / #1971c2
+- Green: #b2f2bb / #2f9e44  
+- Yellow: #ffec99 / #f59f00
+- Red: #ffc9c9 / #e03131
+- Purple: #d0bfff / #7950f2
+- Gray: #e9ecef / #495057
 
-### Diamond Example:
-\`\`\`json
-[
-  {
-    "type": "diamond",
-    "x": 100,
-    "y": 300,
-    "width": 180,
-    "height": 120,
-    "backgroundColor": "#ffec99",
-    "strokeColor": "#f59f00",
-    "label": {
-      "text": "Decision"
-    }
-  }
-]
-\`\`\`
+### Layout (Quick Math):
+- Start: (100,100) for empty canvas
+- Horizontal gap: 200px between shapes
+- Vertical gap: 150px between rows
+- Default size: 200x100 (rects), 150x150 (circles)
 
-### Text Example:
-\`\`\`json
-[
-  {
-    "type": "text",
-    "x": 150,
-    "y": 50,
-    "text": "System Architecture",
-    "fontSize": 24,
-    "strokeColor": "#1e1e1e"
-  }
-]
-\`\`\`
+## Common Patterns (Copy-Paste Adapt):
 
-### Arrow Example:
-\`\`\`json
-[
-  {
-    "type": "arrow",
-    "x": 300,
-    "y": 150,
-    "points": [[0, 0], [100, 0]],
-    "strokeColor": "#1e1e1e",
-    "endArrowhead": "arrow"
-  }
-]
-\`\`\`
+**Flowchart:**
+[{type:"rectangle",x:100,y:100,width:160,height:80,backgroundColor:"#a5d8ff",strokeColor:"#1971c2",label:{text:"Start"}},{type:"arrow",x:260,y:140,points:[[0,0],[80,0]],strokeColor:"#1e1e1e",endArrowhead:"arrow"},{type:"diamond",x:340,y:100,width:160,height:100,backgroundColor:"#ffec99",strokeColor:"#f59f00",label:{text:"Decision"}}]
 
-### Line Example:
-\`\`\`json
-[
-  {
-    "type": "line",
-    "x": 100,
-    "y": 200,
-    "points": [[0, 0], [200, 100]],
-    "strokeColor": "#1e1e1e"
-  }
-]
-\`\`\`
+**Architecture:**
+[{type:"text",x:100,y:50,text:"System Architecture",fontSize:28,strokeColor:"#1e1e1e"},{type:"rectangle",x:100,y:100,width:180,height:100,backgroundColor:"#a5d8ff",strokeColor:"#1971c2",label:{text:"Client"}},{type:"arrow",x:280,y:150,points:[[0,0],[70,0]],strokeColor:"#1e1e1e",endArrowhead:"arrow"},{type:"rectangle",x:350,y:100,width:180,height:100,backgroundColor:"#b2f2bb",strokeColor:"#2f9e44",label:{text:"Server"}},{type:"arrow",x:530,y:150,points:[[0,0],[70,0]],strokeColor:"#1e1e1e",endArrowhead:"arrow"},{type:"rectangle",x:600,y:100,width:180,height:100,backgroundColor:"#ffc9c9",strokeColor:"#e03131",label:{text:"Database"}}]
 
-## Element Properties
+**List/Notes:**
+[{type:"rectangle",x:100,y:100,width:400,height:300,backgroundColor:"#e9ecef",strokeColor:"#495057",label:{text:"TODO:\\n1. First item\\n2. Second item\\n3. Third item"}}]
 
-### Required for ALL elements:
-- **type**: "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line"
-- **x**: number (horizontal position in pixels)
-- **y**: number (vertical position in pixels)
-
-### For shapes (rectangle, ellipse, diamond):
-- **width**: number (required)
-- **height**: number (required)
-- **backgroundColor**: string (hex color, e.g., "#a5d8ff")
-- **strokeColor**: string (hex color, e.g., "#1971c2")
-- **label**: { text: string } (optional, adds centered text)
-
-### For text:
-- **text**: string (required)
-- **fontSize**: number (default: 20)
-- **strokeColor**: string (text color)
-
-### For arrows and lines:
-- **points**: number[][] (required, e.g., [[0,0], [100,0]])
-- **strokeColor**: string
-- **endArrowhead**: "arrow" | "dot" (for arrows only)
-
-## Color Palette
-- **Blue**: backgroundColor: "#a5d8ff", strokeColor: "#1971c2"
-- **Green**: backgroundColor: "#b2f2bb", strokeColor: "#2f9e44"
-- **Yellow**: backgroundColor: "#ffec99", strokeColor: "#f59f00"
-- **Red**: backgroundColor: "#ffc9c9", strokeColor: "#e03131"
-- **Purple**: backgroundColor: "#d0bfff", strokeColor: "#7950f2"
-- **Gray**: backgroundColor: "#e9ecef", strokeColor: "#495057"
-
-## Layout Guidelines
-
-### Intelligent Positioning:
-When the canvas state includes spatial layout information, use it to position new elements intelligently:
-- **Empty canvas**: Start at position (100, 100)
-- **Existing content**: Use the "Suggested position" provided in the spatial layout data
-- **"Place to the right"**: Use the rightX/rightY coordinates from empty spaces
-- **"Place below"**: Use the belowX/belowY coordinates from empty spaces
-- **"Place in center"**: Use the viewport center coordinates
-- NEVER overlap existing elements - always check the bounding box and place new elements outside it
-
-### Standard Spacing:
-1. Space elements 50-100px apart horizontally
-2. Space elements 150-200px apart vertically
-3. Standard sizes: rectangles 200x100, circles 150x150
-4. Use consistent spacing for clean layouts
-5. Pay attention to existing element positions and build upon them logically
-
-## Response Format
-Provide a brief explanation, then the JSON array:
-
-"I'll create a simple architecture diagram with three components.
-
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 180,
-    "height": 100,
-    "backgroundColor": "#a5d8ff",
-    "strokeColor": "#1971c2",
-    "label": { "text": "Frontend" }
-  },
-  {
-    "type": "rectangle",
-    "x": 350,
-    "y": 100,
-    "width": 180,
-    "height": 100,
-    "backgroundColor": "#b2f2bb",
-    "strokeColor": "#2f9e44",
-    "label": { "text": "API" }
-  },
-  {
-    "type": "arrow",
-    "x": 280,
-    "y": 150,
-    "points": [[0, 0], [70, 0]],
-    "strokeColor": "#1e1e1e",
-    "endArrowhead": "arrow"
-  }
-]
-\`\`\`"
-
-## Markdown Notes
-
-Create rich documentation notes using transparent rectangles with customData.type="markdown". These render as overlays with full markdown support (headings, lists, code blocks, tables, etc.).
-
-### Markdown Note Structure:
-\`\`\`json
-{
-  "type": "rectangle",
-  "x": 600,
-  "y": 100,
-  "width": 500,
-  "height": 400,
-  "strokeColor": "transparent",
-  "backgroundColor": "transparent",
-  "fillStyle": "solid",
-  "roughness": 0,
-  "strokeWidth": 0,
-  "locked": true,
-  "customData": {
-    "type": "markdown",
-    "content": "# Title\\n\\nMarkdown content here"
-  }
-}
-\`\`\`
-
-### Example 1: Project Requirements Note
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 500,
-    "height": 400,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# Project Requirements\\n\\n## Core Features\\n- User authentication\\n- Real-time chat\\n- File uploads\\n\\n## Tech Stack\\n- React + TypeScript\\n- Node.js backend\\n- PostgreSQL database"
-    }
-  }
-]
-\`\`\`
-
-### Example 2: Code Snippet Note
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 300,
-    "y": 200,
-    "width": 450,
-    "height": 300,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# API Endpoint\\n\\n\`\`\`typescript\\napp.post('/api/users', async (req, res) => {\\n  const user = await db.users.create(req.body);\\n  res.json(user);\\n});\\n\`\`\`\\n\\n**Method**: POST  \\n**Auth**: Required"
-    }
-  }
-]
-\`\`\`
-
-### Example 3: Meeting Notes
-\`\`\`json
-[
-  {
-    "type": "rectangle",
-    "x": 200,
-    "y": 150,
-    "width": 600,
-    "height": 350,
-    "strokeColor": "transparent",
-    "backgroundColor": "transparent",
-    "locked": true,
-    "customData": {
-      "type": "markdown",
-      "content": "# Team Standup\\n\\n## Updates\\n- **Alice**: Completed login flow\\n- **Bob**: Working on API endpoints\\n- **Carol**: Designing dashboard\\n\\n## Blockers\\n- Need database schema review\\n- Waiting on design assets"
-    }
-  }
-]
-\`\`\`
-
-### Guidelines for Markdown Notes:
-- Always use transparent stroke/background (notes render as overlays)
-- Set \`locked: true\` to prevent Excalidraw selection
-- Typical dimensions: 400-600px wide, 300-500px tall
-- Markdown supports: headings, lists, bold, italic, code blocks, tables
-- Escape newlines in JSON as \\n
-- Place notes using spatial analysis (avoid overlapping with diagrams)
-- **You can combine shapes AND markdown in single responses!**
-
-IMPORTANT: Output ONLY the JSON array in a code block. Do not include extra properties - the conversion function will add them automatically.`;
+## Output Format
+Return ONLY a raw JSON array. Example:
+[{"type":"rectangle","x":100,"y":100,"width":200,"height":100,"backgroundColor":"#a5d8ff","strokeColor":"#1971c2","label":{"text":"Box"}}]`;
 }
 
 /**
- * Builds context string about current canvas state to append to system prompt
+ * Builds minimal context string about current canvas state
  */
 export function buildCanvasContext(canvasState?: { description?: string }): string {
   if (!canvasState?.description) {
     return '';
   }
 
-  return `\n\n## Current Canvas State\n${canvasState.description}\n\nYou can see what's already on the canvas and can add to it, modify it, or provide feedback about it.`;
+  return `\n\nCANVAS STATE: ${canvasState.description.replace(/\n/g, ' ')}\nPlace new elements adjacent to existing ones. Avoid overlap.`;
 }

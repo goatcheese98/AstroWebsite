@@ -73,12 +73,13 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Build canvas context for system prompt
     const canvasContext = buildCanvasContext(canvasState);
+    const systemPrompt = getExcalidrawSystemPrompt(canvasContext);
 
     // Call Claude API (messages are already validated and sanitized)
     const response = await client.messages.create({
       model: selectedModel,
       max_tokens: CLAUDE_CONFIG.MAX_TOKENS,
-      system: getExcalidrawSystemPrompt(canvasContext),
+      system: systemPrompt,
       messages: messages.map((msg) => ({
         role: msg.role,
         content: msg.content,

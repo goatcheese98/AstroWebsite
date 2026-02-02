@@ -17,8 +17,8 @@ if (!MOONSHOT_API_KEY) {
 const KIMI_CONFIG = {
   BASE_URL: 'https://api.moonshot.ai/v1',
   DEFAULT_MODEL: 'kimi-k2-0711-preview', // Kimi K2.5 model
-  MAX_TOKENS: 4096,
-  TEMPERATURE: 0.7,
+  MAX_TOKENS: 2048,
+  TEMPERATURE: 0.3,
 };
 
 export const POST: APIRoute = async ({ request }) => {
@@ -99,6 +99,7 @@ export const POST: APIRoute = async ({ request }) => {
         ],
         temperature: KIMI_CONFIG.TEMPERATURE,
         max_tokens: KIMI_CONFIG.MAX_TOKENS,
+        top_p: 0.9,
       }),
     });
 

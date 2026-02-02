@@ -17,7 +17,6 @@ const apiKey = import.meta.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GEMIN
 if (!apiKey) {
   console.error('❌ GOOGLE_GEMINI_API_KEY is not set in environment variables');
 } else {
-  // Only log that key is loaded, never log the actual key
   console.log('✅ GOOGLE_GEMINI_API_KEY loaded successfully');
 }
 
@@ -39,7 +38,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Parse and validate request body with Zod
+    // Parse request body
     let body: unknown;
     try {
       body = await request.json();
@@ -54,42 +53,65 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Validate with Zod schema (replaces all manual validation!)
-    const validation = validateImageRequest(body);
-    if (!validation.success) {
+    // Extract data - support both simple prompt and image+prompt
+    const { prompt, model: selectedModel, imageData, mode = 'text' } = body as any;
+
+    // Validate prompt
+    if (!prompt || typeof prompt !== 'string') {
       const errorResponse: ImageGenerationErrorResponse = {
-        error: validation.error,
-        details: validation.details,
+        error: 'Invalid prompt',
+        details: 'Prompt is required and must be a string',
       };
       return new Response(JSON.stringify(errorResponse), {
-        status: validation.statusCode,
+        status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Extract validated data (already sanitized and type-safe!)
-    const { prompt, model: selectedModel } = validation.data;
-
     if (import.meta.env.DEV) {
-      console.log(`🎨 Generating image with model: ${selectedModel}`);
-      console.log(`📝 Prompt length: ${prompt.length} characters`);
+      console.log(`🎨 Generating image with model: ${selectedModel || GEMINI_CONFIG.DEFAULT_MODEL}`);
+      console.log(`📝 Mode: ${mode}`);
+      console.log(`📝 Prompt: ${prompt.substring(0, 100)}...`);
+      if (imageData) {
+        console.log(`🖼️ Has reference image: ${imageData.length} chars`);
+      }
     }
 
     // Initialize the Gemini API client
     const genAI = new GoogleGenerativeAI(apiKey);
+    const generativeModel = genAI.getGenerativeModel({ 
+      model: selectedModel || GEMINI_CONFIG.DEFAULT_MODEL 
+    });
 
-    const generativeModel = genAI.getGenerativeModel({ model: selectedModel });
+    // Build parts array - include image if provided
+    const parts: any[] = [];
+    
+    // If we have an image (screenshot), add it first so Gemini can see it
+    if (imageData && mode === 'visual') {
+      // Remove data URL prefix if present
+      const base64Data = imageData.includes(',') 
+        ? imageData.split(',')[1] 
+        : imageData;
+      
+      parts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: base64Data,
+        },
+      });
+      
+      console.log('📸 Added screenshot to prompt');
+    }
+    
+    // Add the text prompt
+    parts.push({ text: prompt });
 
-    // Generate image from prompt (prompt is already validated and sanitized)
+    // Generate image
     const result = await generativeModel.generateContent({
       contents: [
         {
           role: 'user',
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
+          parts,
         },
       ],
       generationConfig: {
@@ -100,10 +122,9 @@ export const POST: APIRoute = async ({ request }) => {
     const response = await result.response;
 
     // Extract image data from response
-    // Gemini returns images in parts array with inlineData containing base64
-    const parts = response.candidates?.[0]?.content?.parts;
+    const responseParts = response.candidates?.[0]?.content?.parts;
 
-    if (!parts || parts.length === 0) {
+    if (!responseParts || responseParts.length === 0) {
       const errorResponse: ImageGenerationErrorResponse = {
         error: 'No image generated',
         details: 'The model did not return any content parts',
@@ -114,12 +135,13 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Find the image part (should have inlineData with base64)
-    const imagePart = parts.find((part: GeminiPart) => part.inlineData);
+    // Find the image part
+    const imagePart = responseParts.find((part: GeminiPart) => part.inlineData);
 
     if (!imagePart?.inlineData?.data) {
       if (import.meta.env.DEV) {
         console.error('❌ No image data found in response parts');
+        console.log('Response parts:', JSON.stringify(responseParts, null, 2));
       }
       const errorResponse: ImageGenerationErrorResponse = {
         error: 'No image generated',
@@ -142,7 +164,7 @@ export const POST: APIRoute = async ({ request }) => {
       success: true,
       imageData: imagePart.inlineData.data,
       mimeType: imagePart.inlineData.mimeType || 'image/png',
-      model: selectedModel,
+      model: selectedModel || GEMINI_CONFIG.DEFAULT_MODEL,
     };
 
     return new Response(JSON.stringify(successResponse), {

@@ -9,6 +9,7 @@ export interface Message {
     threadId?: string;
     parentId?: string;
     status: "sending" | "sent" | "error" | "editing";
+    drawingCommand?: any[]; // Store the parsed JSON elements for copy functionality
 }
 
 export type MessageContent = 
