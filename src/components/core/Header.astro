@@ -1,6 +1,6 @@
 ---
-import ThemeToggle from './ThemeToggle.astro';
-import { NAV_LINKS } from '../../lib/constants';
+import ThemeToggle from "./ThemeToggle.astro";
+import { NAV_LINKS } from "../../lib/constants";
 
 const currentPath = Astro.url.pathname;
 ---
@@ -13,16 +13,25 @@ const currentPath = Astro.url.pathname;
     </a>
 
     <ul class="header__links" role="list">
-      {NAV_LINKS.map((link) => (
-        <li>
-          <a
-            href={link.href}
-            class:list={['header__link', { active: currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href)) }]}
-          >
-            {link.label}
-          </a>
-        </li>
-      ))}
+      {
+        NAV_LINKS.map((link) => (
+          <li>
+            <a
+              href={link.href}
+              class:list={[
+                "header__link",
+                {
+                  active:
+                    currentPath === link.href ||
+                    (link.href !== "/" && currentPath.startsWith(link.href)),
+                },
+              ]}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
     </ul>
 
     <ThemeToggle />
@@ -33,16 +42,16 @@ const currentPath = Astro.url.pathname;
   .header {
     position: sticky;
     top: 0;
+    left: 0;
+    width: 100%;
     z-index: 100;
-    background: rgba(var(--color-bg-rgb, 250, 248, 245), 0.8);
+    background: rgba(var(--color-bg-rgb), 0.8);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--color-stroke-muted);
-    transition: background 0.3s ease, box-shadow 0.3s ease;
-  }
-
-  [data-theme="dark"] .header {
-    background: rgba(15, 23, 42, 0.8);
+    transition:
+      background 0.3s ease,
+      box-shadow 0.3s ease;
   }
 
   .header__nav {
@@ -73,7 +82,11 @@ const currentPath = Astro.url.pathname;
   }
 
   .header__logo-text {
-    background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
+    background: linear-gradient(
+      135deg,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -88,8 +101,15 @@ const currentPath = Astro.url.pathname;
   }
 
   @keyframes logo-pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); opacity: 0.7; }
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.7;
+    }
   }
 
   .header__links {

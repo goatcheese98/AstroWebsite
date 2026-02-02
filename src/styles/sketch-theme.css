@@ -39,13 +39,13 @@
   --radius-xl: 28px;
 
   /* Shadows - enhanced depth */
-  --shadow-sm: 
+  --shadow-sm:
     2px 2px 0 var(--color-stroke-muted),
     0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 
+  --shadow-md:
     4px 4px 0 var(--color-stroke-muted),
     0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 
+  --shadow-lg:
     6px 6px 0 var(--color-stroke-muted),
     0 8px 24px rgba(0, 0, 0, 0.12);
   --shadow-glow: 0 0 30px var(--color-accent-glow);
@@ -72,29 +72,42 @@
   --color-gradient-end: #3b82f6;
   --dot-color: #e5e7eb;
   --glow-opacity: 0.4;
+  --color-bg-rgb: 250, 248, 245;
   color-scheme: light;
 }
 
 /* Dark theme - deep slate aesthetic */
 [data-theme="dark"] {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-elevated: #334155;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-stroke: #475569;
-  --color-stroke-muted: #334155;
-  --color-accent: #60a5fa;
-  --color-accent-hover: #93c5fd;
-  --color-accent-glow: rgba(96, 165, 250, 0.2);
-  --color-fill-1: #1e3a5f;
-  --color-fill-2: #1e4a2e;
-  --color-fill-3: #4a3e1e;
-  --color-fill-4: #4a1e1e;
-  --color-fill-5: #1e1b4b;
-  --color-gradient-start: #60a5fa;
-  --color-gradient-end: #3b82f6;
-  --dot-color: #1e293b;
-  --glow-opacity: 0.3;
+  --color-bg: #020617;
+  /* Deepest Midnight Navy */
+  --color-surface: #0f172a;
+  /* Elevated Surface for Contrast */
+  --color-surface-elevated: #1e293b;
+  --color-text: #ffffff;
+  /* Pure White for Max Contrast */
+  --color-text-muted: #cbd5e1;
+  /* Light Slate for Readability */
+  --color-stroke: #94a3b8;
+  /* Crisp, Non-translucent Strokes */
+  --color-stroke-muted: #475569;
+  --color-accent: #3b82f6;
+  /* Primary Brand Blue */
+  --color-accent-hover: #60a5fa;
+  --color-accent-glow: rgba(59, 130, 246, 0.25);
+  --color-fill-1: rgba(30, 64, 175, 0.4);
+  /* Deep Electric Blue */
+  --color-fill-2: rgba(6, 78, 59, 0.4);
+  /* Deep Emerald */
+  --color-fill-3: rgba(146, 64, 14, 0.4);
+  /* Rich Burning Amber (High Contrast) */
+  --color-fill-4: rgba(153, 27, 27, 0.4);
+  /* Deep Ruby */
+  --color-fill-5: rgba(55, 48, 163, 0.4);
+  /* Deep Indigo */
+  --color-gradient-start: #3b82f6;
+  --color-gradient-end: #60a5fa;
+  --dot-color: rgba(148, 163, 184, 0.1);
+  --glow-opacity: 0.4;
+  --color-bg-rgb: 2, 6, 23;
   color-scheme: dark;
 }
