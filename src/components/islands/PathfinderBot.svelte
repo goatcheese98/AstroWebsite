@@ -1,8 +1,17 @@
 <script lang="ts">
   type RobotState = "idle" | "waving" | "happy" | "excited" | "love";
   type ScreenMessage = "smile" | "hi" | "heart" | "cool";
+  type ClickAnimation = "right-arm" | "left-arm" | "left-leg" | "right-leg" | "body-shake" | "head-bang";
 
   const MESSAGES: ScreenMessage[] = ["smile", "hi", "heart", "cool"];
+  const CLICK_ANIMATIONS: ClickAnimation[] = [
+    "right-arm",
+    "left-arm", 
+    "left-leg",
+    "right-leg",
+    "body-shake",
+    "head-bang"
+  ];
 
   const COLORS = {
     body: "#e2e8f0",
@@ -20,10 +29,12 @@
   let isHovering = $state(false);
   let mouseOffset = $state({ x: 0, y: 0 });
   let containerRef: HTMLDivElement;
+  let clickAnimation = $state<ClickAnimation | null>(null);
 
   // Refs for timers
   let waveTimeout: ReturnType<typeof setTimeout> | null = null;
   let messageInterval: ReturnType<typeof setInterval> | null = null;
+  let clickAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Track mouse for head movement - subtle when not hovering
   function handleGlobalMouseMove(e: MouseEvent) {
@@ -83,10 +94,15 @@
       window.removeEventListener("mousemove", handleGlobalMouseMove);
       if (waveTimeout) clearTimeout(waveTimeout);
       if (messageInterval) clearInterval(messageInterval);
+      if (clickAnimationTimeout) clearTimeout(clickAnimationTimeout);
     };
   });
 
   function handleClick() {
+    // Randomly select a body part animation
+    const randomAnim = CLICK_ANIMATIONS[Math.floor(Math.random() * CLICK_ANIMATIONS.length)];
+    clickAnimation = randomAnim;
+    
     robotState = "excited";
     screenMessage = "heart";
     setTimeout(() => (robotState = "love"), 300);
@@ -98,6 +114,12 @@
       robotState = "idle";
       screenMessage = "smile";
     }, 2500);
+    
+    // Clear the click animation after it completes
+    if (clickAnimationTimeout) clearTimeout(clickAnimationTimeout);
+    clickAnimationTimeout = setTimeout(() => {
+      clickAnimation = null;
+    }, 2000);
   }
 
   function handleMouseEnter() {
@@ -140,11 +162,17 @@
     on:mouseleave={handleMouseLeave}
     class="bot"
     class:hovering={isHovering}
+    class:anim-right-arm={clickAnimation === "right-arm"}
+    class:anim-left-arm={clickAnimation === "left-arm"}
+    class:anim-left-leg={clickAnimation === "left-leg"}
+    class:anim-right-leg={clickAnimation === "right-leg"}
+    class:anim-body-shake={clickAnimation === "body-shake"}
+    class:anim-head-bang={clickAnimation === "head-bang"}
   >
     <svg
       width="300"
-      height="380"
-      viewBox="0 0 300 380"
+      height="420"
+      viewBox="0 -40 300 420"
       style="overflow: visible;"
     >
       <defs>
@@ -176,7 +204,7 @@
       </defs>
 
       <!-- Left Leg -->
-      <g>
+      <g class="left-leg-group" style="transform-origin: 100px 315px;">
         <rect
           x="85"
           y="280"
@@ -199,7 +227,7 @@
       </g>
 
       <!-- Right Leg -->
-      <g>
+      <g class="right-leg-group" style="transform-origin: 200px 315px;">
         <rect
           x="185"
           y="280"
@@ -363,7 +391,7 @@
       <circle cx="205" cy="240" r="5" fill={COLORS.bodyStroke} opacity="0.5" />
 
       <!-- Left Arm -->
-      <g>
+      <g class="left-arm-group" style="transform-origin: 72px 185px;">
         <rect
           x="60"
           y="175"
@@ -390,7 +418,8 @@
 
       <!-- Right Arm (Waving) -->
       <g
-        style="transform-origin: 215px 190px; transform: {isWaving
+        class="right-arm-group"
+        style="transform-origin: 227px 185px; transform: {isWaving
           ? 'rotate(-30deg)'
           : isExcited || isLove
             ? 'rotate(-45deg)'
@@ -481,8 +510,8 @@
 
       <!-- Head -->
       <g
-        style="transform-origin: 150px 100px;                transform: translate({headTranslateX}px, {headTranslateY}px) rotate({headRotate}deg);
-               transition: transform 0.1s ease-out;"
+        class="head-group"
+        style="transform-origin: 150px 100px; transform: translate({headTranslateX}px, {headTranslateY}px) rotate({headRotate}deg); transition: transform 0.1s ease-out;"
       >
         <circle
           cx="150"
@@ -589,18 +618,22 @@
 <style>
   .container {
     width: 300px;
-    height: 380px;
+    height: 420px;
     position: relative;
     user-select: none;
+    /* Prevent clipping of the head/antenna when moving */
+    overflow: visible;
   }
 
   .bot {
     width: 300px;
-    height: 380px;
+    height: 420px;
     position: absolute;
     cursor: pointer;
     filter: url(#sketch-filter);
     transition: transform 0.2s ease;
+    /* Ensure content can overflow */
+    overflow: visible;
   }
 
   .bot:hover {
@@ -638,5 +671,68 @@
       transform: scale(1.08);
       opacity: 1;
     }
+  }
+
+  /* Click Animation - Left Arm: Cheerful wave outward (away from body to the left) */
+  .anim-left-arm :global(.left-arm-group) {
+    animation: left-arm-wave 0.5s ease-in-out 3;
+  }
+
+  @keyframes left-arm-wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(40deg); }
+    75% { transform: rotate(25deg); }
+  }
+
+  /* Click Animation - Right Arm: Cheerful wave outward (away from body to the right) */
+  .anim-right-arm :global(.right-arm-group) {
+    animation: right-arm-wave 0.5s ease-in-out 3;
+  }
+
+  @keyframes right-arm-wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-40deg); }
+    75% { transform: rotate(-25deg); }
+  }
+
+  /* Click Animation - Left Leg: Kick/stomp motion */
+  .anim-left-leg :global(.left-leg-group) {
+    animation: left-leg-kick 0.6s ease-in-out 2;
+  }
+
+  @keyframes left-leg-kick {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(-10deg); }
+  }
+
+  /* Click Animation - Right Leg: Tap/jump motion */
+  .anim-right-leg :global(.right-leg-group) {
+    animation: right-leg-tap 0.5s ease-in-out 3;
+  }
+
+  @keyframes right-leg-tap {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* Click Animation - Body Shake: Full body wiggle */
+  .anim-body-shake {
+    animation: body-wiggle 0.3s ease-in-out 4;
+  }
+
+  @keyframes body-wiggle {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(-5px) rotate(-2deg); }
+    75% { transform: translateX(5px) rotate(2deg); }
+  }
+
+  /* Click Animation - Head Bang: Head bopping motion */
+  .anim-head-bang :global(.head-group) {
+    animation: head-bop 0.35s ease-in-out 4;
+  }
+
+  @keyframes head-bop {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(8px) rotate(-3deg); }
   }
 </style>

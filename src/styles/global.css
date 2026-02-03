@@ -20,6 +20,7 @@ body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Text rendering fix: use optimizeSpeed on mobile for smoother scrolling */
   text-rendering: optimizeLegibility;
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -27,6 +28,24 @@ body {
   background-color: var(--color-bg);
   overflow-x: hidden;
   position: relative;
+  /* Performance: promote body to its own compositor layer for theme transitions */
+  transform: translateZ(0);
+}
+
+/* Mobile: Optimize text rendering for performance */
+@media (max-width: 768px) {
+  body {
+    text-rendering: optimizeSpeed;
+    /* Prevent font inflation on mobile browsers */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Ensure text doesn't get janky during scroll */
+  h1, h2, h3, h4, h5, h6, p, span, a {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
 }
 
 /* Smooth background and grid transitions - unified timing */
@@ -50,6 +69,24 @@ body::before {
   background-size: 24px 24px;
   pointer-events: none;
   z-index: -1;
+  /* Performance: promote to own layer but don't composite unnecessarily */
+  will-change: opacity;
+}
+
+/* Mobile: Simplify dot grid for performance */
+@media (max-width: 768px) {
+  body::before {
+    background-size: 32px 32px;
+    /* Reduce opacity variation calculation */
+    opacity: 0.8;
+  }
+}
+
+/* Touch devices: Further simplify or remove if needed */
+@media (hover: none) and (pointer: coarse) {
+  body::before {
+    background-size: 40px 40px;
+  }
 }
 
 img,
@@ -249,6 +286,35 @@ pre {
     box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
+  /* Performance: contain layout and paint */
+  contain: layout paint;
+}
+
+/* Mobile/Performance: Disable expensive SVG filter on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .sketch-box,
+  .sketch-badge,
+  .sketch-btn,
+  .theme-toggle,
+  .bento-card,
+  .bot,
+  .scroll-indicator__mouse,
+  .projects__header-line {
+    filter: none !important;
+  }
+  
+  /* Add subtle border-radius variance to maintain hand-drawn feel without filter */
+  .sketch-box {
+    border-radius: var(--radius-md) var(--radius-sm) var(--radius-md) var(--radius-sm);
+  }
+  
+  .sketch-badge {
+    border-radius: var(--radius-sm) var(--radius-md) var(--radius-sm) var(--radius-md);
+  }
+  
+  .sketch-btn {
+    border-radius: var(--radius-md) var(--radius-sm) var(--radius-lg) var(--radius-md);
+  }
 }
 
 .sketch-box::before {

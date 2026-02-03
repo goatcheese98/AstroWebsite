@@ -26,10 +26,20 @@ const { fillColor, class: className } = Astro.props;
     filter: url(#sketch-filter);
     white-space: nowrap;
     color: var(--color-text);
+    /* Performance: contain layout and paint */
+    contain: layout paint;
   }
   
   [data-theme="dark"] .sketch-badge {
     color: #94a3b8;
     border-color: #64748b;
+  }
+
+  /* Mobile/Touch: Disable expensive filter */
+  @media (hover: none) and (pointer: coarse) {
+    .sketch-badge {
+      filter: none;
+      border-radius: var(--radius-sm) var(--radius-md) var(--radius-sm) var(--radius-md);
+    }
   }
 </style>

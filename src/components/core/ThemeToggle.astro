@@ -24,7 +24,7 @@
 
 <style>
   .theme-toggle {
-    background: none;
+    background: var(--color-surface);
     border: 2px solid var(--color-stroke);
     border-radius: var(--radius-md);
     color: var(--color-text);
@@ -34,8 +34,12 @@
     align-items: center;
     justify-content: center;
     filter: url(#sketch-filter);
-    transition: transform 0.15s ease;
+    transition: transform 0.15s ease, background-color 200ms ease-out;
     position: relative;
+    /* Performance: contain layout and paint */
+    contain: layout paint;
+    /* Performance: promote to own layer */
+    will-change: transform;
   }
   .theme-toggle:hover {
     transform: rotate(15deg);
@@ -48,6 +52,14 @@
   [data-theme="light"] .icon-moon { display: block; }
   [data-theme="dark"] .icon-sun { display: block; }
   [data-theme="dark"] .icon-moon { display: none; }
+
+  /* Mobile/Touch: Disable expensive filter */
+  @media (hover: none) and (pointer: coarse) {
+    .theme-toggle {
+      filter: none;
+      border-radius: var(--radius-md) var(--radius-sm) var(--radius-md) var(--radius-sm);
+    }
+  }
 </style>
 
 <script is:inline>

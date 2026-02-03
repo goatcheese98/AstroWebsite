@@ -186,6 +186,16 @@
     overflow: hidden;
     filter: url(#sketch-filter);
     height: fit-content;
+    /* Performance: contain layout and paint */
+    contain: layout paint;
+  }
+
+  /* Mobile/Touch: Disable expensive filter and use organic border-radius instead */
+  @media (hover: none) and (pointer: coarse) {
+    .bento-card {
+      filter: none;
+      border-radius: 16px 12px 20px 14px;
+    }
   }
 
   .bento-card::before {

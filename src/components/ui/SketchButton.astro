@@ -33,6 +33,8 @@ const Tag = href ? 'a' : 'button';
     cursor: pointer;
     filter: url(#sketch-filter);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    /* Performance: contain layout and paint */
+    contain: layout paint;
   }
 
   .sketch-btn:hover {
@@ -68,5 +70,13 @@ const Tag = href ? 'a' : 'button';
   .sketch-btn--sm {
     padding: var(--space-xs) var(--space-sm);
     font-size: var(--text-sm);
+  }
+
+  /* Mobile/Touch: Disable expensive filter */
+  @media (hover: none) and (pointer: coarse) {
+    .sketch-btn {
+      filter: none;
+      border-radius: var(--radius-md) var(--radius-sm) var(--radius-lg) var(--radius-md);
+    }
   }
 </style>

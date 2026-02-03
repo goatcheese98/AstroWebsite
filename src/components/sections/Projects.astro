@@ -131,6 +131,14 @@ import { PROJECTS } from "../../lib/constants";
     filter: url(#sketch-filter);
   }
 
+  /* Mobile: Disable filter */
+  @media (hover: none) and (pointer: coarse) {
+    .projects__header-line {
+      filter: none;
+      border-radius: 3px 1px 3px 1px;
+    }
+  }
+
   .projects__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));

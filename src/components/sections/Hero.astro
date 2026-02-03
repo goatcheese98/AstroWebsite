@@ -218,7 +218,10 @@ const TITLES = [
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 300px;
+    min-width: 340px;
+    /* Ensure the container doesn't clip the robot head/antenna */
+    overflow: visible;
+    padding-top: 20px;
   }
 
   .hero__scroll-indicator {
@@ -240,6 +243,13 @@ const TITLES = [
     border-radius: 13px;
     position: relative;
     filter: url(#sketch-filter);
+  }
+
+  /* Mobile/Touch: Disable filter */
+  @media (hover: none) and (pointer: coarse) {
+    .scroll-indicator__mouse {
+      filter: none;
+    }
   }
 
   .scroll-indicator__wheel {
@@ -297,6 +307,8 @@ const TITLES = [
 
     .hero__deco {
       order: 2;
+      min-width: auto;
+      padding-top: 10px;
     }
   }
 

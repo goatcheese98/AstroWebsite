@@ -26,5 +26,21 @@ const { class: className } = Astro.props;
     background-size: 20px 20px;
     border-radius: var(--radius-lg);
     padding: var(--space-lg);
+    /* Performance: contain layout and paint */
+    contain: layout paint;
+  }
+
+  /* Mobile: Simplify dot pattern */
+  @media (max-width: 768px) {
+    .whiteboard-bg {
+      background-size: 32px 32px;
+    }
+  }
+
+  /* Touch devices: Further simplify */
+  @media (hover: none) and (pointer: coarse) {
+    .whiteboard-bg {
+      background-size: 40px 40px;
+    }
   }
 </style>

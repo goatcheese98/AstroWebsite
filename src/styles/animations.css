@@ -262,6 +262,32 @@
   left: 100%;
 }
 
+/* Mobile Performance: Reduce animation complexity on small screens */
+@media (max-width: 768px) {
+  .reveal,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale {
+    /* Use simpler fade without transform for mobile */
+    transition: opacity 0.5s ease;
+  }
+  
+  /* Reduce animation duration globally on mobile */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.8s !important;
+    animation-iteration-count: 1 !important;
+  }
+  
+  /* Disable continuous animations on mobile */
+  .hero-deco-circle-outer,
+  .hero-deco-circle-inner,
+  .hero-deco-dot {
+    animation: none !important;
+  }
+}
+
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
   *,

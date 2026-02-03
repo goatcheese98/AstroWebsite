@@ -117,40 +117,77 @@
 /* Smooth background transition - only background changes slowly */
 body {
   transition: background-color 200ms ease-out;
+  /* Performance: contain paint during theme transitions */
+  contain: paint;
+}
+
+/* Prevent flash during theme transition - ensure all themed elements transition smoothly */
+[data-theme] {
+  transition: background-color 200ms ease-out, color 200ms ease-out, border-color 200ms ease-out;
 }
 
 /* Theme toggle ripple effect - global styles */
 .theme-page-ripple {
   position: fixed;
-  width: 100px;
-  height: 100px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   transform: translate(-50%, -50%) scale(1);
   pointer-events: none;
   z-index: 9999;
-  animation: theme-ripple-expand 1000ms ease-out forwards;
+  animation: theme-ripple-expand 800ms ease-out forwards;
+  /* Performance: promote to GPU layer */
+  will-change: transform, opacity;
 }
 
 @keyframes theme-ripple-expand {
   0% {
     transform: translate(-50%, -50%) scale(0);
-    opacity: 0.8;
+    opacity: 0.6;
   }
-
   100% {
-    transform: translate(-50%, -50%) scale(20);
+    transform: translate(-50%, -50%) scale(15);
     opacity: 0;
   }
 }
 
-/* Light mode: sun-like warm glow */
-[data-theme="light"] .theme-page-ripple {
-  background: radial-gradient(circle, rgba(255, 200, 80, 0.9) 0%, rgba(255, 160, 40, 0.6) 30%, rgba(255, 140, 20, 0.3) 50%, transparent 70%);
-  box-shadow: 0 0 60px rgba(255, 180, 60, 0.8), 0 0 120px rgba(255, 200, 80, 0.5), 0 0 200px rgba(255, 220, 100, 0.3);
+/* Mobile: Reduce ripple effect intensity */
+@media (max-width: 768px) {
+  .theme-page-ripple {
+    width: 30px;
+    height: 30px;
+    animation-duration: 600ms;
+  }
+  
+  @keyframes theme-ripple-expand {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(10);
+      opacity: 0;
+    }
+  }
 }
 
-/* Dark mode: moon-like cool glow */
+/* Light mode: sun-like warm glow - simplified for performance */
+[data-theme="light"] .theme-page-ripple {
+  background: radial-gradient(circle, rgba(255, 200, 80, 0.8) 0%, rgba(255, 160, 40, 0.4) 40%, transparent 70%);
+  box-shadow: 0 0 40px rgba(255, 180, 60, 0.6), 0 0 80px rgba(255, 200, 80, 0.3);
+}
+
+/* Dark mode: moon-like cool glow - simplified for performance */
 [data-theme="dark"] .theme-page-ripple {
-  background: radial-gradient(circle, rgba(220, 230, 255, 0.9) 0%, rgba(180, 200, 240, 0.6) 30%, rgba(140, 170, 220, 0.3) 50%, transparent 70%);
-  box-shadow: 0 0 60px rgba(200, 220, 255, 0.7), 0 0 120px rgba(180, 200, 240, 0.4), 0 0 200px rgba(160, 190, 230, 0.2);
+  background: radial-gradient(circle, rgba(220, 230, 255, 0.8) 0%, rgba(180, 200, 240, 0.4) 40%, transparent 70%);
+  box-shadow: 0 0 40px rgba(200, 220, 255, 0.5), 0 0 80px rgba(180, 200, 240, 0.25);
+}
+
+/* Mobile: Further simplify ripple to prevent artifacts */
+@media (max-width: 768px) {
+  [data-theme="light"] .theme-page-ripple,
+  [data-theme="dark"] .theme-page-ripple {
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, transparent 60%);
+    box-shadow: none;
+  }
 }
