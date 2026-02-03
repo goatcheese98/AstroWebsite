@@ -36,10 +36,6 @@
     filter: url(#sketch-filter);
     transition: transform 0.15s ease, background-color 200ms ease-out;
     position: relative;
-    /* Performance: contain layout and paint */
-    contain: layout paint;
-    /* Performance: promote to own layer */
-    will-change: transform;
   }
   .theme-toggle:hover {
     transform: rotate(15deg);
@@ -79,7 +75,9 @@
     document.body.appendChild(ripple);
     
     setTimeout(function() {
-      ripple.remove();
-    }, 1600);
+      if (ripple.parentNode) {
+        ripple.remove();
+      }
+    }, 800);
   });
 </script>

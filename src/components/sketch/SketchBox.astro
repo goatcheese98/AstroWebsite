@@ -23,8 +23,6 @@ const { as: Tag = 'div', fillColor, class: className } = Astro.props;
     background: var(--fill, var(--color-surface));
     filter: url(#sketch-filter);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    /* Performance: contain layout and paint */
-    contain: layout paint;
   }
 
   .sketch-box:hover {

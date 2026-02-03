@@ -27,9 +27,6 @@ body {
   color: var(--color-text);
   background-color: var(--color-bg);
   overflow-x: hidden;
-  position: relative;
-  /* Performance: promote body to its own compositor layer for theme transitions */
-  transform: translateZ(0);
 }
 
 /* Mobile: Optimize text rendering for performance */
@@ -69,8 +66,6 @@ body::before {
   background-size: 24px 24px;
   pointer-events: none;
   z-index: -1;
-  /* Performance: promote to own layer but don't composite unnecessarily */
-  will-change: opacity;
 }
 
 /* Mobile: Simplify dot grid for performance */
@@ -286,8 +281,6 @@ pre {
     box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
-  /* Performance: contain layout and paint */
-  contain: layout paint;
 }
 
 /* Mobile/Performance: Disable expensive SVG filter on touch devices */

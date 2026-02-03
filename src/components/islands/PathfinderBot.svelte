@@ -72,7 +72,7 @@
 
   // Initialize timers
   $effect(() => {
-    window.addEventListener("mousemove", handleGlobalMouseMove);
+    window.addEventListener("mousemove", handleGlobalMouseMove, { passive: true });
     scheduleWave();
 
     messageInterval = setInterval(() => {
@@ -621,8 +621,6 @@
     height: 420px;
     position: relative;
     user-select: none;
-    /* Prevent clipping of the head/antenna when moving */
-    overflow: visible;
   }
 
   .bot {
@@ -632,8 +630,7 @@
     cursor: pointer;
     filter: url(#sketch-filter);
     transition: transform 0.2s ease;
-    /* Ensure content can overflow */
-    overflow: visible;
+    touch-action: pan-y;
   }
 
   .bot:hover {
@@ -676,6 +673,7 @@
   /* Click Animation - Left Arm: Cheerful wave outward (away from body to the left) */
   .anim-left-arm :global(.left-arm-group) {
     animation: left-arm-wave 0.5s ease-in-out 3;
+    animation-fill-mode: forwards;
   }
 
   @keyframes left-arm-wave {
@@ -687,6 +685,7 @@
   /* Click Animation - Right Arm: Cheerful wave outward (away from body to the right) */
   .anim-right-arm :global(.right-arm-group) {
     animation: right-arm-wave 0.5s ease-in-out 3;
+    animation-fill-mode: forwards;
   }
 
   @keyframes right-arm-wave {
@@ -698,6 +697,7 @@
   /* Click Animation - Left Leg: Kick/stomp motion */
   .anim-left-leg :global(.left-leg-group) {
     animation: left-leg-kick 0.6s ease-in-out 2;
+    animation-fill-mode: forwards;
   }
 
   @keyframes left-leg-kick {
@@ -708,6 +708,7 @@
   /* Click Animation - Right Leg: Tap/jump motion */
   .anim-right-leg :global(.right-leg-group) {
     animation: right-leg-tap 0.5s ease-in-out 3;
+    animation-fill-mode: forwards;
   }
 
   @keyframes right-leg-tap {
@@ -718,6 +719,7 @@
   /* Click Animation - Body Shake: Full body wiggle */
   .anim-body-shake {
     animation: body-wiggle 0.3s ease-in-out 4;
+    animation-fill-mode: forwards;
   }
 
   @keyframes body-wiggle {
@@ -729,6 +731,7 @@
   /* Click Animation - Head Bang: Head bopping motion */
   .anim-head-bang :global(.head-group) {
     animation: head-bop 0.35s ease-in-out 4;
+    animation-fill-mode: forwards;
   }
 
   @keyframes head-bop {
