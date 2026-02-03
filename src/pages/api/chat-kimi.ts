@@ -16,9 +16,9 @@ if (!MOONSHOT_API_KEY) {
 // Kimi/Moonshot API configuration
 const KIMI_CONFIG = {
   BASE_URL: 'https://api.moonshot.ai/v1',
-  DEFAULT_MODEL: 'kimi-k2-0711-preview', // Kimi K2.5 model
+  DEFAULT_MODEL: 'kimi-k2.5', // Kimi K2.5 model
   MAX_TOKENS: 2048,
-  TEMPERATURE: 0.3,
+  TEMPERATURE: 1.0,
 };
 
 export const POST: APIRoute = async ({ request }) => {
@@ -82,32 +82,26 @@ export const POST: APIRoute = async ({ request }) => {
     console.log('📊 Canvas context:', canvasContext?.substring(0, 100) + '...');
     if (screenshot) console.log('📸 Including screenshot with request');
 
-    // Prepare messages with optional screenshot (OpenAI vision format)
-    const formattedMessages = messages.map((msg: any, index: number) => {
-      // Add screenshot to the last user message if available
-      if (screenshot && index === messages.length - 1 && msg.role === 'user') {
-        return {
-          role: msg.role,
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: screenshot, // Kimi supports data URLs directly
-              },
-            },
-            {
-              type: 'text',
-              text: msg.content,
-            },
-          ],
-        };
-      }
-
+    // Prepare messages as strings (simple text format for Kimi)
+    const formattedMessages = messages.map((msg: any) => {
       return {
         role: msg.role,
-        content: msg.content,
+        content: typeof msg.content === 'string'
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? msg.content.map((c: any) => c.text || '').join('\n')
+            : String(msg.content),
       };
     });
+
+    // Kimi k2.5 might not support vision in the standard OpenAI way
+    // If screenshot is present, we'll append a note to the last user message
+    if (screenshot && formattedMessages.length > 0) {
+      const lastUserMsg = [...formattedMessages].reverse().find(m => m.role === 'user');
+      if (lastUserMsg) {
+        lastUserMsg.content += "\n\n(A screenshot was attached to this message, but vision processing is currently being adapted for this model.)";
+      }
+    }
 
     // Call Kimi/Moonshot API (OpenAI-compatible)
     const response = await fetch(`${KIMI_CONFIG.BASE_URL}/chat/completions`, {
@@ -124,7 +118,7 @@ export const POST: APIRoute = async ({ request }) => {
         ],
         temperature: KIMI_CONFIG.TEMPERATURE,
         max_tokens: KIMI_CONFIG.MAX_TOKENS,
-        top_p: 0.9,
+        top_p: 0.95,
       }),
     });
 
@@ -144,13 +138,23 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const data = await response.json();
-    const assistantMessage = data.choices?.[0]?.message?.content;
 
-    if (!assistantMessage) {
+    // Some models like Kimi k2.5 might put content in different places
+    const choice = data.choices?.[0];
+    const assistantMessage = choice?.message?.content || choice?.message?.reasoning_content;
+    const finishReason = choice?.finish_reason;
+
+    if (!assistantMessage && assistantMessage !== "") {
+      console.error('❌ Kimi produced empty response. Data:', JSON.stringify(data, null, 2));
+
+      // Check for specific error status from API that might be hidden in data
+      const apiError = data.error?.message || data.msg || 'No message content in response';
+
       return new Response(
         JSON.stringify({
           error: 'Empty response from Kimi',
-          details: 'No message content in response',
+          details: `${apiError} (Finish Reason: ${finishReason})`,
+          rawResponse: data
         }),
         {
           status: 500,
@@ -159,7 +163,7 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    console.log('✅ Kimi response received, length:', assistantMessage.length);
+    console.log(`✅ Kimi response received (${finishReason}), length:`, assistantMessage?.length || 0);
 
     return new Response(
       JSON.stringify({

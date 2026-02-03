@@ -109,7 +109,7 @@ export interface UseAIChatStateReturn {
     isLoading: boolean;
     error: string | null;
     clearError: () => void;
-    
+
     // === 🖥️ UI State ===
     panelWidth: number;
     setPanelWidth: (width: number) => void;
@@ -123,11 +123,11 @@ export interface UseAIChatStateReturn {
     setShowTemplates: (show: boolean) => void;
     showImageModal: boolean;
     setShowImageModal: (show: boolean) => void;
-    
+
     // === 🎨 Canvas State ===
     canvasState: any | null;
     setCanvasState: (state: any) => void;
-    
+
     // === 🚀 Actions ===
     handleSend: (options?: SendMessageOptions) => Promise<void>;
     appendMessage: (message: Message) => void;
@@ -136,13 +136,13 @@ export interface UseAIChatStateReturn {
 
 export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateReturn {
     const { isOpen, initialWidth = 400, onClose } = options;
-    
+
     // === 📨 Core Message State ===
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    
+
     // === 🖥️ UI State ===
     const [panelWidth, setPanelWidth] = useState(initialWidth);
     const [isResizing, setIsResizing] = useState(false);
@@ -150,13 +150,13 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const [aiProvider, setAiProvider] = useState<AIProvider>("kimi");
     const [showTemplates, setShowTemplates] = useState(false);
     const [showImageModal, setShowImageModal] = useState(false);
-    
+
     // === 🎨 Canvas State ===
     const [canvasState, setCanvasState] = useState<any>(null);
-    
+
     // === 🔄 Request Tracking ===
     const chatRequestIdRef = useRef<string | null>(null);
-    
+
     // Cleanup on unmount if still open
     useEffect(() => {
         return () => {
@@ -166,37 +166,37 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             }
         };
     }, [isOpen, onClose]);
-    
+
     // === 🚀 Actions ===
-    
+
     /**
      * Clear any error message
      */
     const clearError = useCallback(() => {
         setError(null);
     }, []);
-    
+
     /**
      * Toggle between Kimi and Claude AI providers
      */
     const toggleProvider = useCallback(() => {
         setAiProvider(prev => prev === "kimi" ? "claude" : "kimi");
     }, []);
-    
+
     /**
      * Append a message to the conversation history
      */
     const appendMessage = useCallback((message: Message) => {
         setMessages(prev => [...prev, message]);
     }, []);
-    
+
     /**
      * Clear all messages (reset conversation)
      */
     const clearMessages = useCallback(() => {
         setMessages([]);
     }, []);
-    
+
     /**
      * Build canvas description from current state
      */
@@ -204,19 +204,19 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         if (!canvasState?.elements?.length) {
             return "The canvas is currently empty.";
         }
-        
+
         const counts: Record<string, number> = {};
         canvasState.elements.forEach((el: any) => {
             counts[el.type] = (counts[el.type] || 0) + 1;
         });
-        
+
         const desc = Object.entries(counts)
             .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
             .join(', ');
-        
+
         return `Canvas has ${canvasState.elements.length} elements: ${desc}`;
     }, [canvasState]);
-    
+
     /**
      * Send a message to the AI with optional canvas context and screenshot
      */
@@ -225,21 +225,21 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     ): Promise<void> => {
         const userContent = input.trim();
         if (!userContent || isLoading) return;
-        
+
         const { screenshotData = null, selectedElements = [], getSelectionContext } = sendOptions || {};
-        
+
         // Build context based on mode
         let contextMessage = "";
         let elementDataForPrompt = "";
         let isModifyingElements = false;
-        
+
         if (contextMode === "selected" && selectedElements.length > 0 && getSelectionContext) {
             const selectionContext = getSelectionContext();
             contextMessage = `\n\n[Working with ${selectedElements.length} selected elements:\n${selectionContext}]`;
-            
+
             // Include full element data for modification capability
             if (canvasState?.elements) {
-                const selectedElementData = canvasState.elements.filter((el: any) => 
+                const selectedElementData = canvasState.elements.filter((el: any) =>
                     selectedElements.includes(el.id)
                 );
                 if (selectedElementData.length > 0) {
@@ -250,9 +250,9 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         } else {
             contextMessage = `\n\n[Canvas has ${canvasState?.elements?.length || 0} total elements]`;
         }
-        
+
         const fullContent = userContent + contextMessage + elementDataForPrompt;
-        
+
         // Create user message
         const userMessage: Message = {
             id: nanoid(),
@@ -269,78 +269,84 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             reactions: [],
             status: "sent",
         };
-        
+
         // Update UI state
         setMessages(prev => [...prev, userMessage]);
         setInput("");
         setIsLoading(true);
         setError(null);
-        
+
         try {
             const canvasDescription = getCanvasDescription();
             const selectionContext = selectedElements.length > 0 && getSelectionContext
                 ? `\n\nCurrently selected elements (${selectedElements.length}):\n${getSelectionContext()}`
                 : "";
-            
+
             const canvasStateData = {
                 description: canvasDescription + selectionContext,
                 elementCount: canvasState?.elements?.length || 0,
-                selectedElements: selectedElements.length > 0 
+                selectedElements: selectedElements.length > 0
                     ? `User has selected ${selectedElements.length} elements${getSelectionContext ? ': ' + getSelectionContext() : ''}`
                     : "No specific elements selected",
                 isModifyingElements,
             };
-            
+
             // Call appropriate API based on provider
             const endpoint = aiProvider === "kimi" ? "/api/chat-kimi" : "/api/chat";
-            const model = aiProvider === "kimi" ? 
-                "kimi-k2-0711-preview" : 
+            const model = aiProvider === "kimi" ?
+                "kimi-k2.5" :
                 "claude-sonnet-4-20250514";
-            
+
             console.log(`🤖 Sending to ${aiProvider === "kimi" ? "Kimi K2.5" : "Claude"}...`);
-            
+
             const response = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    messages: [...messages, userMessage].map(m => ({
-                        role: m.role,
-                        content: fullContent,
-                    })),
+                    messages: [
+                        ...messages.map(m => ({
+                            role: m.role,
+                            content: m.content.map(c => c.type === "text" ? c.text : "").join("\n"),
+                        })),
+                        {
+                            role: "user",
+                            content: fullContent,
+                        }
+                    ],
                     model,
                     canvasState: canvasStateData,
                     screenshot: screenshotData,
                 }),
             });
-            
+
             const data = await response.json();
-            
+
             if (!response.ok) {
                 console.error(`❌ ${aiProvider} API error:`, data);
-                
+
                 const errorMessage = data.details || data.error || `${aiProvider} API failed`;
                 const isOverloaded = errorMessage.toLowerCase().includes('overload') ||
-                                   errorMessage.toLowerCase().includes('too many requests') ||
-                                   response.status === 429;
-                
+                    errorMessage.toLowerCase().includes('too many requests') ||
+                    response.status === 429;
+
                 if (isOverloaded) {
                     const otherProvider = aiProvider === "kimi" ? "Claude" : "Kimi";
                     throw new Error(`${aiProvider} is currently overloaded. Click the provider badge to switch to ${otherProvider} instead.`);
                 }
-                
+
                 throw new Error(errorMessage);
             }
-            
+
             console.log(`✅ ${aiProvider} response received`);
-            
+
             // Parse any drawing commands from response
             let displayMessage = data.message;
             let drawingCommand: any[] | null = null;
-            
-            const jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/) 
+
+            const jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/)
                 || data.message.match(/```\s*\n([\s\S]*?)\n```/)
                 || data.message.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-            
+
             if (jsonMatch) {
                 try {
                     const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
@@ -356,7 +362,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                     console.error("Failed to parse drawing command:", err);
                 }
             }
-            
+
             // Create assistant message
             const assistantMessage: Message = {
                 id: nanoid(),
@@ -371,9 +377,9 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 status: "sent",
                 drawingCommand: drawingCommand || undefined,
             };
-            
+
             setMessages(prev => [...prev, assistantMessage]);
-            
+
         } catch (err) {
             console.error("Send message error:", err);
             setError(err instanceof Error ? err.message : "Something went wrong");
@@ -381,7 +387,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             setIsLoading(false);
         }
     }, [input, isLoading, messages, aiProvider, contextMode, canvasState, getCanvasDescription]);
-    
+
     return {
         // Message state
         messages,
@@ -390,7 +396,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         isLoading,
         error,
         clearError,
-        
+
         // UI state
         panelWidth,
         setPanelWidth,
@@ -404,11 +410,11 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         setShowTemplates,
         showImageModal,
         setShowImageModal,
-        
+
         // Canvas state
         canvasState,
         setCanvasState,
-        
+
         // Actions
         handleSend,
         appendMessage,

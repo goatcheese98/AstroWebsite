@@ -21,7 +21,7 @@ let MarkdownNote: any = null;
 
 const loadMarkdownNote = async () => {
   if (!MarkdownNote) {
-    const mod = await import("./MarkdownNote");
+    const mod = await import("./markdown");
     MarkdownNote = mod.MarkdownNote;
   }
   return { MarkdownNote };
