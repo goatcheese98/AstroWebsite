@@ -25,13 +25,31 @@ body {
   font-size: var(--text-base);
   color: var(--color-text);
   background-color: var(--color-bg);
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Smooth background and grid transitions - unified timing */
+body {
+  transition: background-color 200ms ease-out;
+}
+
+body::before {
+  transition: opacity 200ms ease-out;
+}
+
+/* Dot grid overlay with smooth transition */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
   background-image:
     radial-gradient(circle,
-      var(--dot-color) 1px,
+      rgba(var(--dot-color-rgb), var(--dot-opacity)) 1px,
       transparent 1px);
   background-size: 24px 24px;
-  background-attachment: fixed;
-  overflow-x: hidden;
+  pointer-events: none;
+  z-index: -1;
 }
 
 img,

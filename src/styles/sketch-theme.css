@@ -70,7 +70,8 @@
   --color-fill-5: #e0e7ff;
   --color-gradient-start: #2563eb;
   --color-gradient-end: #3b82f6;
-  --dot-color: #e5e7eb;
+  --dot-color-rgb: 160, 160, 160;
+  --dot-opacity: 0.25;
   --glow-opacity: 0.4;
   --color-bg-rgb: 250, 248, 245;
   color-scheme: light;
@@ -106,10 +107,16 @@
   /* Deep Indigo */
   --color-gradient-start: #3b82f6;
   --color-gradient-end: #60a5fa;
-  --dot-color: rgba(148, 163, 184, 0.1);
+  --dot-color-rgb: 160, 160, 160;
+  --dot-opacity: 0.08;
   --glow-opacity: 0.4;
   --color-bg-rgb: 2, 6, 23;
   color-scheme: dark;
+}
+
+/* Smooth background transition - only background changes slowly */
+body {
+  transition: background-color 200ms ease-out;
 }
 
 /* Theme toggle ripple effect - global styles */
@@ -121,7 +128,7 @@
   transform: translate(-50%, -50%) scale(1);
   pointer-events: none;
   z-index: 9999;
-  animation: theme-ripple-expand 2000ms ease-out forwards;
+  animation: theme-ripple-expand 1000ms ease-out forwards;
 }
 
 @keyframes theme-ripple-expand {
@@ -129,6 +136,7 @@
     transform: translate(-50%, -50%) scale(0);
     opacity: 0.8;
   }
+
   100% {
     transform: translate(-50%, -50%) scale(20);
     opacity: 0;
