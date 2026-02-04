@@ -24,3 +24,7 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 .dev.vars
+
+# canvas build temp files
+.temp-pages-backup/
+.canvas-build-state.json

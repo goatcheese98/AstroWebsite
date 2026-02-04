@@ -1,0 +1,44 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/schemas/config/v2.json",
+  "name": "ai-canvas",
+  "compatibility_date": "2025-01-20",
+  "main": "./dist/server/index.js",
+  "assets": {
+    "directory": "./dist/client/",
+    "binding": "ASSETS"
+  },
+  // Routes - only serve the canvas app at root
+  "routes": [
+    {
+      "pattern": "*",
+      "script": "./dist/server/index.js"
+    }
+  ],
+  // D1 Database binding (shared with main site)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "astroweb-db",
+      "database_id": "1daa4434-4ec6-472d-8bf9-ab6e71c11dbf"
+    }
+  ],
+  // KV Namespaces (shared with main site)
+  "kv_namespaces": [
+    {
+      "binding": "SESSION_KV",
+      "id": "2e40b52270bb4622873e0ba5c545a922"
+    },
+    {
+      "binding": "RATE_LIMIT_KV",
+      "id": "598df9d2488549df9929db888147772f"
+    }
+  ],
+  // R2 Bucket binding (shared with main site)
+  "r2_buckets": [
+    {
+      "binding": "CANVAS_STORAGE",
+      "bucket_name": "astroweb-canvases",
+      "preview_bucket_name": "astroweb-canvases-preview"
+    }
+  ]
+}
