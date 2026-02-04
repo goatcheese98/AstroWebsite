@@ -38,6 +38,16 @@ import CanvasApp from "../components/islands/CanvasApp";
   /* Ensure body doesn't scroll when canvas is open */
   :global(body) {
     overflow: hidden !important;
+    /* Prevent browser pinch zoom - let Excalidraw handle it */
+    touch-action: none;
+  }
+
+  /* Prevent browser zoom on the canvas container */
+  .canvas-container {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   /* Make Excalidraw fill entire viewport */

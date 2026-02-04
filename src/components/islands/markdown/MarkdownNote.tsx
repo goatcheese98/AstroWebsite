@@ -10,8 +10,14 @@
  * 💬 ARCHITECTURE:
  * - Underlying element: Native Excalidraw rectangle (transparent stroke)
  * - This overlay: React component that tracks element position
- * - Excalidraw handles: Drag, resize, rotate, arrow binding
- * - We handle: Content rendering, edit mode, purple glow effect
+ * - Excalidraw handles: Drag, resize, rotate, arrow binding, pinch zoom
+ * - We handle: Content rendering, edit mode, purple glow effect, wheel scrolling
+ * 
+ * 🎯 INTERACTION MODEL:
+ * - Single click/drag: Excalidraw handles it via underlying rect (pointerEvents: none on overlay)
+ * - Double-click: Global handler detects it and enters edit mode
+ * - Scroll/wheel: Captured by overlay for content scrolling
+ * - Pinch zoom: Passes through to Excalidraw canvas zoom
  * 
  * @module markdown/MarkdownNote
  */
@@ -26,6 +32,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
     ({ element, appState, onChange }, ref) => {
         const [isEditing, setIsEditing] = useState(false);
         const [content, setContent] = useState(element.customData?.content || '');
+        const contentRef = useRef<HTMLDivElement>(null);
+        const containerRef = useRef<HTMLDivElement>(null);
 
         // Update content when element changes
         useEffect(() => {
@@ -40,7 +48,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const angle = element.angle || 0;
 
         // Determine theme
-        const isDark = typeof document !== 'undefined' && 
+        const isDark = typeof document !== 'undefined' &&
             document.documentElement.getAttribute('data-theme') === 'dark';
 
         // Check if element is selected in Excalidraw
@@ -55,11 +63,11 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             height: `${height}px`,
             transform: `rotate(${angle}rad) scale(${appState.zoom.value})`,
             transformOrigin: 'top left',
-            pointerEvents: 'none',
-            zIndex: isEditing ? 100 : (isSelected ? 20 : 10),
+            pointerEvents: 'none', // Container doesn't capture events
+            zIndex: isEditing ? 5 : (isSelected ? 2 : 1),
         };
 
-        // Content card style
+        // Content card style - visual layer, no pointer events when not editing
         const contentStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
@@ -74,8 +82,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            pointerEvents: isEditing ? 'auto' : 'none', // Only capture clicks when editing
-            cursor: 'default',
+            pointerEvents: isEditing ? 'auto' : 'none', // No pointer events when not editing
+            cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
             WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -106,52 +114,60 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             }
         }, [exitEditMode]);
 
-        // Track if we were selected on the first click of a double-click
-        const wasSelectedOnFirstClick = useRef(false);
-        
-        // Listen for clicks to detect double-click on selected element
+        // Global double-click handler for entering edit mode
         useEffect(() => {
             if (isEditing) return;
 
-            let clickTimeout: number;
-            let clickCount = 0;
-
-            const handleClick = (e: MouseEvent) => {
-                // Check if the click target is within our overlay or the underlying element
+            const handleDblClick = (e: MouseEvent) => {
                 const target = e.target as HTMLElement;
-                const isClickOnNote = target.closest(`[data-note-id="${element.id}"]`);
-                
-                if (!isClickOnNote) return;
-
-                clickCount++;
-
-                if (clickCount === 1) {
-                    // First click - remember if we were selected
-                    wasSelectedOnFirstClick.current = isSelected;
-                    
-                    clickTimeout = window.setTimeout(() => {
-                        clickCount = 0;
-                    }, 300);
-                } else if (clickCount === 2) {
-                    // Second click - this is a double-click
-                    clearTimeout(clickTimeout);
-                    clickCount = 0;
-                    
-                    // Enter edit mode on double-click
-                    if (wasSelectedOnFirstClick.current || isSelected) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        enterEditMode();
-                    }
+                // Check if double-click is on this note
+                const noteElement = containerRef.current;
+                if (noteElement && noteElement.contains(target)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enterEditMode();
                 }
             };
 
-            document.addEventListener('click', handleClick, true);
-            return () => {
-                document.removeEventListener('click', handleClick, true);
-                clearTimeout(clickTimeout);
-            };
-        }, [isEditing, isSelected, enterEditMode, element.id]);
+            // Use capture phase to intercept before Excalidraw
+            document.addEventListener('dblclick', handleDblClick, true);
+            return () => document.removeEventListener('dblclick', handleDblClick, true);
+        }, [isEditing, enterEditMode]);
+
+        // Wheel event handler for content scrolling
+        // This is attached to the container which has pointerEvents: none
+        // But wheel events still work on it
+        const handleWheel = useCallback((e: React.WheelEvent) => {
+            if (isEditing) return; // Let textarea handle its own scrolling
+
+            const contentEl = contentRef.current;
+            if (!contentEl) return;
+
+            const { scrollTop, scrollHeight, clientHeight } = contentEl;
+            const isScrollingDown = e.deltaY > 0;
+            const isScrollingUp = e.deltaY < 0;
+            const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+            const isAtTop = scrollTop <= 0;
+
+            // If at scroll boundaries, let event propagate to canvas for panning
+            if ((isScrollingDown && isAtBottom) || (isScrollingUp && isAtTop)) {
+                return;
+            }
+
+            // Scroll the content
+            e.preventDefault();
+            e.stopPropagation();
+            contentEl.scrollTop += e.deltaY;
+        }, [isEditing]);
+
+        // Touch handlers for pinch zoom pass-through
+        const handleTouchStart = useCallback((e: React.TouchEvent) => {
+            if (isEditing) return;
+            // Multi-touch (pinch) - don't prevent, let Excalidraw handle it
+            if (e.touches.length > 1) {
+                return;
+            }
+        }, [isEditing]);
 
         // Export as image
         const exportAsImage = useCallback(async () => {
@@ -196,12 +212,17 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         return (
             <div
+                ref={containerRef}
                 style={containerStyle}
                 className="markdown-note-container"
                 data-note-id={element.id}
+                // Wheel events work even with pointerEvents: none on parent
+                onWheel={handleWheel}
+                onTouchStart={handleTouchStart}
             >
-                {/* Content card */}
+                {/* Content card - visual layer only */}
                 <div
+                    ref={contentRef}
                     style={contentStyle}
                     data-note-id={element.id}
                 >

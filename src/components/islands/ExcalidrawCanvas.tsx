@@ -8,25 +8,25 @@ let ExcalidrawModule: any = null;
 let convertToExcalidrawElements: any = null;
 
 const loadExcalidraw = async () => {
-  if (!ExcalidrawModule) {
-    const mod = await import("@excalidraw/excalidraw");
-    ExcalidrawModule = mod.Excalidraw;
-    convertToExcalidrawElements = mod.convertToExcalidrawElements;
-    // Import CSS
-    await import("@excalidraw/excalidraw/index.css");
-  }
-  return { Excalidraw: ExcalidrawModule, convertToExcalidrawElements };
+    if (!ExcalidrawModule) {
+        const mod = await import("@excalidraw/excalidraw");
+        ExcalidrawModule = mod.Excalidraw;
+        convertToExcalidrawElements = mod.convertToExcalidrawElements;
+        // Import CSS
+        await import("@excalidraw/excalidraw/index.css");
+    }
+    return { Excalidraw: ExcalidrawModule, convertToExcalidrawElements };
 };
 
 // Lazy-loaded MarkdownNote
 let MarkdownNote: any = null;
 
 const loadMarkdownNote = async () => {
-  if (!MarkdownNote) {
-    const mod = await import("./markdown");
-    MarkdownNote = mod.MarkdownNote;
-  }
-  return { MarkdownNote };
+    if (!MarkdownNote) {
+        const mod = await import("./markdown");
+        MarkdownNote = mod.MarkdownNote;
+    }
+    return { MarkdownNote };
 };
 
 const STORAGE_KEY = "excalidraw-canvas-data";
@@ -207,10 +207,10 @@ export default function ExcalidrawCanvas() {
     // Migration: Unlock existing markdown notes to enable arrow binding
     useEffect(() => {
         if (!excalidrawAPI) return;
-        
+
         const elements = excalidrawAPI.getSceneElements();
         let needsUpdate = false;
-        
+
         const updatedElements = elements.map((el: any) => {
             // Check if this is a markdown note that's locked
             if (el.customData?.type === 'markdown' && el.locked === true) {
@@ -224,7 +224,7 @@ export default function ExcalidrawCanvas() {
             }
             return el;
         });
-        
+
         if (needsUpdate) {
             excalidrawAPI.updateScene({ elements: updatedElements });
             console.log("🔓 Migrated existing markdown notes to enable arrow binding");
@@ -325,7 +325,7 @@ export default function ExcalidrawCanvas() {
         window.addEventListener("excalidraw:draw", handleDrawCommand);
 
         console.log("👂 Canvas listening for draw commands");
-        
+
         return () => {
             console.log("👋 Canvas stopped listening for draw commands");
             window.removeEventListener("ai-draw-command", handleDrawCommand);
@@ -352,7 +352,7 @@ export default function ExcalidrawCanvas() {
             try {
                 // Get current scene elements
                 const currentElements = excalidrawAPI.getSceneElements();
-                
+
                 // Create a map of updated elements by id
                 const updatesById = new Map();
                 elements.forEach((el: any) => {
@@ -423,7 +423,7 @@ export default function ExcalidrawCanvas() {
         };
 
         window.addEventListener("excalidraw:get-state", handleGetState);
-        
+
         return () => {
             window.removeEventListener("excalidraw:get-state", handleGetState);
         };
@@ -524,7 +524,7 @@ export default function ExcalidrawCanvas() {
         };
 
         window.addEventListener("excalidraw:insert-svg", handleInsertSVG);
-        
+
         return () => {
             window.removeEventListener("excalidraw:insert-svg", handleInsertSVG);
         };
@@ -599,7 +599,7 @@ export default function ExcalidrawCanvas() {
         };
 
         window.addEventListener("excalidraw:insert-image", handleInsertImage);
-        
+
         return () => {
             window.removeEventListener("excalidraw:insert-image", handleInsertImage);
         };
@@ -705,7 +705,7 @@ export default function ExcalidrawCanvas() {
         };
 
         window.addEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
-        
+
         return () => {
             window.removeEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
         };
@@ -717,9 +717,9 @@ export default function ExcalidrawCanvas() {
             // Only handle if we're on the canvas
             const target = event.target as HTMLElement;
             const isOnCanvas = target.closest('.excalidraw-wrapper') !== null;
-            
+
             if (!isOnCanvas) return;
-            
+
             if (!excalidrawAPI) {
                 console.warn("⚠️ Excalidraw API not ready for paste");
                 return;
@@ -738,25 +738,25 @@ export default function ExcalidrawCanvas() {
             if (textData && (textData.includes('<svg') || textData.includes('<?xml'))) {
                 event.preventDefault();
                 console.log("📋 Pasting SVG from clipboard");
-                
+
                 try {
                     // Create a blob from the SVG
                     const svgBlob = new Blob([textData], { type: 'image/svg+xml' });
                     const svgUrl = URL.createObjectURL(svgBlob);
-                    
+
                     // Generate unique ID for the SVG
                     const svgId = `pasted-svg-${Date.now()}`;
-                    
+
                     // Get viewport center for positioning
                     const appState = excalidrawAPI.getAppState();
                     const viewportCenterX = appState.width / 2;
                     const viewportCenterY = appState.height / 2;
                     const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
                     const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-                    
+
                     // Load converter
                     const { convertToExcalidrawElements: converter } = await loadExcalidraw();
-                    
+
                     // Create image element
                     const imageElement = converter([
                         {
@@ -793,11 +793,11 @@ export default function ExcalidrawCanvas() {
             // Check for image data
             const items = Array.from(clipboardData.items);
             const imageItem = items.find(item => item.type.startsWith('image/'));
-            
+
             if (imageItem) {
                 event.preventDefault();
                 console.log("📋 Pasting image from clipboard");
-                
+
                 try {
                     const blob = imageItem.getAsFile();
                     if (!blob) return;
@@ -836,7 +836,7 @@ export default function ExcalidrawCanvas() {
 
         // Add paste listener to document (needed for mobile context menu paste)
         document.addEventListener('paste', handlePaste);
-        
+
         return () => {
             document.removeEventListener('paste', handlePaste);
         };
@@ -858,11 +858,11 @@ export default function ExcalidrawCanvas() {
         const appState = excalidrawAPI.getAppState();
         const viewportCenterX = appState.width / 2;
         const viewportCenterY = appState.height / 2;
-        
+
         // Convert viewport center to scene coordinates
         const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
         const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-        
+
         const newElement = {
             type: "rectangle",
             x: sceneX - 250,
@@ -885,7 +885,7 @@ export default function ExcalidrawCanvas() {
 
         const converted = converter([newElement]);
         const currentElements = excalidrawAPI.getSceneElements();
-        
+
         excalidrawAPI.updateScene({
             elements: [...currentElements, ...converted],
         });
@@ -941,11 +941,11 @@ export default function ExcalidrawCanvas() {
 
     if (isLoading || !ExcalidrawComponent) {
         return (
-            <div style={{ 
-                width: "100%", 
-                height: "100%", 
-                display: "flex", 
-                alignItems: "center", 
+            <div style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
                 justifyContent: "center",
                 background: "var(--color-bg)"
             }}>
@@ -996,7 +996,49 @@ export default function ExcalidrawCanvas() {
                     visibility: hidden !important;
                 }
 
-                /* Mobile: Ensure context menu works */
+                /* Markdown note overlay styles */
+                .markdown-note-container {
+                    /* Ensure notes are above canvas but don't interfere with drag */
+                    /* pointerEvents is controlled via JS - 'none' when not editing */
+                }
+
+                .markdown-note-container [data-note-id] {
+                    /* Smooth scrolling for content */
+                    scroll-behavior: smooth;
+                    -webkit-overflow-scrolling: touch;
+                }
+
+                /* Hide scrollbar for cleaner look but allow scrolling */
+                .markdown-note-container [data-note-id]::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+
+                .markdown-note-container [data-note-id]::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+
+                .markdown-note-container [data-note-id]::-webkit-scrollbar-thumb {
+                    background: rgba(129, 140, 248, 0.3);
+                    border-radius: 3px;
+                }
+
+                .markdown-note-container [data-note-id]::-webkit-scrollbar-thumb:hover {
+                    background: rgba(129, 140, 248, 0.5);
+                }
+
+                /* Prevent browser zoom on markdown notes - let Excalidraw handle it */
+                .markdown-note-container {
+                    touch-action: none;
+                }
+
+                /* Excalidraw UI layer boost - ensure internal palettes stay above custom MD notes */
+                .excalidraw .layer-ui__wrapper,
+                .excalidraw .excalidraw-context-menu {
+                    z-index: 10 !important;
+                }
+
+                /* Mobile: Ensure context menu works and prevent browser zoom */
                 @media (hover: none) and (pointer: coarse) {
                     .excalidraw-wrapper {
                         touch-action: manipulation;
@@ -1035,6 +1077,66 @@ export default function ExcalidrawCanvas() {
                         toggleTheme: false,
                         saveAsImage: true,
                     },
+                }}
+                onPointerDown={(event: any, pointerState: any) => {
+                    // Check if clicking on a markdown element
+                    // If so, we want to prevent Excalidraw from entering text editing mode
+                    const elements = excalidrawAPI?.getSceneElements?.() || [];
+                    const appState = excalidrawAPI?.getAppState?.();
+
+                    if (!appState) return;
+
+                    // Convert pointer to scene coordinates
+                    const sceneX = (event.clientX / appState.zoom.value) - appState.scrollX;
+                    const sceneY = (event.clientY / appState.zoom.value) - appState.scrollY;
+
+                    // Check if pointer is over any markdown element
+                    const markdownElement = elements.find((el: any) => {
+                        if (el.customData?.type !== 'markdown' || el.isDeleted) return false;
+
+                        // Simple hit test (assuming no rotation for simplicity)
+                        return sceneX >= el.x &&
+                            sceneX <= el.x + el.width &&
+                            sceneY >= el.y &&
+                            sceneY <= el.y + el.height;
+                    });
+
+                    if (markdownElement) {
+                        // Select the markdown element instead of entering text mode
+                        excalidrawAPI.selectShape({
+                            id: markdownElement.id,
+                        });
+                    }
+                }}
+                onDoubleClick={(event: any, pointerState: any) => {
+                    // Prevent Excalidraw's native text editing when double-clicking on markdown
+                    const elements = excalidrawAPI?.getSceneElements?.() || [];
+                    const appState = excalidrawAPI?.getAppState?.();
+
+                    if (!appState) return false;
+
+                    // Convert pointer to scene coordinates
+                    const sceneX = (event.clientX / appState.zoom.value) - appState.scrollX;
+                    const sceneY = (event.clientY / appState.zoom.value) - appState.scrollY;
+
+                    // Check if double-click is on a markdown element
+                    const isOverMarkdown = elements.some((el: any) => {
+                        if (el.customData?.type !== 'markdown' || el.isDeleted) return false;
+
+                        return sceneX >= el.x &&
+                            sceneX <= el.x + el.width &&
+                            sceneY >= el.y &&
+                            sceneY <= el.y + el.height;
+                    });
+
+                    if (isOverMarkdown) {
+                        // Return false to prevent Excalidraw's default text editing
+                        // The markdown overlay will handle the double-click
+                        return false;
+                    }
+
+                    // Allow default behavior for non-markdown elements
+                    return true;
                 }}
                 onChange={(elements: any[], appState: any) => {
                     // Update view state ref without triggering React renders
@@ -1079,7 +1181,7 @@ export default function ExcalidrawCanvas() {
                     ) : null
                 )}
             />
-            
+
             {/* Render MarkdownNote overlays for each markdown element */}
             {MarkdownNoteComponent && markdownElements.map((element) => (
                 <MarkdownNoteComponent
