@@ -33,6 +33,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const [isEditing, setIsEditing] = useState(false);
         const [content, setContent] = useState(element.customData?.content || '');
         const [isHovered, setIsHovered] = useState(false);
+        const [isNearEdge, setIsNearEdge] = useState(false);
         const contentRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
 
@@ -60,10 +61,10 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             position: 'absolute',
             top: `${y}px`,
             left: `${x}px`,
-            width: `${width}px`,
-            height: `${height}px`,
-            transform: `rotate(${angle}rad) scale(${appState.zoom.value})`,
-            transformOrigin: 'top left',
+            width: `${width * appState.zoom.value}px`,
+            height: `${height * appState.zoom.value}px`,
+            transform: `rotate(${angle}rad)`,
+            transformOrigin: '50% 50%',
             pointerEvents: 'none',
             zIndex: isEditing ? 5 : (isSelected ? 2 : 1),
         };
@@ -78,17 +79,37 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             padding: '18px 22px',
             paddingTop: '38px',
             overflow: 'auto',
+            overscrollBehavior: 'contain',
             boxShadow: isSelected
                 ? '0 0 0 2px transparent, 0 10px 20px -3px rgba(129, 140, 248, 0.4)'
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            pointerEvents: isEditing ? 'auto' : 'none',
-            cursor: isEditing ? 'text' : 'default',
+            pointerEvents: isEditing ? 'auto' : (isHovered && !isNearEdge ? 'auto' : 'none'),
+            cursor: isEditing ? 'text' : (isHovered && !isNearEdge ? 'default' : 'move'),
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
             WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
         };
+
+        // Manual dragging support for when pointer-events is auto
+        const handleMouseDown = useCallback((e: React.MouseEvent) => {
+            if (isEditing) return;
+
+            // If near edge, let it bubble (it will be pointer-events: none anyway)
+            if (isNearEdge) return;
+
+            // Otherwise, we've caught the click in the auto zone.
+            // We should trigger selection in Excalidraw manually.
+            const api = (window as any).excalidrawAPI;
+            if (api) {
+                api.selectShape({ id: element.id });
+            }
+
+            // We don't implement full drag logic here to avoid duplication,
+            // but since it's a click in the center, most users expect to select.
+            // For dragging, they can still use the edges which are pointer-events: none.
+        }, [isEditing, isNearEdge, element.id]);
 
         // Enter edit mode
         const enterEditMode = useCallback(() => {
@@ -129,20 +150,25 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             return () => window.removeEventListener('markdown:edit', handleEditCommand as EventListener);
         }, [isEditing, enterEditMode, element.id]);
 
+
         // Hit test helper
         const isPointInNote = useCallback((clientX: number, clientY: number) => {
-            if (!containerRef.current) return false;
+            if (!containerRef.current) return { inNote: false, isNearEdge: false };
 
-            // Screen coordinates calculated exactly like containerStyle
-            const screenX = (element.x + appState.scrollX) * appState.zoom.value;
-            const screenY = (element.y + appState.scrollY) * appState.zoom.value;
+            // Screen coordinates
             const zoom = appState.zoom.value;
+            const screenX = (element.x + appState.scrollX) * zoom;
+            const screenY = (element.y + appState.scrollY) * zoom;
+            const screenWidth = element.width * zoom;
+            const screenHeight = element.height * zoom;
+            const centerX = screenX + screenWidth / 2;
+            const centerY = screenY + screenHeight / 2;
 
-            // Translate point relative to note top-left
-            let dx = clientX - screenX;
-            let dy = clientY - screenY;
+            // Translate point relative to center
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
 
-            // If rotated, rotate point back
+            // Handle rotation around center
             if (element.angle) {
                 const cos = Math.cos(-element.angle);
                 const sin = Math.sin(-element.angle);
@@ -152,8 +178,20 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 dy = ry;
             }
 
-            // Hit test in unzoomed space
-            return dx >= 0 && dx <= element.width * zoom && dy >= 0 && dy <= element.height * zoom;
+            const halfWidth = screenWidth / 2;
+            const halfHeight = screenHeight / 2;
+            const inNote = dx >= -halfWidth && dx <= halfWidth && dy >= -halfHeight && dy <= halfHeight;
+
+            // Excalidraw handles are usually ~10px. We use a 12px margin for safety.
+            const handleMargin = 12 * zoom;
+            const isNearEdge = inNote && (
+                dx < -halfWidth + handleMargin ||
+                dx > halfWidth - handleMargin ||
+                dy < -halfHeight + handleMargin ||
+                dy > halfHeight - handleMargin
+            );
+
+            return { inNote, isNearEdge };
         }, [element.x, element.y, element.width, element.height, element.angle, appState.scrollX, appState.scrollY, appState.zoom.value]);
 
         // Global capture-phase event handlers
@@ -161,7 +199,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             if (isEditing) return;
 
             const handleGlobalDblClick = (e: MouseEvent) => {
-                if (isPointInNote(e.clientX, e.clientY)) {
+                const { inNote } = isPointInNote(e.clientX, e.clientY);
+                if (inNote) {
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
@@ -170,32 +209,30 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             };
 
             const handleGlobalWheel = (e: WheelEvent) => {
-                if (isPointInNote(e.clientX, e.clientY)) {
-                    const contentEl = contentRef.current;
-                    if (!contentEl) return;
-
-                    const { scrollTop, scrollHeight, clientHeight } = contentEl;
-                    const isScrollingDown = e.deltaY > 0;
-                    const isScrollingUp = e.deltaY < 0;
-                    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
-                    const isAtTop = scrollTop <= 0;
-
-                    // If at scroll boundaries, let event propagate to canvas for panning
-                    if ((isScrollingDown && isAtBottom) || (isScrollingUp && isAtTop)) {
-                        return;
+                const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
+                if (inNote) {
+                    // Prevent scroll chaining and canvas zooming (unless Ctrl is held for intentional zoom)
+                    if (!e.ctrlKey) {
+                        e.stopPropagation();
+                        // If we are near the edge (pointer-events: none), we must scroll manually
+                        if (edge) {
+                            const contentEl = contentRef.current;
+                            if (contentEl) {
+                                e.preventDefault();
+                                contentEl.scrollTop += e.deltaY;
+                            }
+                        }
                     }
-
-                    // Otherwise, scroll the content and stop the canvas from zooming
-                    e.preventDefault();
-                    e.stopPropagation();
-                    contentEl.scrollTop += e.deltaY;
                 }
             };
 
             const handleGlobalMouseMove = (e: MouseEvent) => {
-                const hovered = isPointInNote(e.clientX, e.clientY);
-                if (hovered !== isHovered) {
-                    setIsHovered(hovered);
+                const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
+                if (inNote !== isHovered) {
+                    setIsHovered(inNote);
+                }
+                if (edge !== isNearEdge) {
+                    setIsNearEdge(edge);
                 }
             };
 
@@ -208,7 +245,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 document.removeEventListener('wheel', handleGlobalWheel, true);
                 document.removeEventListener('mousemove', handleGlobalMouseMove, true);
             };
-        }, [isEditing, isHovered, enterEditMode, isPointInNote]);
+        }, [isEditing, isHovered, isNearEdge, enterEditMode, isPointInNote]);
 
         // Touch handlers for pinch zoom pass-through
         const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -272,6 +309,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                     ref={contentRef}
                     style={contentStyle}
                     data-note-id={element.id}
+                    onMouseDown={handleMouseDown}
                 >
                     {isEditing ? (
                         <MarkdownEditor
@@ -284,7 +322,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                         <div
                             className="markdown-preview"
                             style={{
-                                pointerEvents: 'none',
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
                             }}
