@@ -1120,7 +1120,7 @@ export default function ExcalidrawCanvas() {
                     const sceneY = (event.clientY / appState.zoom.value) - appState.scrollY;
 
                     // Check if double-click is on a markdown element
-                    const isOverMarkdown = elements.some((el: any) => {
+                    const markdownElement = elements.find((el: any) => {
                         if (el.customData?.type !== 'markdown' || el.isDeleted) return false;
 
                         return sceneX >= el.x &&
@@ -1129,9 +1129,12 @@ export default function ExcalidrawCanvas() {
                             sceneY <= el.y + el.height;
                     });
 
-                    if (isOverMarkdown) {
+                    if (markdownElement) {
+                        // Dispatch event to trigger markdown edit mode
+                        window.dispatchEvent(new CustomEvent('markdown:edit', {
+                            detail: { elementId: markdownElement.id }
+                        }));
                         // Return false to prevent Excalidraw's default text editing
-                        // The markdown overlay will handle the double-click
                         return false;
                     }
 

@@ -10,10 +10,85 @@ export default function ExportToolbar() {
         setTimeout(() => setMessage(null), 3000);
     };
 
+    /**
+     * Export markdown notes as images and add them to the scene
+     */
+    const exportMarkdownNotes = async (): Promise<Map<string, { dataUrl: string; position: any }>> => {
+        const noteImages = new Map<string, { dataUrl: string; position: any }>();
+        
+        // Get markdown note refs from global
+        const getMarkdownNoteRefs = (window as any).getMarkdownNoteRefs;
+        if (!getMarkdownNoteRefs) return noteImages;
+        
+        const refs = getMarkdownNoteRefs();
+        if (!refs || refs.size === 0) return noteImages;
+        
+        console.log(`📸 Exporting ${refs.size} markdown notes...`);
+        
+        for (const [id, ref] of refs.entries()) {
+            try {
+                if (ref?.exportAsImage) {
+                    const result = await ref.exportAsImage();
+                    if (result?.imageData) {
+                        noteImages.set(id, {
+                            dataUrl: result.imageData,
+                            position: result.position,
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn(`Failed to export markdown note ${id}:`, err);
+            }
+        }
+        
+        return noteImages;
+    };
+
+    /**
+     * Create image elements from markdown note exports
+     */
+    const createMarkdownImageElements = async (
+        api: any,
+        noteImages: Map<string, { dataUrl: string; position: any }>
+    ): Promise<{ elements: any[]; fileIds: string[] }> => {
+        const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+        const elements: any[] = [];
+        const fileIds: string[] = [];
+        
+        for (const [noteId, { dataUrl, position }] of noteImages.entries()) {
+            const fileId = `md-export-${noteId}`;
+            fileIds.push(fileId);
+            
+            // Create image element at markdown note position
+            const imageElement = convertToExcalidrawElements([
+                {
+                    type: "image",
+                    x: position.x,
+                    y: position.y,
+                    width: position.width,
+                    height: position.height,
+                    angle: position.angle || 0,
+                    fileId: fileId,
+                },
+            ]);
+            
+            elements.push(...imageElement);
+            
+            // Add as file
+            await api.addFiles([{
+                mimeType: "image/png",
+                id: fileId,
+                dataURL: dataUrl,
+                created: Date.now(),
+            }]);
+        }
+        
+        return { elements, fileIds };
+    };
+
     const handleExportPNG = async () => {
         setExporting("png");
         try {
-            // Get canvas state from the Excalidraw API
             const api = (window as any).excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
@@ -29,10 +104,20 @@ export default function ExportToolbar() {
 
             const appState = api.getAppState();
             const files = api.getFiles();
+            
+            // Export markdown notes
+            const noteImages = await exportMarkdownNotes();
+            
+            // Add markdown note images to scene
+            let allElements = elements;
+            if (noteImages.size > 0) {
+                const { elements: mdElements } = await createMarkdownImageElements(api, noteImages);
+                allElements = [...elements, ...mdElements];
+            }
 
-            // Export to canvas
+            // Export to canvas with all elements
             const canvas = await exportToCanvas({
-                elements,
+                elements: allElements,
                 appState,
                 files,
             });
@@ -46,7 +131,7 @@ export default function ExportToolbar() {
                     link.download = `canvas-${Date.now()}.png`;
                     link.click();
                     URL.revokeObjectURL(url);
-                    showMessage("✓ PNG downloaded");
+                    showMessage(`✓ PNG downloaded (${noteImages.size} notes)`);
                 }
             });
         } catch (error) {
@@ -75,10 +160,20 @@ export default function ExportToolbar() {
 
             const appState = api.getAppState();
             const files = api.getFiles();
+            
+            // Export markdown notes
+            const noteImages = await exportMarkdownNotes();
+            
+            // Add markdown note images to scene
+            let allElements = elements;
+            if (noteImages.size > 0) {
+                const { elements: mdElements } = await createMarkdownImageElements(api, noteImages);
+                allElements = [...elements, ...mdElements];
+            }
 
-            // Export to SVG
+            // Export to SVG with all elements
             const svg = await exportToSvg({
-                elements,
+                elements: allElements,
                 appState,
                 files,
             });
@@ -92,7 +187,7 @@ export default function ExportToolbar() {
             link.download = `canvas-${Date.now()}.svg`;
             link.click();
             URL.revokeObjectURL(url);
-            showMessage("✓ SVG downloaded");
+            showMessage(`✓ SVG downloaded (${noteImages.size} notes)`);
         } catch (error) {
             console.error("Export SVG error:", error);
             showMessage("✗ Export failed");
@@ -117,9 +212,6 @@ export default function ExportToolbar() {
                 return;
             }
 
-            const appState = api.getAppState();
-            const files = api.getFiles();
-
             // Check if clipboard API is available
             if (!navigator.clipboard || !navigator.clipboard.write) {
                 showMessage("✗ Clipboard not supported");
@@ -127,9 +219,22 @@ export default function ExportToolbar() {
                 return;
             }
 
-            // Export to canvas
+            const appState = api.getAppState();
+            const files = api.getFiles();
+            
+            // Export markdown notes
+            const noteImages = await exportMarkdownNotes();
+            
+            // Add markdown note images to scene
+            let allElements = elements;
+            if (noteImages.size > 0) {
+                const { elements: mdElements } = await createMarkdownImageElements(api, noteImages);
+                allElements = [...elements, ...mdElements];
+            }
+
+            // Export to canvas with all elements
             const canvas = await exportToCanvas({
-                elements,
+                elements: allElements,
                 appState,
                 files,
             });
@@ -141,7 +246,7 @@ export default function ExportToolbar() {
                         await navigator.clipboard.write([
                             new ClipboardItem({ "image/png": blob }),
                         ]);
-                        showMessage("✓ Copied to clipboard");
+                        showMessage(`✓ Copied (${noteImages.size} notes)`);
                     } catch (err) {
                         console.error("Clipboard write error:", err);
                         showMessage("✗ Clipboard copy failed");

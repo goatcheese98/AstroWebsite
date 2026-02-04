@@ -14,8 +14,8 @@
  * - We handle: Content rendering, edit mode, purple glow effect, wheel scrolling
  * 
  * 🎯 INTERACTION MODEL:
- * - Single click/drag: Excalidraw handles it via underlying rect (pointerEvents: none on overlay)
- * - Double-click: Global handler detects it and enters edit mode
+ * - Single click/drag: Excalidraw handles it via underlying rect 
+ * - Double-click: Shield layer captures it and enters edit mode
  * - Scroll/wheel: Captured by overlay for content scrolling
  * - Pinch zoom: Passes through to Excalidraw canvas zoom
  * 
@@ -32,6 +32,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
     ({ element, appState, onChange }, ref) => {
         const [isEditing, setIsEditing] = useState(false);
         const [content, setContent] = useState(element.customData?.content || '');
+        const [isHovered, setIsHovered] = useState(false);
         const contentRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,26 +64,26 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             height: `${height}px`,
             transform: `rotate(${angle}rad) scale(${appState.zoom.value})`,
             transformOrigin: 'top left',
-            pointerEvents: 'none', // Container doesn't capture events
+            pointerEvents: 'none',
             zIndex: isEditing ? 5 : (isSelected ? 2 : 1),
         };
 
-        // Content card style - visual layer, no pointer events when not editing
+        // Content card style - visual layer
         const contentStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
-            backgroundColor: isDark ? 'rgba(23, 23, 23, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+            backgroundColor: isDark ? 'rgba(23, 23, 23, 0.2)' : 'rgba(255, 255, 255, 0.2)',
             color: isDark ? '#e5e5e5' : '#1a1a1a',
-            borderRadius: '10px',
+            borderRadius: '0px',
             padding: '18px 22px',
             paddingTop: '38px',
             overflow: 'auto',
             boxShadow: isSelected
-                ? '0 0 0 2px #818cf8, 0 10px 20px -3px rgba(129, 140, 248, 0.4)'
+                ? '0 0 0 2px transparent, 0 10px 20px -3px rgba(129, 140, 248, 0.4)'
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            pointerEvents: isEditing ? 'auto' : 'none', // No pointer events when not editing
+            pointerEvents: isEditing ? 'auto' : 'none',
             cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -114,56 +115,104 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             }
         }, [exitEditMode]);
 
-        // Global double-click handler for entering edit mode
+        // Listen for edit command from ExcalidrawCanvas
         useEffect(() => {
             if (isEditing) return;
 
-            const handleDblClick = (e: MouseEvent) => {
-                const target = e.target as HTMLElement;
-                // Check if double-click is on this note
-                const noteElement = containerRef.current;
-                if (noteElement && noteElement.contains(target)) {
-                    e.preventDefault();
-                    e.stopPropagation();
+            const handleEditCommand = (e: CustomEvent<{ elementId: string }>) => {
+                if (e.detail.elementId === element.id) {
                     enterEditMode();
                 }
             };
 
-            // Use capture phase to intercept before Excalidraw
-            document.addEventListener('dblclick', handleDblClick, true);
-            return () => document.removeEventListener('dblclick', handleDblClick, true);
-        }, [isEditing, enterEditMode]);
+            window.addEventListener('markdown:edit', handleEditCommand as EventListener);
+            return () => window.removeEventListener('markdown:edit', handleEditCommand as EventListener);
+        }, [isEditing, enterEditMode, element.id]);
 
-        // Wheel event handler for content scrolling
-        // This is attached to the container which has pointerEvents: none
-        // But wheel events still work on it
-        const handleWheel = useCallback((e: React.WheelEvent) => {
-            if (isEditing) return; // Let textarea handle its own scrolling
+        // Hit test helper
+        const isPointInNote = useCallback((clientX: number, clientY: number) => {
+            if (!containerRef.current) return false;
 
-            const contentEl = contentRef.current;
-            if (!contentEl) return;
+            // Screen coordinates calculated exactly like containerStyle
+            const screenX = (element.x + appState.scrollX) * appState.zoom.value;
+            const screenY = (element.y + appState.scrollY) * appState.zoom.value;
+            const zoom = appState.zoom.value;
 
-            const { scrollTop, scrollHeight, clientHeight } = contentEl;
-            const isScrollingDown = e.deltaY > 0;
-            const isScrollingUp = e.deltaY < 0;
-            const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
-            const isAtTop = scrollTop <= 0;
+            // Translate point relative to note top-left
+            let dx = clientX - screenX;
+            let dy = clientY - screenY;
 
-            // If at scroll boundaries, let event propagate to canvas for panning
-            if ((isScrollingDown && isAtBottom) || (isScrollingUp && isAtTop)) {
-                return;
+            // If rotated, rotate point back
+            if (element.angle) {
+                const cos = Math.cos(-element.angle);
+                const sin = Math.sin(-element.angle);
+                const rx = dx * cos - dy * sin;
+                const ry = dx * sin + dy * cos;
+                dx = rx;
+                dy = ry;
             }
 
-            // Scroll the content
-            e.preventDefault();
-            e.stopPropagation();
-            contentEl.scrollTop += e.deltaY;
-        }, [isEditing]);
+            // Hit test in unzoomed space
+            return dx >= 0 && dx <= element.width * zoom && dy >= 0 && dy <= element.height * zoom;
+        }, [element.x, element.y, element.width, element.height, element.angle, appState.scrollX, appState.scrollY, appState.zoom.value]);
+
+        // Global capture-phase event handlers
+        useEffect(() => {
+            if (isEditing) return;
+
+            const handleGlobalDblClick = (e: MouseEvent) => {
+                if (isPointInNote(e.clientX, e.clientY)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    enterEditMode();
+                }
+            };
+
+            const handleGlobalWheel = (e: WheelEvent) => {
+                if (isPointInNote(e.clientX, e.clientY)) {
+                    const contentEl = contentRef.current;
+                    if (!contentEl) return;
+
+                    const { scrollTop, scrollHeight, clientHeight } = contentEl;
+                    const isScrollingDown = e.deltaY > 0;
+                    const isScrollingUp = e.deltaY < 0;
+                    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+                    const isAtTop = scrollTop <= 0;
+
+                    // If at scroll boundaries, let event propagate to canvas for panning
+                    if ((isScrollingDown && isAtBottom) || (isScrollingUp && isAtTop)) {
+                        return;
+                    }
+
+                    // Otherwise, scroll the content and stop the canvas from zooming
+                    e.preventDefault();
+                    e.stopPropagation();
+                    contentEl.scrollTop += e.deltaY;
+                }
+            };
+
+            const handleGlobalMouseMove = (e: MouseEvent) => {
+                const hovered = isPointInNote(e.clientX, e.clientY);
+                if (hovered !== isHovered) {
+                    setIsHovered(hovered);
+                }
+            };
+
+            document.addEventListener('dblclick', handleGlobalDblClick, true);
+            document.addEventListener('wheel', handleGlobalWheel, { capture: true, passive: false });
+            document.addEventListener('mousemove', handleGlobalMouseMove, true);
+
+            return () => {
+                document.removeEventListener('dblclick', handleGlobalDblClick, true);
+                document.removeEventListener('wheel', handleGlobalWheel, true);
+                document.removeEventListener('mousemove', handleGlobalMouseMove, true);
+            };
+        }, [isEditing, isHovered, enterEditMode, isPointInNote]);
 
         // Touch handlers for pinch zoom pass-through
         const handleTouchStart = useCallback((e: React.TouchEvent) => {
             if (isEditing) return;
-            // Multi-touch (pinch) - don't prevent, let Excalidraw handle it
             if (e.touches.length > 1) {
                 return;
             }
@@ -216,11 +265,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 style={containerStyle}
                 className="markdown-note-container"
                 data-note-id={element.id}
-                // Wheel events work even with pointerEvents: none on parent
-                onWheel={handleWheel}
                 onTouchStart={handleTouchStart}
             >
-                {/* Content card - visual layer only */}
+                {/* Content card - visual layer */}
                 <div
                     ref={contentRef}
                     style={contentStyle}
