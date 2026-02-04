@@ -56,15 +56,20 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
 
-        // Container style - position over the Excalidraw element
+        // Calculate screen center position
+        const zoom = appState.zoom.value;
+        const screenCenterX = (element.x + element.width / 2 + appState.scrollX) * zoom;
+        const screenCenterY = (element.y + element.height / 2 + appState.scrollY) * zoom;
+
+        // Container style - position so center matches screenCenterX/Y
         const containerStyle: React.CSSProperties = {
             position: 'absolute',
-            top: `${y}px`,
-            left: `${x}px`,
-            width: `${width * appState.zoom.value}px`,
-            height: `${height * appState.zoom.value}px`,
-            transform: `rotate(${angle}rad)`,
-            transformOrigin: '50% 50%',
+            top: `${screenCenterY - height / 2}px`,
+            left: `${screenCenterX - width / 2}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: `scale(${zoom}) rotate(${angle}rad)`,
+            transformOrigin: 'center center',
             pointerEvents: 'none',
             zIndex: isEditing ? 5 : (isSelected ? 2 : 1),
         };
