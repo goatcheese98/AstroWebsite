@@ -118,13 +118,33 @@ export function useElementSelection(options: UseElementSelectionOptions) {
             }
         };
 
+        // Listen for markdown note selection events (custom selection system)
+        const handleMarkdownNoteSelect = (event: any) => {
+            const { elementId } = event.detail;
+            if (elementId) {
+                setSelectedElements([elementId]);
+                captureSnapshots([elementId]);
+                onSelectionChange?.([elementId]);
+            }
+        };
+
+        const handleMarkdownNoteDeselect = () => {
+            setSelectedElements([]);
+            setElementSnapshots(new Map());
+            onSelectionChange?.([]);
+        };
+
         window.addEventListener("excalidraw:state-update", handleCanvasUpdate);
+        window.addEventListener("markdown-note:select", handleMarkdownNoteSelect);
+        window.addEventListener("markdown-note:deselect", handleMarkdownNoteDeselect);
         
         // Initial sync
         syncWithExcalidrawSelection();
 
         return () => {
             window.removeEventListener("excalidraw:state-update", handleCanvasUpdate);
+            window.removeEventListener("markdown-note:select", handleMarkdownNoteSelect);
+            window.removeEventListener("markdown-note:deselect", handleMarkdownNoteDeselect);
         };
     }, [enabled, selectedElements, captureSnapshots, onSelectionChange, syncWithExcalidrawSelection]);
 

@@ -801,6 +801,22 @@ export default function ExcalidrawCanvas() {
                 position: "relative",
             }}
         >
+            <style>{`
+                /* Hide Excalidraw's native selection UI for markdown notes */
+                .excalidraw-container .excalidraw__canvas {
+                    /* Ensure canvas doesn't show selection borders for locked elements */
+                }
+                
+                /* Hide selection border and handles */
+                .excalidraw-container .selection-border,
+                .excalidraw-container .selection-dots,
+                .excalidraw-container [data-testid="selection-border"],
+                .excalidraw-container [data-testid="selection-dots"] {
+                    display: none !important;
+                    opacity: 0 !important;
+                    visibility: hidden !important;
+                }
+            `}</style>
             <ExcalidrawComponent
                 theme={theme}
                 excalidrawAPI={(api: any) => {

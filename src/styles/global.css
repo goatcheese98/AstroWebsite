@@ -473,3 +473,23 @@ img {
 img[loading] {
   opacity: 0;
 }
+
+/* Hide Excalidraw's native selection border for markdown notes
+   We use our own custom rounded border in the React overlay */
+.excalidraw .excalidraw-element.selected .selection-stroke,
+.excalidraw [data-testid="selection"],
+.excalidraw .selection-border,
+.excalidraw .excalidraw-selection {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Also hide the selection dots/handles */
+.excalidraw .excalidraw-element.selected .selection-dots,
+.excalidraw .selection-dots,
+.excalidraw [data-testid="selection-dots"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
