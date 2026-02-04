@@ -104,6 +104,7 @@ export interface SendMessageOptions {
 export interface UseAIChatStateReturn {
     // === 📨 Message State ===
     messages: Message[];
+    setMessages: (messages: Message[]) => void;
     input: string;
     setInput: (value: string) => void;
     isLoading: boolean;
@@ -118,6 +119,7 @@ export interface UseAIChatStateReturn {
     contextMode: "all" | "selected";
     setContextMode: (mode: "all" | "selected") => void;
     aiProvider: AIProvider;
+    setAiProvider: (provider: AIProvider) => void;
     toggleProvider: () => void;
     showTemplates: boolean;
     setShowTemplates: (show: boolean) => void;
@@ -174,6 +176,13 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
      */
     const clearError = useCallback(() => {
         setError(null);
+    }, []);
+
+    /**
+     * Set AI provider directly
+     */
+    const setAiProviderCallback = useCallback((provider: AIProvider) => {
+        setAiProvider(provider);
     }, []);
 
     /**
@@ -388,9 +397,38 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         }
     }, [input, isLoading, messages, aiProvider, contextMode, canvasState, getCanvasDescription]);
 
+    // Listen for load events from file
+    useEffect(() => {
+        const handleLoadMessages = (e: CustomEvent<{ messages: Message[] }>) => {
+            const loadedMessages = e.detail.messages.map(msg => ({
+                ...msg,
+                metadata: {
+                    ...msg.metadata,
+                    timestamp: new Date(msg.metadata.timestamp),
+                },
+            }));
+            setMessages(loadedMessages);
+            console.log(`📂 Loaded ${loadedMessages.length} messages`);
+        };
+
+        const handleSetProvider = (e: CustomEvent<{ provider: AIProvider }>) => {
+            setAiProvider(e.detail.provider);
+            console.log(`📂 Set AI provider to ${e.detail.provider}`);
+        };
+
+        window.addEventListener("chat:load-messages", handleLoadMessages as EventListener);
+        window.addEventListener("chat:set-provider", handleSetProvider as EventListener);
+
+        return () => {
+            window.removeEventListener("chat:load-messages", handleLoadMessages as EventListener);
+            window.removeEventListener("chat:set-provider", handleSetProvider as EventListener);
+        };
+    }, []);
+
     return {
         // Message state
         messages,
+        setMessages,
         input,
         setInput,
         isLoading,
@@ -405,6 +443,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         contextMode,
         setContextMode,
         aiProvider,
+        setAiProvider: setAiProviderCallback,
         toggleProvider,
         showTemplates,
         setShowTemplates,

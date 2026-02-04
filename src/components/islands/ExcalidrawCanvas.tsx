@@ -842,6 +842,111 @@ export default function ExcalidrawCanvas() {
         };
     }, [excalidrawAPI]);
 
+    // Handle drag-and-drop for canvas state files
+    useEffect(() => {
+        const handleDragOver = (e: DragEvent) => {
+            // Check if any files are .rj files
+            const hasCanvasFile = Array.from(e.dataTransfer?.items || []).some(
+                item => item.kind === 'file' && item.type === 'application/json' || 
+                        (item.kind === 'file' && (item.getAsFile()?.name?.endsWith('.rj')))
+            );
+            
+            if (hasCanvasFile) {
+                e.preventDefault();
+                e.dataTransfer!.dropEffect = 'copy';
+            }
+        };
+
+        const handleDrop = async (e: DragEvent) => {
+            const files = Array.from(e.dataTransfer?.files || []);
+            const canvasFile = files.find(f => f.name.endsWith('.rj'));
+            
+            if (canvasFile) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log("📂 Canvas state file dropped:", canvasFile.name);
+                
+                // Import and use the state manager
+                const { loadCanvasStateFromFile } = await import('../../lib/canvas-state-manager');
+                const result = await loadCanvasStateFromFile(canvasFile);
+                
+                if (result.success && result.state) {
+                    // Dispatch event to load the state
+                    window.dispatchEvent(new CustomEvent('canvas:load-state', {
+                        detail: { state: result.state },
+                    }));
+                    
+                    // Also dispatch to chat components
+                    window.dispatchEvent(new CustomEvent('chat:load-messages', {
+                        detail: { messages: result.state.chat.messages },
+                    }));
+                    
+                    if (result.state.chat.aiProvider) {
+                        window.dispatchEvent(new CustomEvent('chat:set-provider', {
+                            detail: { provider: result.state.chat.aiProvider },
+                        }));
+                    }
+                    
+                    console.log('✅ Canvas state loaded from drop');
+                } else {
+                    console.error('❌ Failed to load canvas state:', result.error);
+                    alert(`Failed to load: ${result.error}`);
+                }
+            }
+        };
+
+        document.addEventListener('dragover', handleDragOver);
+        document.addEventListener('drop', handleDrop);
+
+        return () => {
+            document.removeEventListener('dragover', handleDragOver);
+            document.removeEventListener('drop', handleDrop);
+        };
+    }, []);
+
+    // Handle loading canvas state from file
+    useEffect(() => {
+        const handleLoadState = (event: CustomEvent<{ state: any }>) => {
+            const { state } = event.detail;
+            if (!state?.canvas || !excalidrawAPI) {
+                console.warn("⚠️ Cannot load state: missing canvas data or API");
+                return;
+            }
+
+            console.log("📂 ExcalidrawCanvas loading state from file...");
+
+            try {
+                // Update scene with loaded elements and app state
+                const { elements, appState, files } = state.canvas;
+
+                // Update the scene
+                excalidrawAPI.updateScene({
+                    elements: elements || [],
+                    appState: appState || {},
+                });
+
+                // Add files if present
+                if (files && Object.keys(files).length > 0) {
+                    excalidrawAPI.addFiles(Object.values(files));
+                }
+
+                console.log("✅ ExcalidrawCanvas state loaded:", {
+                    elements: elements?.length || 0,
+                    files: Object.keys(files || {}).length,
+                });
+            } catch (err) {
+                console.error("❌ Error loading canvas state:", err);
+            }
+        };
+
+        window.addEventListener("canvas:load-state", handleLoadState as EventListener);
+
+        return () => {
+            window.removeEventListener("canvas:load-state", handleLoadState as EventListener);
+        };
+    }, [excalidrawAPI]);
+
     // Expose markdown note refs for export functionality
     useEffect(() => {
         // Store refs in window object for access by export functions

@@ -80,11 +80,11 @@
  * @module AIChatContainer
  */
 
-import React, { useRef, useCallback, useEffect } from "react";
+import React, { useRef, useCallback, useEffect, useState } from "react";
 
 // Hooks
 import { useAIChatState } from "./hooks/useAIChatState";
-import { useImageGeneration } from "./hooks/useImageGeneration";
+import { useImageGeneration, type ImageHistoryItem } from "./hooks/useImageGeneration";
 import { useCanvasCommands } from "./hooks/useCanvasCommands";
 import { usePanelResize } from "./hooks/usePanelResize";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -110,6 +110,15 @@ export interface AIChatContainerProps {
     onClose: () => void;
     /** Initial width of the panel in pixels */
     initialWidth?: number;
+    /** Callback to update parent with current state (for save functionality) */
+    onStateUpdate?: (state: { 
+        messages: Message[]; 
+        aiProvider: "kimi" | "claude"; 
+        contextMode: "all" | "selected";
+        imageHistory: ImageHistoryItem[];
+    }) => void;
+    /** Pending state to load (from file) */
+    pendingLoadState?: any;
 }
 
 /**
@@ -119,6 +128,8 @@ export default function AIChatContainer({
     isOpen,
     onClose,
     initialWidth = 400,
+    onStateUpdate,
+    pendingLoadState,
 }: AIChatContainerProps) {
     // === 📱 MOBILE DETECTION ===
     const { isMobile, viewportWidth } = useMobileDetection();
@@ -140,6 +151,9 @@ export default function AIChatContainer({
             window.removeEventListener("ai-chat:close-request", handleCloseRequest);
         };
     }, [isOpen, onClose]);
+    
+    // Track if we've loaded the pending state
+    const [hasLoadedPendingState, setHasLoadedPendingState] = useState(false);
     
     // === 🧠 HOOKS ===
     
@@ -167,12 +181,14 @@ export default function AIChatContainer({
     // Core chat state
     const {
         messages,
+        setMessages,
         input,
         setInput,
         isLoading,
         error,
         clearError,
         aiProvider,
+        setAiProvider,
         toggleProvider,
         contextMode,
         setContextMode,
@@ -196,6 +212,7 @@ export default function AIChatContainer({
         generateImage,
         copyImageToClipboard,
         clearHistory: clearImageHistory,
+        setImageHistory,
     } = useImageGeneration();
     
     // Track pending image generation (screenshot coordination)
@@ -320,6 +337,63 @@ export default function AIChatContainer({
             window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
         };
     }, [isOpen, generateImage]);
+    
+    // Report state changes to parent for save functionality
+    useEffect(() => {
+        onStateUpdate?.({
+            messages,
+            aiProvider,
+            contextMode,
+            imageHistory,
+        });
+    }, [messages, aiProvider, contextMode, imageHistory, onStateUpdate]);
+    
+    // Handle loading state from file
+    useEffect(() => {
+        if (pendingLoadState && !hasLoadedPendingState) {
+            console.log("📂 AIChatContainer loading state from file...");
+            
+            // Load chat state
+            if (pendingLoadState.chat) {
+                if (pendingLoadState.chat.messages) {
+                    // Replace messages with loaded ones
+                    const loadedMessages = pendingLoadState.chat.messages.map((msg: any) => ({
+                        ...msg,
+                        metadata: {
+                            ...msg.metadata,
+                            timestamp: new Date(msg.metadata.timestamp),
+                        },
+                    }));
+                    setMessages(loadedMessages);
+                }
+                if (pendingLoadState.chat.aiProvider) {
+                    setAiProvider(pendingLoadState.chat.aiProvider);
+                }
+                if (pendingLoadState.chat.contextMode) {
+                    setContextMode(pendingLoadState.chat.contextMode);
+                }
+            }
+            
+            // Load image history
+            if (pendingLoadState.images?.history) {
+                const loadedHistory = pendingLoadState.images.history.map((img: any) => ({
+                    ...img,
+                    timestamp: new Date(img.timestamp),
+                }));
+                setImageHistory(loadedHistory);
+            }
+            
+            setHasLoadedPendingState(true);
+            console.log("✅ AIChatContainer state loaded");
+        }
+    }, [pendingLoadState, hasLoadedPendingState, setContextMode, setImageHistory, setMessages, setAiProvider]);
+    
+    // Reset loaded flag when pending state is cleared
+    useEffect(() => {
+        if (!pendingLoadState && hasLoadedPendingState) {
+            setHasLoadedPendingState(false);
+        }
+    }, [pendingLoadState, hasLoadedPendingState]);
     
     // === 🎨 RENDER ===
     

@@ -1,0 +1,370 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║                    🗄️ canvas-state-manager.ts                                ║
+ * ║                 "The Canvas State Archivist"                                 ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  🏷️ BADGES: 🔵 Utility | 💾 State Manager | 🔄 Import/Export                  ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ * 
+ * 👤 WHO AM I?
+ * I am the keeper of canvas memories. I can capture the entire state of the AI
+ * canvas - drawings, conversations, and generated images - and save them to a
+ * file. Later, I can restore that exact state, bringing everything back to life
+ * exactly as it was.
+ * 
+ * 🎯 WHAT USER PROBLEM DO I SOLVE?
+ * Users want to save their work and come back to it later, or share their
+ * canvas state with others. I enable:
+ * - Saving the complete canvas state to a .aicanvas file
+ * - Loading a previously saved state from a file
+ * - Version compatibility checking for future-proofing
+ * 
+ * 💬 DATA STRUCTURE:
+ * ┌─────────────────────────────────────────────────────────────────────────────┐
+ * │  CanvasStateFile (.aicanvas)                                                │
+ * ├─────────────────────────────────────────────────────────────────────────────┤
+ * │  {                                                                          │
+ * │    version: "1.0.0",         // File format version                         │
+ * │    exportedAt: timestamp,    // When the file was created                   │
+ * │    canvas: {                 // Excalidraw state                            │
+ * │      elements: [...],        // All drawing elements                        │
+ * │      appState: {...},        // View state (zoom, scroll, etc)              │
+ * │      files: {...}            // Binary files (images, svgs)                 │
+ * │    },                                                                       │
+ * │    chat: {                   // AI Chat state                               │
+ * │      messages: [...],        // Conversation history                        │
+ * │      aiProvider: "kimi",     // Active AI provider                          │
+ * │      contextMode: "all"      // Canvas context mode                         │
+ * │    },                                                                       │
+ * │    images: {                 // Generated images                            │
+ * │      history: [...]          // Gallery of generated images                 │
+ * │    }                                                                        │
+ * │  }                                                                          │
+ * └─────────────────────────────────────────────────────────────────────────────┘
+ * 
+ * @module canvas-state-manager
+ */
+
+import type { Message } from "../components/ai-chat/types";
+import type { ImageHistoryItem } from "../components/ai-chat/hooks/useImageGeneration";
+
+// File format version for compatibility checking
+const STATE_FILE_VERSION = "1.0.0";
+const STATE_FILE_EXTENSION = ".rj";
+
+/**
+ * Complete canvas state that can be saved/loaded
+ */
+export interface CanvasState {
+    version: string;
+    exportedAt: number;
+    canvas: {
+        elements: any[];
+        appState: Record<string, any>;
+        files: Record<string, any>;
+    };
+    chat: {
+        messages: Message[];
+        aiProvider: "kimi" | "claude";
+        contextMode: "all" | "selected";
+    };
+    images: {
+        history: ImageHistoryItem[];
+    };
+}
+
+/**
+ * Current state data collected from various sources
+ */
+export interface CurrentStateData {
+    excalidrawAPI: any;
+    messages: Message[];
+    aiProvider: "kimi" | "claude";
+    contextMode: "all" | "selected";
+    imageHistory: ImageHistoryItem[];
+}
+
+/**
+ * Result of loading a canvas state
+ */
+export interface LoadStateResult {
+    success: boolean;
+    state?: CanvasState;
+    error?: string;
+}
+
+/**
+ * Collect complete canvas state from all sources
+ */
+export function collectCanvasState(data: CurrentStateData): CanvasState {
+    const { excalidrawAPI, messages, aiProvider, contextMode, imageHistory } = data;
+    
+    // Get Excalidraw state
+    const elements = excalidrawAPI?.getSceneElements?.() || [];
+    const appState = excalidrawAPI?.getAppState?.() || {};
+    const files = excalidrawAPI?.getFiles?.() || {};
+    
+    // Extract only the essential app state properties
+    const essentialAppState = {
+        viewBackgroundColor: appState.viewBackgroundColor,
+        scrollX: appState.scrollX,
+        scrollY: appState.scrollY,
+        zoom: appState.zoom,
+        currentItemStrokeColor: appState.currentItemStrokeColor,
+        currentItemBackgroundColor: appState.currentItemBackgroundColor,
+        currentItemFillStyle: appState.currentItemFillStyle,
+        currentItemStrokeWidth: appState.currentItemStrokeWidth,
+        currentItemRoughness: appState.currentItemRoughness,
+        currentItemOpacity: appState.currentItemOpacity,
+        currentItemFontFamily: appState.currentItemFontFamily,
+        currentItemFontSize: appState.currentItemFontSize,
+        currentItemTextAlign: appState.currentItemTextAlign,
+        currentItemStrokeStyle: appState.currentItemStrokeStyle,
+        currentItemRoundness: appState.currentItemRoundness,
+    };
+    
+    return {
+        version: STATE_FILE_VERSION,
+        exportedAt: Date.now(),
+        canvas: {
+            elements,
+            appState: essentialAppState,
+            files,
+        },
+        chat: {
+            messages: messages.map(msg => ({
+                ...msg,
+                metadata: {
+                    ...msg.metadata,
+                    // Convert Date to timestamp for serialization
+                    timestamp: msg.metadata.timestamp instanceof Date 
+                        ? msg.metadata.timestamp.toISOString() 
+                        : msg.metadata.timestamp,
+                },
+            })),
+            aiProvider,
+            contextMode,
+        },
+        images: {
+            history: imageHistory.map(img => ({
+                ...img,
+                // Convert Date to timestamp for serialization
+                timestamp: img.timestamp instanceof Date 
+                    ? img.timestamp.toISOString() 
+                    : img.timestamp,
+            })),
+        },
+    };
+}
+
+/**
+ * Generate a descriptive filename for the canvas state
+ */
+function generateFilename(state: CanvasState): string {
+    const now = new Date();
+    
+    // Format: YYYY-MM-DD_HH-MM
+    const dateStr = now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+    }).replace(/\//g, '-');
+    
+    const timeStr = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+    }).replace(':', '-');
+    
+    // Count elements by type for descriptive name
+    const elements = state.canvas.elements || [];
+    const elementCount = elements.length;
+    const messageCount = state.chat.messages?.length || 0;
+    const imageCount = state.images.history?.length || 0;
+    
+    // Build descriptive parts
+    const parts: string[] = [];
+    if (elementCount > 0) parts.push(`${elementCount}el`);
+    if (messageCount > 0) parts.push(`${messageCount}ch`);
+    if (imageCount > 0) parts.push(`${imageCount}im`);
+    
+    const description = parts.length > 0 ? `_${parts.join('-')}` : '';
+    
+    return `Canvas_${dateStr}_${timeStr}${description}${STATE_FILE_EXTENSION}`;
+}
+
+/**
+ * Save canvas state to a file
+ */
+export function saveCanvasStateToFile(state: CanvasState, filename?: string): void {
+    const finalFilename = filename || generateFilename(state);
+    
+    // Ensure filename has correct extension
+    const finalFilenameWithExt = finalFilename.endsWith(STATE_FILE_EXTENSION) 
+        ? finalFilename 
+        : `${finalFilename}${STATE_FILE_EXTENSION}`;
+    
+    // Convert to JSON
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = finalFilenameWithExt;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    console.log("💾 Canvas state saved:", finalFilenameWithExt);
+}
+
+/**
+ * Load canvas state from a file
+ */
+export async function loadCanvasStateFromFile(file: File): Promise<LoadStateResult> {
+    return new Promise((resolve) => {
+        // Validate file extension
+        if (!file.name.endsWith(STATE_FILE_EXTENSION)) {
+            resolve({
+                success: false,
+                error: `Invalid file type. Expected ${STATE_FILE_EXTENSION} file.`,
+            });
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            try {
+                const content = e.target?.result as string;
+                if (!content) {
+                    resolve({
+                        success: false,
+                        error: "File is empty",
+                    });
+                    return;
+                }
+                
+                const state = JSON.parse(content) as CanvasState;
+                
+                // Validate required fields
+                if (!state.version || !state.canvas || !state.chat) {
+                    resolve({
+                        success: false,
+                        error: "Invalid file format: missing required fields",
+                    });
+                    return;
+                }
+                
+                // Check version compatibility
+                const versionParts = state.version.split(".").map(Number);
+                const currentParts = STATE_FILE_VERSION.split(".").map(Number);
+                
+                // Major version mismatch is not compatible
+                if (versionParts[0] !== currentParts[0]) {
+                    resolve({
+                        success: false,
+                        error: `Version mismatch: file is v${state.version}, expected v${STATE_FILE_VERSION}. Please update the app.`,
+                    });
+                    return;
+                }
+                
+                // Restore Date objects from timestamps
+                if (state.chat.messages) {
+                    state.chat.messages = state.chat.messages.map(msg => ({
+                        ...msg,
+                        metadata: {
+                            ...msg.metadata,
+                            timestamp: new Date(msg.metadata.timestamp as any),
+                        },
+                    }));
+                }
+                
+                if (state.images?.history) {
+                    state.images.history = state.images.history.map(img => ({
+                        ...img,
+                        timestamp: new Date(img.timestamp as any),
+                    }));
+                }
+                
+                console.log("📂 Canvas state loaded:", {
+                    version: state.version,
+                    exportedAt: new Date(state.exportedAt).toLocaleString(),
+                    elements: state.canvas.elements?.length || 0,
+                    messages: state.chat.messages?.length || 0,
+                    images: state.images?.history?.length || 0,
+                });
+                
+                resolve({
+                    success: true,
+                    state,
+                });
+                
+            } catch (err) {
+                console.error("Failed to parse canvas state file:", err);
+                resolve({
+                    success: false,
+                    error: err instanceof Error ? err.message : "Failed to parse file",
+                });
+            }
+        };
+        
+        reader.onerror = () => {
+            resolve({
+                success: false,
+                error: "Failed to read file",
+            });
+        };
+        
+        reader.readAsText(file);
+    });
+}
+
+/**
+ * Trigger file picker for loading canvas state
+ */
+export function triggerCanvasStateLoad(): Promise<LoadStateResult> {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = STATE_FILE_EXTENSION;
+        input.style.display = "none";
+        
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) {
+                resolve({
+                    success: false,
+                    error: "No file selected",
+                });
+                return;
+            }
+            
+            const result = await loadCanvasStateFromFile(file);
+            resolve(result);
+        };
+        
+        input.oncancel = () => {
+            resolve({
+                success: false,
+                error: "Cancelled",
+            });
+        };
+        
+        document.body.appendChild(input);
+        input.click();
+        document.body.removeChild(input);
+    });
+}
+
+/**
+ * Check if a file is a valid canvas state file
+ */
+export function isCanvasStateFile(file: File): boolean {
+    return file.name.endsWith(STATE_FILE_EXTENSION);
+}
+
+export { STATE_FILE_VERSION, STATE_FILE_EXTENSION };

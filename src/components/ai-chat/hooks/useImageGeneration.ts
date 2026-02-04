@@ -83,6 +83,8 @@ export interface UseImageGenerationReturn {
     isGeneratingImage: boolean;
     /** History of generated images */
     imageHistory: ImageHistoryItem[];
+    /** Set image history directly (for loading saved state) */
+    setImageHistory: (history: ImageHistoryItem[]) => void;
     /** Generate an image from screenshot and options */
     generateImage: (
         screenshotData: string,
@@ -269,9 +271,17 @@ IMPORTANT: Study the reference image carefully before generating. Your output MU
         setImageHistory([]);
     }, []);
 
+    /**
+     * Set image history directly (used for loading saved state)
+     */
+    const setImageHistoryCallback = useCallback((history: ImageHistoryItem[]) => {
+        setImageHistory(history);
+    }, []);
+
     return {
         isGeneratingImage,
         imageHistory,
+        setImageHistory: setImageHistoryCallback,
         generateImage,
         copyImageToClipboard,
         clearHistory,

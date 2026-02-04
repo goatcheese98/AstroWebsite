@@ -7,9 +7,11 @@ interface CanvasControlsProps {
     onOpenAssets: () => void;
     isChatOpen: boolean;
     isAssetsOpen: boolean;
+    onSaveState?: () => void;
+    onLoadState?: () => void;
 }
 
-export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, isAssetsOpen }: CanvasControlsProps) {
+export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, isAssetsOpen, onSaveState, onLoadState }: CanvasControlsProps) {
     const [exporting, setExporting] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
@@ -244,6 +246,38 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                         </svg>
                         <span className="label">Copy</span>
                     </button>
+
+                    {/* Divider */}
+                    <div className="divider"></div>
+
+                    {/* Save/Load buttons */}
+                    <button
+                        onClick={onSaveState}
+                        disabled={!onSaveState || exporting !== null}
+                        className="control-btn save-btn"
+                        title="Save canvas state to file"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        <span className="label">Save</span>
+                    </button>
+
+                    <button
+                        onClick={onLoadState}
+                        disabled={!onLoadState || exporting !== null}
+                        className="control-btn load-btn"
+                        title="Load canvas state from file"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span className="label">Load</span>
+                    </button>
                 </div>
             )}
 
@@ -366,6 +400,28 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                     background: #fff3bf;
                     border-color: #f59f00;
                     box-shadow: 3px 3px 0 #f59f00;
+                }
+
+                .save-btn:hover:not(:disabled) {
+                    background: #e7f5ff;
+                    border-color: #339af0;
+                }
+
+                .save-btn:hover:not(:disabled) .label {
+                    background: #e7f5ff;
+                    border-color: #339af0;
+                    box-shadow: 3px 3px 0 #339af0;
+                }
+
+                .load-btn:hover:not(:disabled) {
+                    background: #f3f0ff;
+                    border-color: #7950f2;
+                }
+
+                .load-btn:hover:not(:disabled) .label {
+                    background: #f3f0ff;
+                    border-color: #7950f2;
+                    box-shadow: 3px 3px 0 #7950f2;
                 }
 
                 .divider {
