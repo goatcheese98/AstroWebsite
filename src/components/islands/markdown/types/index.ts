@@ -94,6 +94,7 @@ export interface AppState {
     zoom: {
         value: number;
     };
+    selectedElementIds?: Record<string, boolean>;
 }
 
 /**

@@ -64,10 +64,11 @@ export function createMarkdownNote(
         width: options?.width || 500,
         height: options?.height || 400,
         strokeColor: "transparent",
-        backgroundColor: "transparent",
+        backgroundColor: "#ffffff", // White background for hit testing
         fillStyle: "solid" as const,
         roughness: 0,
         strokeWidth: 0,
+        opacity: 100,
         locked: false, // Allow arrow binding
         customData: {
             type: "markdown",

@@ -158,7 +158,7 @@ export default function ExcalidrawCanvas() {
         return () => observer.disconnect();
     }, []);
 
-    // RAF polling loop - no setState, just ref updates
+    // RAF polling loop - update view state and selection state
     useEffect(() => {
         if (!excalidrawAPI) return;
 
@@ -171,11 +171,12 @@ export default function ExcalidrawCanvas() {
                 const elements = excalidrawAPI.getSceneElements();
                 const appState = excalidrawAPI.getAppState();
 
-                // Always update refs (no re-render)
+                // Update refs with full appState including selection
                 viewStateRef.current = {
                     scrollX: appState.scrollX,
                     scrollY: appState.scrollY,
                     zoom: appState.zoom,
+                    selectedElementIds: appState.selectedElementIds,
                 };
 
                 const mdElements = elements.filter(
@@ -736,11 +737,11 @@ export default function ExcalidrawCanvas() {
             y: sceneY - 175,
             width: 500,
             height: 350,
-            backgroundColor: "transparent",
-            strokeColor: "transparent",
+            backgroundColor: "#ffffff", // White background (will be covered by overlay)
+            strokeColor: "transparent", // Transparent stroke
             strokeWidth: 0,
             roughness: 0,
-            opacity: 100,
+            opacity: 100, // Normal opacity
             fillStyle: "solid",
             id: nanoid(),
             locked: false, // Allow arrow binding - selection is handled by our custom overlay
