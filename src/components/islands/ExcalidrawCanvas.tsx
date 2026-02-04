@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { nanoid } from "nanoid";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
+import { useLongPress } from "../../hooks/useLongPress";
 
 // Dynamically import Excalidraw to avoid SSR issues
 let ExcalidrawModule: any = null;
@@ -710,6 +711,137 @@ export default function ExcalidrawCanvas() {
         };
     }, [excalidrawAPI]);
 
+    // Handle paste events for mobile and clipboard paste
+    useEffect(() => {
+        const handlePaste = async (event: ClipboardEvent) => {
+            // Only handle if we're on the canvas
+            const target = event.target as HTMLElement;
+            const isOnCanvas = target.closest('.excalidraw-wrapper') !== null;
+            
+            if (!isOnCanvas) return;
+            
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready for paste");
+                return;
+            }
+
+            const clipboardData = event.clipboardData;
+            if (!clipboardData) return;
+
+            console.log("📋 Paste event detected on canvas");
+
+            // Try to get text/SVG data first
+            const textData = clipboardData.getData('text/plain');
+            const htmlData = clipboardData.getData('text/html');
+
+            // Check if it's SVG
+            if (textData && (textData.includes('<svg') || textData.includes('<?xml'))) {
+                event.preventDefault();
+                console.log("📋 Pasting SVG from clipboard");
+                
+                try {
+                    // Create a blob from the SVG
+                    const svgBlob = new Blob([textData], { type: 'image/svg+xml' });
+                    const svgUrl = URL.createObjectURL(svgBlob);
+                    
+                    // Generate unique ID for the SVG
+                    const svgId = `pasted-svg-${Date.now()}`;
+                    
+                    // Get viewport center for positioning
+                    const appState = excalidrawAPI.getAppState();
+                    const viewportCenterX = appState.width / 2;
+                    const viewportCenterY = appState.height / 2;
+                    const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+                    const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+                    
+                    // Load converter
+                    const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+                    
+                    // Create image element
+                    const imageElement = converter([
+                        {
+                            type: "image",
+                            x: sceneX - 100,
+                            y: sceneY - 100,
+                            width: 200,
+                            height: 200,
+                            fileId: svgId,
+                        },
+                    ]);
+
+                    const currentElements = excalidrawAPI.getSceneElements();
+                    const files = excalidrawAPI.getFiles();
+
+                    excalidrawAPI.updateScene({
+                        elements: [...currentElements, ...imageElement],
+                    });
+
+                    excalidrawAPI.addFiles([{
+                        mimeType: "image/svg+xml",
+                        id: svgId,
+                        dataURL: svgUrl,
+                        created: Date.now(),
+                    }]);
+
+                    console.log("✅ SVG pasted successfully");
+                } catch (err) {
+                    console.error("❌ Error pasting SVG:", err);
+                }
+                return;
+            }
+
+            // Check for image data
+            const items = Array.from(clipboardData.items);
+            const imageItem = items.find(item => item.type.startsWith('image/'));
+            
+            if (imageItem) {
+                event.preventDefault();
+                console.log("📋 Pasting image from clipboard");
+                
+                try {
+                    const blob = imageItem.getAsFile();
+                    if (!blob) return;
+
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const imageData = e.target?.result as string;
+                        if (!imageData) return;
+
+                        // Get image dimensions
+                        const img = new Image();
+                        img.onload = async () => {
+                            const aspectRatio = img.width / img.height;
+                            const maxWidth = 400;
+                            const width = Math.min(img.width, maxWidth);
+                            const height = width / aspectRatio;
+
+                            // Dispatch insert image event
+                            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
+                                detail: {
+                                    imageData,
+                                    type: blob.type.replace('image/', ''),
+                                    width,
+                                    height,
+                                },
+                            }));
+                        };
+                        img.src = imageData;
+                    };
+                    reader.readAsDataURL(blob);
+                } catch (err) {
+                    console.error("❌ Error pasting image:", err);
+                }
+            }
+        };
+
+        // Add paste listener to document (needed for mobile context menu paste)
+        document.addEventListener('paste', handlePaste);
+        
+        return () => {
+            document.removeEventListener('paste', handlePaste);
+        };
+    }, [excalidrawAPI]);
+
     // Expose markdown note refs for export functionality
     useEffect(() => {
         // Store refs in window object for access by export functions
@@ -791,6 +923,22 @@ export default function ExcalidrawCanvas() {
         }
     }, []);
 
+    // Long press handler for mobile context menu - MUST be called before any early returns
+    const longPressHandlers = useLongPress({
+        onContextMenu: (event) => {
+            // On mobile, trigger the native context menu
+            if (isMobile && event.target instanceof HTMLElement) {
+                // Focus the canvas first to ensure paste works
+                const canvas = document.querySelector('.excalidraw-wrapper canvas') as HTMLCanvasElement;
+                if (canvas) {
+                    canvas.focus();
+                }
+            }
+        },
+        delay: 600, // Slightly faster than default for better UX
+        disabled: !isMobile, // Only enable on mobile
+    });
+
     if (isLoading || !ExcalidrawComponent) {
         return (
             <div style={{ 
@@ -829,6 +977,8 @@ export default function ExcalidrawCanvas() {
                 height: "100%",
                 position: "relative",
             }}
+            // Add long-press support for mobile context menu
+            {...(isMobile ? longPressHandlers.handlers : {})}
         >
             <style>{`
                 /* Hide Excalidraw's native selection UI for markdown notes */
@@ -844,6 +994,21 @@ export default function ExcalidrawCanvas() {
                     display: none !important;
                     opacity: 0 !important;
                     visibility: hidden !important;
+                }
+
+                /* Mobile: Ensure context menu works */
+                @media (hover: none) and (pointer: coarse) {
+                    .excalidraw-wrapper {
+                        touch-action: manipulation;
+                        -webkit-touch-callout: default;
+                        -webkit-user-select: auto;
+                        user-select: auto;
+                    }
+                    
+                    .excalidraw-wrapper canvas {
+                        touch-action: manipulation;
+                        -webkit-touch-callout: default;
+                    }
                 }
             `}</style>
             <ExcalidrawComponent
