@@ -38,6 +38,33 @@ export interface MarkdownNoteRef {
 }
 
 /**
+ * Arrow binding info
+ */
+export interface ArrowBinding {
+    elementId: string;
+    focus: number;
+    gap: number;
+}
+
+/**
+ * Arrow element structure (simplified)
+ */
+export interface ArrowElement {
+    id: string;
+    type: 'arrow';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    points: [number, number][];
+    startBinding?: ArrowBinding;
+    endBinding?: ArrowBinding;
+    boundElements?: any[];
+    version?: number;
+    versionNonce?: number;
+}
+
+/**
  * The Excalidraw element with markdown-specific custom data
  */
 export interface MarkdownElement {
@@ -48,6 +75,10 @@ export interface MarkdownElement {
     height: number;
     angle?: number;
     isDeleted?: boolean;
+    version?: number;
+    versionNonce?: number;
+    locked?: boolean;
+    boundElements?: any[];
     customData?: {
         type: 'markdown';
         content: string;

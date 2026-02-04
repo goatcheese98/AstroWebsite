@@ -1,26 +1,31 @@
 export type Theme = 'light' | 'dark';
 
+/**
+ * Always returns 'light' - light mode is enforced application-wide
+ */
 export function getTheme(): Theme {
-  return (document.documentElement.getAttribute('data-theme') as Theme) || 'light';
+  return 'light';
 }
 
-export function setTheme(theme: Theme): void {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('theme', theme);
+/**
+ * No-op: Theme is locked to light mode
+ */
+export function setTheme(_theme: Theme): void {
+  // Theme is locked to light mode, no changes allowed
+  document.documentElement.setAttribute('data-theme', 'light');
 }
 
+/**
+ * No-op: Theme is locked to light mode
+ */
 export function toggleTheme(): void {
-  const current = getTheme();
-  setTheme(current === 'dark' ? 'light' : 'dark');
+  // Theme is locked to light mode, no toggle allowed
 }
 
-export function onThemeChange(callback: (theme: Theme) => void): () => void {
-  const observer = new MutationObserver(() => {
-    callback(getTheme());
-  });
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
-  return () => observer.disconnect();
+/**
+ * No-op: Theme is locked to light mode, no changes to listen for
+ */
+export function onThemeChange(_callback: (theme: Theme) => void): () => void {
+  // Theme is locked to light mode, no changes to listen for
+  return () => {};
 }

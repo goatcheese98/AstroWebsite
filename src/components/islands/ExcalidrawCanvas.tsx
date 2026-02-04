@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { nanoid } from "nanoid";
+import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 
 // Dynamically import Excalidraw to avoid SSR issues
 let ExcalidrawModule: any = null;
@@ -31,6 +32,7 @@ const STORAGE_KEY = "excalidraw-canvas-data";
 const STORAGE_VERSION = 1;
 
 export default function ExcalidrawCanvas() {
+    const { isMobile, isPhone } = useMobileDetection();
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -138,16 +140,15 @@ export default function ExcalidrawCanvas() {
     }, []);
 
     useEffect(() => {
-        // Get initial theme from document
-        const currentTheme = document.documentElement.getAttribute("data-theme");
-        setTheme(currentTheme === "dark" ? "dark" : "light");
+        // Force light theme always, regardless of document theme
+        setTheme("light");
 
-        // Watch for theme changes
+        // Keep watching for any theme changes and force back to light
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.attributeName === "data-theme") {
-                    const newTheme = document.documentElement.getAttribute("data-theme");
-                    setTheme(newTheme === "dark" ? "dark" : "light");
+                    // Always force light mode
+                    setTheme("light");
                 }
             });
         });
@@ -199,6 +200,33 @@ export default function ExcalidrawCanvas() {
         return () => {
             if (rafId) cancelAnimationFrame(rafId);
         };
+    }, [excalidrawAPI]);
+
+    // Migration: Unlock existing markdown notes to enable arrow binding
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+        
+        const elements = excalidrawAPI.getSceneElements();
+        let needsUpdate = false;
+        
+        const updatedElements = elements.map((el: any) => {
+            // Check if this is a markdown note that's locked
+            if (el.customData?.type === 'markdown' && el.locked === true) {
+                needsUpdate = true;
+                return {
+                    ...el,
+                    locked: false, // Unlock to allow arrow binding
+                    version: (el.version || 0) + 1,
+                    versionNonce: Date.now(),
+                };
+            }
+            return el;
+        });
+        
+        if (needsUpdate) {
+            excalidrawAPI.updateScene({ elements: updatedElements });
+            console.log("🔓 Migrated existing markdown notes to enable arrow binding");
+        }
     }, [excalidrawAPI]);
 
     // Listen for drawing commands from the AI chat (supports both old and new event names)
@@ -715,7 +743,7 @@ export default function ExcalidrawCanvas() {
             opacity: 100,
             fillStyle: "solid",
             id: nanoid(),
-            locked: true, // Prevent Excalidraw selection handles
+            locked: false, // Allow arrow binding - selection is handled by our custom overlay
             customData: {
                 type: "markdown",
                 content: "# 📝 New Note\n\nDouble-click to edit this note.\n\n## Markdown Supported\n- **Bold** and *italic* text\n- Lists and checkboxes\n- Code blocks with syntax highlighting\n- Tables, links, and more!\n\n```javascript\nconst example = \"Hello World\";\n```",
@@ -834,10 +862,10 @@ export default function ExcalidrawCanvas() {
                 }}
                 UIOptions={{
                     canvasActions: {
-                        changeViewBackgroundColor: true,
+                        changeViewBackgroundColor: !isMobile, // Disable on mobile
                         clearCanvas: true,
-                        loadScene: true,
-                        saveToActiveFile: true,
+                        loadScene: !isMobile, // Disable on mobile
+                        saveToActiveFile: !isMobile, // Disable on mobile
                         toggleTheme: false,
                         saveAsImage: true,
                     },
@@ -864,22 +892,25 @@ export default function ExcalidrawCanvas() {
                     }
                 }}
                 renderTopRightUI={() => (
-                    <button
-                        style={{
-                            background: "var(--color-primary, #6366f1)",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            padding: "6px 12px",
-                            fontSize: "0.8rem",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                        }}
-                        onClick={handleCreateMarkdown}
-                    >
-                        + Add Note
-                    </button>
+                    // Only show "+ Add Note" on desktop - it's resource intensive
+                    !isMobile ? (
+                        <button
+                            style={{
+                                background: "var(--color-primary, #6366f1)",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "4px",
+                                padding: "6px 12px",
+                                fontSize: "0.8rem",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                            }}
+                            onClick={handleCreateMarkdown}
+                        >
+                            + Add Note
+                        </button>
+                    ) : null
                 )}
             />
             

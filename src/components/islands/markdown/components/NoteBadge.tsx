@@ -46,8 +46,8 @@ export const NoteBadge = React.memo(function NoteBadge({
 }: NoteBadgeProps) {
     if (!isVisible) return null;
 
-    const isDark = typeof document !== 'undefined' && 
-        document.documentElement.getAttribute('data-theme') === 'dark';
+    // Light mode only - theme is enforced application-wide
+    const isDark = false;
 
     return (
         <div

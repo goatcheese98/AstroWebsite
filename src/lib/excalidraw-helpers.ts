@@ -68,7 +68,7 @@ export function createMarkdownNote(
         fillStyle: "solid" as const,
         roughness: 0,
         strokeWidth: 0,
-        locked: true,
+        locked: false, // Allow arrow binding
         customData: {
             type: "markdown",
             content,

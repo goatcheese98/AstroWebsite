@@ -69,15 +69,10 @@ interface MarkdownPreviewProps {
 }
 
 /**
- * Get current theme from document
+ * Get current theme - always returns 'light' as light mode is enforced
  */
 function useTheme(): 'light' | 'dark' {
-    return useMemo(() => {
-        if (typeof document === 'undefined') return 'light';
-        return document.documentElement.getAttribute('data-theme') === 'dark' 
-            ? 'dark' 
-            : 'light';
-    }, []);
+    return 'light';
 }
 
 /**

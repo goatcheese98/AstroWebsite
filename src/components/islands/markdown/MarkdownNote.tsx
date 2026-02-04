@@ -105,9 +105,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const height = element.height;
         const angle = element.angle || 0;
 
-        // Determine theme for styling
-        const isDark = typeof document !== 'undefined' && 
-            document.documentElement.getAttribute('data-theme') === 'dark';
+        // Light mode only - theme is enforced application-wide
+        const isDark = false;
 
         // Container style (positioned absolutely over Excalidraw element)
         const containerStyle: React.CSSProperties = {

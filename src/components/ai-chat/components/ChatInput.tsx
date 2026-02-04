@@ -102,6 +102,8 @@ export interface ChatInputProps {
     contextMode: "all" | "selected";
     /** onKeyDown handler from useKeyboardShortcuts */
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+    /** Whether we're on mobile */
+    isMobile?: boolean;
 }
 
 /**
@@ -119,30 +121,38 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         selectedElementsCount,
         contextMode,
         onKeyDown,
+        isMobile = false,
     }, ref) {
         const hasInput = input.trim().length > 0;
         const canSend = hasInput && !isLoading;
         const hasSelection = selectedElementsCount > 0;
         const isImageGenActive = isGeneratingImage;
         
-        // Context-aware placeholder
-        const placeholder = contextMode === "selected" && hasSelection
-            ? `Ask about ${selectedElementsCount} selected elements...`
-            : "Ask AI to draw, explain, or modify...";
+        // Context-aware placeholder - shorter on mobile
+        const placeholder = isMobile 
+            ? "Ask AI to draw..."
+            : contextMode === "selected" && hasSelection
+                ? `Ask about ${selectedElementsCount} selected elements...`
+                : "Ask AI to draw, explain, or modify...";
         
         return (
             <div style={{
-                padding: "14px 18px 18px",
+                padding: isMobile ? "12px 16px 16px" : "14px 18px 18px",
                 background: "var(--color-bg, #fafafa)",
                 borderTop: "1px solid var(--color-stroke-muted, #e5e7eb)",
                 flexShrink: 0,
+                // Ensure input area is above mobile keyboard
+                paddingBottom: isMobile ? "max(16px, env(safe-area-inset-bottom))" : "18px",
             }}>
                 {/* Toolbar */}
                 <div style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "10px",
+                    gap: isMobile ? "6px" : "8px",
+                    marginBottom: isMobile ? "8px" : "10px",
+                    // Horizontal scroll on mobile if needed
+                    overflowX: isMobile ? "auto" : undefined,
+                    flexWrap: isMobile ? "nowrap" : undefined,
                 }}>
                     {/* Templates Button */}
                     <button
@@ -151,14 +161,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             display: "flex",
                             alignItems: "center",
                             gap: "4px",
-                            padding: "5px 10px",
+                            padding: isMobile ? "8px 12px" : "5px 10px",
                             background: "transparent",
                             border: "1px solid var(--color-stroke-muted, #e5e7eb)",
                             borderRadius: "6px",
-                            fontSize: "11px",
+                            fontSize: isMobile ? "13px" : "11px",
                             color: "var(--color-text-muted, #6b7280)",
                             cursor: "pointer",
                             transition: "all 0.15s",
+                            flexShrink: 0,
+                            minHeight: isMobile ? "36px" : undefined,
+                            touchAction: "manipulation",
                         }}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
@@ -170,7 +183,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         }}
                     >
                         <span>⚡</span>
-                        Templates
+                        {isMobile ? "Quick" : "Templates"}
                     </button>
                     
                     {/* Generate Image Button */}
@@ -191,13 +204,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             display: "flex",
                             alignItems: "center",
                             gap: "4px",
-                            padding: "5px 10px",
+                            padding: isMobile ? "8px 12px" : "5px 10px",
                             background: isImageGenActive || !hasSelection ? "#fee2e2" : "#059669",
                             border: hasSelection && !isImageGenActive
                                 ? "1px solid #047857"
                                 : "1px solid #fca5a5",
                             borderRadius: "6px",
-                            fontSize: "11px",
+                            fontSize: isMobile ? "13px" : "11px",
                             color: isImageGenActive || !hasSelection ? "#9ca3af" : "white",
                             cursor: isImageGenActive ? "not-allowed" : "pointer",
                             transition: "all 0.2s ease",
@@ -205,6 +218,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             boxShadow: hasSelection && !isImageGenActive
                                 ? "0 0 0 3px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1)"
                                 : "none",
+                            flexShrink: 0,
+                            minHeight: isMobile ? "36px" : undefined,
+                            touchAction: "manipulation",
                         }}
                         onMouseEnter={(e) => {
                             if (hasSelection && !isImageGenActive) {
@@ -222,23 +238,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         {isGeneratingImage ? (
                             <>
                                 <div style={{
-                                    width: "10px",
-                                    height: "10px",
+                                    width: isMobile ? "14px" : "10px",
+                                    height: isMobile ? "14px" : "10px",
                                     border: "2px solid rgba(255,255,255,0.3)",
                                     borderTopColor: "white",
                                     borderRadius: "50%",
                                     animation: "spin 0.8s linear infinite",
                                 }} />
-                                Generating...
+                                {isMobile ? "..." : "Generating..."}
                             </>
                         ) : (
                             <>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <svg width={isMobile ? "16" : "12"} height={isMobile ? "16" : "12"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                                     <circle cx="8.5" cy="8.5" r="1.5" />
                                     <polyline points="21 15 16 10 5 21" />
                                 </svg>
-                                Generate Image
+                                {isMobile ? "Image" : "Generate Image"}
                             </>
                         )}
                     </button>
@@ -256,19 +272,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         onChange={(e) => onInputChange(e.target.value)}
                         onKeyDown={onKeyDown}
                         placeholder={placeholder}
-                        rows={2}
+                        rows={isMobile ? 1 : 2}
                         style={{
                             flex: 1,
-                            padding: "10px 14px",
+                            padding: isMobile ? "12px 14px" : "10px 14px",
                             border: "1px solid var(--color-stroke-muted, #e5e7eb)",
                             borderRadius: "10px",
                             background: "var(--color-surface, #ffffff)",
-                            fontSize: "13px",
+                            fontSize: isMobile ? "16px" : "13px", // 16px prevents iOS zoom
                             lineHeight: 1.5,
                             resize: "none",
                             outline: "none",
                             fontFamily: "inherit",
+                            minHeight: isMobile ? "44px" : undefined, // Touch-friendly height
+                            // Improve mobile typing experience
+                            WebkitAppearance: "none",
                         }}
+                        // Mobile-specific attributes
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="sentences"
                     />
                     
                     {/* Send Button */}
@@ -277,16 +300,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         disabled={!canSend}
                         style={{
                             alignSelf: "flex-end",
-                            padding: "10px 18px",
+                            padding: isMobile ? "12px 20px" : "10px 18px",
                             background: canSend ? "#059669" : "#fee2e2",
                             color: canSend ? "white" : "#9ca3af",
                             border: canSend ? "1px solid #047857" : "1px solid #fca5a5",
                             borderRadius: "8px",
-                            fontSize: "13px",
+                            fontSize: isMobile ? "15px" : "13px",
                             fontWeight: 600,
                             cursor: canSend ? "pointer" : "not-allowed",
                             transition: "all 0.15s",
                             boxShadow: canSend ? "0 1px 3px rgba(0, 0, 0, 0.1)" : "none",
+                            minHeight: isMobile ? "44px" : undefined, // Touch-friendly
+                            minWidth: isMobile ? "70px" : undefined,
+                            touchAction: "manipulation",
                         }}
                         onMouseEnter={(e) => {
                             if (canSend) {
@@ -299,18 +325,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             }
                         }}
                     >
-                        Send
+                        {isMobile ? "➤" : "Send"}
                     </button>
                 </div>
                 
-                {/* Keyboard Hint */}
-                <div style={{
-                    marginTop: "6px",
-                    fontSize: "10px",
-                    color: "var(--color-text-muted, #6b7280)",
-                }}>
-                    Enter to send • Shift+Enter for new line • ESC to close
-                </div>
+                {/* Keyboard Hint - hidden on mobile */}
+                {!isMobile && (
+                    <div style={{
+                        marginTop: "6px",
+                        fontSize: "10px",
+                        color: "var(--color-text-muted, #6b7280)",
+                    }}>
+                        Enter to send • Shift+Enter for new line • ESC to close
+                    </div>
+                )}
                 
                 {/* Animation */}
                 <style>{`

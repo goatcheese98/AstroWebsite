@@ -148,13 +148,29 @@ export function useMarkdownNote({
         const api = (window as any).excalidrawAPI;
         if (api) {
             const elements = api.getSceneElements();
-            const updatedElements = elements.map((el: MarkdownElement) => {
+            const appState = api.getAppState();
+            
+            const updatedElements = elements.map((el: any) => {
                 if (el.id === element.id) {
-                    return { ...el, ...updates };
+                    return { 
+                        ...el, 
+                        ...updates,
+                        version: (el.version || 0) + 1,
+                        versionNonce: Date.now(),
+                        updated: Date.now(),
+                    };
                 }
                 return el;
             });
-            api.updateScene({ elements: updatedElements });
+            
+            // Update scene and trigger binding recalculation by updating appState
+            api.updateScene({ 
+                elements: updatedElements,
+                appState: {
+                    ...appState,
+                    editingElement: null,
+                }
+            });
         }
     }, [element.id]);
 

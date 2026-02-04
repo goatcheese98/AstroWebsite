@@ -142,6 +142,38 @@ export function useExcalidrawSelection({
         return () => document.removeEventListener('mousedown', handleClickOutside, true);
     }, [isSelected, elementId, deselect]);
 
+    /**
+     * Watch for native Excalidraw selection and convert to custom selection
+     * This handles cases where user clicks on the underlying element directly
+     */
+    useEffect(() => {
+        const handleStateUpdate = (event: any) => {
+            const detail = event.detail;
+            if (detail?.appState?.selectedElementIds?.[elementId]) {
+                // This note was selected natively - convert to custom selection
+                // Clear native selection and use our custom system
+                const api = (window as any).excalidrawAPI;
+                if (api) {
+                    const appState = api.getAppState();
+                    api.updateScene({
+                        appState: {
+                            ...appState,
+                            selectedElementIds: {},
+                        },
+                    });
+                }
+                // Activate custom selection
+                setGlobalSelectedNoteId(elementId);
+                window.dispatchEvent(new CustomEvent('markdown-note:select', {
+                    detail: { elementId },
+                }));
+            }
+        };
+
+        window.addEventListener('excalidraw:state-update', handleStateUpdate);
+        return () => window.removeEventListener('excalidraw:state-update', handleStateUpdate);
+    }, [elementId]);
+
     return {
         isSelected,
         select,

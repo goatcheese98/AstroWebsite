@@ -1,6 +1,7 @@
 // Image Generation Modal - Center popup with preview and generation options
 
 import React, { useState, useEffect, useRef } from "react";
+import { useMobileDetection } from "./hooks/useMobileDetection";
 
 // Excalidraw color palette presets
 const EXCALIDRAW_COLORS = [
@@ -67,6 +68,7 @@ export default function ImageGenerationModal({
     onGenerate,
     isGenerating,
 }: ImageGenerationModalProps) {
+    const { isMobile } = useMobileDetection();
     const [prompt, setPrompt] = useState("");
     const [backgroundColor, setBackgroundColor] = useState<string>("canvas");
     const [customColor, setCustomColor] = useState<string>("#ffffff");
@@ -268,20 +270,21 @@ export default function ImageGenerationModal({
                 className="image-gen-modal"
                 style={{
                     position: "fixed",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: "90%",
-                    maxWidth: "480px",
-                    maxHeight: "85vh",
+                    top: isMobile ? 0 : "50%",
+                    left: isMobile ? 0 : "50%",
+                    transform: isMobile ? "none" : "translate(-50%, -50%)",
+                    width: isMobile ? "100%" : "90%",
+                    height: isMobile ? "100%" : undefined,
+                    maxWidth: isMobile ? "none" : "480px",
+                    maxHeight: isMobile ? "100vh" : "85vh",
                     background: "var(--color-surface, #ffffff)",
-                    borderRadius: "16px",
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                    borderRadius: isMobile ? 0 : "16px",
+                    boxShadow: isMobile ? "none" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
                     zIndex: 2001,
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
-                    animation: "modalSlideIn 0.25s ease",
+                    animation: isMobile ? "slideUp 0.25s ease" : "modalSlideIn 0.25s ease",
                 }}
             >
                 {/* Header */}
@@ -453,14 +456,14 @@ export default function ImageGenerationModal({
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="e.g., Modern SaaS dashboard with blue theme, clean UI, professional look..."
-                            rows={3}
+                            rows={isMobile ? 2 : 3}
                             disabled={isGenerating}
                             style={{
                                 width: "100%",
-                                padding: "12px 14px",
+                                padding: isMobile ? "14px 16px" : "12px 14px",
                                 border: "2px solid var(--color-stroke-muted, #e5e7eb)",
                                 borderRadius: "10px",
-                                fontSize: "14px",
+                                fontSize: isMobile ? "16px" : "14px", // 16px prevents iOS zoom
                                 lineHeight: 1.5,
                                 resize: "none",
                                 fontFamily: "inherit",
@@ -917,6 +920,14 @@ export default function ImageGenerationModal({
                         to { 
                             opacity: 1;
                             transform: translate(-50%, -50%) scale(1);
+                        }
+                    }
+                    @keyframes slideUp {
+                        from {
+                            transform: translateY(100%);
+                        }
+                        to {
+                            transform: translateY(0);
                         }
                     }
                     @keyframes spin {

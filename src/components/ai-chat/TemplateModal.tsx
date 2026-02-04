@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { PromptTemplate } from "./types";
+import { useMobileDetection } from "./hooks/useMobileDetection";
 
 // Enhanced template library with categories
 const TEMPLATE_CATEGORIES: Record<string, PromptTemplate[]> = {
@@ -146,6 +147,7 @@ export default function TemplateModal({
     onSelect,
     selectedElementsCount,
 }: TemplateModalProps) {
+    const { isMobile } = useMobileDetection();
     const [selectedCategory, setSelectedCategory] = useState<string>("Design & UI");
     const [searchQuery, setSearchQuery] = useState("");
     const [recentTemplates, setRecentTemplates] = useState<string[]>([]);
@@ -353,7 +355,7 @@ export default function TemplateModal({
 
                 <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
                     {/* Sidebar - Categories */}
-                    {!searchQuery && (
+                    {!searchQuery && !isMobile && (
                         <div style={{
                             width: "200px",
                             borderRight: "1px solid var(--color-stroke-muted, #e5e7eb)",
@@ -425,8 +427,10 @@ export default function TemplateModal({
                                 </h3>
                                 <div style={{
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                                    gap: "12px",
+                                    gridTemplateColumns: isMobile 
+                                        ? "repeat(auto-fill, minmax(140px, 1fr))" 
+                                        : "repeat(auto-fill, minmax(160px, 1fr))",
+                                    gap: isMobile ? "10px" : "12px",
                                 }}>
                                     {recentTemplateObjects.map(template => (
                                         <TemplateCard
@@ -452,8 +456,10 @@ export default function TemplateModal({
                                 </h3>
                                 <div style={{
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                                    gap: "12px",
+                                    gridTemplateColumns: isMobile 
+                                        ? "repeat(auto-fill, minmax(140px, 1fr))" 
+                                        : "repeat(auto-fill, minmax(160px, 1fr))",
+                                    gap: isMobile ? "10px" : "12px",
                                 }}>
                                     {templates.map(template => (
                                         <TemplateCard
@@ -496,6 +502,14 @@ export default function TemplateModal({
                         to {
                             opacity: 1;
                             transform: translate(-50%, -50%) scale(1);
+                        }
+                    }
+                    @keyframes slideUp {
+                        from {
+                            transform: translateY(100%);
+                        }
+                        to {
+                            transform: translateY(0);
                         }
                     }
                 `}</style>

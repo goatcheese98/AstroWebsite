@@ -83,6 +83,7 @@ export { useScreenshotCapture } from "./hooks/useScreenshotCapture";
 export { useCanvasCommands } from "./hooks/useCanvasCommands";
 export { usePanelResize } from "./hooks/usePanelResize";
 export { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+export { useMobileDetection } from "./hooks/useMobileDetection";
 
 // Types
 export type {
@@ -130,6 +131,9 @@ export type {
     UseKeyboardShortcutsOptions,
     UseKeyboardShortcutsReturn 
 } from "./hooks/useKeyboardShortcuts";
+export type { 
+    MobileDetectionState 
+} from "./hooks/useMobileDetection";
 
 // Constants
 export { QUICK_TEMPLATES, TEMPLATE_CATEGORIES } from "./constants/promptTemplates";

@@ -85,17 +85,36 @@ export interface ChatPanelProps {
     onResizeStart: (e: React.MouseEvent) => void;
     /** All child components */
     children: React.ReactNode;
+    /** Whether we're on mobile - if true, panel takes full screen */
+    isMobile?: boolean;
 }
 
 /**
  * Main chat panel container with resize handle
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-    function ChatPanel({ isOpen, width, onResizeStart, children }, ref) {
+    function ChatPanel({ isOpen, width, onResizeStart, children, isMobile = false }, ref) {
         if (!isOpen) return null;
         
         return (
             <>
+                {/* Mobile Backdrop - tap to close */}
+                {isMobile && (
+                    <div
+                        onClick={() => {
+                            // Dispatch close event - parent handles actual closing
+                            window.dispatchEvent(new CustomEvent("ai-chat:close-request"));
+                        }}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            background: "rgba(0, 0, 0, 0.3)",
+                            zIndex: 998,
+                            animation: "fadeIn 0.2s ease",
+                        }}
+                    />
+                )}
+                
                 {/* Main Panel */}
                 <div
                     ref={ref}
@@ -105,43 +124,50 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: `${width}px`,
+                        width: isMobile ? "100%" : `${width}px`,
                         background: "var(--color-surface, #ffffff)",
-                        borderLeft: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                        boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.08)",
+                        borderLeft: isMobile ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
+                        boxShadow: isMobile ? "-8px 0 30px rgba(0, 0, 0, 0.15)" : "-4px 0 20px rgba(0, 0, 0, 0.08)",
                         zIndex: 999,
                         display: "flex",
                         flexDirection: "column",
                         animation: "slideIn 0.25s ease",
                         pointerEvents: "auto",
+                        maxWidth: isMobile ? "100%" : undefined,
                     }}
                 >
                     {children}
                 </div>
                 
-                {/* Resize Handle */}
-                <div
-                    onMouseDown={onResizeStart}
-                    style={{
-                        position: "fixed",
-                        right: `${width - 2}px`,
-                        top: 0,
-                        bottom: 0,
-                        width: "4px",
-                        cursor: "ew-resize",
-                        zIndex: 1000,
-                        background: "transparent",
-                        transition: "background 0.15s",
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-accent, #6366f1)"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                />
+                {/* Resize Handle - hidden on mobile */}
+                {!isMobile && (
+                    <div
+                        onMouseDown={onResizeStart}
+                        style={{
+                            position: "fixed",
+                            right: `${width - 2}px`,
+                            top: 0,
+                            bottom: 0,
+                            width: "4px",
+                            cursor: "ew-resize",
+                            zIndex: 1000,
+                            background: "transparent",
+                            transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-accent, #6366f1)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    />
+                )}
                 
                 {/* Animations */}
                 <style>{`
                     @keyframes slideIn {
                         from { transform: translateX(100%); }
                         to { transform: translateX(0); }
+                    }
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
                     }
                 `}</style>
             </>

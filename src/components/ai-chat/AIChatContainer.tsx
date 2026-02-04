@@ -89,6 +89,7 @@ import { useCanvasCommands } from "./hooks/useCanvasCommands";
 import { usePanelResize } from "./hooks/usePanelResize";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useElementSelection } from "./useElementSelection";
+import { useMobileDetection } from "./hooks/useMobileDetection";
 
 // Components
 import { ChatPanel } from "./components/ChatPanel";
@@ -119,9 +120,26 @@ export default function AIChatContainer({
     onClose,
     initialWidth = 400,
 }: AIChatContainerProps) {
+    // === 📱 MOBILE DETECTION ===
+    const { isMobile, viewportWidth } = useMobileDetection();
+    
     // === 🧠 REFS ===
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
+    // Listen for mobile backdrop close request
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleCloseRequest = () => {
+            onClose();
+        };
+        
+        window.addEventListener("ai-chat:close-request", handleCloseRequest);
+        return () => {
+            window.removeEventListener("ai-chat:close-request", handleCloseRequest);
+        };
+    }, [isOpen, onClose]);
     
     // === 🧠 HOOKS ===
     
@@ -135,15 +153,15 @@ export default function AIChatContainer({
         enabled: isOpen,
     });
     
-    // Panel resize
+    // Panel resize - use full width on mobile
     const {
         panelWidth,
         isResizing,
         startResize,
     } = usePanelResize({
-        initialWidth,
-        minWidth: 320,
-        maxWidth: "80%",
+        initialWidth: isMobile ? viewportWidth : initialWidth,
+        minWidth: isMobile ? viewportWidth : 320,
+        maxWidth: isMobile ? "100%" : "80%",
     });
     
     // Core chat state
@@ -313,6 +331,7 @@ export default function AIChatContainer({
                 isOpen={isOpen}
                 width={panelWidth}
                 onResizeStart={startResize}
+                isMobile={isMobile}
             >
                 {/* Header */}
                 <ChatHeader
@@ -361,6 +380,7 @@ export default function AIChatContainer({
                     selectedElementsCount={selectedElements.length}
                     contextMode={contextMode}
                     onKeyDown={handleKeyDown}
+                    isMobile={isMobile}
                 />
             </ChatPanel>
             
