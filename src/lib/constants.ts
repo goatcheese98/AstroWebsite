@@ -18,6 +18,11 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'Blog', href: '/blog' },
 ];
 
+// Canvas-only navigation (no home/blog)
+export const CANVAS_NAV_LINKS: NavLink[] = [
+  { label: 'AI Canvas', href: '/' },
+];
+
 export const PROJECTS: Project[] = [
   {
     title: 'ALGS Esports Performance Dashboard',

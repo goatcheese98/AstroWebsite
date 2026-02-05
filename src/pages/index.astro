@@ -1,0 +1,68 @@
+---
+import PageLayout from "../layouts/PageLayout.astro";
+import Hero from "../components/sections/Hero.astro";
+import Projects from "../components/sections/Projects.astro";
+import Experience from "../components/sections/Experience.astro";
+import Contact from "../components/sections/Contact.astro";
+import BentoSkills from "../components/islands/BentoSkills.svelte";
+import SketchDivider from "../components/sketch/SketchDivider.astro";
+---
+
+<PageLayout title="Home">
+  <Hero />
+
+  <SketchDivider variant="wavy" />
+  <Projects />
+  <SketchDivider variant="zigzag" />
+  <Experience />
+  <SketchDivider variant="zigzag" />
+
+  <section class="skills section-gap" id="skills" aria-label="Skills">
+    <div class="container">
+      <div class="skills__header">
+        <h2 class="skills__heading">
+          <span class="gradient-text">Skills & Expertise</span>
+        </h2>
+        <p class="skills__subhead">
+          A generalist's toolkit spanning data, technology, and strategy
+        </p>
+        <div class="skills__header-line" aria-hidden="true"></div>
+      </div>
+
+      <BentoSkills client:load />
+    </div>
+  </section>
+
+  <SketchDivider variant="wavy" />
+  <Contact />
+</PageLayout>
+
+<script>
+  import { annotate } from "rough-notation";
+
+  function initAnnotations() {
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const style = getComputedStyle(document.documentElement);
+    const accentColor = style.getPropertyValue("--color-accent").trim();
+
+    const el = document.querySelector("#hero-title");
+    if (el && !reducedMotion) {
+      const annotation = annotate(el as HTMLElement, {
+        type: "underline",
+        color: accentColor,
+        strokeWidth: 2,
+        padding: 4,
+      });
+      annotation.show();
+    }
+  }
+
+  // Run on page load
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initAnnotations);
+  } else {
+    initAnnotations();
+  }
+</script>

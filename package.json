@@ -10,7 +10,7 @@
     "preview": "astro preview",
     "preview:canvas": "DEPLOY_TARGET=canvas astro preview",
     "deploy": "astro build && wrangler pages deploy dist --project-name=astroweb",
-    "deploy:canvas": "npm run build:canvas && wrangler pages deploy dist --project-name=ai-canvas -c wrangler.canvas.jsonc",
+    "deploy:canvas": "bash scripts/deploy-canvas.sh",
     "astro": "astro"
   },
   "dependencies": {

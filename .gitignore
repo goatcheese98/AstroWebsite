@@ -28,3 +28,5 @@ pnpm-debug.log*
 # canvas build temp files
 .temp-pages-backup/
 .canvas-build-state.json
+wrangler.backup.toml
+wrangler.toml
