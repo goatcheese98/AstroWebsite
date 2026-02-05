@@ -1,75 +1,22 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════╗
  * ║                        🖥️ ChatPanel.tsx                                      ║
- * ║                    "The Chat's Home Container"                               ║
+ * ║                    "The Floating Chat Widget"                                ║
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  🏷️ BADGES: 🟣 UI Component | 📐 Layout Container | 🖱️ Interaction Zone      ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
  * 👤 WHO AM I?
- * I am the physical container that houses the entire AI chat experience. I'm a
- * fixed-position panel that slides in from the right side of the screen. I have
- * a resize handle on my left edge and I cast a shadow to separate myself from
- * the canvas underneath.
+ * I am a floating chat widget that appears at the bottom right of the screen,
+ * similar to customer support chat windows. I have a fixed height and width,
+ * rounded corners, and a shadow to appear floating above the canvas.
  * 
  * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Users need a dedicated space for AI conversation that:
- * - Doesn't obstruct their drawing (slides in/out)
- * - Can be resized to their preference
- * - Has clear visual boundaries (shadow, border)
- * - Supports all chat interactions without layout issues
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
-      │                    ┌─────────────────┐                           │
-      │                    │   AIChatContainer │ (my parent - orchestrator)│
-      │                    └────────┬────────┘                           │
-      │                             │                                    │
-      │                             ▼                                    │
-      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
-      │   │ ResizeHandle│─────▶│      ME      │◀─────│    Shadow   │   │
-      │   │   (left)    │      │ (ChatPanel)  │      │   (visual)  │   │
-      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
-      │                               │                                │
-      │           ┌───────────────────┼───────────────────┐            │
-      │           ▼                   ▼                   ▼            │
-      │   ┌─────────────┐    ┌──────────────┐    ┌─────────────┐       │
-      │   │ChatHeader   │    │ MessageList  │    │ ChatInput   │       │
-      │   └─────────────┘    └──────────────┘    └─────────────┘       │
-      │                                                                  │
-      │   I CONTAIN: All chat UI components stacked vertically           │
-      │                                                                  │
-      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Panel doesn't appear, wrong position, no resize handle
- * - User Impact: Can't access AI chat at all
- * - Quick Fix: Check isOpen prop, verify fixed positioning CSS
- * - Debug: Inspect element - should have position:fixed, right:0
- * - Common Issue: z-index too low - other elements overlay the panel
- * 
- * 📦 PROPS I ACCEPT:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ isOpen              │ Whether panel should be visible                      │
- * │ width               │ Width in pixels                                      │
- * │ onResizeStart       │ Callback when user grabs resize handle               │
- * │ children            │ All the chat UI components inside                    │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- * 
- * 🎨 VISUAL FEATURES:
- * - Fixed position on right side
- * - Slide-in animation when opening
- * - Subtle shadow for depth
- * - 4px resize handle on left edge (invisible until hover)
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted from AIChatContainer.tsx (was ~40 lines of panel markup)
- * 2026-02-02: Separated container concerns from content concerns
- * 2026-02-02: Added forwardRef for parent component access
+ * Users need a compact AI chat that:
+ * - Doesn't take up the entire side of the screen
+ * - Floats above the canvas like a popup
+ * - Can be easily opened and closed
+ * - Has a familiar chat widget appearance
  * 
  * @module ChatPanel
  */
@@ -90,11 +37,16 @@ export interface ChatPanelProps {
 }
 
 /**
- * Main chat panel container with resize handle
+ * Floating chat panel widget
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
     function ChatPanel({ isOpen, width, onResizeStart, children, isMobile = false }, ref) {
         if (!isOpen) return null;
+        
+        // Fixed dimensions for floating chat
+        const chatWidth = isMobile ? "100%" : `${width}px`;
+        const chatHeight = isMobile ? "100%" : "600px";
+        const maxHeight = isMobile ? "100%" : "calc(100vh - 100px)";
         
         return (
             <>
@@ -102,7 +54,6 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                 {isMobile && (
                     <div
                         onClick={() => {
-                            // Dispatch close event - parent handles actual closing
                             window.dispatchEvent(new CustomEvent("ai-chat:close-request"));
                         }}
                         style={{
@@ -115,55 +66,50 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                     />
                 )}
                 
-                {/* Main Panel */}
+                {/* Main Chat Widget */}
                 <div
                     ref={ref}
                     className="ai-chat-container"
                     style={{
                         position: "fixed",
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: isMobile ? "100%" : `${width}px`,
+                        right: isMobile ? 0 : "20px",
+                        bottom: isMobile ? 0 : "20px",
+                        top: isMobile ? 0 : "auto",
+                        width: chatWidth,
+                        height: chatHeight,
+                        maxHeight: maxHeight,
                         background: "var(--color-surface, #ffffff)",
-                        borderLeft: isMobile ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
-                        boxShadow: isMobile ? "-8px 0 30px rgba(0, 0, 0, 0.15)" : "-4px 0 20px rgba(0, 0, 0, 0.08)",
+                        border: isMobile ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
+                        borderRadius: isMobile ? 0 : "16px",
+                        boxShadow: isMobile 
+                            ? "-8px 0 30px rgba(0, 0, 0, 0.15)" 
+                            : "0 10px 40px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)",
                         zIndex: 999,
                         display: "flex",
                         flexDirection: "column",
-                        animation: "slideIn 0.25s ease",
+                        animation: isMobile ? "slideUp 0.25s ease" : "popIn 0.2s ease",
                         pointerEvents: "auto",
-                        maxWidth: isMobile ? "100%" : undefined,
+                        overflow: "hidden",
                     }}
                 >
                     {children}
                 </div>
                 
-                {/* Resize Handle - hidden on mobile */}
-                {!isMobile && (
-                    <div
-                        onMouseDown={onResizeStart}
-                        style={{
-                            position: "fixed",
-                            right: `${width - 2}px`,
-                            top: 0,
-                            bottom: 0,
-                            width: "4px",
-                            cursor: "ew-resize",
-                            zIndex: 1000,
-                            background: "transparent",
-                            transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-accent, #6366f1)"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    />
-                )}
-                
                 {/* Animations */}
                 <style>{`
-                    @keyframes slideIn {
-                        from { transform: translateX(100%); }
-                        to { transform: translateX(0); }
+                    @keyframes popIn {
+                        from { 
+                            opacity: 0;
+                            transform: scale(0.95) translateY(10px);
+                        }
+                        to { 
+                            opacity: 1;
+                            transform: scale(1) translateY(0);
+                        }
+                    }
+                    @keyframes slideUp {
+                        from { transform: translateY(100%); }
+                        to { transform: translateY(0); }
                     }
                     @keyframes fadeIn {
                         from { opacity: 0; }

@@ -100,6 +100,10 @@ export interface ChatInputProps {
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
     /** Whether we're on mobile */
     isMobile?: boolean;
+    /** Current AI provider */
+    aiProvider?: "kimi" | "claude";
+    /** Callback to toggle AI provider */
+    onToggleProvider?: () => void;
 }
 
 /**
@@ -116,10 +120,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         contextMode,
         onKeyDown,
         isMobile = false,
+        aiProvider = "claude",
+        onToggleProvider,
     }, ref) {
         const hasInput = input.trim().length > 0;
         const canSend = hasInput && !isLoading;
         const hasSelection = selectedElementsCount > 0;
+        const isKimi = aiProvider === "kimi";
         
         // Context-aware placeholder - shorter on mobile
         const placeholder = isMobile 
@@ -141,6 +148,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 <div style={{
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "space-between",
                     gap: isMobile ? "6px" : "8px",
                     marginBottom: isMobile ? "8px" : "10px",
                     // Horizontal scroll on mobile if needed
@@ -179,6 +187,40 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         {isMobile ? "Quick" : "Templates"}
                     </button>
                     
+                    {/* Model Selector */}
+                    {onToggleProvider && (
+                        <button
+                            onClick={onToggleProvider}
+                            title={`Click to switch to ${isKimi ? "Claude" : "Kimi K2.5"}`}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: isMobile ? "8px 12px" : "5px 10px",
+                                background: isKimi ? "#10b981" : "#f97316",
+                                border: isKimi ? "1px solid #059669" : "1px solid #ea580c",
+                                borderRadius: "6px",
+                                fontSize: isMobile ? "13px" : "11px",
+                                color: "white",
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                                flexShrink: 0,
+                                minHeight: isMobile ? "36px" : undefined,
+                                touchAction: "manipulation",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = isKimi ? "#059669" : "#ea580c";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = isKimi ? "#10b981" : "#f97316";
+                            }}
+                        >
+                            {isKimi ? "Kimi K2.5" : "Claude"}
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path d="M7 17L17 7M17 7H7M17 7V17" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
                 
                 {/* Input Area */}

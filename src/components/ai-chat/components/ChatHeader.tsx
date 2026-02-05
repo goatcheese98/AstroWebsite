@@ -80,68 +80,19 @@ export interface ChatHeaderProps {
 }
 
 /**
- * Chat panel header with title, provider badge, and close button
+ * Chat panel header with close button only
  */
-export function ChatHeader({ aiProvider, onToggleProvider, onClose }: ChatHeaderProps) {
-    const isKimi = aiProvider === "kimi";
-    
+export function ChatHeader({ onClose }: { onClose: () => void }) {
     return (
         <div style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 18px",
+            justifyContent: "flex-end",
+            padding: "12px 16px",
             borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
             background: "var(--color-bg, #fafafa)",
             flexShrink: 0,
         }}>
-            {/* Title & Icon */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "18px" }}>💬</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <h2 style={{
-                        margin: 0,
-                        fontFamily: "var(--font-hand, sans-serif)",
-                        fontSize: "17px",
-                        fontWeight: 600,
-                        color: "var(--color-text, #1f2937)",
-                    }}>
-                        AI Assistant
-                    </h2>
-                    
-                    {/* Provider Badge - Clickable */}
-                    <button
-                        onClick={onToggleProvider}
-                        title={`Click to switch to ${isKimi ? "Claude (premium)" : "Kimi"}`}
-                        style={{
-                            fontSize: "10px",
-                            padding: "2px 6px",
-                            background: isKimi ? "#10b981" : "#f97316",
-                            color: "white",
-                            borderRadius: "4px",
-                            fontWeight: 500,
-                            border: isKimi ? "1px solid #059669" : "1px solid #ea580c",
-                            cursor: "pointer",
-                            transition: "all 0.15s",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "3px",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = isKimi ? "#059669" : "#ea580c";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = isKimi ? "#10b981" : "#f97316";
-                        }}
-                    >
-                        {isKimi ? "Kimi K2.5" : "Claude"}
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <path d="M7 17L17 7M17 7H7M17 7V17" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            
             {/* Close Button */}
             <button
                 onClick={onClose}

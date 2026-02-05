@@ -78,7 +78,7 @@ import { useAIChatState } from "./hooks/useAIChatState";
 import { useImageGeneration, type ImageHistoryItem } from "./hooks/useImageGeneration";
 import type { Message } from "./types";
 import { useCanvasCommands } from "./hooks/useCanvasCommands";
-import { usePanelResize } from "./hooks/usePanelResize";
+
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useElementSelection } from "./useElementSelection";
 import { useMobileDetection } from "./hooks/useMobileDetection";
@@ -118,7 +118,7 @@ export interface AIChatContainerProps {
 export default function AIChatContainer({
     isOpen,
     onClose,
-    initialWidth = 400,
+    initialWidth = 340,
     onStateUpdate,
     pendingLoadState,
 }: AIChatContainerProps) {
@@ -158,16 +158,9 @@ export default function AIChatContainer({
         enabled: isOpen,
     });
 
-    // Panel resize - use full width on mobile
-    const {
-        panelWidth,
-        isResizing,
-        startResize,
-    } = usePanelResize({
-        initialWidth: isMobile ? viewportWidth : initialWidth,
-        minWidth: isMobile ? viewportWidth : 320,
-        maxWidth: isMobile ? "100%" : "80%",
-    });
+    // Fixed panel size - floating chat widget (no resize)
+    const panelWidth = isMobile ? viewportWidth : 360;
+    const startResize = () => {}; // No-op since we're not using resize
 
     // Core chat state
     const {
@@ -310,24 +303,10 @@ export default function AIChatContainer({
                 onResizeStart={startResize}
                 isMobile={isMobile}
             >
-                {/* Header */}
-                <ChatHeader
-                    aiProvider={aiProvider}
-                    onToggleProvider={toggleProvider}
-                    onClose={onClose}
-                />
+                {/* Header - just close button */}
+                <ChatHeader onClose={onClose} />
 
-                {/* Canvas Context */}
-                <CanvasContextPanel
-                    contextMode={contextMode}
-                    onContextModeChange={setContextMode}
-                    selectedElements={selectedElements}
-                    elementSnapshots={elementSnapshots}
-                    canvasElementCount={canvasState?.elements?.length || 0}
-                    onClearSelection={clearSelection}
-                />
-
-                {/* Messages */}
+                {/* Messages - with empty state showing "Start creating with AI" */}
                 <MessageList
                     ref={messagesEndRef}
                     messages={messages}
@@ -337,7 +316,17 @@ export default function AIChatContainer({
                     canvasState={canvasState}
                 />
 
-                {/* Input Area */}
+                {/* Canvas Context - above templates */}
+                <CanvasContextPanel
+                    contextMode={contextMode}
+                    onContextModeChange={setContextMode}
+                    selectedElements={selectedElements}
+                    elementSnapshots={elementSnapshots}
+                    canvasElementCount={canvasState?.elements?.length || 0}
+                    onClearSelection={clearSelection}
+                />
+
+                {/* Input Area - with model selector */}
                 <ChatInput
                     ref={inputRef}
                     input={input}
@@ -349,6 +338,8 @@ export default function AIChatContainer({
                     contextMode={contextMode}
                     onKeyDown={handleKeyDown}
                     isMobile={isMobile}
+                    aiProvider={aiProvider}
+                    onToggleProvider={toggleProvider}
                 />
             </ChatPanel>
 
