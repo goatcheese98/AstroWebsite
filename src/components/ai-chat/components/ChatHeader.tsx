@@ -116,11 +116,11 @@ export function ChatHeader({ aiProvider, onToggleProvider, onClose }: ChatHeader
                         style={{
                             fontSize: "10px",
                             padding: "2px 6px",
-                            background: isKimi ? "#10b981" : "#047857",
+                            background: isKimi ? "#10b981" : "#f97316",
                             color: "white",
                             borderRadius: "4px",
                             fontWeight: 500,
-                            border: isKimi ? "1px solid #059669" : "1px solid #065f46",
+                            border: isKimi ? "1px solid #059669" : "1px solid #ea580c",
                             cursor: "pointer",
                             transition: "all 0.15s",
                             display: "flex",
@@ -128,10 +128,10 @@ export function ChatHeader({ aiProvider, onToggleProvider, onClose }: ChatHeader
                             gap: "3px",
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.background = isKimi ? "#059669" : "#065f46";
+                            e.currentTarget.style.background = isKimi ? "#059669" : "#ea580c";
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.background = isKimi ? "#10b981" : "#047857";
+                            e.currentTarget.style.background = isKimi ? "#10b981" : "#f97316";
                         }}
                     >
                         {isKimi ? "Kimi K2.5" : "Claude"}

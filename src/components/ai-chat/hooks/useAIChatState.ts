@@ -149,7 +149,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const [panelWidth, setPanelWidth] = useState(initialWidth);
     const [isResizing, setIsResizing] = useState(false);
     const [contextMode, setContextMode] = useState<"all" | "selected">("all");
-    const [aiProvider, setAiProvider] = useState<AIProvider>("kimi");
+    const [aiProvider, setAiProvider] = useState<AIProvider>("claude");
     const [showTemplates, setShowTemplates] = useState(false);
     const [showImageModal, setShowImageModal] = useState(false);
 
