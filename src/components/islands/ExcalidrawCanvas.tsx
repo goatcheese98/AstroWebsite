@@ -165,6 +165,7 @@ export default function ExcalidrawCanvas() {
         let rafId: number;
         let lastUpdateTime = 0;
         const UPDATE_INTERVAL = 8; // Update React state at ~120fps for ultra-smooth overlay sync
+        let lastSelectedIds: string = "";
 
         const pollExcalidrawState = (timestamp: number) => {
             try {
@@ -178,6 +179,15 @@ export default function ExcalidrawCanvas() {
                     zoom: appState.zoom,
                     selectedElementIds: appState.selectedElementIds,
                 };
+
+                // Dispatch selection change event when selection changes
+                const currentSelectedIds = Object.keys(appState.selectedElementIds || {}).sort().join(",");
+                if (currentSelectedIds !== lastSelectedIds) {
+                    lastSelectedIds = currentSelectedIds;
+                    window.dispatchEvent(new CustomEvent("excalidraw:selection-change", {
+                        detail: { selectedElementIds: appState.selectedElementIds }
+                    }));
+                }
 
                 const mdElements = elements.filter(
                     (el: any) => el.customData?.type === "markdown" && !el.isDeleted

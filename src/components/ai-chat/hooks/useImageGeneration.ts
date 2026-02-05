@@ -131,10 +131,19 @@ export function useImageGeneration(): UseImageGenerationReturn {
             // Build comprehensive prompt with strict instructions
             let systemInstructions = "You are an expert UI/UX designer tasked with transforming wireframes into photorealistic designs.\n\n";
             
-            // Add background color instruction FIRST
+            // Add background color instruction FIRST - STRICT ENFORCEMENT
             const bgColor = options.backgroundColor;
-            if (bgColor && bgColor !== "canvas") {
-                systemInstructions += `CRITICAL: The background color MUST be exactly ${bgColor}. Do not deviate from this color under any circumstances.\n\n`;
+            if (bgColor) {
+                systemInstructions += `BACKGROUND COLOR REQUIREMENTS (ABSOLUTELY MANDATORY - HIGHEST PRIORITY):
+1. The ENTIRE background of the generated image MUST be exactly ${bgColor}
+2. Use ${bgColor} as the SOLID background color across 100% of the image canvas
+3. NO gradients, NO patterns, NO variations from ${bgColor}
+4. NO shadows or lighting effects that change the background color
+5. If the reference has transparency, REPLACE it with solid ${bgColor}
+6. Every single pixel that is not part of the main design elements must be ${bgColor}
+7. This is the MOST IMPORTANT rule - failure to use exactly ${bgColor} is unacceptable
+
+`;
             }
             
             // Add layout instructions based on strict ratio setting
@@ -163,13 +172,13 @@ export function useImageGeneration(): UseImageGenerationReturn {
             // Add quality and rendering instructions
             systemInstructions += `RENDERING REQUIREMENTS:
 - Produce a photorealistic, high-quality design
-- Use modern design principles (proper shadows, gradients, depth)
+- Use modern design principles (proper shadows, gradients, depth) - BUT ONLY on UI elements, NOT the background
 - Ensure professional polish and attention to detail
 - Make it look like a finished product, not a prototype
-${bgColor && bgColor !== "canvas" ? `- Background must be ${bgColor} with NO variations or gradients\n` : ""}
+- Background MUST remain exactly ${bgColor} with NO variations, NO gradients, NO shadows
 - If the reference shows UI elements (buttons, cards, text), make them look realistic and functional
 
-IMPORTANT: Study the reference image carefully before generating. Your output MUST respect the layout constraints specified above.`;
+FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Every pixel of the background must be this exact color.`;
 
             console.log('🎨 Calling Gemini API...');
             console.log('🤖 Model:', options.useProModel ? 'Gemini 3 Pro' : 'Gemini 2.5 Flash');
@@ -208,15 +217,15 @@ IMPORTANT: Study the reference image carefully before generating. Your output MU
             // Success - create image data URL
             const imageDataUrl = `data:${data.mimeType};base64,${data.imageData}`;
             
-            // Add to history
-            setImageHistory(prev => [{
-                id: nanoid(),
-                url: imageDataUrl,
-                prompt: options.prompt,
-                timestamp: new Date(),
-            }, ...prev]);
+            // Dispatch to My Assets panel
+            window.dispatchEvent(new CustomEvent("asset:image-generated", {
+                detail: {
+                    imageUrl: imageDataUrl,
+                    prompt: options.prompt,
+                },
+            }));
             
-            console.log('✅ Image generated successfully');
+            console.log('✅ Image generated and added to assets');
             
             // Calculate dimensions and insert into canvas
             const img = new Image();

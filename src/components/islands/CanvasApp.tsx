@@ -1,18 +1,18 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import CanvasControls from "./CanvasControls";
-// import AIChatPanel from "./AIChatPanel"; // Original component (backup)
-import { AIChatContainer } from "../ai-chat"; // New enterprise component
+import { AIChatContainer, ImageGenerationModal, useImageGeneration, useElementSelection } from "../ai-chat";
 import MyAssetsPanel from "./MyAssetsPanel";
 import SaveOptionsModal from "./SaveOptionsModal";
-import { 
-    collectCanvasState, 
-    saveCanvasStateToFile, 
+import {
+    collectCanvasState,
+    saveCanvasStateToFile,
     triggerCanvasStateLoad,
     type CanvasState,
     type SaveOptions
 } from "../../lib/canvas-state-manager";
 import type { Message } from "../ai-chat/types";
 import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
+import type { GenerationOptions } from "../ai-chat/ImageGenerationModal";
 
 // State container for save/load coordination
 interface CanvasStateContainer {
@@ -28,7 +28,10 @@ export default function CanvasApp() {
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [pendingSaveState, setPendingSaveState] = useState<CanvasState | null>(null);
-    
+
+    // Image generation modal state - managed independently of AI chat
+    const [showImageModal, setShowImageModal] = useState(false);
+
     // Refs to access state from child components
     const stateContainerRef = useRef<CanvasStateContainer>({
         messages: [],
@@ -36,9 +39,15 @@ export default function CanvasApp() {
         contextMode: "all",
         imageHistory: [],
     });
-    
+
     // Pending state to load (set when loading, applied when components mount/update)
     const pendingLoadStateRef = useRef<CanvasState | null>(null);
+
+    // Track pending image generation (screenshot coordination)
+    const pendingImageGenRef = useRef<{
+        options: GenerationOptions;
+        isCapturing: boolean;
+    } | null>(null);
 
     const showMessage = (msg: string) => {
         setSaveMessage(msg);
@@ -100,7 +109,7 @@ export default function CanvasApp() {
 
         try {
             await saveCanvasStateToFile(pendingSaveState, undefined, options);
-            
+
             // Build status message
             let mode = options.compressed ? "compressed" : "full size";
             if (options.excludeHistory) {
@@ -120,7 +129,7 @@ export default function CanvasApp() {
      */
     const handleLoadState = useCallback(async () => {
         const result = await triggerCanvasStateLoad();
-        
+
         if (!result.success) {
             if (result.error !== "Cancelled") {
                 showMessage(`✗ ${result.error}`);
@@ -130,12 +139,12 @@ export default function CanvasApp() {
 
         if (result.state) {
             pendingLoadStateRef.current = result.state;
-            
+
             // Dispatch event to notify components to load state
             window.dispatchEvent(new CustomEvent("canvas:load-state", {
                 detail: { state: result.state },
             }));
-            
+
             showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages`);
         }
     }, []);
@@ -159,6 +168,107 @@ export default function CanvasApp() {
         }
     }, []);
 
+    // === IMAGE GENERATION (moved from AIChatContainer) ===
+
+    // Element selection from canvas - always enabled for image generation
+    const {
+        selectedElements,
+        elementSnapshots,
+        clearSelection,
+    } = useElementSelection({
+        enabled: true, // Always enabled for image generation
+    });
+
+    // Image generation hook
+    const {
+        isGeneratingImage,
+        generateImage,
+    } = useImageGeneration();
+
+    // Listen for external events to open image generation modal
+    useEffect(() => {
+        const handleOpenImageGen = () => {
+            setShowImageModal(true);
+        };
+        window.addEventListener("imagegen:open", handleOpenImageGen);
+        return () => window.removeEventListener("imagegen:open", handleOpenImageGen);
+    }, []);
+
+    /**
+     * Handle image generation request from modal
+     * Triggers screenshot capture, then calls API
+     */
+    const handleImageGenerationRequest = useCallback((options: GenerationOptions) => {
+        console.log("🎨 Image generation requested, capturing screenshot...");
+
+        // Store options for when screenshot arrives
+        pendingImageGenRef.current = {
+            options,
+            isCapturing: true,
+        };
+
+        // Dispatch screenshot capture event
+        const requestId = `generation-${Date.now()}`;
+        window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
+            detail: {
+                elementIds: selectedElements.length > 0 ? selectedElements : undefined,
+                quality: "high",
+                backgroundColor: options.backgroundColor !== "canvas" ? options.backgroundColor : undefined,
+                requestId,
+            }
+        }));
+    }, [selectedElements]);
+
+    /**
+     * Listen for screenshot captures and trigger image generation
+     */
+    useEffect(() => {
+        const handleScreenshotCaptured = (event: any) => {
+            const { requestId, dataURL, error } = event.detail || {};
+
+            // Only handle generation screenshots (not chat or preview)
+            if (!requestId?.startsWith("generation-")) return;
+
+            console.log("📸 Generation screenshot received:", requestId);
+
+            if (!pendingImageGenRef.current?.isCapturing) {
+                console.log("⏭️ No pending image generation, ignoring");
+                return;
+            }
+
+            pendingImageGenRef.current.isCapturing = false;
+
+            if (error) {
+                console.error("❌ Screenshot error:", error);
+                return;
+            }
+
+            if (dataURL && pendingImageGenRef.current.options) {
+                console.log("🚀 Starting API call with screenshot...");
+                generateImage(
+                    dataURL,
+                    pendingImageGenRef.current.options,
+                    {
+                        onSuccess: () => {
+                            console.log("✅ Image generation complete");
+                            setShowImageModal(false);
+                            pendingImageGenRef.current = null;
+                        },
+                        onError: (err) => {
+                            console.error("❌ Image generation failed:", err);
+                            pendingImageGenRef.current = null;
+                        }
+                    }
+                );
+            }
+        };
+
+        window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        return () => {
+            window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
+        };
+    }, [generateImage]);
+
     return (
         <>
             <CanvasControls
@@ -170,18 +280,16 @@ export default function CanvasApp() {
                 onLoadState={handleLoadState}
                 onCreateMarkdown={handleCreateNote}
             />
-            
+
             {/* Use new AIChatContainer with element selection feature */}
-            <AIChatContainer 
-                isOpen={isChatOpen} 
+            <AIChatContainer
+                isOpen={isChatOpen}
                 onClose={handleCloseChat}
                 onStateUpdate={handleStateUpdate}
                 pendingLoadState={pendingLoadStateRef.current}
             />
-            
-            {/* Original component (backup) */}
-            {/* <AIChatPanel isOpen={isChatOpen} onClose={handleCloseChat} /> */}
-            
+
+
             <MyAssetsPanel isOpen={isAssetsOpen} onClose={handleCloseAssets} />
 
             {/* Save Options Modal */}
@@ -198,7 +306,21 @@ export default function CanvasApp() {
                     imageCount={pendingSaveState.images.history.length}
                 />
             )}
-            
+
+            {/* Image Generation Modal - now independent of AI chat */}
+            <ImageGenerationModal
+                isOpen={showImageModal}
+                onClose={() => {
+                    setShowImageModal(false);
+                    pendingImageGenRef.current = null;
+                }}
+                selectedElements={selectedElements}
+                elementSnapshots={elementSnapshots}
+                canvasState={null}
+                onGenerate={handleImageGenerationRequest}
+                isGenerating={isGeneratingImage}
+            />
+
             {/* Toast message for save/load feedback */}
             {saveMessage && (
                 <div className="canvas-toast">

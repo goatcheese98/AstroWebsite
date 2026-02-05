@@ -4,7 +4,7 @@
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  👤 I render markdown content beautifully. I use react-markdown with        ║
  * ║     syntax highlighting via Prism. I support GFM (tables, checkboxes,       ║
- * ║     strikethrough) and adapt to light/dark themes.                          ║
+ * ║     strikethrough). Currently optimized for light mode.                     ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
  * 💬 WHO IS IN MY SOCIAL CIRCLE?
@@ -40,7 +40,6 @@
  * - Parse and render markdown with GFM support
  * - Syntax-highlight code blocks
  * - Render interactive checkboxes for task lists
- * - Adapt styling to current theme (light/dark)
  * 
  * 🔑 KEY CONCEPTS:
  * - Uses react-markdown with remark-gfm plugin
@@ -69,7 +68,7 @@ interface MarkdownPreviewProps {
 }
 
 /**
- * Get current theme - always returns 'light' as light mode is enforced
+ * Get current theme - currently returns 'light' as light mode is enforced globally
  */
 function useTheme(): 'light' | 'dark' {
     return 'light';
@@ -124,10 +123,10 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         p({ children }) {
             return (
-                <p style={{ 
-                    marginBottom: '0.75em', 
-                    lineHeight: '1.6', 
-                    color: isDark ? '#d4d4d8' : '#3f3f46' 
+                <p style={{
+                    marginBottom: '0.75em',
+                    lineHeight: '1.6',
+                    color: isDark ? '#d4d4d8' : '#3f3f46'
                 }}>
                     {children}
                 </p>
@@ -136,13 +135,13 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         h1({ children }) {
             return (
-                <h1 style={{ 
-                    fontSize: '1.75em', 
-                    fontWeight: 700, 
-                    marginBottom: '0.5em', 
-                    marginTop: '0.5em', 
-                    lineHeight: '1.2', 
-                    color: isDark ? '#f4f4f5' : '#18181b' 
+                <h1 style={{
+                    fontSize: '1.75em',
+                    fontWeight: 700,
+                    marginBottom: '0.5em',
+                    marginTop: '0.5em',
+                    lineHeight: '1.2',
+                    color: isDark ? '#f4f4f5' : '#18181b'
                 }}>
                     {children}
                 </h1>
@@ -151,13 +150,13 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         h2({ children }) {
             return (
-                <h2 style={{ 
-                    fontSize: '1.5em', 
-                    fontWeight: 600, 
-                    marginBottom: '0.5em', 
-                    marginTop: '0.75em', 
-                    lineHeight: '1.3', 
-                    color: isDark ? '#f4f4f5' : '#18181b' 
+                <h2 style={{
+                    fontSize: '1.5em',
+                    fontWeight: 600,
+                    marginBottom: '0.5em',
+                    marginTop: '0.75em',
+                    lineHeight: '1.3',
+                    color: isDark ? '#f4f4f5' : '#18181b'
                 }}>
                     {children}
                 </h2>
@@ -166,13 +165,13 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         h3({ children }) {
             return (
-                <h3 style={{ 
-                    fontSize: '1.25em', 
-                    fontWeight: 600, 
-                    marginBottom: '0.4em', 
-                    marginTop: '0.6em', 
-                    lineHeight: '1.4', 
-                    color: isDark ? '#e4e4e7' : '#27272a' 
+                <h3 style={{
+                    fontSize: '1.25em',
+                    fontWeight: 600,
+                    marginBottom: '0.4em',
+                    marginTop: '0.6em',
+                    lineHeight: '1.4',
+                    color: isDark ? '#e4e4e7' : '#27272a'
                 }}>
                     {children}
                 </h3>
@@ -181,11 +180,11 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         ul({ children }) {
             return (
-                <ul style={{ 
-                    marginBottom: '0.75em', 
-                    marginTop: '0.5em', 
-                    paddingLeft: '1.5em', 
-                    lineHeight: '1.6' 
+                <ul style={{
+                    marginBottom: '0.75em',
+                    marginTop: '0.5em',
+                    paddingLeft: '1.5em',
+                    lineHeight: '1.6'
                 }}>
                     {children}
                 </ul>
@@ -194,11 +193,11 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         ol({ children }) {
             return (
-                <ol style={{ 
-                    marginBottom: '0.75em', 
-                    marginTop: '0.5em', 
-                    paddingLeft: '1.5em', 
-                    lineHeight: '1.6' 
+                <ol style={{
+                    marginBottom: '0.75em',
+                    marginTop: '0.5em',
+                    paddingLeft: '1.5em',
+                    lineHeight: '1.6'
                 }}>
                     {children}
                 </ol>

@@ -33,8 +33,8 @@
  *      │           ┌───────────────────┼───────────────────┐             │
  *      │           ▼                   ▼                   ▼             │
  *      │    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐      │
- *      │    │useScreenshot│    │useCanvasCmds │    │useImageGen  │      │
- *      │    │  Capture    │    │              │    │             │      │
+ *      │    │ Window Event│    │useCanvasCmds │    │useImageGen  │      │
+ *      │    │  (Capture)  │    │              │    │             │      │
  *      │    └─────────────┘    └──────────────┘    └─────────────┘      │
  *      │                                                                  │
  *      │   I TALK TO: /api/chat-kimi, /api/chat (Claude)                 │
@@ -123,8 +123,6 @@ export interface UseAIChatStateReturn {
     toggleProvider: () => void;
     showTemplates: boolean;
     setShowTemplates: (show: boolean) => void;
-    showImageModal: boolean;
-    setShowImageModal: (show: boolean) => void;
 
     // === 🎨 Canvas State ===
     canvasState: any | null;
@@ -151,7 +149,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const [contextMode, setContextMode] = useState<"all" | "selected">("all");
     const [aiProvider, setAiProvider] = useState<AIProvider>("claude");
     const [showTemplates, setShowTemplates] = useState(false);
-    const [showImageModal, setShowImageModal] = useState(false);
 
     // === 🎨 Canvas State ===
     const [canvasState, setCanvasState] = useState<any>(null);
@@ -447,8 +444,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         toggleProvider,
         showTemplates,
         setShowTemplates,
-        showImageModal,
-        setShowImageModal,
 
         // Canvas state
         canvasState,

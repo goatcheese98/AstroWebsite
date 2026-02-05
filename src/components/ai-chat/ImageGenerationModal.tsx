@@ -33,13 +33,10 @@ const EXCALIDRAW_COLORS = [
     "#f76707", // Orange 4
 ];
 
-// Common presets
+// Common presets - simplified to white, black, and custom only
 const PRESET_COLORS = [
-    { name: "Canvas", value: "canvas", color: "transparent" },
     { name: "White", value: "#ffffff", color: "#ffffff" },
     { name: "Black", value: "#000000", color: "#000000" },
-    { name: "Light Gray", value: "#f8f9fa", color: "#f8f9fa" },
-    { name: "Dark Gray", value: "#343a40", color: "#343a40" },
 ];
 
 interface ImageGenerationModalProps {
@@ -70,7 +67,7 @@ export default function ImageGenerationModal({
 }: ImageGenerationModalProps) {
     const { isMobile } = useMobileDetection();
     const [prompt, setPrompt] = useState("");
-    const [backgroundColor, setBackgroundColor] = useState<string>("canvas");
+    const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
     const [customColor, setCustomColor] = useState<string>("#ffffff");
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [strictRatio, setStrictRatio] = useState(true);
@@ -83,9 +80,7 @@ export default function ImageGenerationModal({
     const receivedResponseRef = useRef(false);
 
     // Get effective background color
-    const effectiveBackgroundColor = backgroundColor === "canvas" 
-        ? null 
-        : (backgroundColor === "custom" ? customColor : backgroundColor);
+    const effectiveBackgroundColor = backgroundColor === "custom" ? customColor : backgroundColor;
 
     // Capture preview once when modal opens
     useEffect(() => {
@@ -205,7 +200,7 @@ export default function ImageGenerationModal({
     useEffect(() => {
         if (isOpen) {
             setPrompt("");
-            setBackgroundColor("canvas");
+            setBackgroundColor("#ffffff");
             setCustomColor("#ffffff");
             setStrictRatio(true);
             setUseProModel(false);
@@ -521,19 +516,17 @@ export default function ImageGenerationModal({
                                         transition: "all 0.15s",
                                     }}
                                 >
-                                    {preset.value !== "canvas" && (
-                                        <span style={{
-                                            width: "16px",
-                                            height: "16px",
-                                            borderRadius: "4px",
-                                            background: preset.color,
-                                            border: "1px solid rgba(0,0,0,0.1)",
-                                        }} />
-                                    )}
+                                    <span style={{
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "4px",
+                                        background: preset.color,
+                                        border: "1px solid rgba(0,0,0,0.1)",
+                                    }} />
                                     <span style={{
                                         fontSize: "12px",
                                         fontWeight: 500,
-                                        color: preset.value === "#000000" || preset.value === "#343a40" 
+                                        color: preset.value === "#000000" 
                                             ? "white" 
                                             : "var(--color-text, #1f2937)",
                                     }}>
@@ -682,7 +675,7 @@ export default function ImageGenerationModal({
                             color: "var(--color-text-muted, #6b7280)",
                             lineHeight: 1.5,
                         }}>
-                            💡 Tip: Use a custom background for objects with small footprints but stretchy parts with lots of whitespace.
+                            💡 The generated image will have a solid {backgroundColor === "custom" ? customColor.toUpperCase() : backgroundColor.toUpperCase()} background. Choose white for light themes, black for dark themes, or a custom color to match your design.
                         </p>
                     </div>
 

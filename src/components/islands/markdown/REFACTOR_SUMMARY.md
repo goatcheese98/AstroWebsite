@@ -1,12 +1,14 @@
 # Markdown Feature Refactoring Summary
 
 ## Overview
+
 Refactored the monolithic `MarkdownNote.tsx` (1055 lines) into a modular, maintainable architecture following the AI_CODING_SYSTEM_PROMPT.md guidelines.
 
 ## Before
+
 - **File**: `src/components/islands/MarkdownNote.tsx`
 - **Lines**: 1055 lines
-- **Issues**: 
+- **Issues**:
   - Violated 300-line soft limit
   - Mixed UI, state, and event handling concerns
   - No error boundaries
@@ -15,6 +17,7 @@ Refactored the monolithic `MarkdownNote.tsx` (1055 lines) into a modular, mainta
 ## After
 
 ### Architecture
+
 ```
 src/components/islands/markdown/
 ├── index.ts                      # Public API exports
@@ -67,6 +70,7 @@ src/components/islands/markdown/
    - Event listeners cleaned up correctly
 
 ### API (Unchanged)
+
 ```typescript
 import { MarkdownNote } from './markdown';
 
@@ -80,17 +84,21 @@ import { MarkdownNote } from './markdown';
 ```
 
 ### Build Verification
+
 ✅ TypeScript compilation: PASS
 ✅ Production build: PASS
 ✅ No broken imports
 ✅ All tests (if any) pass
 
 ### Files Removed
+
 - `src/components/islands/MarkdownNote.tsx` (original 1055-line file)
 
 ### Migration Notes
+
 No changes required for consumers. The public API remains identical.
 The `ExcalidrawCanvas.tsx` was updated to import from the new location:
+
 ```typescript
 // Before
 import("./MarkdownNote")
@@ -104,12 +112,15 @@ import("./markdown")
 The markdown notes are already well-integrated with the system:
 
 ### ✅ AI Chat Integration
+
 **How it works:**
+
 - `useElementSelection.ts` extracts `customData?.content` from elements (line 35)
 - When user selects elements and sends to AI, markdown content is included
 - Format: `"- ${type}: "${content}"`
 
 **Example AI context:**
+
 ```
 Selected elements:
 - rectangle: "# Meeting Notes
@@ -119,18 +130,23 @@ Selected elements:
 ```
 
 ### ✅ Export Integration
+
 **How it works:**
+
 - `exportCanvasWithMarkdown()` in `lib/excalidraw-export-utils.ts`
 - Exports base canvas (without markdown rectangles)
 - Composites each markdown note using `html2canvas` + positioning
 - Supports PNG export with proper rotation/scaling
 
 **Files involved:**
+
 - `src/lib/excalidraw-export-utils.ts`
 - `src/components/islands/CanvasControls.tsx`
 
 ### ✅ Visual Overlay
+
 **How it works:**
+
 - Notes render as React overlays positioned over Excalidraw elements
 - Position calculated: `(element.x + scrollX) * zoom`
 - Handles drag, resize, rotate via pointer events
@@ -138,20 +154,24 @@ Selected elements:
 ## Bug Fixes
 
 ### Fixed: Selection/Deselection (2026-02-03)
+
 **Issue:** Clicking into a note allowed dragging but clicking out didn't deselect. Also, notes weren't properly integrated with Excalidraw's native selection.
 
 **Root Cause:** The old `useSelection` hook managed selection in isolation. It didn't sync with Excalidraw's `appState.selectedElementIds`, so:
+
 - AI chat couldn't see selected notes
 - Copy/paste didn't work
 - Click-outside handling was complex
 
 **Fix:** Created `useExcalidrawSelection` hook that:
+
 1. Syncs selection state with Excalidraw's native `selectedElementIds`
 2. When you click a note, it sets `selectedElementIds[noteId] = true`
 3. Uses Excalidraw's state-update event to track changes
 4. Click-outside now works via Excalidraw's own selection clearing
 
-**Files Changed:** 
+**Files Changed:**
+
 - `src/components/islands/markdown/hooks/useExcalidrawSelection.ts` (NEW)
 - `src/components/islands/markdown/hooks/useMarkdownNote.ts`
 - `src/components/islands/markdown/hooks/useDrag.ts`
@@ -160,6 +180,13 @@ Selected elements:
 - `src/components/islands/markdown/MarkdownNote.tsx`
 
 ## Future Enhancements
+
 1. Add unit tests for hooks (useDrag, useResize, etc.)
 2. Add visual regression tests for MarkdownPreview
 3. Consider lazy-loading markdown parsing libraries
+
+## 🚨 CURRENT STATUS / DISCREPANCIES (2026-02-05)
+
+* **Monolithic Content**: `MarkdownNote.tsx` still contains significant logic that was originally planned for hooks (isEditing, content state, mouse events). The "modular" architecture exists in the filesystem but is not fully utilized by the main component.
+- **Selection Bridge**: `useExcalidrawSelection.ts` was implemented to intercept native selection to avoid boxy borders, but the main component still checks `appState.selectedElementIds`.
+- **Theme Support**: `MarkdownPreview.tsx` claims to adapt to themes but is currently locked to `'light'` mode to match the global canvas theme enforcement.

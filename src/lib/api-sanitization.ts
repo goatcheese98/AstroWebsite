@@ -267,9 +267,8 @@ export function containsProhibitedContent(input: string): boolean {
   // Convert to lowercase for case-insensitive matching
   const lower = input.toLowerCase();
 
-  // Basic prohibited patterns (customize as needed)
+  // Basic prohibited patterns (currently empty, add regex patterns to block specific content)
   const prohibitedPatterns: RegExp[] = [
-    // Add specific patterns you want to block
     // Example: /\b(spam|viagra)\b/i
   ];
 

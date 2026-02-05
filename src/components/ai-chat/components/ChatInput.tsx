@@ -90,12 +90,8 @@ export interface ChatInputProps {
     onSend: () => void;
     /** Callback to open template modal */
     onOpenTemplates: () => void;
-    /** Callback to open image generation modal */
-    onOpenImageGen: () => void;
     /** Whether AI is processing (disables send) */
     isLoading: boolean;
-    /** Whether image generation is active */
-    isGeneratingImage: boolean;
     /** Count of selected elements */
     selectedElementsCount: number;
     /** Current context mode (affects placeholder) */
@@ -115,9 +111,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onInputChange,
         onSend,
         onOpenTemplates,
-        onOpenImageGen,
         isLoading,
-        isGeneratingImage,
         selectedElementsCount,
         contextMode,
         onKeyDown,
@@ -126,7 +120,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         const hasInput = input.trim().length > 0;
         const canSend = hasInput && !isLoading;
         const hasSelection = selectedElementsCount > 0;
-        const isImageGenActive = isGeneratingImage;
         
         // Context-aware placeholder - shorter on mobile
         const placeholder = isMobile 
@@ -186,78 +179,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         {isMobile ? "Quick" : "Templates"}
                     </button>
                     
-                    {/* Generate Image Button */}
-                    <button
-                        onClick={() => {
-                            if (!hasSelection) {
-                                // Show error - need selection first
-                                return;
-                            }
-                            onOpenImageGen();
-                        }}
-                        disabled={isImageGenActive}
-                        title={hasSelection 
-                            ? "Generate realistic image from selected elements" 
-                            : "Select elements on the canvas to generate an image"
-                        }
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: isMobile ? "8px 12px" : "5px 10px",
-                            background: isImageGenActive || !hasSelection ? "#fee2e2" : "#059669",
-                            border: hasSelection && !isImageGenActive
-                                ? "1px solid #047857"
-                                : "1px solid #fca5a5",
-                            borderRadius: "6px",
-                            fontSize: isMobile ? "13px" : "11px",
-                            color: isImageGenActive || !hasSelection ? "#9ca3af" : "white",
-                            cursor: isImageGenActive ? "not-allowed" : "pointer",
-                            transition: "all 0.2s ease",
-                            fontWeight: 500,
-                            boxShadow: hasSelection && !isImageGenActive
-                                ? "0 0 0 3px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1)"
-                                : "none",
-                            flexShrink: 0,
-                            minHeight: isMobile ? "36px" : undefined,
-                            touchAction: "manipulation",
-                        }}
-                        onMouseEnter={(e) => {
-                            if (hasSelection && !isImageGenActive) {
-                                e.currentTarget.style.background = "#047857";
-                                e.currentTarget.style.boxShadow = "0 0 0 4px rgba(5, 150, 105, 0.15), 0 2px 6px rgba(0, 0, 0, 0.15)";
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            if (hasSelection && !isImageGenActive) {
-                                e.currentTarget.style.background = "#059669";
-                                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1)";
-                            }
-                        }}
-                    >
-                        {isGeneratingImage ? (
-                            <>
-                                <div style={{
-                                    width: isMobile ? "14px" : "10px",
-                                    height: isMobile ? "14px" : "10px",
-                                    border: "2px solid rgba(255,255,255,0.3)",
-                                    borderTopColor: "white",
-                                    borderRadius: "50%",
-                                    animation: "spin 0.8s linear infinite",
-                                }} />
-                                {isMobile ? "..." : "Generating..."}
-                            </>
-                        ) : (
-                            <>
-                                <svg width={isMobile ? "16" : "12"} height={isMobile ? "16" : "12"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                                {isMobile ? "Image" : "Generate Image"}
-                            </>
-                        )}
-                    </button>
                 </div>
                 
                 {/* Input Area */}

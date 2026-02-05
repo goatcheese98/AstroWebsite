@@ -22,12 +22,23 @@ export default function CanvasControls({
     const [message, setMessage] = useState<string | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [hasSelection, setHasSelection] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     const showMessage = (msg: string) => {
         setMessage(msg);
         setTimeout(() => setMessage(null), 3000);
     };
+
+    // Listen for canvas selection changes
+    useEffect(() => {
+        const handleSelectionChange = (event: any) => {
+            const selectedIds = event.detail?.selectedElementIds || {};
+            setHasSelection(Object.keys(selectedIds).length > 0);
+        };
+        window.addEventListener("excalidraw:selection-change", handleSelectionChange);
+        return () => window.removeEventListener("excalidraw:selection-change", handleSelectionChange);
+    }, []);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -107,6 +118,11 @@ export default function CanvasControls({
         setIsMenuOpen(false);
     };
 
+    const handleGenerateImage = () => {
+        // Open image generation modal directly without opening AI chat
+        window.dispatchEvent(new CustomEvent("imagegen:open"));
+    };
+
     // Hide controls when any panel is open
     const isPanelOpen = isChatOpen || isAssetsOpen;
 
@@ -115,6 +131,20 @@ export default function CanvasControls({
             {/* Right side controls - vertically centered */}
             {!isPanelOpen && (
                 <div className="canvas-controls">
+                    {/* Generate Image - Top action with animation when selected */}
+                    <button 
+                        onClick={handleGenerateImage} 
+                        className={`control-btn image-gen-btn ${hasSelection ? 'has-selection' : ''}`}
+                        title="Generate image from canvas"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                        <span className="label">Generate Image</span>
+                    </button>
+
                     {/* Primary actions - most used */}
                     <button onClick={onOpenChat} className="control-btn chat-btn" title="Open AI Chat">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -390,14 +420,14 @@ export default function CanvasControls({
 
                 /* Specific button styles */
                 .chat-btn:hover {
-                    background: #e3f2ff;
-                    border-color: #1971c2;
+                    background: #ffe8d6;
+                    border-color: #d97706;
                 }
 
                 .chat-btn:hover .label {
-                    background: #e3f2ff;
-                    border-color: #1971c2;
-                    box-shadow: 2px 2px 0 #1971c2;
+                    background: #ffe8d6;
+                    border-color: #d97706;
+                    box-shadow: 2px 2px 0 #d97706;
                 }
 
                 .assets-btn:hover {
@@ -431,6 +461,30 @@ export default function CanvasControls({
                     background: #f8f9fa;
                     border-color: #868e96;
                     box-shadow: 2px 2px 0 #868e96;
+                }
+
+                .image-gen-btn:hover {
+                    background: #e3f2ff;
+                    border-color: #1971c2;
+                }
+
+                .image-gen-btn:hover .label {
+                    background: #e3f2ff;
+                    border-color: #1971c2;
+                    box-shadow: 2px 2px 0 #1971c2;
+                }
+
+                .image-gen-btn.has-selection {
+                    animation: selection-pulse 2s ease-in-out infinite;
+                }
+
+                @keyframes selection-pulse {
+                    0%, 100% {
+                        box-shadow: 2px 2px 0 var(--color-stroke, #333), 0 0 0 0 rgba(0, 0, 0, 0.2);
+                    }
+                    50% {
+                        box-shadow: 2px 2px 0 var(--color-stroke, #333), 0 0 0 8px rgba(0, 0, 0, 0);
+                    }
                 }
 
                 .export-btn:hover:not(:disabled) {

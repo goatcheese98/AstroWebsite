@@ -64,14 +64,12 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
       enabled: true,
       requireEmailVerification: false, // Disabled for now (enable when email service is set up)
       sendResetPassword: async ({ user, url }) => {
-        // TODO: Implement email sending (e.g., via Resend, SendGrid, etc.)
+        // Log reset link for development; integrate email service (Resend/SendGrid) for production
         console.log(`Password reset for ${user.email}: ${url}`);
-        // For now, just log. Implement actual email sending later.
       },
       sendVerificationEmail: async ({ user, url }) => {
-        // TODO: Implement email verification sending
+        // Log verification link for development; integrate email service (Resend/SendGrid) for production
         console.log(`Email verification for ${user.email}: ${url}`);
-        // For now, just log. Implement actual email sending later.
       },
     },
 

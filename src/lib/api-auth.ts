@@ -2,8 +2,8 @@
  * API Authentication Middleware
  *
  * This module provides authentication for API endpoints.
- * Currently configured for simple API key auth, but can be extended
- * to support JWT, OAuth, or other authentication methods.
+ * Currently configured for simple API key auth. JWT support is 
+ * present as a placeholder for future implementation.
  *
  * USAGE:
  * 1. Set ENABLE_API_AUTH=true in environment variables to enable auth
@@ -21,10 +21,10 @@ export interface AuthResult {
 // ============================================================================
 
 const AUTH_ENABLED = import.meta.env.ENABLE_API_AUTH === 'true' ||
-                     process.env.ENABLE_API_AUTH === 'true';
+  process.env.ENABLE_API_AUTH === 'true';
 
 const API_SECRET_KEY = import.meta.env.API_SECRET_KEY ||
-                       process.env.API_SECRET_KEY;
+  process.env.API_SECRET_KEY;
 
 // ============================================================================
 // Authentication Strategies

@@ -1,5 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { svgLibrary, categories, type SVGMetadata } from "../../lib/svg-library-config";
+
+interface GeneratedImage {
+    id: string;
+    url: string;
+    prompt: string;
+    timestamp: Date;
+}
 
 interface MyAssetsPanelProps {
     isOpen: boolean;
@@ -7,10 +14,29 @@ interface MyAssetsPanelProps {
 }
 
 export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
-    const [selectedCategory, setSelectedCategory] = useState<string>("icons");
+    const [selectedCategory, setSelectedCategory] = useState<string>("generated");
     const [searchQuery, setSearchQuery] = useState("");
     const [panelWidth, setPanelWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
+    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    // Listen for new generated images
+    useEffect(() => {
+        const handleImageGenerated = (event: any) => {
+            const { imageUrl, prompt } = event.detail;
+            if (imageUrl) {
+                setGeneratedImages(prev => [{
+                    id: Date.now().toString(),
+                    url: imageUrl,
+                    prompt: prompt || "Generated Image",
+                    timestamp: new Date(),
+                }, ...prev]);
+            }
+        };
+        window.addEventListener("asset:image-generated", handleImageGenerated);
+        return () => window.removeEventListener("asset:image-generated", handleImageGenerated);
+    }, []);
 
     const filteredSvgs = svgLibrary.filter((svg) => {
         const matchesCategory = selectedCategory === "all" || svg.category === selectedCategory;
@@ -20,10 +46,41 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
         return matchesCategory && matchesSearch;
     });
 
+    const filteredImages = generatedImages.filter((img) => {
+        return searchQuery === "" ||
+            img.prompt.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
     const handleSvgClick = (svg: SVGMetadata) => {
         window.dispatchEvent(new CustomEvent("excalidraw:insert-svg", {
             detail: { svgPath: svg.path, svgId: svg.id },
         }));
+    };
+
+    const handleImageClick = (image: GeneratedImage) => {
+        // Insert image into canvas without opening chat
+        const img = new Image();
+        img.onload = () => {
+            const aspectRatio = img.width / img.height;
+            const maxWidth = 400;
+            const width = Math.min(img.width, maxWidth);
+            const height = width / aspectRatio;
+            
+            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
+                detail: {
+                    imageData: image.url,
+                    type: "png",
+                    width,
+                    height,
+                },
+            }));
+        };
+        img.src = image.url;
+    };
+
+    const handleDeleteImage = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setGeneratedImages(prev => prev.filter(img => img.id !== id));
     };
 
     // Resize functionality
@@ -89,6 +146,12 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
 
                 <div className="category-tabs">
                     <button
+                        onClick={() => setSelectedCategory("generated")}
+                        className={`category-tab ${selectedCategory === "generated" ? "active" : ""}`}
+                    >
+                        ✨ Generated
+                    </button>
+                    <button
                         onClick={() => setSelectedCategory("all")}
                         className={`category-tab ${selectedCategory === "all" ? "active" : ""}`}
                     >
@@ -106,20 +169,50 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                 </div>
 
                 <div className="svg-grid">
-                    {filteredSvgs.length === 0 ? (
-                        <div className="empty-state">No assets found</div>
+                    {selectedCategory === "generated" ? (
+                        // Generated Images Grid
+                        filteredImages.length === 0 ? (
+                            <div className="empty-state">
+                                No generated images yet.<br />
+                                Click "Generate Image" to create some!
+                            </div>
+                        ) : (
+                            filteredImages.map((img) => (
+                                <button
+                                    key={img.id}
+                                    onClick={() => handleImageClick(img)}
+                                    className="svg-item generated-image-item"
+                                    title={img.prompt}
+                                >
+                                    <img src={img.url} alt={img.prompt} className="svg-preview" />
+                                    <span className="svg-name">{img.prompt.slice(0, 30)}{img.prompt.length > 30 ? "..." : ""}</span>
+                                    <button 
+                                        className="delete-image-btn"
+                                        onClick={(e) => handleDeleteImage(e, img.id)}
+                                        title="Delete image"
+                                    >
+                                        ×
+                                    </button>
+                                </button>
+                            ))
+                        )
                     ) : (
-                        filteredSvgs.map((svg) => (
-                            <button
-                                key={svg.id}
-                                onClick={() => handleSvgClick(svg)}
-                                className="svg-item"
-                                title={svg.description}
-                            >
-                                <img src={svg.path} alt={svg.name} className="svg-preview" />
-                                <span className="svg-name">{svg.name}</span>
-                            </button>
-                        ))
+                        // SVG Library Grid
+                        filteredSvgs.length === 0 ? (
+                            <div className="empty-state">No assets found</div>
+                        ) : (
+                            filteredSvgs.map((svg) => (
+                                <button
+                                    key={svg.id}
+                                    onClick={() => handleSvgClick(svg)}
+                                    className="svg-item"
+                                    title={svg.description}
+                                >
+                                    <img src={svg.path} alt={svg.name} className="svg-preview" />
+                                    <span className="svg-name">{svg.name}</span>
+                                </button>
+                            ))
+                        )
                     )}
                 </div>
 
@@ -296,6 +389,47 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                         overflow: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
+                    }
+
+                    .generated-image-item {
+                        position: relative;
+                    }
+
+                    .generated-image-item .svg-preview {
+                        width: 64px;
+                        height: 64px;
+                        object-fit: cover;
+                        border-radius: 4px;
+                    }
+
+                    .delete-image-btn {
+                        position: absolute;
+                        top: 4px;
+                        right: 4px;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: rgba(255, 255, 255, 0.9);
+                        border: 1px solid var(--color-stroke-muted, #ddd);
+                        color: var(--color-text-muted, #666);
+                        font-size: 14px;
+                        line-height: 1;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        opacity: 0;
+                        transition: opacity 0.2s, background 0.2s;
+                    }
+
+                    .generated-image-item:hover .delete-image-btn {
+                        opacity: 1;
+                    }
+
+                    .delete-image-btn:hover {
+                        background: #fee2e2;
+                        color: #dc2626;
+                        border-color: #fca5a5;
                     }
 
                     @media (max-width: 768px) {

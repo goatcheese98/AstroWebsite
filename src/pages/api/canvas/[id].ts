@@ -58,7 +58,7 @@ export const GET: APIRoute = async (context) => {
       );
     }
 
-    // Optional auth (public canvases can be viewed by anyone)
+    // Check for optional session (public canvases are visible without login)
     const auth = await optionalAuth(context);
 
     // Get canvas metadata

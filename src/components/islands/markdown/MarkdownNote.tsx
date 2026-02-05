@@ -15,7 +15,7 @@
  * 
  * 🎯 INTERACTION MODEL:
  * - Single click/drag: Excalidraw handles it via underlying rect 
- * - Double-click: Shield layer captures it and enters edit mode
+ * - Double-click: Global handleGlobalDblClick captures it and enters edit mode
  * - Scroll/wheel: Captured by overlay for content scrolling
  * - Pinch zoom: Passes through to Excalidraw canvas zoom
  * 
