@@ -105,6 +105,35 @@ export const CANVAS_NAV_LINKS: NavLink[] = [
 ];
 ```
 
+### Theme Handling
+
+**Main Site** (`rohanjasani.com`):
+- Respects user's system preference (light/dark)
+- Theme toggle button visible and functional
+- Saves preference to localStorage
+- Supports both light and dark modes
+
+**Canvas Site** (`canvas.rohanjasani.com`):
+- Always forces light mode (optimal for Excalidraw)
+- Theme toggle button is hidden
+- Excalidraw canvas always renders in light theme
+
+The theme is initialized in `BaseLayout.astro`:
+```javascript
+// Check if we're on a canvas subdomain
+var isCanvas = hostname.includes('canvas.') || pathname === '/ai-canvas';
+
+if (isCanvas) {
+  // Force light mode on canvas pages
+  document.documentElement.setAttribute('data-theme', 'light');
+} else {
+  // Use saved preference or system preference on main site
+  var saved = localStorage.getItem('theme');
+  var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', saved || preferred);
+}
+```
+
 ### Wrangler Configuration
 
 #### Full Site (`wrangler.jsonc`)
@@ -177,6 +206,18 @@ const canvasOnlyPages = ['index.astro', 'ai-canvas.astro', '404.astro', 'login.a
 
 ### Navigation shows Home/Blog on canvas domain
 Check that `CANVAS_SITE_URL` is set correctly in your environment and that the Header component is detecting `siteUrl.includes('canvas.')`.
+
+### Theme toggle not working on main site
+Check that `src/lib/theme.ts` has the full theme functionality restored (not locked to light mode).
+
+### Canvas page showing in dark mode
+The canvas pages force light mode via inline script in `BaseLayout.astro`. If dark mode appears, check that the script is running:
+```javascript
+var isCanvas = hostname.includes('canvas.') || pathname === '/ai-canvas';
+if (isCanvas) {
+  document.documentElement.setAttribute('data-theme', 'light');
+}
+```
 
 ## Architecture Diagram
 
