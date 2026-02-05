@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { nanoid } from "nanoid";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
+import "@excalidraw/excalidraw/index.css";
 
 // Dynamically import Excalidraw to avoid SSR issues
 let ExcalidrawModule: any = null;
@@ -12,8 +13,6 @@ const loadExcalidraw = async () => {
         const mod = await import("@excalidraw/excalidraw");
         ExcalidrawModule = mod.Excalidraw;
         convertToExcalidrawElements = mod.convertToExcalidrawElements;
-        // Import CSS
-        await import("@excalidraw/excalidraw/index.css");
     }
     return { Excalidraw: ExcalidrawModule, convertToExcalidrawElements };
 };

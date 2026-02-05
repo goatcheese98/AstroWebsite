@@ -24,7 +24,7 @@
 
 <style>
   .theme-toggle {
-    background: var(--color-surface);
+    background: none;
     border: 2px solid var(--color-stroke);
     border-radius: var(--radius-md);
     color: var(--color-text);
@@ -34,7 +34,7 @@
     align-items: center;
     justify-content: center;
     filter: url(#sketch-filter);
-    transition: transform 0.15s ease, background-color 200ms ease-out;
+    transition: transform 0.15s ease;
     position: relative;
   }
   .theme-toggle:hover {
@@ -78,13 +78,25 @@
       return;
     }
     
-    // On main site, enable theme toggle
-    document.querySelector('.theme-toggle').addEventListener('click', function() {
+    // On main site, enable theme toggle with ripple animation
+    document.querySelector('.theme-toggle').addEventListener('click', function(e) {
       var html = document.documentElement;
       var current = html.getAttribute('data-theme');
       var next = current === 'dark' ? 'light' : 'dark';
       html.setAttribute('data-theme', next);
       localStorage.setItem('theme', next);
+      
+      // Full-page sun/moon ripple effect
+      var ripple = document.createElement('span');
+      ripple.className = 'theme-page-ripple';
+      ripple.style.left = e.clientX + 'px';
+      ripple.style.top = e.clientY + 'px';
+      
+      document.body.appendChild(ripple);
+      
+      setTimeout(function() {
+        ripple.remove();
+      }, 1000);
     });
   })();
 </script>

@@ -107,8 +107,8 @@
   /* Deep Indigo */
   --color-gradient-start: #3b82f6;
   --color-gradient-end: #60a5fa;
-  --dot-color-rgb: 160, 160, 160;
-  --dot-opacity: 0.08;
+  --dot-color-rgb: 180, 180, 180;
+  --dot-opacity: 0.15;
   --glow-opacity: 0.4;
   --color-bg-rgb: 2, 6, 23;
   color-scheme: dark;
@@ -122,22 +122,22 @@ body {
 /* Theme toggle ripple effect - global styles */
 .theme-page-ripple {
   position: fixed;
-  width: 50px;
-  height: 50px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   transform: translate(-50%, -50%) scale(0);
   pointer-events: none;
   z-index: 9999;
-  animation: theme-ripple-expand 700ms ease-out forwards;
+  animation: theme-ripple-expand 1000ms ease-out forwards;
 }
 
 @keyframes theme-ripple-expand {
   0% {
     transform: translate(-50%, -50%) scale(0);
-    opacity: 0.5;
+    opacity: 0.6;
   }
   100% {
-    transform: translate(-50%, -50%) scale(12);
+    transform: translate(-50%, -50%) scale(20);
     opacity: 0;
   }
 }
@@ -145,18 +145,18 @@ body {
 /* Mobile: Reduce ripple effect intensity */
 @media (max-width: 768px) {
   .theme-page-ripple {
-    width: 30px;
-    height: 30px;
-    animation-duration: 500ms;
+    width: 50px;
+    height: 50px;
+    animation-duration: 800ms;
   }
   
   @keyframes theme-ripple-expand {
     0% {
       transform: translate(-50%, -50%) scale(0);
-      opacity: 0.4;
+      opacity: 0.5;
     }
     100% {
-      transform: translate(-50%, -50%) scale(8);
+      transform: translate(-50%, -50%) scale(14);
       opacity: 0;
     }
   }
