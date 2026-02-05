@@ -94,10 +94,6 @@ export const MarkdownEditor = React.memo(function MarkdownEditor({
                 cursor: 'text',
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            onWheel={(e) => {
-                // Allow two-finger scroll to propagate to canvas
-                // Don't stop propagation so parent can handle panning
-            }}
         />
     );
 });

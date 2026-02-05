@@ -83,6 +83,26 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
         setGeneratedImages(prev => prev.filter(img => img.id !== id));
     };
 
+    const handleCopyImage = async (e: React.MouseEvent, image: GeneratedImage) => {
+        e.stopPropagation();
+        try {
+            const response = await fetch(image.url);
+            const blob = await response.blob();
+            await navigator.clipboard.write([
+                new ClipboardItem({ [blob.type]: blob })
+            ]);
+            // Dispatch toast event for copy success
+            window.dispatchEvent(new CustomEvent("canvas:show-toast", {
+                detail: { message: "Image copied to clipboard!", type: "success" }
+            }));
+        } catch (err) {
+            console.error("Failed to copy image:", err);
+            window.dispatchEvent(new CustomEvent("canvas:show-toast", {
+                detail: { message: "Failed to copy image", type: "info" }
+            }));
+        }
+    };
+
     // Resize functionality
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -186,13 +206,25 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                                 >
                                     <img src={img.url} alt={img.prompt} className="svg-preview" />
                                     <span className="svg-name">{img.prompt.slice(0, 30)}{img.prompt.length > 30 ? "..." : ""}</span>
-                                    <button 
-                                        className="delete-image-btn"
-                                        onClick={(e) => handleDeleteImage(e, img.id)}
-                                        title="Delete image"
-                                    >
-                                        ×
-                                    </button>
+                                    <div className="image-actions">
+                                        <button 
+                                            className="copy-image-btn"
+                                            onClick={(e) => handleCopyImage(e, img)}
+                                            title="Copy image"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            className="delete-image-btn"
+                                            onClick={(e) => handleDeleteImage(e, img.id)}
+                                            title="Delete image"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
                                 </button>
                             ))
                         )
@@ -402,10 +434,22 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                         border-radius: 4px;
                     }
 
-                    .delete-image-btn {
+                    .image-actions {
                         position: absolute;
                         top: 4px;
                         right: 4px;
+                        display: flex;
+                        gap: 4px;
+                        opacity: 0;
+                        transition: opacity 0.2s;
+                    }
+
+                    .generated-image-item:hover .image-actions {
+                        opacity: 1;
+                    }
+
+                    .copy-image-btn,
+                    .delete-image-btn {
                         width: 20px;
                         height: 20px;
                         border-radius: 50%;
@@ -418,12 +462,14 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        opacity: 0;
-                        transition: opacity 0.2s, background 0.2s;
+                        transition: opacity 0.2s, background 0.2s, color 0.2s;
+                        padding: 0;
                     }
 
-                    .generated-image-item:hover .delete-image-btn {
-                        opacity: 1;
+                    .copy-image-btn:hover {
+                        background: #dbeafe;
+                        color: #2563eb;
+                        border-color: #93c5fd;
                     }
 
                     .delete-image-btn:hover {

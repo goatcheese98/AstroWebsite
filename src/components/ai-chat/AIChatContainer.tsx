@@ -16,10 +16,10 @@
  * I bring together all the pieces of the AI chat feature into a cohesive whole.
  * Users get a complete chat experience with:
  * - Message sending and receiving
- * - Canvas context awareness
- * - Image generation
- * - Resizable panel
- * - Keyboard shortcuts
+ * - Canvas context awareness (elements, selected area)
+ * - Mobile-responsive layout (full-width panel on small screens)
+ * - Resizable sidebar (on desktop)
+ * - Keyboard shortcuts (Cmd+Enter to send)
  * 
  * 💬 WHO IS IN MY SOCIAL CIRCLE?
  * 
@@ -32,16 +32,16 @@
  *      │   │useAIChatState│ │useImageGen   │ │usePanelResize   │         │
  *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
  *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
- *      │   │useScreenshot│ │useCanvasCmds │ │useKeyboardShorts│         │
+ *      │   │useMobileDet │ │useCanvasCmds │ │useKeyboardShorts│         │
  *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
  *      │                                                                  │
  *      │   🎨 UI (Components)                                             │
  *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
  *      │   │ ChatPanel   │ │ ChatHeader   │ │CanvasContextPanel│         │
  *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
- *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
- *      │   │ImageGallery │ │ MessageList  │ │    ChatInput    │         │
- *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
+ *      │   ┌─────────────┐ ┌──────────────┐                             │
+ *      │   │ MessageList │ │  ChatInput   │                             │
+ *      │   └─────────────┘ └──────────────┘                             │
  *      │                                                                  │
  *      │   🎭 MODALS                                                      │
  *      │   ┌─────────────────┐                                            │
@@ -54,8 +54,6 @@
  * - Symptoms: Chat doesn't open, components not rendering, hooks failing
  * - User Impact: Complete chat feature failure
  * - Quick Fix: Check all imports are correct, verify props passing
- * - Debug: Look for errors in component tree, check hook return values
- * - Common Issue: Missing context providers or wrong prop types
  * 
  * 📦 PROPS I ACCEPT:
  * ┌─────────────────────┬──────────────────────────────────────────────────────┐
@@ -64,18 +62,11 @@
  * │ initialWidth        │ Starting width of the panel (default: 400)           │
  * └─────────────────────┴──────────────────────────────────────────────────────┘
  * 
- * 🏗️ ARCHITECTURE DECISIONS:
- * - I compose hooks rather than having internal state
- * - I pass callbacks between hooks to coordinate actions
- * - I render components with their required props
- * - I handle the screenshot → chat flow coordination
- * 
  * 📝 REFACTOR JOURNAL:
- * 2026-02-02: BEFORE: 1,760-line God Component with everything inline
- * 2026-02-02: AFTER: ~250-line orchestrator composing 6 hooks + 6 components
  * 2026-02-02: Extracted all business logic to custom hooks
- * 2026-02-02: Extracted all UI to specialized components
- * 2026-02-05: Moved ImageGenerationModal to CanvasApp for independent access
+ * 2026-02-05: Integrated useMobileDetection for responsive resizing.
+ * 2026-02-05: Moved ImageGenerationModal logic to CanvasApp.
+ * 2026-02-05: Cleaned up redundant resize state (now using specialized hook).
  * 
  * @module AIChatContainer
  */

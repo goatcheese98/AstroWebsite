@@ -1,6 +1,47 @@
 /**
- * Authentication Middleware
- * Validates user sessions and protects routes
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║                      🛡️ auth-middleware.ts                                   ║
+ * ║                    "The Session Sentry"                                      ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  🏷️ BADGES: 🔴 API Handler | 🔐 Security Layer | 🛰️ Request Interceptor      ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ * 
+ * 👤 WHO AM I?
+ * I am the sentry standing guard at the entrance of our API routes. I check 
+ * every incoming request for a valid session token. If I find one, I let the
+ * request through with user details; if not, I either block it (requireAuth)
+ * or let it pass quietly (optionalAuth).
+ * 
+ * 🎯 WHAT USER PROBLEM DO I SOLVE?
+ * I ensure that private resources (like a user's own canvases) are only accessible
+ * to the rightful owner. I handle:
+ * - Session verification via Better Auth
+ * - Extraction of userId and user metadata from cookies
+ * - Standardized 401 Unauthorized responses
+ * 
+ * 💬 WHO IS IN MY SOCIAL CIRCLE?
+ * 
+ *      ┌─────────────────────────────────────────────────────────────────┐
+ *      │                        MY NEIGHBORS                              │
+ *      ├─────────────────────────────────────────────────────────────────┤
+ *      │                                                                  │
+ *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
+ *      │   │ API Routes  │◀─────│      ME      │─────▶│    Auth     │   │
+ *      │   │ (Request)   │      │ (Middleware) │      │ (BetterAuth)│   │
+ *      │   └─────────────┘      └──────────────┘      └─────────────┘   │
+ *      │                                                                  │
+ *      └─────────────────────────────────────────────────────────────────┘
+ * 
+ * 🚨 IF I BREAK:
+ * - Symptoms: Logged-in users can't access their data; 401 errors even with session;
+ *   public data becomes private.
+ * - User Impact: Users are effectively locked out of their accounts.
+ * - Quick Fix: Verify the DB binding in context.locals.runtime.
+ * 
+ * 📝 REFACTOR JOURNAL:
+ * 2026-02-05: Added personified header.
+ * 
+ * @module middleware/auth-middleware
  */
 
 import { createAuth } from '@/lib/auth';
@@ -51,8 +92,8 @@ export async function getSession(context: APIContext): Promise<{
       user: {
         id: session.user.id,
         email: session.user.email,
-        name: session.user.name,
-        avatarUrl: session.user.image,
+        name: session.user.name || undefined,
+        avatarUrl: session.user.image || undefined,
       },
       sessionId: session.session.id,
     };

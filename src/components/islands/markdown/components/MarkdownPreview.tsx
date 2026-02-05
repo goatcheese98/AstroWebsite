@@ -4,7 +4,7 @@
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  👤 I render markdown content beautifully. I use react-markdown with        ║
  * ║     syntax highlighting via Prism. I support GFM (tables, checkboxes,       ║
- * ║     strikethrough). Currently optimized for light mode.                     ║
+ * ║     strikethrough). I support both light and dark modes.                    ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
  * 💬 WHO IS IN MY SOCIAL CIRCLE?
@@ -65,14 +65,10 @@ interface MarkdownPreviewProps {
     content: string;
     /** Called when a checkbox is toggled */
     onCheckboxToggle: (lineIndex: number) => void;
+    /** Whether to render in dark mode */
+    isDark?: boolean;
 }
 
-/**
- * Get current theme - currently returns 'light' as light mode is enforced globally
- */
-function useTheme(): 'light' | 'dark' {
-    return 'light';
-}
 
 /**
  * Markdown preview component with syntax highlighting
@@ -80,8 +76,8 @@ function useTheme(): 'light' | 'dark' {
 export const MarkdownPreview = React.memo(function MarkdownPreview({
     content,
     onCheckboxToggle,
+    isDark = false,
 }: MarkdownPreviewProps) {
-    const isDark = useTheme() === 'dark';
 
     // Custom renderers for markdown elements
     const components: Components = useMemo(() => ({

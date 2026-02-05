@@ -1,6 +1,53 @@
 /**
- * Better Auth Configuration
- * Centralized authentication setup with Drizzle + D1 database adapter
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║                        🔑 auth.ts                                            ║
+ * ║                    "The Auth Gatekeeper"                                     ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  🏷️ BADGES: 🔴 API Handler | 🟢 State Manager | 🏗️ Architecture Root        ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ * 
+ * 👤 WHO AM I?
+ * I am the gatekeeper of the application. I manage user identities, sessions,
+ * and authentication flows. I use Better Auth as my brain, Drizzle as my pen,
+ * and Cloudflare D1 as my ledger.
+ * 
+ * 🎯 WHAT USER PROBLEM DO I SOLVE?
+ * I ensure that users can securely log in, stay logged in across devices,
+ * and that their private data (like canvases) stays private. I handle:
+ * - Credentials (Email/Password)
+ * - OAuth (Google/GitHub)
+ * - Session Persistence
+ * - Link sending (Reset/Verify)
+ * 
+ * 💬 WHO IS IN MY SOCIAL CIRCLE?
+ * 
+ *      ┌─────────────────────────────────────────────────────────────────┐
+ *      │                        MY NEIGHBORS                              │
+ *      ├─────────────────────────────────────────────────────────────────┤
+ *      │                                                                  │
+ *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
+ *      │   │ Middleware  │─────▶│      ME      │─────▶│  D1 / DB    │   │
+ *      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
+ *      │                               │                                │
+ *      │                               ▼                                │
+ *      │                  [Auth Events & Sessions]                      │
+ *      │                                                                  │
+ *      └─────────────────────────────────────────────────────────────────┘
+ * 
+ * 🚨 IF I BREAK:
+ * - **Symptoms:** Users can't log in; sessions expire instantly; 401 errors everywhere.
+ * - **User Impact:** High. The application becomes a static viewer with no save/edit functionality.
+ * - **Quick Fix:** Check BETTER_AUTH_SECRET and BETTER_AUTH_URL in Cloudflare dashboard.
+ * 
+ * 🔑 KEY CONCEPTS:
+ * - Better Auth + Drizzle Adapter
+ * - Password hashing and email logic (placeholders for now)
+ * - Cross-subdomain and Secure cookie settings
+ * 
+ * 📝 REFACTOR JOURNAL:
+ * 2026-02-05: Standardized header; fixed TypeScript 'any' type errors on callbacks.
+ * 
+ * @module auth
  */
 
 import { betterAuth } from 'better-auth';
@@ -63,11 +110,11 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false, // Disabled for now (enable when email service is set up)
-      sendResetPassword: async ({ user, url }) => {
+      sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
         // Log reset link for development; integrate email service (Resend/SendGrid) for production
         console.log(`Password reset for ${user.email}: ${url}`);
       },
-      sendVerificationEmail: async ({ user, url }) => {
+      sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
         // Log verification link for development; integrate email service (Resend/SendGrid) for production
         console.log(`Email verification for ${user.email}: ${url}`);
       },
@@ -99,7 +146,6 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
 
     // Security settings
     advanced: {
-      generateId: () => crypto.randomUUID(),
       cookiePrefix: 'astroweb',
       useSecureCookies: authUrl.startsWith('https'),
       crossSubDomainCookies: {

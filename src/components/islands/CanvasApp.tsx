@@ -22,6 +22,85 @@ interface CanvasStateContainer {
     imageHistory: ImageHistoryItem[];
 }
 
+// Toast types
+interface Toast {
+    id: string;
+    message: string;
+    type: 'loading' | 'success' | 'info';
+    duration?: number;
+}
+
+// Simple Toast Component
+function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+    useEffect(() => {
+        if (toast.duration && toast.duration > 0) {
+            const timer = setTimeout(() => {
+                onRemove(toast.id);
+            }, toast.duration);
+            return () => clearTimeout(timer);
+        }
+    }, [toast, onRemove]);
+
+    return (
+        <div 
+            style={{
+                background: 'white',
+                border: '2px solid #333',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                boxShadow: '3px 3px 0 #333',
+                animation: 'toastIn 0.3s ease',
+                minWidth: '180px',
+            }}
+        >
+            {toast.type === 'loading' && (
+                <div 
+                    style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid #e5e7eb',
+                        borderTopColor: '#6366f1',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                        flexShrink: 0,
+                    }}
+                />
+            )}
+            {toast.type === 'success' && (
+                <span 
+                    style={{
+                        width: '18px',
+                        height: '18px',
+                        background: '#22c55e',
+                        color: 'white',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                    }}
+                >
+                    ✓
+                </span>
+            )}
+            <span 
+                style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#333',
+                }}
+            >
+                {toast.message}
+            </span>
+        </div>
+    );
+}
+
 export default function CanvasApp() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
@@ -31,6 +110,9 @@ export default function CanvasApp() {
 
     // Image generation modal state - managed independently of AI chat
     const [showImageModal, setShowImageModal] = useState(false);
+
+    // Toast state
+    const [toasts, setToasts] = useState<Toast[]>([]);
 
     // Refs to access state from child components
     const stateContainerRef = useRef<CanvasStateContainer>({
@@ -48,6 +130,18 @@ export default function CanvasApp() {
         options: GenerationOptions;
         isCapturing: boolean;
     } | null>(null);
+
+    // Toast helper functions
+    const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration: number = 3000) => {
+        const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const toast: Toast = { id, message, type, duration };
+        setToasts(prev => [...prev, toast]);
+        return id;
+    }, []);
+
+    const removeToast = useCallback((id: string) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
 
     const showMessage = (msg: string) => {
         setSaveMessage(msg);
@@ -185,6 +279,9 @@ export default function CanvasApp() {
         generateImage,
     } = useImageGeneration();
 
+    // Ref to track the loading toast id
+    const loadingToastIdRef = useRef<string | null>(null);
+
     // Listen for external events to open image generation modal
     useEffect(() => {
         const handleOpenImageGen = () => {
@@ -199,7 +296,38 @@ export default function CanvasApp() {
      * Triggers screenshot capture, then calls API
      */
     const handleImageGenerationRequest = useCallback((options: GenerationOptions) => {
-        console.log("🎨 Image generation requested, capturing screenshot...");
+        console.log("🎨 Image generation requested...");
+
+        // Close modal immediately
+        setShowImageModal(false);
+
+        // Show loading toast
+        loadingToastIdRef.current = addToast("Generating image...", 'loading', 0);
+
+        // If no elements are selected, generate without a reference screenshot
+        if (selectedElements.length === 0) {
+            console.log("🎨 No elements selected - generating without reference image");
+            generateImage(
+                "", // No screenshot data
+                { ...options, hasReference: false },
+                {
+                    onSuccess: () => {
+                        console.log("✅ Image generation complete");
+                        // Loading toast will be removed when canvas-inserted event fires
+                    },
+                    onError: (err) => {
+                        console.error("❌ Image generation failed:", err);
+                        // Remove loading toast and show error
+                        if (loadingToastIdRef.current) {
+                            removeToast(loadingToastIdRef.current);
+                            loadingToastIdRef.current = null;
+                        }
+                        addToast("Failed to generate image", 'info', 3000);
+                    }
+                }
+            );
+            return;
+        }
 
         // Store options for when screenshot arrives
         pendingImageGenRef.current = {
@@ -211,13 +339,13 @@ export default function CanvasApp() {
         const requestId = `generation-${Date.now()}`;
         window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
             detail: {
-                elementIds: selectedElements.length > 0 ? selectedElements : undefined,
+                elementIds: selectedElements,
                 quality: "high",
                 backgroundColor: options.backgroundColor !== "canvas" ? options.backgroundColor : undefined,
                 requestId,
             }
         }));
-    }, [selectedElements]);
+    }, [selectedElements, generateImage, addToast, removeToast]);
 
     /**
      * Listen for screenshot captures and trigger image generation
@@ -240,6 +368,12 @@ export default function CanvasApp() {
 
             if (error) {
                 console.error("❌ Screenshot error:", error);
+                // Remove loading toast and show error
+                if (loadingToastIdRef.current) {
+                    removeToast(loadingToastIdRef.current);
+                    loadingToastIdRef.current = null;
+                }
+                addToast("Failed to capture screenshot", 'info', 3000);
                 return;
             }
 
@@ -251,11 +385,17 @@ export default function CanvasApp() {
                     {
                         onSuccess: () => {
                             console.log("✅ Image generation complete");
-                            setShowImageModal(false);
                             pendingImageGenRef.current = null;
+                            // Loading toast will be removed when canvas-inserted event fires
                         },
                         onError: (err) => {
                             console.error("❌ Image generation failed:", err);
+                            // Remove loading toast and show error
+                            if (loadingToastIdRef.current) {
+                                removeToast(loadingToastIdRef.current);
+                                loadingToastIdRef.current = null;
+                            }
+                            addToast("Failed to generate image", 'info', 3000);
                             pendingImageGenRef.current = null;
                         }
                     }
@@ -267,10 +407,94 @@ export default function CanvasApp() {
         return () => {
             window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
         };
-    }, [generateImage]);
+    }, [generateImage, addToast, removeToast]);
+
+    // Listen for image insertion to canvas
+    useEffect(() => {
+        const handleImageInserted = () => {
+            console.log("🎨 Image inserted to canvas");
+            // Remove loading toast
+            if (loadingToastIdRef.current) {
+                removeToast(loadingToastIdRef.current);
+                loadingToastIdRef.current = null;
+            }
+            // Show success toast
+            addToast("Added to Canvas", 'success', 2000);
+        };
+
+        window.addEventListener("excalidraw:image-inserted", handleImageInserted);
+        return () => window.removeEventListener("excalidraw:image-inserted", handleImageInserted);
+    }, [addToast, removeToast]);
+
+    // Listen for image added to library/assets
+    useEffect(() => {
+        const handleImageAddedToLibrary = () => {
+            console.log("🎨 Image added to library");
+            // Show library toast (staggered after canvas toast)
+            setTimeout(() => {
+                addToast("Added to library", 'info', 2000);
+            }, 500);
+        };
+
+        window.addEventListener("asset:image-generated", handleImageAddedToLibrary);
+        return () => window.removeEventListener("asset:image-generated", handleImageAddedToLibrary);
+    }, [addToast]);
+
+    // Listen for generic toast requests
+    useEffect(() => {
+        const handleShowToast = (event: any) => {
+            const { message, type = 'info' } = event.detail || {};
+            if (message) {
+                addToast(message, type, 2000);
+            }
+        };
+
+        window.addEventListener("canvas:show-toast", handleShowToast);
+        return () => window.removeEventListener("canvas:show-toast", handleShowToast);
+    }, [addToast]);
 
     return (
         <>
+            {/* Global styles for toast animations */}
+            <style>{`
+                @keyframes toastIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(50px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+
+            {/* Toast Container - Bottom Right */}
+            <div 
+                style={{
+                    position: 'fixed',
+                    bottom: '24px',
+                    right: '24px',
+                    zIndex: 9999,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    alignItems: 'flex-end',
+                }}
+            >
+                {toasts.map((toast) => (
+                    <ToastItem 
+                        key={toast.id} 
+                        toast={toast} 
+                        onRemove={removeToast} 
+                    />
+                ))}
+            </div>
+
             <CanvasControls
                 onOpenChat={handleOpenChat}
                 onOpenAssets={handleOpenAssets}

@@ -53,13 +53,10 @@
  * │ input           │ Current text in the input box                           │
  * │ isLoading       │ Whether AI is currently generating a response           │
  * │ error           │ Any error message to display to user                    │
- * │ panelWidth      │ Width of chat panel in pixels (user can resize)         │
- * │ isResizing      │ Whether user is currently dragging the resize handle    │
  * │ contextMode     │ "all" canvas or "selected" elements only                │
  * │ aiProvider      │ "kimi" | "claude" - which AI backend to use              │
  * │ canvasState     │ Snapshot of Excalidraw elements for context             │
  * │ showTemplates   │ Whether template modal is open                          │
- * │ showImageModal  │ Whether image generation modal is open                  │
  * └─────────────────┴─────────────────────────────────────────────────────────┘
  * 
  * 🎬 MAIN ACTIONS I PROVIDE:
@@ -112,10 +109,6 @@ export interface UseAIChatStateReturn {
     clearError: () => void;
 
     // === 🖥️ UI State ===
-    panelWidth: number;
-    setPanelWidth: (width: number) => void;
-    isResizing: boolean;
-    setIsResizing: (resizing: boolean) => void;
     contextMode: "all" | "selected";
     setContextMode: (mode: "all" | "selected") => void;
     aiProvider: AIProvider;
@@ -144,8 +137,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const [error, setError] = useState<string | null>(null);
 
     // === 🖥️ UI State ===
-    const [panelWidth, setPanelWidth] = useState(initialWidth);
-    const [isResizing, setIsResizing] = useState(false);
     const [contextMode, setContextMode] = useState<"all" | "selected">("all");
     const [aiProvider, setAiProvider] = useState<AIProvider>("claude");
     const [showTemplates, setShowTemplates] = useState(false);
@@ -325,7 +316,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 }),
             });
 
-            const data = await response.json();
+            const data = await response.json() as any;
 
             if (!response.ok) {
                 console.error(`❌ ${aiProvider} API error:`, data);
@@ -433,10 +424,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         clearError,
 
         // UI state
-        panelWidth,
-        setPanelWidth,
-        isResizing,
-        setIsResizing,
         contextMode,
         setContextMode,
         aiProvider,

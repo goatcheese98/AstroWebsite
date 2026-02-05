@@ -119,59 +119,72 @@ export function useImageGeneration(): UseImageGenerationReturn {
             onError?: (error: string) => void;
         }
     ): Promise<void> => {
-        if (!screenshotData) {
-            callbacks?.onError?.("No screenshot data provided");
-            return;
-        }
+        // Check if we have a reference image
+        const hasReference = options.hasReference !== false && screenshotData && screenshotData.length > 0;
 
         setIsGeneratingImage(true);
         console.log("🎨 Starting image generation...");
 
         try {
+            // Check if we have a reference wireframe
+            const hasReference = options.hasReference !== false;
+            const bgColor = options.backgroundColor;
+            
             // Build comprehensive prompt with strict instructions
-            let systemInstructions = "You are an expert UI/UX designer tasked with transforming wireframes into photorealistic designs.\n\n";
+            let systemInstructions = "";
+            
+            if (hasReference) {
+                // Prompt for wireframe-to-design transformation
+                systemInstructions = "You are an expert UI/UX designer tasked with transforming wireframes into photorealistic designs.\n\n";
+            } else {
+                // Prompt for pure generation from text (no reference)
+                systemInstructions = "You are an expert UI/UX designer creating photorealistic designs from a description.\n\n";
+            }
             
             // Add background color instruction FIRST - STRICT ENFORCEMENT
-            const bgColor = options.backgroundColor;
             if (bgColor) {
                 systemInstructions += `BACKGROUND COLOR REQUIREMENTS (ABSOLUTELY MANDATORY - HIGHEST PRIORITY):
 1. The ENTIRE background of the generated image MUST be exactly ${bgColor}
 2. Use ${bgColor} as the SOLID background color across 100% of the image canvas
 3. NO gradients, NO patterns, NO variations from ${bgColor}
 4. NO shadows or lighting effects that change the background color
-5. If the reference has transparency, REPLACE it with solid ${bgColor}
-6. Every single pixel that is not part of the main design elements must be ${bgColor}
-7. This is the MOST IMPORTANT rule - failure to use exactly ${bgColor} is unacceptable
+5. Every single pixel that is not part of the main design elements must be ${bgColor}
+6. This is the MOST IMPORTANT rule - failure to use exactly ${bgColor} is unacceptable
 
 `;
             }
             
-            // Add layout instructions based on strict ratio setting
-            if (options.strictRatio) {
-                systemInstructions += `LAYOUT REQUIREMENTS (MANDATORY):
-1. Maintain EXACT element positions - do not move any elements from their locations in the wireframe
-2. Preserve PRECISE proportions - element sizes must match the wireframe exactly (1:1 ratio)
-3. Keep IDENTICAL spacing - gaps between elements must be the same as shown
-4. Follow the EXACT composition - overall layout structure cannot change
-5. Maintain relative sizes - if element A is 2x larger than element B in the wireframe, keep this ratio
+            // Add layout instructions based on strict ratio setting and reference availability
+            if (hasReference) {
+                if (options.strictRatio) {
+                    systemInstructions += `LAYOUT REQUIREMENTS (MANDATORY):
+1. Study the provided wireframe/reference image carefully
+2. Maintain EXACT element positions - do not move any elements from their locations in the wireframe
+3. Preserve PRECISE proportions - element sizes must match the wireframe exactly (1:1 ratio)
+4. Keep IDENTICAL spacing - gaps between elements must be the same as shown
+5. Follow the EXACT composition - overall layout structure cannot change
+6. Maintain relative sizes - if element A is 2x larger than element B in the wireframe, keep this ratio
 
 `;
-            } else {
-                systemInstructions += `LAYOUT REQUIREMENTS:
-1. Follow the general layout structure shown in the wireframe
-2. Element positions should be similar but can be adjusted for visual balance
-3. Proportions should be close to the reference but can be refined for aesthetics
-4. You have creative freedom to improve spacing and alignment
+                } else {
+                    systemInstructions += `LAYOUT REQUIREMENTS:
+1. Study the provided wireframe/reference image for general guidance
+2. Follow the general layout structure shown in the wireframe
+3. Element positions should be similar but can be adjusted for visual balance
+4. Proportions should be close to the reference but can be refined for aesthetics
+5. You have creative freedom to improve spacing and alignment
 
 `;
+                }
             }
             
             // Add the user's creative prompt
             systemInstructions += `DESIGN VISION:\n${options.prompt}\n\n`;
             
             // Add quality and rendering instructions
-            systemInstructions += `RENDERING REQUIREMENTS:
-- Produce a photorealistic, high-quality design
+            if (hasReference) {
+                systemInstructions += `RENDERING REQUIREMENTS:
+- Transform the wireframe into a photorealistic, high-quality design
 - Use modern design principles (proper shadows, gradients, depth) - BUT ONLY on UI elements, NOT the background
 - Ensure professional polish and attention to detail
 - Make it look like a finished product, not a prototype
@@ -179,21 +192,37 @@ export function useImageGeneration(): UseImageGenerationReturn {
 - If the reference shows UI elements (buttons, cards, text), make them look realistic and functional
 
 FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Every pixel of the background must be this exact color.`;
+            } else {
+                systemInstructions += `RENDERING REQUIREMENTS:
+- Create a photorealistic, high-quality design based on the description
+- Use modern design principles (proper shadows, gradients, depth) - BUT ONLY on UI elements, NOT the background
+- Ensure professional polish and attention to detail
+- Make it look like a finished product, not a prototype
+- Background MUST remain exactly ${bgColor} with NO variations, NO gradients, NO shadows
+
+FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Every pixel of the background must be this exact color.`;
+            }
 
             console.log('🎨 Calling Gemini API...');
             console.log('🤖 Model:', options.useProModel ? 'Gemini 3 Pro' : 'Gemini 2.5 Flash');
 
+            // Build request body - only include image if we have a reference
+            const requestBody: any = {
+                prompt: systemInstructions,
+                model: options.useProModel
+                    ? "gemini-3-pro-image-preview"
+                    : "gemini-2.5-flash-image",
+                mode: hasReference ? "visual" : "text",
+            };
+            
+            if (hasReference) {
+                requestBody.imageData = screenshotData;
+            }
+
             const response = await fetch("/api/generate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    prompt: systemInstructions,
-                    model: options.useProModel
-                        ? "gemini-3-pro-image-preview"
-                        : "gemini-2.5-flash-image",
-                    imageData: screenshotData,
-                    mode: "visual",
-                }),
+                body: JSON.stringify(requestBody),
             });
             
             const data = await response.json();
@@ -243,6 +272,9 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                         height,
                     },
                 }));
+                
+                // Dispatch event for toast notification
+                window.dispatchEvent(new CustomEvent("excalidraw:image-inserted"));
                 
                 callbacks?.onSuccess?.(imageDataUrl);
             };

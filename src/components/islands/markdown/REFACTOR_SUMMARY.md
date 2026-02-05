@@ -18,7 +18,7 @@ Refactored the monolithic `MarkdownNote.tsx` (1055 lines) into a modular, mainta
 
 ### Architecture
 
-```
+```markdown
 src/components/islands/markdown/
 ├── index.ts                      # Public API exports
 ├── MarkdownNote.tsx              # Main orchestrator (282 lines) ✓
@@ -121,7 +121,7 @@ The markdown notes are already well-integrated with the system:
 
 **Example AI context:**
 
-```
+```markdown
 Selected elements:
 - rectangle: "# Meeting Notes
   - Action items
@@ -187,6 +187,6 @@ Selected elements:
 
 ## 🚨 CURRENT STATUS / DISCREPANCIES (2026-02-05)
 
-* **Monolithic Content**: `MarkdownNote.tsx` still contains significant logic that was originally planned for hooks (isEditing, content state, mouse events). The "modular" architecture exists in the filesystem but is not fully utilized by the main component.
+- **Monolithic Content**: `MarkdownNote.tsx` still contains significant logic that was originally planned for hooks (isEditing, content state, mouse events). The "modular" architecture exists in the filesystem but is not fully utilized by the main component.
 - **Selection Bridge**: `useExcalidrawSelection.ts` was implemented to intercept native selection to avoid boxy borders, but the main component still checks `appState.selectedElementIds`.
-- **Theme Support**: `MarkdownPreview.tsx` claims to adapt to themes but is currently locked to `'light'` mode to match the global canvas theme enforcement.
+- **Theme Support**: ✅ FIXED. `MarkdownPreview.tsx` now supports dynamic theme switching based on the detected `isDark` state from the parent `MarkdownNote.tsx`.

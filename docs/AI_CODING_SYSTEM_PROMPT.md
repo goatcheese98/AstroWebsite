@@ -86,17 +86,17 @@
 
 Use these badges in the header to indicate file type:
 
-| Badge | Meaning | Use For |
-|-------|---------|---------|
-| 🟣 | UI Component | React components that render DOM |
-| 🔵 | Custom Hook | Logic extraction, state management |
-| 🟢 | State Manager | Complex state logic, data flow |
-| 🔴 | API Handler | External API calls, data fetching |
-| 🟡 | Utility | Helper functions, pure logic |
-| ⚡ | Event Coordinator | Event listeners, dispatchers |
-| ⚪ | Type Definition | Interfaces, types, constants |
-| 🏗️ | Architecture Root | Main orchestrators, entry points |
-| 🎯 | Orchestrator | Composes multiple hooks/components |
+| Badge | Meaning           | Use For                            |
+| :---: | :---------------- | :--------------------------------- |
+|   🟣  | UI Component      | React components that render DOM   |
+|   🔵  | Custom Hook       | Logic extraction, state management |
+|   🟢  | State Manager     | Complex state logic, data flow     |
+|   🔴  | API Handler       | External API calls, data fetching  |
+|   🟡  | Utility           | Helper functions, pure logic       |
+|   ⚡  | Event Coordinator | Event listeners, dispatchers       |
+|   ⚪  | Type Definition   | Interfaces, types, constants       |
+|   🏗️  | Architecture Root | Main orchestrators, entry points   |
+|   🎯  | Orchestrator      | Composes multiple hooks/components |
 
 **Multiple badges allowed:** `🔵 Custom Hook | 🟢 State Manager | 🔴 API Handler`
 
@@ -108,25 +108,28 @@ Use these badges in the header to indicate file type:
 
 **Aspirational Goal:** No code file should exceed 300 lines (excluding header).
 
-**Practical Limits:**
+### Practical Limits
+
 - UI Components: 150-350 lines
 - Custom Hooks: 200-450 lines (API integration is verbose)
 - Utilities: <100 lines
 - Orchestrators: <400 lines
 
-**When to split:**
+### When to split
+
 - Logic grows beyond 300 lines → Extract to custom hook
 - UI grows beyond 300 lines → Extract to sub-component
 - Constants clutter file → Move to `constants/` folder
 
-**Exceptions allowed for:**
+### Exceptions allowed for
+
 - Complex API integration logic
 - Data-heavy configuration files
 - Generated code
 
 ### 2. Logic Isolation Hierarchy
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    COMPONENT LAYERS                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -163,6 +166,7 @@ Use these badges in the header to indicate file type:
 6. ✅ **Test incrementally** - Build after each major extraction
 
 **NEVER:**
+
 - ❌ Leave dead code in source file
 - ❌ Break event listener attachments
 - ❌ Forget to move CSS-in-JS styles
@@ -185,13 +189,15 @@ Use these badges in the header to indicate file type:
 
 ### When Creating New Components
 
-**Step 1:** Determine responsibility
+### Step 1: Determine responsibility
+
 - What user problem does this solve?
 - What will it receive as props?
 - What will it dispatch/return?
 
-**Step 2:** Choose location
-```
+### Step 2: Choose location
+
+```text
 src/components/[feature]/
 ├── components/     ← UI components
 ├── hooks/          ← Custom hooks  
@@ -201,37 +207,43 @@ src/components/[feature]/
 └── index.ts        ← Public API
 ```
 
-**Step 3:** Write header first
+### Step 3: Write header first
+
 - Use the **comprehensive template** for files >150 lines
 - Use the **minimal template** for small utilities (<50 lines)
 - Define relationships before writing code
 - This acts as your specification
 
-**Step 4:** Implement with line limit in mind
+### Step 4: Implement with line limit in mind
+
 - Stop at 250 lines, assess
 - Extract early if growing
 
 ### When Refactoring (The "God Component" Surgery)
 
-**Phase 1: Analyze & Plan**
-1. Read the entire monolith
-2. Identify state clusters (what changes together)
-3. Identify UI sections (what renders together)
-4. Map dependencies (who talks to whom)
+#### Phase 1: Analyze & Plan
 
-**Phase 2: Extract State (Custom Hooks)**
+- Read the entire monolith
+- Identify state clusters (what changes together)
+- Identify UI sections (what renders together)
+- Map dependencies (who talks to whom)
+
+#### Phase 2: Extract State (Custom Hooks)
+
 1. Group related state variables
 2. Extract to `use[Feature][Concern].ts`
 3. Move handlers that modify that state
 4. Keep UI-specific handlers in component
 
-**Phase 3: Extract UI (Components)**
+#### Phase 3: Extract UI (Components)
+
 1. Identify visual sections
 2. Extract to `[SectionName].tsx`
 3. Pass props down, callbacks up
 4. Preserve all CSS-in-JS styles
 
-**Phase 4: Clean Up Orchestrator**
+#### Phase 4: Clean Up Orchestrator
+
 1. Component should be < 300 lines
 2. Only compose hooks and components
 3. Handle high-level coordination only
@@ -258,13 +270,15 @@ Before declaring refactoring complete:
 
 **Starting Point:** `AIChatContainer.tsx` (1,760 lines)
 
-**Step 1:** Extract hooks
+### Step 1: Extract hooks
+
 - `useAIChatState.ts` - Core message state (419 lines)
 - `useImageGeneration.ts` - Image generation (370 lines)
 - `useCanvasCommands.ts` - Canvas operations (301 lines)
 - `usePanelResize.ts` - Resize handling (204 lines)
 
-**Step 2:** Extract components
+### Step 2: Extract components
+
 - `ChatPanel.tsx` - Container (152 lines)
 - `ChatHeader.tsx` - Header bar (174 lines)
 - `MessageList.tsx` - Messages (233 lines)
@@ -273,7 +287,8 @@ Before declaring refactoring complete:
 - `CanvasContextPanel.tsx` - Context selector (319 lines)
 - `ImageGallery.tsx` - Generated images (241 lines)
 
-**Step 3:** Clean up orchestrator
+### Step 3: Clean up orchestrator
+
 - `AIChatContainer.tsx` - Now 358 lines, only composes hooks/components
 
 **Result:** 7 specialized components, 5 focused hooks, 1 clean orchestrator
@@ -295,6 +310,7 @@ Before declaring refactoring complete:
 ```
 
 **When to use minimal header:**
+
 - Pure utility functions
 - Simple constants files
 - Type definitions only
@@ -304,7 +320,8 @@ Before declaring refactoring complete:
 
 ## 📝 Summary
 
-**Remember:**
+### Remember
+
 1. **Personify everything** - Files are people with jobs
 2. **Document relationships** - Show who talks to whom
 3. **Stay small** - 300 lines is a soft limit, not a suggestion
