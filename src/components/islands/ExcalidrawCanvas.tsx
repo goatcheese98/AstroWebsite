@@ -952,14 +952,24 @@ export default function ExcalidrawCanvas() {
         (window as any).getMarkdownNoteRefs = () => markdownNoteRefsRef.current;
     }, []);
 
+    // Use a ref to always have access to the latest excalidrawAPI
+    const excalidrawAPIRef = useRef(excalidrawAPI);
+    useEffect(() => {
+        excalidrawAPIRef.current = excalidrawAPI;
+    }, [excalidrawAPI]);
+
     // Handle creating new markdown element
     const handleCreateMarkdown = useCallback(async () => {
-        if (!excalidrawAPI) return;
+        const api = excalidrawAPIRef.current;
+        if (!api) {
+            console.warn("⚠️ Cannot create note: Excalidraw API not ready");
+            return;
+        }
 
         const { convertToExcalidrawElements: converter } = await loadExcalidraw();
 
         // Get viewport center for proper positioning
-        const appState = excalidrawAPI.getAppState();
+        const appState = api.getAppState();
         const viewportCenterX = appState.width / 2;
         const viewportCenterY = appState.height / 2;
 
@@ -988,14 +998,14 @@ export default function ExcalidrawCanvas() {
         };
 
         const converted = converter([newElement]);
-        const currentElements = excalidrawAPI.getSceneElements();
+        const currentElements = api.getSceneElements();
 
-        excalidrawAPI.updateScene({
+        api.updateScene({
             elements: [...currentElements, ...converted],
         });
 
         console.log("✅ Created new markdown note at viewport center");
-    }, [excalidrawAPI]);
+    }, []);
 
     // Handle markdown content update - signature matches MarkdownNote's onChange prop
     const handleMarkdownUpdate = useCallback((elementId: string, newContent: string) => {
@@ -1161,9 +1171,10 @@ export default function ExcalidrawCanvas() {
                 theme={theme}
                 excalidrawAPI={(api: any) => {
                     setExcalidrawAPI(api);
-                    // Make API globally available for debugging and other components
+                    // Make API and helper functions globally available
                     if (typeof window !== "undefined") {
                         (window as any).excalidrawAPI = api;
+                        (window as any).createMarkdownNote = handleCreateMarkdown;
                     }
                 }}
                 initialData={initialCanvasData || {
@@ -1267,25 +1278,8 @@ export default function ExcalidrawCanvas() {
                     }
                 }}
                 renderTopRightUI={() => (
-                    // Only show "+ Add Note" on desktop - it's resource intensive
-                    !isMobile ? (
-                        <button
-                            style={{
-                                background: "var(--color-primary, #6366f1)",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "4px",
-                                padding: "6px 12px",
-                                fontSize: "0.8rem",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                            }}
-                            onClick={handleCreateMarkdown}
-                        >
-                            + Add Note
-                        </button>
-                    ) : null
+                    // Top-right UI now empty - Add Note moved to right-side controls
+                    null
                 )}
             />
 

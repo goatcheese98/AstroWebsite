@@ -49,7 +49,7 @@ import type { Message } from "../components/ai-chat/types";
 import type { ImageHistoryItem } from "../components/ai-chat/hooks/useImageGeneration";
 
 // File format version for compatibility checking
-const STATE_FILE_VERSION = "1.0.0";
+const STATE_FILE_VERSION = "1.1.0";  // Bumped for compression support
 const STATE_FILE_EXTENSION = ".rj";
 
 /**
@@ -194,9 +194,109 @@ function generateFilename(state: CanvasState): string {
 }
 
 /**
- * Save canvas state to a file
+ * Compress data using gzip via CompressionStream API
  */
-export function saveCanvasStateToFile(state: CanvasState, filename?: string): void {
+async function compressData(data: string): Promise<Uint8Array> {
+    const encoder = new TextEncoder();
+    const input = encoder.encode(data);
+    
+    const compressionStream = new CompressionStream('gzip');
+    const writer = compressionStream.writable.getWriter();
+    
+    writer.write(input);
+    writer.close();
+    
+    const reader = compressionStream.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }
+    
+    // Concatenate chunks
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    
+    return result;
+}
+
+/**
+ * Decompress gzip data via DecompressionStream API
+ */
+async function decompressData(compressed: ArrayBuffer): Promise<string> {
+    const decompressionStream = new DecompressionStream('gzip');
+    const writer = decompressionStream.writable.getWriter();
+    
+    writer.write(new Uint8Array(compressed));
+    writer.close();
+    
+    const reader = decompressionStream.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }
+    
+    // Concatenate chunks
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(result);
+}
+
+/**
+ * Detect file format from buffer content
+ * @returns 'json' | 'gzip' | 'unknown'
+ */
+function detectFormat(buffer: ArrayBuffer): 'json' | 'gzip' | 'unknown' {
+    const bytes = new Uint8Array(buffer.slice(0, 2));
+    
+    // Gzip magic number: 0x1f 0x8b
+    if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        return 'gzip';
+    }
+    
+    // JSON starts with '{'
+    if (bytes[0] === 0x7b) {
+        return 'json';
+    }
+    
+    return 'unknown';
+}
+
+export interface SaveOptions {
+    compressed?: boolean;
+    excludeHistory?: boolean;
+}
+
+/**
+ * Save canvas state to a file
+ * @param state - The canvas state to save
+ * @param filename - Optional filename (auto-generated if not provided)
+ * @param options - Save options (compressed vs full size, exclude history)
+ */
+export async function saveCanvasStateToFile(
+    state: CanvasState, 
+    filename?: string,
+    options: SaveOptions = { compressed: true, excludeHistory: false }
+): Promise<void> {
     const finalFilename = filename || generateFilename(state);
     
     // Ensure filename has correct extension
@@ -204,123 +304,161 @@ export function saveCanvasStateToFile(state: CanvasState, filename?: string): vo
         ? finalFilename 
         : `${finalFilename}${STATE_FILE_EXTENSION}`;
     
-    // Convert to JSON
-    const json = JSON.stringify(state, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
+    // Create modified state if excluding history
+    const stateToSave = options.excludeHistory 
+        ? { ...state, images: { history: [] } }
+        : state;
     
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = finalFilenameWithExt;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const historyCount = state.images.history.length;
+    const excludedCount = options.excludeHistory ? historyCount : 0;
     
-    console.log("💾 Canvas state saved:", finalFilenameWithExt);
+    if (options.compressed) {
+        // Compressed: compact JSON + gzip
+        const json = JSON.stringify(stateToSave);
+        const compressed = await compressData(json);
+        const blob = new Blob([compressed], { type: "application/gzip" });
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = finalFilenameWithExt;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        const compressionRatio = ((1 - compressed.length / json.length) * 100).toFixed(1);
+        const historyNote = excludedCount > 0 ? ` (excluded ${excludedCount} gallery images)` : '';
+        console.log(`💾 Canvas state saved (compressed): ${finalFilenameWithExt} (${compressionRatio}% smaller)${historyNote}`);
+    } else {
+        // Full size: pretty-printed JSON for human readability
+        const json = JSON.stringify(stateToSave, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = finalFilenameWithExt;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        const sizeKB = (json.length / 1024).toFixed(1);
+        const historyNote = excludedCount > 0 ? ` (excluded ${excludedCount} gallery images)` : '';
+        console.log(`💾 Canvas state saved (full size): ${finalFilenameWithExt} (${sizeKB} KB)${historyNote}`);
+    }
 }
 
 /**
- * Load canvas state from a file
+ * Load canvas state from a file (supports both compressed and legacy uncompressed)
  */
 export async function loadCanvasStateFromFile(file: File): Promise<LoadStateResult> {
-    return new Promise((resolve) => {
-        // Validate file extension
-        if (!file.name.endsWith(STATE_FILE_EXTENSION)) {
-            resolve({
+    // Validate file extension
+    if (!file.name.endsWith(STATE_FILE_EXTENSION)) {
+        return {
+            success: false,
+            error: `Invalid file type. Expected ${STATE_FILE_EXTENSION} file.`,
+        };
+    }
+    
+    try {
+        // Read file as ArrayBuffer to handle both text and binary
+        const arrayBuffer = await file.arrayBuffer();
+        
+        if (arrayBuffer.byteLength === 0) {
+            return {
                 success: false,
-                error: `Invalid file type. Expected ${STATE_FILE_EXTENSION} file.`,
-            });
-            return;
+                error: "File is empty",
+            };
         }
         
-        const reader = new FileReader();
+        // Detect file format
+        const format = detectFormat(arrayBuffer);
+        let content: string;
+        let wasCompressed = false;
         
-        reader.onload = (e) => {
-            try {
-                const content = e.target?.result as string;
-                if (!content) {
-                    resolve({
-                        success: false,
-                        error: "File is empty",
-                    });
-                    return;
-                }
-                
-                const state = JSON.parse(content) as CanvasState;
-                
-                // Validate required fields
-                if (!state.version || !state.canvas || !state.chat) {
-                    resolve({
-                        success: false,
-                        error: "Invalid file format: missing required fields",
-                    });
-                    return;
-                }
-                
-                // Check version compatibility
-                const versionParts = state.version.split(".").map(Number);
-                const currentParts = STATE_FILE_VERSION.split(".").map(Number);
-                
-                // Major version mismatch is not compatible
-                if (versionParts[0] !== currentParts[0]) {
-                    resolve({
-                        success: false,
-                        error: `Version mismatch: file is v${state.version}, expected v${STATE_FILE_VERSION}. Please update the app.`,
-                    });
-                    return;
-                }
-                
-                // Restore Date objects from timestamps
-                if (state.chat.messages) {
-                    state.chat.messages = state.chat.messages.map(msg => ({
-                        ...msg,
-                        metadata: {
-                            ...msg.metadata,
-                            timestamp: new Date(msg.metadata.timestamp as any),
-                        },
-                    }));
-                }
-                
-                if (state.images?.history) {
-                    state.images.history = state.images.history.map(img => ({
-                        ...img,
-                        timestamp: new Date(img.timestamp as any),
-                    }));
-                }
-                
-                console.log("📂 Canvas state loaded:", {
-                    version: state.version,
-                    exportedAt: new Date(state.exportedAt).toLocaleString(),
-                    elements: state.canvas.elements?.length || 0,
-                    messages: state.chat.messages?.length || 0,
-                    images: state.images?.history?.length || 0,
-                });
-                
-                resolve({
-                    success: true,
-                    state,
-                });
-                
-            } catch (err) {
-                console.error("Failed to parse canvas state file:", err);
-                resolve({
-                    success: false,
-                    error: err instanceof Error ? err.message : "Failed to parse file",
-                });
-            }
-        };
-        
-        reader.onerror = () => {
-            resolve({
+        if (format === 'gzip') {
+            // Decompress gzip file
+            content = await decompressData(arrayBuffer);
+            wasCompressed = true;
+        } else if (format === 'json') {
+            // Legacy uncompressed JSON file
+            const decoder = new TextDecoder();
+            content = decoder.decode(arrayBuffer);
+        } else {
+            return {
                 success: false,
-                error: "Failed to read file",
-            });
+                error: "Invalid file format. File is not a valid .rj file.",
+            };
+        }
+        
+        const state = JSON.parse(content) as CanvasState;
+        
+        // Validate required fields
+        if (!state.version || !state.canvas || !state.chat) {
+            return {
+                success: false,
+                error: "Invalid file format: missing required fields",
+            };
+        }
+        
+        // Check version compatibility (only major version matters)
+        const versionParts = state.version.split(".").map(Number);
+        const currentParts = STATE_FILE_VERSION.split(".").map(Number);
+        
+        // Major version mismatch is not compatible
+        if (versionParts[0] !== currentParts[0]) {
+            return {
+                success: false,
+                error: `Version mismatch: file is v${state.version}, expected v${STATE_FILE_VERSION}. Please update the app.`,
+            };
+        }
+        
+        // Restore Date objects from timestamps
+        if (state.chat.messages) {
+            state.chat.messages = state.chat.messages.map(msg => ({
+                ...msg,
+                metadata: {
+                    ...msg.metadata,
+                    timestamp: new Date(msg.metadata.timestamp as any),
+                },
+            }));
+        }
+        
+        if (state.images?.history) {
+            state.images.history = state.images.history.map(img => ({
+                ...img,
+                timestamp: new Date(img.timestamp as any),
+            }));
+        }
+        
+        const originalSize = arrayBuffer.byteLength;
+        const uncompressedSize = new TextEncoder().encode(content).length;
+        const savings = ((1 - originalSize / uncompressedSize) * 100).toFixed(1);
+        
+        console.log("📂 Canvas state loaded:", {
+            version: state.version,
+            exportedAt: new Date(state.exportedAt).toLocaleString(),
+            elements: state.canvas.elements?.length || 0,
+            messages: state.chat.messages?.length || 0,
+            images: state.images?.history?.length || 0,
+            compressed: wasCompressed,
+            compression: wasCompressed ? `${savings}% smaller` : 'uncompressed (legacy)',
+        });
+        
+        return {
+            success: true,
+            state,
         };
         
-        reader.readAsText(file);
-    });
+    } catch (err) {
+        console.error("Failed to parse canvas state file:", err);
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : "Failed to parse file",
+        };
+    }
 }
 
 /**

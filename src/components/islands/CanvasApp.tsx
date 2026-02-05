@@ -3,11 +3,13 @@ import CanvasControls from "./CanvasControls";
 // import AIChatPanel from "./AIChatPanel"; // Original component (backup)
 import { AIChatContainer } from "../ai-chat"; // New enterprise component
 import MyAssetsPanel from "./MyAssetsPanel";
+import SaveOptionsModal from "./SaveOptionsModal";
 import { 
     collectCanvasState, 
     saveCanvasStateToFile, 
     triggerCanvasStateLoad,
-    type CanvasState 
+    type CanvasState,
+    type SaveOptions
 } from "../../lib/canvas-state-manager";
 import type { Message } from "../ai-chat/types";
 import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
@@ -24,6 +26,8 @@ export default function CanvasApp() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+    const [pendingSaveState, setPendingSaveState] = useState<CanvasState | null>(null);
     
     // Refs to access state from child components
     const stateContainerRef = useRef<CanvasStateContainer>({
@@ -64,7 +68,7 @@ export default function CanvasApp() {
     };
 
     /**
-     * Handle save canvas state to file
+     * Handle save canvas state - opens modal to choose options
      */
     const handleSaveState = useCallback(() => {
         const excalidrawAPI = (window as any).excalidrawAPI;
@@ -81,9 +85,35 @@ export default function CanvasApp() {
             imageHistory: stateContainerRef.current.imageHistory,
         });
 
-        saveCanvasStateToFile(state);
-        showMessage(`✓ Saved ${state.canvas.elements.length} elements, ${state.chat.messages.length} messages`);
+        // Store state and show modal
+        setPendingSaveState(state);
+        setIsSaveModalOpen(true);
     }, []);
+
+    /**
+     * Handle confirm save from modal
+     */
+    const handleConfirmSave = useCallback(async (options: SaveOptions) => {
+        if (!pendingSaveState) return;
+
+        setIsSaveModalOpen(false);
+
+        try {
+            await saveCanvasStateToFile(pendingSaveState, undefined, options);
+            
+            // Build status message
+            let mode = options.compressed ? "compressed" : "full size";
+            if (options.excludeHistory) {
+                mode += " (no history)";
+            }
+            showMessage(`✓ Saved (${mode}): ${pendingSaveState.canvas.elements.length} elements, ${pendingSaveState.chat.messages.length} messages`);
+        } catch (err) {
+            console.error("Save failed:", err);
+            showMessage("✗ Failed to save canvas state");
+        } finally {
+            setPendingSaveState(null);
+        }
+    }, [pendingSaveState]);
 
     /**
      * Handle load canvas state from file
@@ -120,6 +150,15 @@ export default function CanvasApp() {
         };
     }, []);
 
+    const handleCreateNote = useCallback(() => {
+        const createFn = (window as any).createMarkdownNote;
+        if (createFn) {
+            createFn();
+        } else {
+            console.warn("Note creation not available yet");
+        }
+    }, []);
+
     return (
         <>
             <CanvasControls
@@ -129,6 +168,7 @@ export default function CanvasApp() {
                 isAssetsOpen={isAssetsOpen}
                 onSaveState={handleSaveState}
                 onLoadState={handleLoadState}
+                onCreateMarkdown={handleCreateNote}
             />
             
             {/* Use new AIChatContainer with element selection feature */}
@@ -143,6 +183,21 @@ export default function CanvasApp() {
             {/* <AIChatPanel isOpen={isChatOpen} onClose={handleCloseChat} /> */}
             
             <MyAssetsPanel isOpen={isAssetsOpen} onClose={handleCloseAssets} />
+
+            {/* Save Options Modal */}
+            {pendingSaveState && (
+                <SaveOptionsModal
+                    isOpen={isSaveModalOpen}
+                    onClose={() => {
+                        setIsSaveModalOpen(false);
+                        setPendingSaveState(null);
+                    }}
+                    onConfirm={handleConfirmSave}
+                    elementCount={pendingSaveState.canvas.elements.length}
+                    messageCount={pendingSaveState.chat.messages.length}
+                    imageCount={pendingSaveState.images.history.length}
+                />
+            )}
             
             {/* Toast message for save/load feedback */}
             {saveMessage && (

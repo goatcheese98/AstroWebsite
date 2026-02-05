@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { exportCanvasWithMarkdown } from "../../lib/excalidraw-export-utils";
-import type { MarkdownNoteRef } from "../../lib/excalidraw-export-utils";
+import { useState, useRef, useEffect } from "react";
 
 interface CanvasControlsProps {
     onOpenChat: () => void;
@@ -9,98 +7,81 @@ interface CanvasControlsProps {
     isAssetsOpen: boolean;
     onSaveState?: () => void;
     onLoadState?: () => void;
+    onCreateMarkdown?: () => void;
 }
 
-export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, isAssetsOpen, onSaveState, onLoadState }: CanvasControlsProps) {
-    const [exporting, setExporting] = useState<string | null>(null);
+export default function CanvasControls({ 
+    onOpenChat, 
+    onOpenAssets, 
+    isChatOpen, 
+    isAssetsOpen, 
+    onSaveState, 
+    onLoadState,
+    onCreateMarkdown 
+}: CanvasControlsProps) {
     const [message, setMessage] = useState<string | null>(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const showMessage = (msg: string) => {
         setMessage(msg);
         setTimeout(() => setMessage(null), 3000);
     };
 
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const handleExportPNG = async () => {
-        setExporting("png");
+        setIsExporting(true);
         try {
             const api = (window as any).excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
-                setExporting(null);
                 return;
             }
-
-            const elements = api.getSceneElements();
-            const markdownElements = elements.filter((el: any) => el.customData?.type === "markdown");
-            const hasMarkdownNotes = markdownElements.length > 0;
-
-            // Get markdown note refs if available
-            const getMarkdownRefs = (window as any).getMarkdownNoteRefs;
-            const markdownNoteRefs = getMarkdownRefs ? getMarkdownRefs() : new Map<string, MarkdownNoteRef>();
-
-            // Use enhanced export if there are markdown notes with refs
-            if (hasMarkdownNotes && markdownNoteRefs.size > 0) {
-                const blob = await exportCanvasWithMarkdown(api, markdownNoteRefs, "png");
-
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `canvas-${Date.now()}.png`;
-                link.click();
-                URL.revokeObjectURL(url);
-                showMessage("✓ PNG downloaded with notes");
-            } else {
-                // Fall back to standard export
-                const appState = api.getAppState();
-                const files = api.getFiles();
-
-                const { exportToCanvas } = await import("@excalidraw/excalidraw");
-                const canvas = await exportToCanvas({ elements, appState, files });
-
-                canvas.toBlob((blob: Blob | null) => {
-                    if (blob) {
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = `canvas-${Date.now()}.png`;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                        showMessage("✓ PNG downloaded");
-                    }
-                });
-            }
+            const { exportToCanvas } = await import("@excalidraw/excalidraw");
+            const canvas = await exportToCanvas({
+                elements: api.getSceneElements(),
+                appState: { ...api.getAppState(), exportBackground: true, exportWithDarkMode: false, exportScale: 2 },
+                files: api.getFiles(),
+            });
+            const link = document.createElement("a");
+            link.href = canvas.toDataURL("image/png");
+            link.download = `canvas-${Date.now()}.png`;
+            link.click();
+            showMessage("✓ PNG downloaded");
         } catch (error) {
             console.error("Export PNG error:", error);
             showMessage("✗ Export failed");
-        } finally {
-            setExporting(null);
         }
+        setIsExporting(false);
+        setIsMenuOpen(false);
     };
 
     const handleExportSVG = async () => {
-        setExporting("svg");
+        setIsExporting(true);
         try {
             const api = (window as any).excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
                 return;
             }
-
-            const elements = api.getSceneElements();
-            if (elements.length === 0) {
-                showMessage("Canvas is empty");
-                setExporting(null);
-                return;
-            }
-
-            const appState = api.getAppState();
-            const files = api.getFiles();
-
             const { exportToSvg } = await import("@excalidraw/excalidraw");
-            const svg = await exportToSvg({ elements, appState, files });
-
-            const svgData = svg.outerHTML;
-            const blob = new Blob([svgData], { type: "image/svg+xml" });
+            const svg = await exportToSvg({
+                elements: api.getSceneElements(),
+                appState: { ...api.getAppState(), exportWithDarkMode: false },
+                files: api.getFiles(),
+            });
+            const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
@@ -111,75 +92,22 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
         } catch (error) {
             console.error("Export SVG error:", error);
             showMessage("✗ Export failed");
-        } finally {
-            setExporting(null);
         }
+        setIsExporting(false);
+        setIsMenuOpen(false);
     };
 
-    const handleCopyToClipboard = async () => {
-        setExporting("clipboard");
-        try {
-            const api = (window as any).excalidrawAPI;
-            if (!api) {
-                showMessage("Canvas not ready");
-                setExporting(null);
-                return;
-            }
-
-            const elements = api.getSceneElements();
-
-            if (!navigator.clipboard || !navigator.clipboard.write) {
-                showMessage("✗ Clipboard not supported");
-                setExporting(null);
-                return;
-            }
-
-            const markdownElements = elements.filter((el: any) => el.customData?.type === "markdown");
-            const hasMarkdownNotes = markdownElements.length > 0;
-
-            // Get markdown note refs if available
-            const getMarkdownRefs = (window as any).getMarkdownNoteRefs;
-            const markdownNoteRefs = getMarkdownRefs ? getMarkdownRefs() : new Map<string, MarkdownNoteRef>();
-
-            let blob: Blob;
-
-            // Use enhanced export if there are markdown notes with refs
-            if (hasMarkdownNotes && markdownNoteRefs.size > 0) {
-                blob = await exportCanvasWithMarkdown(api, markdownNoteRefs, "png");
-            } else {
-                // Fall back to standard export
-                const appState = api.getAppState();
-                const files = api.getFiles();
-
-                const { exportToCanvas } = await import("@excalidraw/excalidraw");
-                const canvas = await exportToCanvas({ elements, appState, files });
-
-                blob = await new Promise<Blob>((resolve, reject) => {
-                    canvas.toBlob((b: Blob | null) => {
-                        if (b) resolve(b);
-                        else reject(new Error("Failed to create blob"));
-                    });
-                });
-            }
-
-            try {
-                await navigator.clipboard.write([
-                    new ClipboardItem({ "image/png": blob }),
-                ]);
-                showMessage("✓ Copied to clipboard");
-            } catch (err) {
-                console.error("Clipboard write error:", err);
-                showMessage("✗ Clipboard copy failed");
-            }
-        } catch (error) {
-            console.error("Copy to clipboard error:", error);
-            showMessage("✗ Copy failed");
-        } finally {
-            setExporting(null);
-        }
+    const handleSave = () => {
+        onSaveState?.();
+        setIsMenuOpen(false);
     };
 
-    // Hide controls when any panel is open (but state sync is now fixed)
+    const handleLoad = () => {
+        onLoadState?.();
+        setIsMenuOpen(false);
+    };
+
+    // Hide controls when any panel is open
     const isPanelOpen = isChatOpen || isAssetsOpen;
 
     return (
@@ -187,15 +115,28 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
             {/* Right side controls - vertically centered */}
             {!isPanelOpen && (
                 <div className="canvas-controls">
+                    {/* Primary actions - most used */}
                     <button onClick={onOpenChat} className="control-btn chat-btn" title="Open AI Chat">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span className="label">AI Chat</span>
                     </button>
 
+                    {onCreateMarkdown && (
+                        <button onClick={onCreateMarkdown} className="control-btn note-btn" title="Add a note">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="18" x2="12" y2="12"/>
+                                <line x1="9" y1="15" x2="15" y2="15"/>
+                            </svg>
+                            <span className="label">Add Note</span>
+                        </button>
+                    )}
+
                     <button onClick={onOpenAssets} className="control-btn assets-btn" title="Browse My Assets">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span className="label">My Assets</span>
@@ -204,80 +145,159 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                     {/* Divider */}
                     <div className="divider"></div>
 
-                    {/* Export buttons */}
-                    <button
-                        onClick={handleExportPNG}
-                        disabled={exporting !== null}
-                        className="control-btn export-btn"
-                        title="Download as PNG"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span className="label">PNG</span>
-                    </button>
+                    {/* Menu button - contains Save, Load, Export */}
+                    <div ref={menuRef} style={{ position: "relative" }}>
+                        <button 
+                            onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                            className="control-btn menu-btn" 
+                            title="More options"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="5" r="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <circle cx="12" cy="19" r="2"/>
+                            </svg>
+                            <span className="label">Menu</span>
+                        </button>
 
-                    <button
-                        onClick={handleExportSVG}
-                        disabled={exporting !== null}
-                        className="control-btn export-btn"
-                        title="Download as SVG"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <path d="M14 2v6h6"/>
-                            <path d="M9 13h6"/>
-                            <path d="M9 17h6"/>
-                        </svg>
-                        <span className="label">SVG</span>
-                    </button>
-
-                    <button
-                        onClick={handleCopyToClipboard}
-                        disabled={exporting !== null}
-                        className="control-btn export-btn"
-                        title="Copy to clipboard"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                        <span className="label">Copy</span>
-                    </button>
-
-                    {/* Divider */}
-                    <div className="divider"></div>
-
-                    {/* Save/Load buttons */}
-                    <button
-                        onClick={onSaveState}
-                        disabled={!onSaveState || exporting !== null}
-                        className="control-btn save-btn"
-                        title="Save canvas state to file"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                            <polyline points="17 21 17 13 7 13 7 21"/>
-                            <polyline points="7 3 7 8 15 8"/>
-                        </svg>
-                        <span className="label">Save</span>
-                    </button>
-
-                    <button
-                        onClick={onLoadState}
-                        disabled={!onLoadState || exporting !== null}
-                        className="control-btn load-btn"
-                        title="Load canvas state from file"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                        <span className="label">Load</span>
-                    </button>
+                        {isMenuOpen && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    right: "100%",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    marginRight: "10px",
+                                    background: "white",
+                                    border: "2px solid var(--color-stroke, #333)",
+                                    borderRadius: "10px",
+                                    boxShadow: "3px 3px 0 var(--color-stroke, #333)",
+                                    minWidth: "160px",
+                                    zIndex: 1001,
+                                    overflow: "hidden",
+                                }}
+                            >
+                                <button
+                                    onClick={handleSave}
+                                    disabled={!onSaveState}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "none",
+                                        borderBottom: "1px solid #eee",
+                                        background: "white",
+                                        textAlign: "left",
+                                        cursor: onSaveState ? "pointer" : "not-allowed",
+                                        fontSize: "0.85rem",
+                                        color: onSaveState ? "#333" : "#999",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        fontFamily: "var(--font-hand, sans-serif)",
+                                        fontWeight: 600,
+                                    }}
+                                    onMouseEnter={(e) => onSaveState && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                        <polyline points="17 21 17 13 7 13 7 21"/>
+                                        <polyline points="7 3 7 8 15 8"/>
+                                    </svg>
+                                    Save as .rj
+                                </button>
+                                <button
+                                    onClick={handleLoad}
+                                    disabled={!onLoadState}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "none",
+                                        borderBottom: "1px solid #eee",
+                                        background: "white",
+                                        textAlign: "left",
+                                        cursor: onLoadState ? "pointer" : "not-allowed",
+                                        fontSize: "0.85rem",
+                                        color: onLoadState ? "#333" : "#999",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        fontFamily: "var(--font-hand, sans-serif)",
+                                        fontWeight: 600,
+                                    }}
+                                    onMouseEnter={(e) => onLoadState && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    Load Canvas
+                                </button>
+                                <div style={{ height: "1px", background: "#eee" }} />
+                                <button
+                                    onClick={handleExportPNG}
+                                    disabled={isExporting}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "none",
+                                        borderBottom: "1px solid #eee",
+                                        background: "white",
+                                        textAlign: "left",
+                                        cursor: isExporting ? "not-allowed" : "pointer",
+                                        fontSize: "0.85rem",
+                                        color: "#333",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        fontFamily: "var(--font-hand, sans-serif)",
+                                        fontWeight: 600,
+                                    }}
+                                    onMouseEnter={(e) => !isExporting && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21 15 16 10 5 21"/>
+                                    </svg>
+                                    Export PNG
+                                </button>
+                                <button
+                                    onClick={handleExportSVG}
+                                    disabled={isExporting}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "none",
+                                        background: "white",
+                                        textAlign: "left",
+                                        cursor: isExporting ? "not-allowed" : "pointer",
+                                        fontSize: "0.85rem",
+                                        color: "#333",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        fontFamily: "var(--font-hand, sans-serif)",
+                                        fontWeight: 600,
+                                    }}
+                                    onMouseEnter={(e) => !isExporting && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <polyline points="14 2 14 8 20 8"/>
+                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                        <polyline points="10 9 9 9 8 9"/>
+                                    </svg>
+                                    Export SVG
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -292,7 +312,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                     transform: translateY(-50%);
                     display: flex;
                     flex-direction: column;
-                    gap: 0.625rem;
+                    gap: 0.5rem;
                     z-index: 1000;
                     pointer-events: none;
                 }
@@ -305,19 +325,19 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    gap: 0.625rem;
-                    padding: 0.75rem;
-                    min-width: 3rem;
-                    min-height: 3rem;
+                    gap: 0.5rem;
+                    padding: 0.5rem;
+                    min-width: 2.25rem;
+                    min-height: 2.25rem;
                     background: var(--color-surface, white);
                     border: 2px solid var(--color-stroke, #333);
-                    border-radius: 10px;
+                    border-radius: 8px;
                     cursor: pointer;
                     font-family: var(--font-hand, sans-serif);
-                    font-size: 0.8125rem;
+                    font-size: 0.75rem;
                     font-weight: 600;
                     color: var(--color-text, #333);
-                    box-shadow: 3px 3px 0 var(--color-stroke, #333);
+                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
                     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
                     position: relative;
                     overflow: visible;
@@ -332,12 +352,12 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .control-btn .label {
                     position: absolute;
                     right: 100%;
-                    margin-right: 0.75rem;
-                    padding: 0.625rem 1rem;
+                    margin-right: 0.625rem;
+                    padding: 0.5rem 0.875rem;
                     background: var(--color-surface, white);
                     border: 2px solid var(--color-stroke, #333);
                     border-radius: 8px;
-                    box-shadow: 3px 3px 0 var(--color-stroke, #333);
+                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
                     white-space: nowrap;
                     opacity: 0;
                     pointer-events: none;
@@ -347,14 +367,14 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 }
 
                 .control-btn:hover {
-                    transform: translate(-2px, -2px);
-                    box-shadow: 5px 5px 0 var(--color-stroke, #333);
+                    transform: translate(-1px, -1px);
+                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
                     background: var(--color-fill-1, #f8f9fa);
                 }
 
                 .control-btn:active {
                     transform: translate(1px, 1px);
-                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
+                    box-shadow: 1px 1px 0 var(--color-stroke, #333);
                 }
 
                 .control-btn:disabled {
@@ -365,7 +385,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
 
                 .control-btn:disabled:hover {
                     transform: none;
-                    box-shadow: 3px 3px 0 var(--color-stroke, #333);
+                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
                 }
 
                 /* Specific button styles */
@@ -377,7 +397,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .chat-btn:hover .label {
                     background: #e3f2ff;
                     border-color: #1971c2;
-                    box-shadow: 3px 3px 0 #1971c2;
+                    box-shadow: 2px 2px 0 #1971c2;
                 }
 
                 .assets-btn:hover {
@@ -388,7 +408,29 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .assets-btn:hover .label {
                     background: #ebfbee;
                     border-color: #2f9e44;
-                    box-shadow: 3px 3px 0 #2f9e44;
+                    box-shadow: 2px 2px 0 #2f9e44;
+                }
+
+                .note-btn:hover {
+                    background: #fff9db;
+                    border-color: #fab005;
+                }
+
+                .note-btn:hover .label {
+                    background: #fff9db;
+                    border-color: #fab005;
+                    box-shadow: 2px 2px 0 #fab005;
+                }
+
+                .menu-btn:hover {
+                    background: #f8f9fa;
+                    border-color: #868e96;
+                }
+
+                .menu-btn:hover .label {
+                    background: #f8f9fa;
+                    border-color: #868e96;
+                    box-shadow: 2px 2px 0 #868e96;
                 }
 
                 .export-btn:hover:not(:disabled) {
@@ -399,7 +441,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .export-btn:hover:not(:disabled) .label {
                     background: #fff3bf;
                     border-color: #f59f00;
-                    box-shadow: 3px 3px 0 #f59f00;
+                    box-shadow: 2px 2px 0 #f59f00;
                 }
 
                 .save-btn:hover:not(:disabled) {
@@ -410,7 +452,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .save-btn:hover:not(:disabled) .label {
                     background: #e7f5ff;
                     border-color: #339af0;
-                    box-shadow: 3px 3px 0 #339af0;
+                    box-shadow: 2px 2px 0 #339af0;
                 }
 
                 .load-btn:hover:not(:disabled) {
@@ -421,7 +463,7 @@ export default function CanvasControls({ onOpenChat, onOpenAssets, isChatOpen, i
                 .load-btn:hover:not(:disabled) .label {
                     background: #f3f0ff;
                     border-color: #7950f2;
-                    box-shadow: 3px 3px 0 #7950f2;
+                    box-shadow: 2px 2px 0 #7950f2;
                 }
 
                 .divider {
