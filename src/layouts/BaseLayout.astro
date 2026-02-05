@@ -117,5 +117,39 @@ const canonicalURL = new URL(
     </svg>
 
     <slot />
+
+    <!-- Scroll reveal animation script -->
+    <script>
+      function initRevealAnimations() {
+        const revealElements = document.querySelectorAll('.reveal, .reveal-scale, .reveal-left, .reveal-right, .stagger-children');
+        
+        if (revealElements.length === 0) return;
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              // Optionally unobserve after animation
+              observer.unobserve(entry.target);
+            }
+          });
+        }, {
+          threshold: 0.1,
+          rootMargin: '0px 0px -50px 0px'
+        });
+
+        revealElements.forEach(el => observer.observe(el));
+      }
+
+      // Run on page load
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRevealAnimations);
+      } else {
+        initRevealAnimations();
+      }
+
+      // Re-init after view transitions
+      document.addEventListener('astro:page-load', initRevealAnimations);
+    </script>
   </body>
 </html>

@@ -15,14 +15,13 @@ import { PROJECTS } from "../../lib/constants";
       <div class="projects__header-line" aria-hidden="true"></div>
     </div>
 
-    <div class="projects__grid stagger-children">
+    <div class="projects__grid">
       {
         PROJECTS.map((project, index) => {
           const isAstroWeb = project.title.toLowerCase().includes("astroweb");
           return (
             <article
-              class={`project-card-wrapper ${isAstroWeb ? "visible" : "reveal-scale"}`}
-              style={isAstroWeb ? "" : `transition-delay: ${index * 100}ms`}
+              class="project-card-wrapper"
             >
               <SketchBox class="project-card" fillColor={project.fillColor}>
                 <div class="project-card__inner">
@@ -238,20 +237,6 @@ import { PROJECTS } from "../../lib/constants";
     gap: var(--space-sm);
     padding-top: var(--space-sm);
     border-top: 1px solid var(--color-stroke-muted);
-  }
-
-  /* Card entrance animation */
-  .project-card-wrapper {
-    opacity: 0;
-    transform: scale(0.95);
-    transition:
-      opacity 0.6s ease,
-      transform 0.6s ease;
-  }
-
-  .project-card-wrapper.visible {
-    opacity: 1;
-    transform: scale(1);
   }
 
   @media (max-width: 768px) {
