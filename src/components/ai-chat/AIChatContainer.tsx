@@ -243,26 +243,54 @@ export default function AIChatContainer({
         onStateUpdate: setCanvasState,
     });
 
+    // Track if user manually selected elements (not via "All" button)
+    const wasManualSelectionRef = useRef(false);
+    const previousSelectionCountRef = useRef(0);
+
+    // Auto-switch to "selected" mode only when user manually selects elements
+    useEffect(() => {
+        const currentCount = selectedElements.length;
+        const previousCount = previousSelectionCountRef.current;
+
+        // If selection increased and we're in "all" mode, check if it's manual
+        if (contextMode === "all" && currentCount > 0 && currentCount < canvasState?.elements?.length) {
+            // Only auto-switch if it's not a full selection (which would be from "All" button)
+            setContextMode("selected");
+        }
+
+        previousSelectionCountRef.current = currentCount;
+    }, [selectedElements.length, contextMode, setContextMode, canvasState?.elements?.length]);
+
     // === 🚀 ACTIONS ===
 
     /**
      * Handle sending a message
      */
     const handleSend = useCallback(async () => {
-        // Skip screenshot for Kimi (doesn't support images)
-        const isKimi = aiProvider === "kimi";
+        // Check if we have selected images
+        const selectedImageData: string[] = [];
 
-        // For now, simplified send without screenshot coordination
-        // Currently processing message directly
-        // Future: Add screenshot capture for vision-capable models (e.g. Claude)
+        if (contextMode === "selected" && selectedElements.length > 0) {
+            // Extract image data from selected image elements
+            elementSnapshots.forEach((snapshot) => {
+                if (snapshot.type === 'image' && snapshot.imageDataURL) {
+                    selectedImageData.push(snapshot.imageDataURL);
+                }
+            });
+        }
+
+        // Use the first selected image as the screenshot data (Claude supports vision)
+        const imageForAI = selectedImageData.length > 0 ? selectedImageData[0] : null;
+
         await handleSendMessage({
-            screenshotData: null,
+            screenshotData: imageForAI,
             selectedElements,
             getSelectionContext,
         });
     }, [
-        aiProvider,
+        contextMode,
         selectedElements,
+        elementSnapshots,
         handleSendMessage,
         getSelectionContext,
     ]);
@@ -338,6 +366,16 @@ export default function AIChatContainer({
 
     return (
         <>
+            {/* Canvas Context Preview - Separate container to the LEFT of chat */}
+            <CanvasContextOverlay
+                contextMode={contextMode}
+                onContextModeChange={setContextMode}
+                selectedElements={selectedElements}
+                elementSnapshots={elementSnapshots}
+                canvasElementCount={canvasState?.elements?.length || 0}
+                onClearSelection={clearSelection}
+            />
+
             <ChatPanel
                 isOpen={isOpen}
                 width={panelWidth}
@@ -348,7 +386,7 @@ export default function AIChatContainer({
                 {/* Header - just close button */}
                 <ChatHeader onClose={onClose} />
 
-                {/* Messages wrapper with floating context overlay */}
+                {/* Messages wrapper */}
                 <div style={{
                     flex: 1,
                     position: "relative",
@@ -364,16 +402,7 @@ export default function AIChatContainer({
                         error={error}
                         aiProvider={aiProvider}
                         canvasState={canvasState}
-                    />
-
-                    {/* Canvas Context - floating overlay on top of messages */}
-                    <CanvasContextOverlay
-                        contextMode={contextMode}
-                        onContextModeChange={setContextMode}
-                        selectedElements={selectedElements}
-                        elementSnapshots={elementSnapshots}
-                        canvasElementCount={canvasState?.elements?.length || 0}
-                        onClearSelection={clearSelection}
+                        hasPreviewPanel={false}
                     />
                 </div>
 

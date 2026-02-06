@@ -84,6 +84,13 @@ export const POST: APIRoute = async ({ request }) => {
         const base64Data = screenshot.split(',')[1];
         const mediaType = screenshot.split(';')[0].split(':')[1] || 'image/png';
 
+        if (!base64Data) {
+          return {
+            role: msg.role,
+            content: msg.content,
+          };
+        }
+
         return {
           role: msg.role,
           content: [

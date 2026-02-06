@@ -199,7 +199,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                             {isMobile ? "Quick" : "Templates"}
                         </button>
 
-                        {/* All/Selected Mode Toggle */}
+                        {/* Selected/All Mode Toggle - Selected on left */}
                         {onContextModeChange && (
                             <div style={{
                                 display: "flex",
@@ -210,27 +210,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                                 borderRadius: "6px",
                                 border: "1px solid var(--color-stroke-muted, #e5e7eb)",
                             }}>
-                                <button
-                                    onClick={() => {
-                                        onContextModeChange("all");
-                                        onClearSelection?.();
-                                    }}
-                                    title="Use all canvas elements"
-                                    style={{
-                                        padding: isMobile ? "6px 10px" : "4px 8px",
-                                        borderRadius: "4px",
-                                        border: "none",
-                                        background: contextMode === "all" ? "#10b981" : "transparent",
-                                        color: contextMode === "all" ? "white" : "#6b7280",
-                                        fontSize: isMobile ? "12px" : "10px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                        transition: "all 0.15s",
-                                        minHeight: isMobile ? "32px" : undefined,
-                                    }}
-                                >
-                                    All
-                                </button>
                                 <button
                                     onClick={() => onContextModeChange("selected")}
                                     title="Use selected elements only"
@@ -248,6 +227,41 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                                     }}
                                 >
                                     Selected
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onContextModeChange("all");
+                                        // Select all canvas elements when switching to "all" mode
+                                        const api = (window as any).excalidrawAPI;
+                                        if (api) {
+                                            const elements = api.getSceneElements();
+                                            const allElementIds = elements.reduce((acc: Record<string, boolean>, el: any) => {
+                                                acc[el.id] = true;
+                                                return acc;
+                                            }, {});
+                                            api.updateScene({
+                                                appState: {
+                                                    ...api.getAppState(),
+                                                    selectedElementIds: allElementIds,
+                                                },
+                                            });
+                                        }
+                                    }}
+                                    title="Use all canvas elements (selects all)"
+                                    style={{
+                                        padding: isMobile ? "6px 10px" : "4px 8px",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        background: contextMode === "all" ? "#10b981" : "transparent",
+                                        color: contextMode === "all" ? "white" : "#6b7280",
+                                        fontSize: isMobile ? "12px" : "10px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                        minHeight: isMobile ? "32px" : undefined,
+                                    }}
+                                >
+                                    All
                                 </button>
                             </div>
                         )}

@@ -91,6 +91,8 @@ export interface MessageListProps {
     aiProvider: "kimi" | "claude";
     /** Canvas state for message context */
     canvasState?: any;
+    /** Whether the preview panel is visible (adds left padding) */
+    hasPreviewPanel?: boolean;
 }
 
 /**
@@ -190,7 +192,7 @@ function ErrorDisplay({ message }: { message: string }) {
  * Scrollable message list (now with position: relative for overlay support)
  */
 export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
-    function MessageList({ messages, isLoading, error, aiProvider, canvasState }, forwardedRef) {
+    function MessageList({ messages, isLoading, error, aiProvider, canvasState, hasPreviewPanel = false }, forwardedRef) {
         const internalRef = useRef<HTMLDivElement>(null);
         const scrollRef = (forwardedRef as React.RefObject<HTMLDivElement>) || internalRef;
 
@@ -207,10 +209,12 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
                 position: "relative", // Enable absolute positioning for overlay
                 overflowY: "auto",
                 padding: "18px",
+                paddingLeft: hasPreviewPanel ? "252px" : "18px", // Add left padding for preview panel
                 display: "flex",
                 flexDirection: "column",
                 gap: "14px",
                 minHeight: 0, // Important for flex child scrolling
+                transition: "padding-left 0.2s ease",
             }}>
                 {!hasMessages ? (
                     <EmptyState />

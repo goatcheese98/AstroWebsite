@@ -3,9 +3,13 @@ import ThemeToggle from "./ThemeToggle.astro";
 import { NAV_LINKS, CANVAS_NAV_LINKS } from "../../lib/constants";
 
 const currentPath = Astro.url.pathname;
-// Detect canvas-only mode by checking the site URL (for canvas.rohanjasani.com)
-const siteUrl = Astro.site?.toString() || '';
-const isCanvasOnly = siteUrl.includes('canvas.') || currentPath === '/ai-canvas';
+const hostname = Astro.url.hostname;
+
+// Canvas-only mode: only true when on canvas.rohanjasani.com subdomain
+// NOT when on main site at /ai-canvas
+const isCanvasOnly = hostname === 'canvas.rohanjasani.com' || 
+                     hostname.startsWith('canvas.');
+
 const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
 ---
 

@@ -51,6 +51,9 @@ export interface CanvasElementSnapshot {
     text?: string;
     label?: string;
     selected: boolean;
+    // Image-specific fields
+    fileId?: string;
+    imageDataURL?: string; // Base64 data URL for image preview
 }
 
 export interface Reaction {

@@ -412,6 +412,11 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
         .map(c => c.text)
         .join("\n");
 
+    // Extract image content from message
+    const imageContent = message.content
+        .filter((c): c is { type: "image"; url: string } => c.type === "image")
+        .map(c => c.url);
+
     // Determine theme for markdown rendering
     const isDark = typeof document !== 'undefined' &&
         document.documentElement.getAttribute('data-theme') === 'dark';
@@ -446,8 +451,32 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
                 border: isUser ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
             }}>
                 {isUser ? (
-                    // User messages: plain text
-                    textContent
+                    // User messages: plain text and images
+                    <>
+                        {textContent}
+                        {imageContent.length > 0 && (
+                            <div style={{
+                                marginTop: textContent ? "8px" : "0",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "8px",
+                            }}>
+                                {imageContent.map((url, index) => (
+                                    <img
+                                        key={index}
+                                        src={url}
+                                        alt="Shared image"
+                                        style={{
+                                            maxWidth: "100%",
+                                            maxHeight: "300px",
+                                            objectFit: "contain",
+                                            borderRadius: "8px",
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
                 ) : (
                     // AI messages: rendered markdown
                     <div

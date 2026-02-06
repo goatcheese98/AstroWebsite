@@ -243,13 +243,13 @@ export default function CanvasApp() {
     const handleOpenChat = () => {
         console.log("Opening AI Chat");
         setIsChatOpen(true);
-        setIsAssetsOpen(false); // Close assets if open
+        // Allow both panels to be open simultaneously
     };
 
     const handleOpenAssets = () => {
         console.log("Opening Assets");
         setIsAssetsOpen(true);
-        setIsChatOpen(false); // Close chat if open
+        // Allow both panels to be open simultaneously
     };
 
     const handleCloseChat = () => {

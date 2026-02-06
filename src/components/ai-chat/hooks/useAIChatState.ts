@@ -137,7 +137,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const [error, setError] = useState<string | null>(null);
 
     // === 🖥️ UI State ===
-    const [contextMode, setContextMode] = useState<"all" | "selected">("all");
+    const [contextMode, setContextMode] = useState<"all" | "selected">("selected");
     const [aiProvider, setAiProvider] = useState<AIProvider>("claude");
     const [showTemplates, setShowTemplates] = useState(false);
 
@@ -250,11 +250,24 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
         const fullContent = userContent + contextMessage + elementDataForPrompt;
 
+        // Build message content array
+        const messageContent: Array<{ type: string; text?: string; url?: string }> = [
+            { type: "text", text: userContent }
+        ];
+
+        // If a screenshot is provided, add it to the message content
+        if (screenshotData) {
+            messageContent.push({
+                type: "image",
+                url: screenshotData,
+            });
+        }
+
         // Create user message
         const userMessage: Message = {
             id: nanoid(),
             role: "user",
-            content: [{ type: "text", text: userContent }],
+            content: messageContent as any,
             metadata: {
                 timestamp: new Date(),
                 canvasContext: {

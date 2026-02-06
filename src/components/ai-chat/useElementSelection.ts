@@ -43,12 +43,13 @@ export function useElementSelection(options: UseElementSelectionOptions) {
         if (!api) return;
 
         const elements = api.getSceneElements();
+        const files = api.getFiles?.() || {};
         const newSnapshots = new Map(elementSnapshots);
 
         elementIds.forEach(id => {
             const element = elements.find((el: any) => el.id === id);
             if (element) {
-                newSnapshots.set(id, {
+                const snapshot: CanvasElementSnapshot = {
                     id: element.id,
                     type: element.type,
                     x: element.x,
@@ -57,7 +58,18 @@ export function useElementSelection(options: UseElementSelectionOptions) {
                     height: element.height || 100,
                     text: element.text || element.label?.text,
                     selected: true,
-                });
+                };
+
+                // If it's an image element, capture the image data
+                if (element.type === 'image' && element.fileId) {
+                    snapshot.fileId = element.fileId;
+                    const fileData = files[element.fileId];
+                    if (fileData) {
+                        snapshot.imageDataURL = fileData.dataURL;
+                    }
+                }
+
+                newSnapshots.set(id, snapshot);
             }
         });
 
