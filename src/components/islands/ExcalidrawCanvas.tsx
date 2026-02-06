@@ -175,7 +175,7 @@ export default function ExcalidrawCanvas() {
         };
 
         window.addEventListener("beforeunload", handleBeforeUnload);
-        
+
         return () => {
             window.removeEventListener("beforeunload", handleBeforeUnload);
         };
@@ -898,10 +898,10 @@ export default function ExcalidrawCanvas() {
         const handleDragOver = (e: DragEvent) => {
             // Check if any files are .rj files
             const hasCanvasFile = Array.from(e.dataTransfer?.items || []).some(
-                item => item.kind === 'file' && item.type === 'application/json' || 
-                        (item.kind === 'file' && (item.getAsFile()?.name?.endsWith('.rj')))
+                item => item.kind === 'file' && item.type === 'application/json' ||
+                    (item.kind === 'file' && (item.getAsFile()?.name?.endsWith('.rj')))
             );
-            
+
             if (hasCanvasFile) {
                 e.preventDefault();
                 e.dataTransfer!.dropEffect = 'copy';
@@ -911,34 +911,34 @@ export default function ExcalidrawCanvas() {
         const handleDrop = async (e: DragEvent) => {
             const files = Array.from(e.dataTransfer?.files || []);
             const canvasFile = files.find(f => f.name.endsWith('.rj'));
-            
+
             if (canvasFile) {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 console.log("📂 Canvas state file dropped:", canvasFile.name);
-                
+
                 // Import and use the state manager
                 const { loadCanvasStateFromFile } = await import('../../lib/canvas-state-manager');
                 const result = await loadCanvasStateFromFile(canvasFile);
-                
+
                 if (result.success && result.state) {
                     // Dispatch event to load the state
                     window.dispatchEvent(new CustomEvent('canvas:load-state', {
                         detail: { state: result.state },
                     }));
-                    
+
                     // Also dispatch to chat components
                     window.dispatchEvent(new CustomEvent('chat:load-messages', {
                         detail: { messages: result.state.chat.messages },
                     }));
-                    
+
                     if (result.state.chat.aiProvider) {
                         window.dispatchEvent(new CustomEvent('chat:set-provider', {
                             detail: { provider: result.state.chat.aiProvider },
                         }));
                     }
-                    
+
                     console.log('✅ Canvas state loaded from drop');
                 } else {
                     console.error('❌ Failed to load canvas state:', result.error);
@@ -1101,7 +1101,7 @@ export default function ExcalidrawCanvas() {
                 }
             }
         },
-        delay: 600, // Slightly faster than default for better UX
+        delay: 1500, // 2.5x longer than original (600ms × 3 = 1800ms) for deliberate long-press
         disabled: !isMobile, // Only enable on mobile
     });
 
@@ -1248,7 +1248,7 @@ export default function ExcalidrawCanvas() {
                         };
                         console.log("💡 Debug utility available: clearCanvasStorage()");
                     }
-                    
+
                     // Restore files from localStorage immediately when API is ready
                     try {
                         const saved = localStorage.getItem(STORAGE_KEY);
