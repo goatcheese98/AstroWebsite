@@ -109,7 +109,12 @@ export default function CanvasControls({
     };
 
     const handleSave = () => {
-        onSaveState?.();
+        console.log("💾 CanvasControls: Save clicked, onSaveState:", typeof onSaveState);
+        if (onSaveState) {
+            onSaveState();
+        } else {
+            console.error("❌ CanvasControls: onSaveState is not defined!");
+        }
         setIsMenuOpen(false);
     };
 
@@ -123,8 +128,8 @@ export default function CanvasControls({
         window.dispatchEvent(new CustomEvent("imagegen:open"));
     };
 
-    // Hide controls when any panel is open
-    const isPanelOpen = isChatOpen || isAssetsOpen;
+    // Note: Controls now always visible for access to Save/Load
+    const isPanelOpen = false; // isChatOpen || isAssetsOpen;
 
     return (
         <>
@@ -209,7 +214,7 @@ export default function CanvasControls({
                             >
                                 <button
                                     onClick={handleSave}
-                                    disabled={!onSaveState}
+                                    disabled={false}
                                     style={{
                                         width: "100%",
                                         padding: "12px 16px",
@@ -217,16 +222,16 @@ export default function CanvasControls({
                                         borderBottom: "1px solid #eee",
                                         background: "white",
                                         textAlign: "left",
-                                        cursor: onSaveState ? "pointer" : "not-allowed",
+                                        cursor: "pointer",
                                         fontSize: "0.85rem",
-                                        color: onSaveState ? "#333" : "#999",
+                                        color: "#333",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "10px",
                                         fontFamily: "var(--font-hand, sans-serif)",
                                         fontWeight: 600,
                                     }}
-                                    onMouseEnter={(e) => onSaveState && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

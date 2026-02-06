@@ -29,7 +29,7 @@ const loadMarkdownNote = async () => {
 };
 
 const STORAGE_KEY = "excalidraw-canvas-data";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
 export default function ExcalidrawCanvas() {
     const { isMobile, isPhone } = useMobileDetection();
@@ -45,6 +45,7 @@ export default function ExcalidrawCanvas() {
     const markdownElementsRef = useRef<any[]>([]);
     const markdownNoteRefsRef = useRef<Map<string, any>>(new Map());
     const saveTimeoutRef = useRef<number | null>(null);
+    const pendingSaveDataRef = useRef<{ elements: any[]; appState: any; files: any } | null>(null);
 
     // State for triggering React re-renders (updated at controlled intervals)
     const [, forceUpdate] = useState({});
@@ -56,15 +57,28 @@ export default function ExcalidrawCanvas() {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 const data = JSON.parse(saved);
+                console.log("📂 Loaded from localStorage:", {
+                    version: data.version,
+                    expectedVersion: STORAGE_VERSION,
+                    savedAt: data.savedAt ? new Date(data.savedAt).toISOString() : "unknown",
+                    elements: data.canvasData?.elements?.length || 0,
+                    files: Object.keys(data.canvasData?.files || {}).length,
+                });
+
                 if (data.version === STORAGE_VERSION) {
                     setInitialCanvasData(data.canvasData);
                     console.log("✅ Restored canvas from localStorage");
                 } else {
-                    console.log("⚠️ Canvas data version mismatch, starting fresh");
+                    console.warn(`⚠️ Canvas data version mismatch (got ${data.version}, expected ${STORAGE_VERSION}), clearing old data`);
+                    localStorage.removeItem(STORAGE_KEY);
                 }
+            } else {
+                console.log("📂 No saved data in localStorage");
             }
         } catch (err) {
-            console.error("Failed to load canvas data:", err);
+            console.error("❌ Failed to load canvas data:", err);
+            // Clear corrupted data
+            localStorage.removeItem(STORAGE_KEY);
         }
     }, []);
 
@@ -93,15 +107,51 @@ export default function ExcalidrawCanvas() {
 
         return () => {
             mounted = false;
-            // Clear any pending save on unmount
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
         };
+    }, []);
+
+    // Actually perform the save to localStorage
+    const performSave = useCallback((elements: any[], appState: any, files: any) => {
+        try {
+            const dataToSave = {
+                version: STORAGE_VERSION,
+                savedAt: Date.now(), // Add timestamp for staleness detection
+                canvasData: {
+                    elements,
+                    appState: {
+                        viewBackgroundColor: appState.viewBackgroundColor,
+                        currentItemStrokeColor: appState.currentItemStrokeColor,
+                        currentItemBackgroundColor: appState.currentItemBackgroundColor,
+                        currentItemFillStyle: appState.currentItemFillStyle,
+                        currentItemStrokeWidth: appState.currentItemStrokeWidth,
+                        currentItemRoughness: appState.currentItemRoughness,
+                        currentItemOpacity: appState.currentItemOpacity,
+                        currentItemFontFamily: appState.currentItemFontFamily,
+                        currentItemFontSize: appState.currentItemFontSize,
+                        currentItemTextAlign: appState.currentItemTextAlign,
+                        currentItemStrokeStyle: appState.currentItemStrokeStyle,
+                        currentItemRoundness: appState.currentItemRoundness,
+                    },
+                    files,
+                },
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            console.log("💾 Canvas auto-saved:", {
+                version: STORAGE_VERSION,
+                elements: elements.length,
+                files: Object.keys(files || {}).length,
+                timestamp: new Date(dataToSave.savedAt).toISOString(),
+            });
+        } catch (err) {
+            console.error("Failed to save canvas:", err);
+        }
     }, []);
 
     // Save canvas to localStorage with debouncing
     const saveToLocalStorage = useCallback((elements: any[], appState: any, files: any) => {
+        // Store pending data for emergency save on page unload
+        pendingSaveDataRef.current = { elements, appState, files };
+
         // Clear existing timeout
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
@@ -109,35 +159,27 @@ export default function ExcalidrawCanvas() {
 
         // Debounce save by 1 second
         saveTimeoutRef.current = window.setTimeout(() => {
-            try {
-                const dataToSave = {
-                    version: STORAGE_VERSION,
-                    canvasData: {
-                        elements,
-                        appState: {
-                            viewBackgroundColor: appState.viewBackgroundColor,
-                            currentItemStrokeColor: appState.currentItemStrokeColor,
-                            currentItemBackgroundColor: appState.currentItemBackgroundColor,
-                            currentItemFillStyle: appState.currentItemFillStyle,
-                            currentItemStrokeWidth: appState.currentItemStrokeWidth,
-                            currentItemRoughness: appState.currentItemRoughness,
-                            currentItemOpacity: appState.currentItemOpacity,
-                            currentItemFontFamily: appState.currentItemFontFamily,
-                            currentItemFontSize: appState.currentItemFontSize,
-                            currentItemTextAlign: appState.currentItemTextAlign,
-                            currentItemStrokeStyle: appState.currentItemStrokeStyle,
-                            currentItemRoundness: appState.currentItemRoundness,
-                        },
-                        files,
-                    },
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-                console.log("💾 Canvas auto-saved");
-            } catch (err) {
-                console.error("Failed to save canvas:", err);
-            }
+            performSave(elements, appState, files);
+            pendingSaveDataRef.current = null;
         }, 1000);
-    }, []);
+    }, [performSave]);
+
+    // Handle page unload - save any pending changes immediately
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            // If there's pending save data, save it immediately
+            if (pendingSaveDataRef.current) {
+                const { elements, appState, files } = pendingSaveDataRef.current;
+                performSave(elements, appState, files);
+            }
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+        };
+    }, [performSave]);
 
     useEffect(() => {
         // Force light theme always, regardless of document theme
@@ -1185,11 +1227,47 @@ export default function ExcalidrawCanvas() {
                     if (typeof window !== "undefined") {
                         (window as any).excalidrawAPI = api;
                         (window as any).createMarkdownNote = handleCreateMarkdown;
+
+                        // Add utility to clear all canvas localStorage (for debugging)
+                        (window as any).clearCanvasStorage = () => {
+                            try {
+                                const keys = [
+                                    STORAGE_KEY,
+                                    "canvas-image-history",
+                                ];
+                                keys.forEach(key => {
+                                    localStorage.removeItem(key);
+                                    console.log(`🗑️ Cleared: ${key}`);
+                                });
+                                console.log("✅ All canvas storage cleared. Refresh the page.");
+                                return "Storage cleared. Refresh the page to start fresh.";
+                            } catch (err) {
+                                console.error("❌ Failed to clear storage:", err);
+                                return "Failed to clear storage.";
+                            }
+                        };
+                        console.log("💡 Debug utility available: clearCanvasStorage()");
+                    }
+                    
+                    // Restore files from localStorage immediately when API is ready
+                    try {
+                        const saved = localStorage.getItem(STORAGE_KEY);
+                        if (saved) {
+                            const data = JSON.parse(saved);
+                            const files = data.canvasData?.files;
+                            if (files && Object.keys(files).length > 0) {
+                                console.log("📂 Restoring files:", Object.keys(files).length);
+                                api.addFiles(Object.values(files));
+                                console.log("✅ Files restored");
+                            }
+                        }
+                    } catch (err) {
+                        console.error("❌ Failed to restore files:", err);
                     }
                 }}
                 initialData={initialCanvasData || {
                     appState: {
-                        viewBackgroundColor: "transparent",
+                        viewBackgroundColor: "#ffffff", // Always white background
                         gridSize: 0, // Remove grid dots (0 = no grid)
                     },
                 }}
@@ -1274,9 +1352,11 @@ export default function ExcalidrawCanvas() {
                         zoom: appState.zoom,
                     };
 
-                    // Auto-save to localStorage
-                    if (excalidrawAPI) {
-                        const files = excalidrawAPI.getFiles();
+                    // Auto-save to localStorage - use ref to avoid closure issues
+                    const api = excalidrawAPIRef.current;
+                    if (api) {
+                        const files = api.getFiles();
+                        console.log("📝 onChange - files count:", Object.keys(files || {}).length);
 
                         // If canvas is empty, clear localStorage
                         if (elements.length === 0) {
@@ -1285,6 +1365,8 @@ export default function ExcalidrawCanvas() {
                         } else {
                             saveToLocalStorage(elements, appState, files);
                         }
+                    } else {
+                        console.log("📝 onChange - API not ready yet");
                     }
                 }}
                 renderTopRightUI={() => (

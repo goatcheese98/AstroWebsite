@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { svgLibrary, categories, type SVGMetadata } from "../../lib/svg-library-config";
 
 interface GeneratedImage {
@@ -11,32 +11,67 @@ interface GeneratedImage {
 interface MyAssetsPanelProps {
     isOpen: boolean;
     onClose: () => void;
+    /** Image history from useImageGeneration hook (for persistence) */
+    imageHistory?: GeneratedImage[];
+    /** Callback when image history changes (for persistence) */
+    onImageHistoryChange?: (history: GeneratedImage[]) => void;
 }
 
-export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
+export default function MyAssetsPanel({ 
+    isOpen, 
+    onClose, 
+    imageHistory = [], 
+    onImageHistoryChange 
+}: MyAssetsPanelProps) {
     const [selectedCategory, setSelectedCategory] = useState<string>("generated");
     const [searchQuery, setSearchQuery] = useState("");
     const [panelWidth, setPanelWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
     const panelRef = useRef<HTMLDivElement>(null);
+    
+    // Use external imageHistory if provided, otherwise fall back to local state
+    const isExternalHistory = onImageHistoryChange !== undefined;
+    const [localGeneratedImages, setLocalGeneratedImages] = useState<GeneratedImage[]>([]);
+    
+    // Use external or local state
+    const generatedImages = isExternalHistory ? imageHistory : localGeneratedImages;
+    
+    // Helper to add a new image to history (handles both external and local state)
+    const addGeneratedImage = useCallback((imageUrl: string, prompt?: string) => {
+        const newImage: GeneratedImage = {
+            id: Date.now().toString(),
+            url: imageUrl,
+            prompt: prompt || "Generated Image",
+            timestamp: new Date(),
+        };
+        
+        if (isExternalHistory && onImageHistoryChange) {
+            onImageHistoryChange([newImage, ...generatedImages]);
+        } else {
+            setLocalGeneratedImages(prev => [newImage, ...prev]);
+        }
+    }, [isExternalHistory, onImageHistoryChange, generatedImages]);
+    
+    // Helper to delete an image from history
+    const deleteGeneratedImage = useCallback((id: string) => {
+        if (isExternalHistory && onImageHistoryChange) {
+            onImageHistoryChange(generatedImages.filter(img => img.id !== id));
+        } else {
+            setLocalGeneratedImages(prev => prev.filter(img => img.id !== id));
+        }
+    }, [isExternalHistory, onImageHistoryChange, generatedImages]);
 
     // Listen for new generated images
     useEffect(() => {
         const handleImageGenerated = (event: any) => {
             const { imageUrl, prompt } = event.detail;
             if (imageUrl) {
-                setGeneratedImages(prev => [{
-                    id: Date.now().toString(),
-                    url: imageUrl,
-                    prompt: prompt || "Generated Image",
-                    timestamp: new Date(),
-                }, ...prev]);
+                addGeneratedImage(imageUrl, prompt);
             }
         };
         window.addEventListener("asset:image-generated", handleImageGenerated);
         return () => window.removeEventListener("asset:image-generated", handleImageGenerated);
-    }, []);
+    }, [addGeneratedImage]);
 
     const filteredSvgs = svgLibrary.filter((svg) => {
         const matchesCategory = selectedCategory === "all" || svg.category === selectedCategory;
@@ -80,7 +115,16 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
 
     const handleDeleteImage = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        setGeneratedImages(prev => prev.filter(img => img.id !== id));
+
+        // Show confirmation dialog
+        const confirmed = window.confirm("Delete this generated image? This cannot be undone.");
+        if (confirmed) {
+            deleteGeneratedImage(id);
+            // Show success toast
+            window.dispatchEvent(new CustomEvent("canvas:show-toast", {
+                detail: { message: "Image deleted", type: "info" }
+            }));
+        }
     };
 
     const handleCopyImage = async (e: React.MouseEvent, image: GeneratedImage) => {
@@ -440,7 +484,7 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                         right: 4px;
                         display: flex;
                         gap: 4px;
-                        opacity: 0;
+                        opacity: 0.7;
                         transition: opacity 0.2s;
                     }
 
@@ -448,34 +492,53 @@ export default function MyAssetsPanel({ isOpen, onClose }: MyAssetsPanelProps) {
                         opacity: 1;
                     }
 
+                    /* Always show actions on mobile/touch devices */
+                    @media (hover: none) {
+                        .image-actions {
+                            opacity: 1;
+                        }
+                    }
+
                     .copy-image-btn,
                     .delete-image-btn {
-                        width: 20px;
-                        height: 20px;
+                        width: 24px;
+                        height: 24px;
                         border-radius: 50%;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.95);
                         border: 1px solid var(--color-stroke-muted, #ddd);
                         color: var(--color-text-muted, #666);
-                        font-size: 14px;
+                        font-size: 16px;
                         line-height: 1;
                         cursor: pointer;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        transition: opacity 0.2s, background 0.2s, color 0.2s;
+                        transition: all 0.2s;
                         padding: 0;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
                     }
 
                     .copy-image-btn:hover {
                         background: #dbeafe;
                         color: #2563eb;
                         border-color: #93c5fd;
+                        transform: scale(1.1);
+                    }
+
+                    .delete-image-btn {
+                        font-weight: bold;
                     }
 
                     .delete-image-btn:hover {
                         background: #fee2e2;
                         color: #dc2626;
                         border-color: #fca5a5;
+                        transform: scale(1.1);
+                    }
+
+                    .delete-image-btn:active,
+                    .copy-image-btn:active {
+                        transform: scale(0.95);
                     }
 
                     @media (max-width: 768px) {

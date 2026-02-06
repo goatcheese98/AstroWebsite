@@ -14,6 +14,10 @@ import type { Message } from "../ai-chat/types";
 import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
 import type { GenerationOptions } from "../ai-chat/ImageGenerationModal";
 
+// localStorage key for image history persistence
+const IMAGE_HISTORY_STORAGE_KEY = "canvas-image-history";
+const IMAGE_HISTORY_STORAGE_VERSION = 2; // Bumped to invalidate old cache
+
 // State container for save/load coordination
 interface CanvasStateContainer {
     messages: Message[];
@@ -131,6 +135,94 @@ export default function CanvasApp() {
         isCapturing: boolean;
     } | null>(null);
 
+    // Ref to always have latest pendingSaveState (avoid stale closure)
+    const pendingSaveStateRef = useRef<CanvasState | null>(null);
+    
+    // Keep ref in sync with state
+    useEffect(() => {
+        pendingSaveStateRef.current = pendingSaveState;
+    }, [pendingSaveState]);
+
+    // === IMAGE GENERATION (needed for save functionality) ===
+    const {
+        isGeneratingImage,
+        generateImage,
+        imageHistory,
+        setImageHistory,
+    } = useImageGeneration();
+
+    // === IMAGE HISTORY PERSISTENCE ===
+    // Track if we've loaded initial data (to avoid saving on mount)
+    const hasLoadedInitialHistory = useRef(false);
+
+    // Load image history from localStorage on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(IMAGE_HISTORY_STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                console.log("📂 Image history from localStorage:", {
+                    version: data.version,
+                    expectedVersion: IMAGE_HISTORY_STORAGE_VERSION,
+                    historyLength: data.history?.length || 0,
+                });
+
+                if (data.version === IMAGE_HISTORY_STORAGE_VERSION && data.history) {
+                    // Restore timestamps as Date objects
+                    const restoredHistory = data.history.map((img: any) => ({
+                        ...img,
+                        timestamp: img.timestamp ? new Date(img.timestamp) : new Date(),
+                    }));
+                    setImageHistory(restoredHistory);
+                    console.log(`✅ Restored ${restoredHistory.length} images from localStorage`);
+                } else {
+                    console.warn(`⚠️ Image history version mismatch (got ${data.version}, expected ${IMAGE_HISTORY_STORAGE_VERSION}), clearing old data`);
+                    localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
+                }
+            } else {
+                console.log("📂 No image history in localStorage");
+            }
+            // Mark that we've completed initial load
+            hasLoadedInitialHistory.current = true;
+        } catch (err) {
+            console.error("❌ Failed to load image history from localStorage:", err);
+            // Clear corrupted data
+            localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
+            hasLoadedInitialHistory.current = true;
+        }
+    }, [setImageHistory]);
+
+    // Save image history to localStorage whenever it changes (after initial load)
+    useEffect(() => {
+        // Skip saving on initial mount
+        if (!hasLoadedInitialHistory.current) {
+            return;
+        }
+
+        try {
+            if (imageHistory.length === 0) {
+                // Clear localStorage if history is empty
+                localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
+                console.log("🗑️ Cleared image history from localStorage");
+            } else {
+                // Serialize history with timestamps as ISO strings
+                const dataToSave = {
+                    version: IMAGE_HISTORY_STORAGE_VERSION,
+                    history: imageHistory.map(img => ({
+                        ...img,
+                        timestamp: img.timestamp instanceof Date
+                            ? img.timestamp.toISOString()
+                            : img.timestamp,
+                    })),
+                };
+                localStorage.setItem(IMAGE_HISTORY_STORAGE_KEY, JSON.stringify(dataToSave));
+                console.log(`💾 Saved ${imageHistory.length} images to localStorage`);
+            }
+        } catch (err) {
+            console.error("Failed to save image history to localStorage:", err);
+        }
+    }, [imageHistory]);
+
     // Toast helper functions
     const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration: number = 3000) => {
         const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -174,49 +266,82 @@ export default function CanvasApp() {
      * Handle save canvas state - opens modal to choose options
      */
     const handleSaveState = useCallback(() => {
+        console.log("💾 CanvasApp: handleSaveState called");
+        
         const excalidrawAPI = (window as any).excalidrawAPI;
+        console.log("💾 CanvasApp: excalidrawAPI exists:", !!excalidrawAPI);
+        
         if (!excalidrawAPI) {
             showMessage("✗ Canvas not ready");
             return;
         }
+
+        // Debug logging
+        const elements = excalidrawAPI?.getSceneElements?.() || [];
+        console.log("📊 Save - Elements count:", elements.length);
+        console.log("📊 Save - Image history count:", imageHistory.length);
+        console.log("📊 Save - Messages count:", stateContainerRef.current.messages.length);
 
         const state = collectCanvasState({
             excalidrawAPI,
             messages: stateContainerRef.current.messages,
             aiProvider: stateContainerRef.current.aiProvider,
             contextMode: stateContainerRef.current.contextMode,
-            imageHistory: stateContainerRef.current.imageHistory,
+            imageHistory, // Use imageHistory directly from useImageGeneration hook
         });
+
+        console.log("📊 Save - Total elements in state:", state.canvas.elements.length);
+        console.log("📊 Save - Total images in state:", state.images.history.length);
+        console.log("📊 Save - Opening modal...");
 
         // Store state and show modal
         setPendingSaveState(state);
         setIsSaveModalOpen(true);
-    }, []);
+        console.log("📊 Save - Modal state set");
+    }, [imageHistory]);
 
     /**
      * Handle confirm save from modal
      */
     const handleConfirmSave = useCallback(async (options: SaveOptions) => {
-        if (!pendingSaveState) return;
+        console.log("💾 CanvasApp: handleConfirmSave called with options:", options);
+        
+        // Use ref to get latest state (avoid stale closure)
+        const stateToSave = pendingSaveStateRef.current;
+        console.log("💾 CanvasApp: stateToSave from ref:", stateToSave ? "exists" : "null");
+        
+        if (!stateToSave) {
+            console.error("❌ Save failed: pendingSaveState is null");
+            showMessage("✗ Save failed: no state to save");
+            return;
+        }
+
+        console.log("💾 Confirming save with:", {
+            elements: stateToSave.canvas.elements.length,
+            images: stateToSave.images.history.length,
+            messages: stateToSave.chat.messages.length,
+            options,
+        });
 
         setIsSaveModalOpen(false);
 
         try {
-            await saveCanvasStateToFile(pendingSaveState, undefined, options);
+            await saveCanvasStateToFile(stateToSave, undefined, options);
+            console.log("✅ File saved successfully");
 
             // Build status message
             let mode = options.compressed ? "compressed" : "full size";
             if (options.excludeHistory) {
                 mode += " (no history)";
             }
-            showMessage(`✓ Saved (${mode}): ${pendingSaveState.canvas.elements.length} elements, ${pendingSaveState.chat.messages.length} messages`);
+            showMessage(`✓ Saved (${mode}): ${stateToSave.canvas.elements.length} elements, ${stateToSave.chat.messages.length} messages`);
         } catch (err) {
             console.error("Save failed:", err);
             showMessage("✗ Failed to save canvas state");
         } finally {
             setPendingSaveState(null);
         }
-    }, [pendingSaveState]);
+    }, []);
 
     /**
      * Handle load canvas state from file
@@ -232,6 +357,12 @@ export default function CanvasApp() {
         }
 
         if (result.state) {
+            console.log("📂 Load - State loaded from file:", {
+                elements: result.state.canvas.elements.length,
+                images: result.state.images?.history?.length || 0,
+                messages: result.state.chat.messages.length,
+            });
+
             pendingLoadStateRef.current = result.state;
 
             // Dispatch event to notify components to load state
@@ -239,7 +370,7 @@ export default function CanvasApp() {
                 detail: { state: result.state },
             }));
 
-            showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages`);
+            showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages, ${result.state.images?.history?.length || 0} images`);
         }
     }, []);
 
@@ -262,6 +393,16 @@ export default function CanvasApp() {
         }
     }, []);
 
+    // Debug: Add global save trigger for testing
+    useEffect(() => {
+        const handleDebugSave = () => {
+            console.log("🔧 Debug save triggered");
+            handleSaveState();
+        };
+        window.addEventListener("canvas:debug-save", handleDebugSave);
+        return () => window.removeEventListener("canvas:debug-save", handleDebugSave);
+    }, [handleSaveState]);
+
     // === IMAGE GENERATION (moved from AIChatContainer) ===
 
     // Element selection from canvas - always enabled for image generation
@@ -273,11 +414,21 @@ export default function CanvasApp() {
         enabled: true, // Always enabled for image generation
     });
 
-    // Image generation hook
-    const {
-        isGeneratingImage,
-        generateImage,
-    } = useImageGeneration();
+    // Sync loaded image history from file
+    useEffect(() => {
+        if (pendingLoadStateRef.current?.images?.history) {
+            const historyLength = pendingLoadStateRef.current.images.history.length;
+            console.log(`📂 Sync effect - Loading ${historyLength} images`);
+            const loadedHistory = pendingLoadStateRef.current.images.history.map((img: any) => ({
+                ...img,
+                timestamp: img.timestamp instanceof Date ? img.timestamp : new Date(img.timestamp),
+            }));
+            setImageHistory(loadedHistory);
+            console.log(`✅ Sync effect - Set ${loadedHistory.length} images into state`);
+            // Clear the pending state so we don't reload on next render
+            pendingLoadStateRef.current = null;
+        }
+    }, [setImageHistory]);
 
     // Ref to track the loading toast id
     const loadingToastIdRef = useRef<string | null>(null);
@@ -511,10 +662,17 @@ export default function CanvasApp() {
                 onClose={handleCloseChat}
                 onStateUpdate={handleStateUpdate}
                 pendingLoadState={pendingLoadStateRef.current}
+                imageHistory={imageHistory}
+                setImageHistory={setImageHistory}
             />
 
 
-            <MyAssetsPanel isOpen={isAssetsOpen} onClose={handleCloseAssets} />
+            <MyAssetsPanel 
+                isOpen={isAssetsOpen} 
+                onClose={handleCloseAssets} 
+                imageHistory={imageHistory}
+                onImageHistoryChange={setImageHistory}
+            />
 
             {/* Save Options Modal */}
             {pendingSaveState && (

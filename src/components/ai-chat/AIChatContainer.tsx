@@ -110,6 +110,10 @@ export interface AIChatContainerProps {
     }) => void;
     /** Pending state to load (from file) */
     pendingLoadState?: any;
+    /** External image history (from parent useImageGeneration hook) */
+    imageHistory?: ImageHistoryItem[];
+    /** External setter for image history */
+    setImageHistory?: (history: ImageHistoryItem[]) => void;
 }
 
 /**
@@ -121,6 +125,8 @@ export default function AIChatContainer({
     initialWidth = 340,
     onStateUpdate,
     pendingLoadState,
+    imageHistory: externalImageHistory,
+    setImageHistory: externalSetImageHistory,
 }: AIChatContainerProps) {
     // === 📱 MOBILE DETECTION ===
     const { isMobile, viewportWidth } = useMobileDetection();
@@ -187,11 +193,10 @@ export default function AIChatContainer({
         onClose,
     });
 
-    // Image generation (for history tracking only - modal moved to CanvasApp)
-    const {
-        imageHistory,
-        setImageHistory,
-    } = useImageGeneration();
+    // Image generation - use external props if provided, otherwise use internal hook
+    const internalImageGen = useImageGeneration();
+    const imageHistory = externalImageHistory ?? internalImageGen.imageHistory;
+    const setImageHistory = externalSetImageHistory ?? internalImageGen.setImageHistory;
 
     // Canvas commands
     const {
