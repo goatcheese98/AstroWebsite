@@ -87,7 +87,7 @@ export function ChatHeader({ onClose }: { onClose: () => void }) {
         <div style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "flex-end",
+            justifyContent: "flex-start",
             padding: "12px 16px",
             borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
             background: "var(--color-bg, #fafafa)",

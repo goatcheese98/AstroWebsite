@@ -893,13 +893,133 @@ export default function ExcalidrawCanvas() {
         };
     }, [excalidrawAPI]);
 
-    // Handle drag-and-drop for canvas state files
+    // Handle markdown file loading (both single and bulk)
+    useEffect(() => {
+        const handleLoadMarkdownFiles = async (event: any) => {
+            const { files, dropPosition } = event.detail || {};
+            if (!files || !Array.isArray(files) || files.length === 0) {
+                console.warn("No markdown files provided");
+                return;
+            }
+
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                return;
+            }
+
+            console.log(`📝 Creating ${files.length} markdown note(s)`);
+
+            try {
+                const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+                const appState = excalidrawAPI.getAppState();
+
+                // Grid layout configuration
+                const GRID_COLS = Math.ceil(Math.sqrt(files.length)); // Square-ish grid
+                const NOTE_WIDTH = 500;
+                const NOTE_HEIGHT = 350;
+                const PADDING = 50; // Space between notes
+
+                // Starting position
+                let startX, startY;
+
+                if (dropPosition && files.length === 1) {
+                    // If single file with drop position, use drop location
+                    startX = (dropPosition.x / appState.zoom.value) - appState.scrollX - NOTE_WIDTH / 2;
+                    startY = (dropPosition.y / appState.zoom.value) - appState.scrollY - NOTE_HEIGHT / 2;
+                } else {
+                    // Otherwise, use viewport center and grid layout
+                    const viewportCenterX = appState.width / 2;
+                    const viewportCenterY = appState.height / 2;
+                    startX = (viewportCenterX / appState.zoom.value) - appState.scrollX - (GRID_COLS * (NOTE_WIDTH + PADDING)) / 2;
+                    startY = (viewportCenterY / appState.zoom.value) - appState.scrollY - 200;
+                }
+
+                const newElements = [];
+
+                // Read all files and create markdown notes
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const arrayBuffer = await file.arrayBuffer();
+                    const decoder = new TextDecoder();
+                    const content = decoder.decode(arrayBuffer);
+
+                    // Calculate grid position
+                    const col = i % GRID_COLS;
+                    const row = Math.floor(i / GRID_COLS);
+                    const x = startX + col * (NOTE_WIDTH + PADDING);
+                    const y = startY + row * (NOTE_HEIGHT + PADDING);
+
+                    const markdownElement = {
+                        type: "rectangle",
+                        x,
+                        y,
+                        width: NOTE_WIDTH,
+                        height: NOTE_HEIGHT,
+                        backgroundColor: "#ffffff",
+                        strokeColor: "transparent",
+                        strokeWidth: 0,
+                        roughness: 0,
+                        opacity: 100,
+                        fillStyle: "solid",
+                        id: nanoid(),
+                        locked: false,
+                        customData: {
+                            type: "markdown",
+                            content: content,
+                            originalFilename: file.name,
+                        },
+                    };
+
+                    newElements.push(markdownElement);
+                }
+
+                // Convert and add to canvas
+                const converted = converter(newElements);
+                const currentElements = excalidrawAPI.getSceneElements();
+
+                excalidrawAPI.updateScene({
+                    elements: [...currentElements, ...converted],
+                });
+
+                console.log(`✅ Created ${newElements.length} markdown note(s) from files`);
+
+                // Show toast notification
+                window.dispatchEvent(new CustomEvent("canvas:show-toast", {
+                    detail: {
+                        message: `Added ${files.length} markdown note${files.length > 1 ? 's' : ''}`,
+                        type: 'success',
+                    },
+                }));
+            } catch (err) {
+                console.error("❌ Error creating markdown notes:", err);
+                window.dispatchEvent(new CustomEvent("canvas:show-toast", {
+                    detail: {
+                        message: "Failed to load markdown files",
+                        type: 'info',
+                    },
+                }));
+            }
+        };
+
+        window.addEventListener('canvas:load-markdown-files', handleLoadMarkdownFiles);
+
+        return () => {
+            window.removeEventListener('canvas:load-markdown-files', handleLoadMarkdownFiles);
+        };
+    }, [excalidrawAPI]);
+
+    // Handle drag-and-drop for canvas state files, .excalidraw, and .md files
     useEffect(() => {
         const handleDragOver = (e: DragEvent) => {
-            // Check if any files are .rj files
+            // Check if any files are supported file types
             const hasCanvasFile = Array.from(e.dataTransfer?.items || []).some(
-                item => item.kind === 'file' && item.type === 'application/json' ||
-                    (item.kind === 'file' && (item.getAsFile()?.name?.endsWith('.rj')))
+                item => {
+                    if (item.kind !== 'file') return false;
+                    const file = item.getAsFile();
+                    return file?.name?.endsWith('.rj') ||
+                           file?.name?.endsWith('.excalidraw') ||
+                           file?.name?.endsWith('.md');
+                }
             );
 
             if (hasCanvasFile) {
@@ -910,13 +1030,18 @@ export default function ExcalidrawCanvas() {
 
         const handleDrop = async (e: DragEvent) => {
             const files = Array.from(e.dataTransfer?.files || []);
-            const canvasFile = files.find(f => f.name.endsWith('.rj'));
 
-            if (canvasFile) {
+            // Separate files by type
+            const canvasFiles = files.filter(f => f.name.endsWith('.rj') || f.name.endsWith('.excalidraw'));
+            const markdownFiles = files.filter(f => f.name.endsWith('.md'));
+
+            // Handle canvas state files (.rj or .excalidraw)
+            if (canvasFiles.length > 0) {
                 e.preventDefault();
                 e.stopPropagation();
 
-                console.log("📂 Canvas state file dropped:", canvasFile.name);
+                const canvasFile = canvasFiles[0]; // Use first canvas file
+                console.log("📂 Canvas file dropped:", canvasFile.name);
 
                 // Import and use the state manager
                 const { loadCanvasStateFromFile } = await import('../../lib/canvas-state-manager');
@@ -928,15 +1053,17 @@ export default function ExcalidrawCanvas() {
                         detail: { state: result.state },
                     }));
 
-                    // Also dispatch to chat components
-                    window.dispatchEvent(new CustomEvent('chat:load-messages', {
-                        detail: { messages: result.state.chat.messages },
-                    }));
-
-                    if (result.state.chat.aiProvider) {
-                        window.dispatchEvent(new CustomEvent('chat:set-provider', {
-                            detail: { provider: result.state.chat.aiProvider },
+                    // Also dispatch to chat components (if .rj file)
+                    if (canvasFile.name.endsWith('.rj')) {
+                        window.dispatchEvent(new CustomEvent('chat:load-messages', {
+                            detail: { messages: result.state.chat.messages },
                         }));
+
+                        if (result.state.chat.aiProvider) {
+                            window.dispatchEvent(new CustomEvent('chat:set-provider', {
+                                detail: { provider: result.state.chat.aiProvider },
+                            }));
+                        }
                     }
 
                     console.log('✅ Canvas state loaded from drop');
@@ -944,6 +1071,27 @@ export default function ExcalidrawCanvas() {
                     console.error('❌ Failed to load canvas state:', result.error);
                     alert(`Failed to load: ${result.error}`);
                 }
+            }
+            // Handle markdown files
+            else if (markdownFiles.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                console.log(`📂 ${markdownFiles.length} markdown file(s) dropped`);
+
+                // Get drop position
+                const dropPosition = {
+                    x: e.clientX,
+                    y: e.clientY,
+                };
+
+                // Dispatch event to create markdown notes
+                window.dispatchEvent(new CustomEvent('canvas:load-markdown-files', {
+                    detail: {
+                        files: markdownFiles,
+                        dropPosition: markdownFiles.length === 1 ? dropPosition : undefined,
+                    },
+                }));
             }
         };
 

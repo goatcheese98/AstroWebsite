@@ -363,14 +363,31 @@ export default function CanvasApp() {
                 messages: result.state.chat.messages.length,
             });
 
-            pendingLoadStateRef.current = result.state;
+            // Check if this is a markdown file
+            const markdownContent = (result.state as any).markdownContent;
+            const markdownFilename = (result.state as any).markdownFilename;
 
-            // Dispatch event to notify components to load state
-            window.dispatchEvent(new CustomEvent("canvas:load-state", {
-                detail: { state: result.state },
-            }));
+            if (markdownContent && markdownFilename) {
+                // Create a File object from the markdown content
+                const blob = new Blob([markdownContent], { type: 'text/markdown' });
+                const file = new File([blob], markdownFilename, { type: 'text/markdown' });
 
-            showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages, ${result.state.images?.history?.length || 0} images`);
+                // Dispatch event to create markdown note
+                window.dispatchEvent(new CustomEvent('canvas:load-markdown-files', {
+                    detail: { files: [file] },
+                }));
+
+                showMessage(`✓ Loaded markdown: ${markdownFilename}`);
+            } else {
+                pendingLoadStateRef.current = result.state;
+
+                // Dispatch event to notify components to load state
+                window.dispatchEvent(new CustomEvent("canvas:load-state", {
+                    detail: { state: result.state },
+                }));
+
+                showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages, ${result.state.images?.history?.length || 0} images`);
+            }
         }
     }, []);
 

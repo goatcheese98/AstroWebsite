@@ -51,6 +51,7 @@ import type { ImageHistoryItem } from "../components/ai-chat/hooks/useImageGener
 // File format version for compatibility checking
 const STATE_FILE_VERSION = "1.1.0";  // Bumped for compression support
 const STATE_FILE_EXTENSION = ".rj";
+const EXCALIDRAW_EXTENSION = ".excalidraw";
 
 /**
  * Complete canvas state that can be saved/loaded
@@ -351,100 +352,171 @@ export async function saveCanvasStateToFile(
 }
 
 /**
- * Load canvas state from a file (supports both compressed and legacy uncompressed)
+ * Convert .excalidraw file to our CanvasState format
+ */
+function convertExcalidrawToCanvasState(excalidrawData: any): CanvasState {
+    return {
+        version: STATE_FILE_VERSION,
+        exportedAt: Date.now(),
+        canvas: {
+            elements: excalidrawData.elements || [],
+            appState: excalidrawData.appState || {},
+            files: excalidrawData.files || {},
+        },
+        chat: {
+            messages: [],
+            aiProvider: "kimi",
+            contextMode: "all",
+        },
+        images: {
+            history: [],
+        },
+    };
+}
+
+/**
+ * Load canvas state from a file (supports .rj, .excalidraw, and .md files)
  */
 export async function loadCanvasStateFromFile(file: File): Promise<LoadStateResult> {
     // Validate file extension
-    if (!file.name.endsWith(STATE_FILE_EXTENSION)) {
+    const isRjFile = file.name.endsWith(STATE_FILE_EXTENSION);
+    const isExcalidrawFile = file.name.endsWith(EXCALIDRAW_EXTENSION);
+    const isMarkdownFile = file.name.endsWith('.md');
+
+    if (!isRjFile && !isExcalidrawFile && !isMarkdownFile) {
         return {
             success: false,
-            error: `Invalid file type. Expected ${STATE_FILE_EXTENSION} file.`,
+            error: `Invalid file type. Expected ${STATE_FILE_EXTENSION}, ${EXCALIDRAW_EXTENSION}, or .md file.`,
         };
     }
     
     try {
         // Read file as ArrayBuffer to handle both text and binary
         const arrayBuffer = await file.arrayBuffer();
-        
+
         if (arrayBuffer.byteLength === 0) {
             return {
                 success: false,
                 error: "File is empty",
             };
         }
-        
-        // Detect file format
-        const format = detectFormat(arrayBuffer);
-        let content: string;
+
+        let state: CanvasState;
         let wasCompressed = false;
-        
-        if (format === 'gzip') {
-            // Decompress gzip file
-            content = await decompressData(arrayBuffer);
-            wasCompressed = true;
-        } else if (format === 'json') {
-            // Legacy uncompressed JSON file
+
+        // Handle .excalidraw files
+        if (isExcalidrawFile) {
             const decoder = new TextDecoder();
-            content = decoder.decode(arrayBuffer);
-        } else {
-            return {
-                success: false,
-                error: "Invalid file format. File is not a valid .rj file.",
-            };
+            const content = decoder.decode(arrayBuffer);
+            const excalidrawData = JSON.parse(content);
+            state = convertExcalidrawToCanvasState(excalidrawData);
+            console.log("📂 Loaded .excalidraw file and converted to canvas state");
         }
-        
-        const state = JSON.parse(content) as CanvasState;
-        
-        // Validate required fields
-        if (!state.version || !state.canvas || !state.chat) {
-            return {
-                success: false,
-                error: "Invalid file format: missing required fields",
-            };
-        }
-        
-        // Check version compatibility (only major version matters)
-        const versionParts = state.version.split(".").map(Number);
-        const currentParts = STATE_FILE_VERSION.split(".").map(Number);
-        
-        // Major version mismatch is not compatible
-        if (versionParts[0] !== currentParts[0]) {
-            return {
-                success: false,
-                error: `Version mismatch: file is v${state.version}, expected v${STATE_FILE_VERSION}. Please update the app.`,
-            };
-        }
-        
-        // Restore Date objects from timestamps
-        if (state.chat.messages) {
-            state.chat.messages = state.chat.messages.map(msg => ({
-                ...msg,
-                metadata: {
-                    ...msg.metadata,
-                    timestamp: new Date(msg.metadata.timestamp as any),
+        // Handle .md files
+        else if (isMarkdownFile) {
+            const decoder = new TextDecoder();
+            const markdownContent = decoder.decode(arrayBuffer);
+
+            // Create a canvas state with a single markdown note
+            state = {
+                version: STATE_FILE_VERSION,
+                exportedAt: Date.now(),
+                canvas: {
+                    elements: [],
+                    appState: {},
+                    files: {},
                 },
-            }));
+                chat: {
+                    messages: [],
+                    aiProvider: "kimi",
+                    contextMode: "all",
+                },
+                images: {
+                    history: [],
+                },
+            };
+
+            // Store markdown content in state for later processing
+            (state as any).markdownContent = markdownContent;
+            (state as any).markdownFilename = file.name;
+
+            console.log("📂 Loaded .md file:", file.name);
+        }
+        // Handle .rj files (our native format)
+        else {
+            // Detect file format
+            const format = detectFormat(arrayBuffer);
+            let content: string;
+
+            if (format === 'gzip') {
+                // Decompress gzip file
+                content = await decompressData(arrayBuffer);
+                wasCompressed = true;
+            } else if (format === 'json') {
+                // Legacy uncompressed JSON file
+                const decoder = new TextDecoder();
+                content = decoder.decode(arrayBuffer);
+            } else {
+                return {
+                    success: false,
+                    error: "Invalid file format. File is not a valid .rj file.",
+                };
+            }
+
+            state = JSON.parse(content) as CanvasState;
         }
         
-        if (state.images?.history) {
-            state.images.history = state.images.history.map(img => ({
-                ...img,
-                timestamp: new Date(img.timestamp as any),
-            }));
+        // Skip validation for markdown files (they have different structure)
+        if (!isMarkdownFile) {
+            // Validate required fields
+            if (!state.version || !state.canvas || !state.chat) {
+                return {
+                    success: false,
+                    error: "Invalid file format: missing required fields",
+                };
+            }
+
+            // Check version compatibility (only major version matters) - skip for .excalidraw
+            if (!isExcalidrawFile) {
+                const versionParts = state.version.split(".").map(Number);
+                const currentParts = STATE_FILE_VERSION.split(".").map(Number);
+
+                // Major version mismatch is not compatible
+                if (versionParts[0] !== currentParts[0]) {
+                    return {
+                        success: false,
+                        error: `Version mismatch: file is v${state.version}, expected v${STATE_FILE_VERSION}. Please update the app.`,
+                    };
+                }
+            }
+
+            // Restore Date objects from timestamps
+            if (state.chat?.messages) {
+                state.chat.messages = state.chat.messages.map(msg => ({
+                    ...msg,
+                    metadata: {
+                        ...msg.metadata,
+                        timestamp: new Date(msg.metadata.timestamp as any),
+                    },
+                }));
+            }
+
+            if (state.images?.history) {
+                state.images.history = state.images.history.map(img => ({
+                    ...img,
+                    timestamp: new Date(img.timestamp as any),
+                }));
+            }
         }
-        
-        const originalSize = arrayBuffer.byteLength;
-        const uncompressedSize = new TextEncoder().encode(content).length;
-        const savings = ((1 - originalSize / uncompressedSize) * 100).toFixed(1);
-        
+
         console.log("📂 Canvas state loaded:", {
+            fileType: isMarkdownFile ? '.md' : isExcalidrawFile ? '.excalidraw' : '.rj',
             version: state.version,
-            exportedAt: new Date(state.exportedAt).toLocaleString(),
+            exportedAt: state.exportedAt ? new Date(state.exportedAt).toLocaleString() : 'N/A',
             elements: state.canvas.elements?.length || 0,
-            messages: state.chat.messages?.length || 0,
+            messages: state.chat?.messages?.length || 0,
             images: state.images?.history?.length || 0,
             compressed: wasCompressed,
-            compression: wasCompressed ? `${savings}% smaller` : 'uncompressed (legacy)',
         });
         
         return {
@@ -462,15 +534,15 @@ export async function loadCanvasStateFromFile(file: File): Promise<LoadStateResu
 }
 
 /**
- * Trigger file picker for loading canvas state
+ * Trigger file picker for loading canvas state (supports single file: .rj, .excalidraw, or .md)
  */
 export function triggerCanvasStateLoad(): Promise<LoadStateResult> {
     return new Promise((resolve) => {
         const input = document.createElement("input");
         input.type = "file";
-        input.accept = STATE_FILE_EXTENSION;
+        input.accept = `${STATE_FILE_EXTENSION},${EXCALIDRAW_EXTENSION},.md`;
         input.style.display = "none";
-        
+
         input.onchange = async (e) => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (!file) {
@@ -480,18 +552,108 @@ export function triggerCanvasStateLoad(): Promise<LoadStateResult> {
                 });
                 return;
             }
-            
+
             const result = await loadCanvasStateFromFile(file);
             resolve(result);
         };
-        
+
         input.oncancel = () => {
             resolve({
                 success: false,
                 error: "Cancelled",
             });
         };
-        
+
+        document.body.appendChild(input);
+        input.click();
+        document.body.removeChild(input);
+    });
+}
+
+/**
+ * Result of loading multiple markdown files
+ */
+export interface BulkMarkdownLoadResult {
+    success: boolean;
+    files?: Array<{
+        filename: string;
+        content: string;
+    }>;
+    error?: string;
+}
+
+/**
+ * Trigger file picker for bulk loading markdown files
+ */
+export function triggerBulkMarkdownLoad(): Promise<BulkMarkdownLoadResult> {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".md";
+        input.multiple = true; // Allow multiple file selection
+        input.style.display = "none";
+
+        input.onchange = async (e) => {
+            const fileList = (e.target as HTMLInputElement).files;
+            if (!fileList || fileList.length === 0) {
+                resolve({
+                    success: false,
+                    error: "No files selected",
+                });
+                return;
+            }
+
+            try {
+                const files: Array<{ filename: string; content: string }> = [];
+
+                // Read all markdown files
+                for (let i = 0; i < fileList.length; i++) {
+                    const file = fileList[i];
+                    if (!file.name.endsWith('.md')) {
+                        console.warn(`Skipping non-markdown file: ${file.name}`);
+                        continue;
+                    }
+
+                    const arrayBuffer = await file.arrayBuffer();
+                    const decoder = new TextDecoder();
+                    const content = decoder.decode(arrayBuffer);
+
+                    files.push({
+                        filename: file.name,
+                        content: content,
+                    });
+                }
+
+                if (files.length === 0) {
+                    resolve({
+                        success: false,
+                        error: "No valid markdown files found",
+                    });
+                    return;
+                }
+
+                console.log(`📂 Loaded ${files.length} markdown files for bulk import`);
+
+                resolve({
+                    success: true,
+                    files,
+                });
+            } catch (err) {
+                console.error("Failed to read markdown files:", err);
+                resolve({
+                    success: false,
+                    error: err instanceof Error ? err.message : "Failed to read files",
+                });
+            }
+        };
+
+        input.oncancel = () => {
+            resolve({
+                success: false,
+                error: "Cancelled",
+            });
+        };
+
         document.body.appendChild(input);
         input.click();
         document.body.removeChild(input);
@@ -502,7 +664,9 @@ export function triggerCanvasStateLoad(): Promise<LoadStateResult> {
  * Check if a file is a valid canvas state file
  */
 export function isCanvasStateFile(file: File): boolean {
-    return file.name.endsWith(STATE_FILE_EXTENSION);
+    return file.name.endsWith(STATE_FILE_EXTENSION) ||
+           file.name.endsWith(EXCALIDRAW_EXTENSION) ||
+           file.name.endsWith('.md');
 }
 
-export { STATE_FILE_VERSION, STATE_FILE_EXTENSION };
+export { STATE_FILE_VERSION, STATE_FILE_EXTENSION, EXCALIDRAW_EXTENSION };

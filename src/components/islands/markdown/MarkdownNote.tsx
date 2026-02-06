@@ -124,8 +124,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            pointerEvents: isEditing ? 'auto' : (isHovered && !isNearEdge ? 'auto' : 'none'),
-            cursor: isEditing ? 'text' : (isHovered && !isNearEdge ? 'default' : 'move'),
+            // Only enable pointer events when selected (for scrolling) or editing
+            pointerEvents: isEditing ? 'auto' : (isSelected && !isNearEdge ? 'auto' : 'none'),
+            cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
             WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -249,7 +250,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
             const handleGlobalWheel = (e: WheelEvent) => {
                 const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
-                if (inNote) {
+                // Only intercept wheel events when the note is selected
+                if (inNote && isSelected) {
                     // Prevent scroll chaining and canvas zooming (unless Ctrl is held for intentional zoom)
                     if (!e.ctrlKey) {
                         e.stopPropagation();
@@ -284,7 +286,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 document.removeEventListener('wheel', handleGlobalWheel, true);
                 document.removeEventListener('mousemove', handleGlobalMouseMove, true);
             };
-        }, [isEditing, isHovered, isNearEdge, enterEditMode, isPointInNote]);
+        }, [isEditing, isHovered, isNearEdge, isSelected, enterEditMode, isPointInNote]);
 
         // Touch handlers for pinch zoom pass-through
         const handleTouchStart = useCallback((e: React.TouchEvent) => {

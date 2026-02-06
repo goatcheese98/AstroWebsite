@@ -123,6 +123,35 @@ export default function CanvasControls({
         setIsMenuOpen(false);
     };
 
+    const handleBulkMarkdownLoad = async () => {
+        try {
+            // Dynamically import the bulk markdown load function
+            const { triggerBulkMarkdownLoad } = await import('../../lib/canvas-state-manager');
+            const result = await triggerBulkMarkdownLoad();
+
+            if (result.success && result.files) {
+                // Create File objects from the loaded content
+                const files = result.files.map(({ filename, content }) => {
+                    const blob = new Blob([content], { type: 'text/markdown' });
+                    return new File([blob], filename, { type: 'text/markdown' });
+                });
+
+                // Dispatch event to create markdown notes
+                window.dispatchEvent(new CustomEvent('canvas:load-markdown-files', {
+                    detail: { files },
+                }));
+
+                showMessage(`✓ Loading ${files.length} markdown files...`);
+            } else if (result.error && result.error !== "Cancelled") {
+                showMessage(`✗ ${result.error}`);
+            }
+        } catch (err) {
+            console.error("Bulk markdown load error:", err);
+            showMessage("✗ Failed to load markdown files");
+        }
+        setIsMenuOpen(false);
+    };
+
     const handleGenerateImage = () => {
         // Open image generation modal directly without opening AI chat
         window.dispatchEvent(new CustomEvent("imagegen:open"));
@@ -268,7 +297,37 @@ export default function CanvasControls({
                                         <polyline points="17 8 12 3 7 8"/>
                                         <line x1="12" y1="3" x2="12" y2="15"/>
                                     </svg>
-                                    Load Canvas
+                                    Load (.rj/.excalidraw/.md)
+                                </button>
+                                <button
+                                    onClick={handleBulkMarkdownLoad}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "none",
+                                        borderBottom: "1px solid #eee",
+                                        background: "white",
+                                        textAlign: "left",
+                                        cursor: "pointer",
+                                        fontSize: "0.85rem",
+                                        color: "#333",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        fontFamily: "var(--font-hand, sans-serif)",
+                                        fontWeight: 600,
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <polyline points="14 2 14 8 20 8"/>
+                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                        <line x1="10" y1="9" x2="8" y2="9"/>
+                                    </svg>
+                                    Load Markdown (Bulk)
                                 </button>
                                 <div style={{ height: "1px", background: "#eee" }} />
                                 <button
