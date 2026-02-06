@@ -96,6 +96,10 @@ export interface ChatInputProps {
     selectedElementsCount: number;
     /** Current context mode (affects placeholder) */
     contextMode: "all" | "selected";
+    /** Callback when context mode changes */
+    onContextModeChange?: (mode: "all" | "selected") => void;
+    /** Callback to clear selection */
+    onClearSelection?: () => void;
     /** onKeyDown handler from useKeyboardShortcuts */
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
     /** Whether we're on mobile */
@@ -118,6 +122,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         isLoading,
         selectedElementsCount,
         contextMode,
+        onContextModeChange,
+        onClearSelection,
         onKeyDown,
         isMobile = false,
         aiProvider = "claude",
@@ -156,38 +162,98 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     flexWrap: isMobile ? "nowrap" : undefined,
                 }}>
                     {/* Templates Button */}
-                    <button
-                        onClick={onOpenTemplates}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: isMobile ? "8px 12px" : "5px 10px",
-                            background: "transparent",
-                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                            borderRadius: "6px",
-                            fontSize: isMobile ? "13px" : "11px",
-                            color: "var(--color-text-muted, #6b7280)",
-                            cursor: "pointer",
-                            transition: "all 0.15s",
-                            flexShrink: 0,
-                            minHeight: isMobile ? "36px" : undefined,
-                            touchAction: "manipulation",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
-                            e.currentTarget.style.background = "var(--color-accent-light, #e0e7ff)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = "var(--color-stroke-muted, #e5e7eb)";
-                            e.currentTarget.style.background = "transparent";
-                        }}
-                    >
-                        <span>⚡</span>
-                        {isMobile ? "Quick" : "Templates"}
-                    </button>
-                    
-                    {/* Model Selector */}
+                    {/* Left side - Templates + Mode Toggle */}
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                    }}>
+                        <button
+                            onClick={onOpenTemplates}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: isMobile ? "8px 12px" : "5px 10px",
+                                background: "transparent",
+                                border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                borderRadius: "6px",
+                                fontSize: isMobile ? "13px" : "11px",
+                                color: "var(--color-text-muted, #6b7280)",
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                                flexShrink: 0,
+                                minHeight: isMobile ? "36px" : undefined,
+                                touchAction: "manipulation",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
+                                e.currentTarget.style.background = "var(--color-accent-light, #e0e7ff)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = "var(--color-stroke-muted, #e5e7eb)";
+                                e.currentTarget.style.background = "transparent";
+                            }}
+                        >
+                            <span>⚡</span>
+                            {isMobile ? "Quick" : "Templates"}
+                        </button>
+
+                        {/* All/Selected Mode Toggle */}
+                        {onContextModeChange && (
+                            <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "2px",
+                                background: "var(--color-fill-1, #f3f4f6)",
+                                borderRadius: "6px",
+                                border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                            }}>
+                                <button
+                                    onClick={() => {
+                                        onContextModeChange("all");
+                                        onClearSelection?.();
+                                    }}
+                                    title="Use all canvas elements"
+                                    style={{
+                                        padding: isMobile ? "6px 10px" : "4px 8px",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        background: contextMode === "all" ? "#10b981" : "transparent",
+                                        color: contextMode === "all" ? "white" : "#6b7280",
+                                        fontSize: isMobile ? "12px" : "10px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                        minHeight: isMobile ? "32px" : undefined,
+                                    }}
+                                >
+                                    All
+                                </button>
+                                <button
+                                    onClick={() => onContextModeChange("selected")}
+                                    title="Use selected elements only"
+                                    style={{
+                                        padding: isMobile ? "6px 10px" : "4px 8px",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        background: contextMode === "selected" ? "#10b981" : "transparent",
+                                        color: contextMode === "selected" ? "white" : "#6b7280",
+                                        fontSize: isMobile ? "12px" : "10px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                        minHeight: isMobile ? "32px" : undefined,
+                                    }}
+                                >
+                                    Selected
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right side - Model Selector */}
                     {onToggleProvider && (
                         <button
                             onClick={onToggleProvider}

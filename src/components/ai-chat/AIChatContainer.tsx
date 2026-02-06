@@ -86,7 +86,7 @@ import { useMobileDetection } from "./hooks/useMobileDetection";
 // Components
 import { ChatPanel } from "./components/ChatPanel";
 import { ChatHeader } from "./components/ChatHeader";
-import { CanvasContextPanel } from "./components/CanvasContextPanel";
+import { CanvasContextOverlay } from "./components/CanvasContextOverlay";
 
 import { MessageList } from "./components/MessageList";
 import { ChatInput } from "./components/ChatInput";
@@ -164,9 +164,45 @@ export default function AIChatContainer({
         enabled: isOpen,
     });
 
-    // Fixed panel size - floating chat widget (no resize)
+    // Panel dimensions - vertical resize enabled
     const panelWidth = isMobile ? viewportWidth : 360;
-    const startResize = () => {}; // No-op since we're not using resize
+    const [panelHeight, setPanelHeight] = useState(600);
+    const [isResizingHeight, setIsResizingHeight] = useState(false);
+
+    // Vertical resize handling
+    const startResize = useCallback((e: React.MouseEvent) => {
+        if (isMobile) return;
+        e.preventDefault();
+        setIsResizingHeight(true);
+        document.body.style.cursor = "ns-resize";
+        document.body.style.userSelect = "none";
+    }, [isMobile]);
+
+    // Handle vertical resize mouse movement
+    useEffect(() => {
+        if (!isResizingHeight) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            // Calculate new height from bottom edge
+            const newHeight = window.innerHeight - e.clientY - 20; // 20px from bottom
+            const clampedHeight = Math.max(300, Math.min(newHeight, window.innerHeight - 100));
+            setPanelHeight(clampedHeight);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizingHeight(false);
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+        };
+
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [isResizingHeight]);
 
     // Core chat state
     const {
@@ -305,33 +341,43 @@ export default function AIChatContainer({
             <ChatPanel
                 isOpen={isOpen}
                 width={panelWidth}
+                height={panelHeight}
                 onResizeStart={startResize}
                 isMobile={isMobile}
             >
                 {/* Header - just close button */}
                 <ChatHeader onClose={onClose} />
 
-                {/* Messages - with empty state showing "Start creating with AI" */}
-                <MessageList
-                    ref={messagesEndRef}
-                    messages={messages}
-                    isLoading={isLoading}
-                    error={error}
-                    aiProvider={aiProvider}
-                    canvasState={canvasState}
-                />
+                {/* Messages wrapper with floating context overlay */}
+                <div style={{
+                    flex: 1,
+                    position: "relative",
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                }}>
+                    {/* Messages - with empty state showing "Start creating with AI" */}
+                    <MessageList
+                        ref={messagesEndRef}
+                        messages={messages}
+                        isLoading={isLoading}
+                        error={error}
+                        aiProvider={aiProvider}
+                        canvasState={canvasState}
+                    />
 
-                {/* Canvas Context - above templates */}
-                <CanvasContextPanel
-                    contextMode={contextMode}
-                    onContextModeChange={setContextMode}
-                    selectedElements={selectedElements}
-                    elementSnapshots={elementSnapshots}
-                    canvasElementCount={canvasState?.elements?.length || 0}
-                    onClearSelection={clearSelection}
-                />
+                    {/* Canvas Context - floating overlay on top of messages */}
+                    <CanvasContextOverlay
+                        contextMode={contextMode}
+                        onContextModeChange={setContextMode}
+                        selectedElements={selectedElements}
+                        elementSnapshots={elementSnapshots}
+                        canvasElementCount={canvasState?.elements?.length || 0}
+                        onClearSelection={clearSelection}
+                    />
+                </div>
 
-                {/* Input Area - with model selector */}
+                {/* Input Area - with model selector and mode toggle */}
                 <ChatInput
                     ref={inputRef}
                     input={input}
@@ -341,6 +387,8 @@ export default function AIChatContainer({
                     isLoading={isLoading}
                     selectedElementsCount={selectedElements.length}
                     contextMode={contextMode}
+                    onContextModeChange={setContextMode}
+                    onClearSelection={clearSelection}
                     onKeyDown={handleKeyDown}
                     isMobile={isMobile}
                     aiProvider={aiProvider}

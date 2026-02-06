@@ -70,6 +70,7 @@ export { default as TemplateModal } from "./TemplateModal";
 export { ChatPanel } from "./components/ChatPanel";
 export { ChatHeader } from "./components/ChatHeader";
 export { CanvasContextPanel } from "./components/CanvasContextPanel";
+export { CanvasContextOverlay } from "./components/CanvasContextOverlay";
 export { ImageGallery } from "./components/ImageGallery";
 export { MessageList } from "./components/MessageList";
 export { MessageBubble } from "./components/MessageBubble";

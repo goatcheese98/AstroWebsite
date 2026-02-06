@@ -187,23 +187,24 @@ function ErrorDisplay({ message }: { message: string }) {
 }
 
 /**
- * Scrollable message list
+ * Scrollable message list (now with position: relative for overlay support)
  */
 export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     function MessageList({ messages, isLoading, error, aiProvider, canvasState }, forwardedRef) {
         const internalRef = useRef<HTMLDivElement>(null);
         const scrollRef = (forwardedRef as React.RefObject<HTMLDivElement>) || internalRef;
-        
+
         // Auto-scroll to bottom when messages change or loading state changes
         useEffect(() => {
             scrollRef.current?.scrollIntoView({ behavior: "smooth" });
         }, [messages, isLoading, scrollRef]);
-        
+
         const hasMessages = messages.length > 0;
-        
+
         return (
             <div style={{
                 flex: 1,
+                position: "relative", // Enable absolute positioning for overlay
                 overflowY: "auto",
                 padding: "18px",
                 display: "flex",
@@ -222,10 +223,10 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
                         />
                     ))
                 )}
-                
+
                 {isLoading && <LoadingIndicator provider={aiProvider} />}
                 {error && <ErrorDisplay message={error} />}
-                
+
                 {/* Scroll anchor */}
                 <div ref={scrollRef} />
             </div>

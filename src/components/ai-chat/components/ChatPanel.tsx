@@ -28,6 +28,8 @@ export interface ChatPanelProps {
     isOpen: boolean;
     /** Current width in pixels */
     width: number;
+    /** Current height in pixels */
+    height?: number;
     /** Callback when user starts dragging resize handle */
     onResizeStart: (e: React.MouseEvent) => void;
     /** All child components */
@@ -40,12 +42,12 @@ export interface ChatPanelProps {
  * Floating chat panel widget
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-    function ChatPanel({ isOpen, width, onResizeStart, children, isMobile = false }, ref) {
+    function ChatPanel({ isOpen, width, height = 600, onResizeStart, children, isMobile = false }, ref) {
         if (!isOpen) return null;
-        
-        // Fixed dimensions for floating chat
+
+        // Dimensions for floating chat
         const chatWidth = isMobile ? "100%" : `${width}px`;
-        const chatHeight = isMobile ? "100%" : "600px";
+        const chatHeight = isMobile ? "100%" : `${height}px`;
         const maxHeight = isMobile ? "100%" : "calc(100vh - 100px)";
         
         return (
@@ -78,11 +80,12 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                         width: chatWidth,
                         height: chatHeight,
                         maxHeight: maxHeight,
+                        minHeight: "300px",
                         background: "var(--color-surface, #ffffff)",
                         border: isMobile ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
                         borderRadius: isMobile ? 0 : "16px",
-                        boxShadow: isMobile 
-                            ? "-8px 0 30px rgba(0, 0, 0, 0.15)" 
+                        boxShadow: isMobile
+                            ? "-8px 0 30px rgba(0, 0, 0, 0.15)"
                             : "0 10px 40px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)",
                         zIndex: 999,
                         display: "flex",
@@ -92,6 +95,39 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                         overflow: "hidden",
                     }}
                 >
+                    {/* Vertical Resize Handle (top edge) */}
+                    {!isMobile && (
+                        <div
+                            onMouseDown={onResizeStart}
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: "8px",
+                                cursor: "ns-resize",
+                                zIndex: 1000,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <div style={{
+                                width: "40px",
+                                height: "4px",
+                                background: "var(--color-stroke-muted, #e5e7eb)",
+                                borderRadius: "2px",
+                                transition: "background 0.15s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "var(--color-accent, #6366f1)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "var(--color-stroke-muted, #e5e7eb)";
+                            }}
+                            />
+                        </div>
+                    )}
                     {children}
                 </div>
                 

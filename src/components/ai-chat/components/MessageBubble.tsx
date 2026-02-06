@@ -74,12 +74,163 @@
 
 import React, { useState } from "react";
 import type { Message } from "../types";
+import { MarkdownPreview } from "../../islands/markdown/components/MarkdownPreview";
+import { nanoid } from "nanoid";
 
 export interface MessageBubbleProps {
     /** Message data to display */
     message: Message;
     /** Canvas state for SVG export */
     canvasState?: any;
+}
+
+/**
+ * Action buttons for AI messages - Copy and Add as Note
+ */
+function MessageActions({
+    textContent,
+}: {
+    textContent: string;
+}) {
+    const [copied, setCopied] = useState(false);
+    const [addedAsNote, setAddedAsNote] = useState(false);
+
+    /**
+     * Copy message text to clipboard
+     */
+    const copyMessage = async () => {
+        try {
+            await navigator.clipboard.writeText(textContent);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Failed to copy message:", err);
+        }
+    };
+
+    /**
+     * Add message as markdown note to canvas
+     */
+    const addAsNote = async () => {
+        try {
+            // Dynamically load the markdown note creator
+            const excalidrawAPI = (window as any).excalidrawAPI;
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                return;
+            }
+
+            // Get viewport center for positioning
+            const appState = excalidrawAPI.getAppState();
+            const viewportCenterX = appState.width / 2;
+            const viewportCenterY = appState.height / 2;
+
+            // Convert viewport center to scene coordinates
+            const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+            const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+            // Import converter
+            const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+
+            const markdownElement = {
+                type: "rectangle",
+                x: sceneX - 250,
+                y: sceneY - 175,
+                width: 500,
+                height: 350,
+                backgroundColor: "#ffffff",
+                strokeColor: "transparent",
+                strokeWidth: 0,
+                roughness: 0,
+                opacity: 100,
+                fillStyle: "solid",
+                id: nanoid(),
+                locked: false,
+                customData: {
+                    type: "markdown",
+                    content: textContent,
+                },
+            };
+
+            const converted = convertToExcalidrawElements([markdownElement]);
+            const currentElements = excalidrawAPI.getSceneElements();
+
+            excalidrawAPI.updateScene({
+                elements: [...currentElements, ...converted],
+            });
+
+            setAddedAsNote(true);
+            setTimeout(() => setAddedAsNote(false), 2000);
+
+            console.log("✅ Added AI response as markdown note");
+        } catch (err) {
+            console.error("Failed to add as note:", err);
+        }
+    };
+
+    return (
+        <div style={{
+            display: "flex",
+            gap: "6px",
+            marginTop: "4px",
+            marginLeft: "10px",
+            flexWrap: "wrap",
+        }}>
+            {/* Copy Button */}
+            <button
+                onClick={copyMessage}
+                title="Copy message"
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 8px",
+                    background: copied ? "#dcfce7" : "var(--color-fill-1, #f3f4f6)",
+                    border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    color: copied ? "#166534" : "var(--color-text-muted, #6b7280)",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    fontWeight: 500,
+                }}
+            >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                {copied ? "Copied!" : "Copy"}
+            </button>
+
+            {/* Add as Note Button */}
+            <button
+                onClick={addAsNote}
+                title="Add as markdown note to canvas"
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 8px",
+                    background: addedAsNote ? "#dcfce7" : "var(--color-accent, #6366f1)",
+                    border: "1px solid var(--color-accent, #6366f1)",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    color: addedAsNote ? "#166534" : "white",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    fontWeight: 500,
+                }}
+            >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+                {addedAsNote ? "Added!" : "Add as Note"}
+            </button>
+        </div>
+    );
 }
 
 /**
@@ -254,13 +405,22 @@ function CopyButtons({
 export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
     const isUser = message.role === "user";
     const hasDrawingCommand = !!message.drawingCommand && Array.isArray(message.drawingCommand);
-    
+
     // Extract text content from message
     const textContent = message.content
         .filter((c): c is { type: "text"; text: string } => c.type === "text")
         .map(c => c.text)
         .join("\n");
-    
+
+    // Determine theme for markdown rendering
+    const isDark = typeof document !== 'undefined' &&
+        document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Dummy checkbox toggle handler (AI messages are read-only)
+    const handleCheckboxToggle = () => {
+        // No-op for AI messages
+    };
+
     return (
         <div style={{
             alignSelf: isUser ? "flex-end" : "flex-start",
@@ -273,29 +433,149 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
             <div style={{
                 padding: "12px 16px",
                 borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                background: isUser 
-                    ? "var(--color-accent, #6366f1)" 
+                background: isUser
+                    ? "var(--color-accent, #6366f1)"
                     : "var(--color-surface, #ffffff)",
                 color: isUser ? "white" : "var(--color-text, #1f2937)",
-                boxShadow: isUser 
-                    ? "0 1px 4px rgba(99, 102, 241, 0.2)" 
+                boxShadow: isUser
+                    ? "0 1px 4px rgba(99, 102, 241, 0.2)"
                     : "0 1px 3px rgba(0, 0, 0, 0.06)",
                 fontSize: "13px",
                 lineHeight: 1.55,
-                whiteSpace: "pre-wrap",
+                whiteSpace: isUser ? "pre-wrap" : "normal",
                 border: isUser ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
             }}>
-                {textContent}
+                {isUser ? (
+                    // User messages: plain text
+                    textContent
+                ) : (
+                    // AI messages: rendered markdown
+                    <div
+                        className="ai-message-markdown"
+                        style={{
+                            fontSize: "13px",
+                            lineHeight: 1.55,
+                        }}
+                    >
+                        <MarkdownPreview
+                            content={textContent}
+                            onCheckboxToggle={handleCheckboxToggle}
+                            isDark={isDark}
+                        />
+                        <style>{`
+                            .ai-message-markdown {
+                                overflow-wrap: break-word;
+                                word-wrap: break-word;
+                            }
+
+                            /* Adjust spacing for markdown elements in chat */
+                            .ai-message-markdown p {
+                                margin: 0 0 0.75em 0;
+                            }
+
+                            .ai-message-markdown p:last-child {
+                                margin-bottom: 0;
+                            }
+
+                            .ai-message-markdown h1,
+                            .ai-message-markdown h2,
+                            .ai-message-markdown h3,
+                            .ai-message-markdown h4,
+                            .ai-message-markdown h5,
+                            .ai-message-markdown h6 {
+                                margin: 0.5em 0 0.5em 0;
+                                line-height: 1.3;
+                            }
+
+                            .ai-message-markdown h1:first-child,
+                            .ai-message-markdown h2:first-child,
+                            .ai-message-markdown h3:first-child,
+                            .ai-message-markdown h4:first-child,
+                            .ai-message-markdown h5:first-child,
+                            .ai-message-markdown h6:first-child {
+                                margin-top: 0;
+                            }
+
+                            .ai-message-markdown ul,
+                            .ai-message-markdown ol {
+                                margin: 0.5em 0;
+                                padding-left: 1.5em;
+                            }
+
+                            .ai-message-markdown li {
+                                margin: 0.25em 0;
+                            }
+
+                            .ai-message-markdown code {
+                                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                                font-size: 0.9em;
+                                padding: 0.15em 0.3em;
+                                background: rgba(0, 0, 0, 0.05);
+                                border-radius: 3px;
+                            }
+
+                            .ai-message-markdown pre {
+                                margin: 0.75em 0;
+                            }
+
+                            .ai-message-markdown blockquote {
+                                margin: 0.75em 0;
+                                padding-left: 1em;
+                                border-left: 3px solid rgba(0, 0, 0, 0.1);
+                                color: rgba(0, 0, 0, 0.7);
+                            }
+
+                            .ai-message-markdown table {
+                                border-collapse: collapse;
+                                width: 100%;
+                                margin: 0.75em 0;
+                                font-size: 0.95em;
+                            }
+
+                            .ai-message-markdown th,
+                            .ai-message-markdown td {
+                                border: 1px solid rgba(0, 0, 0, 0.1);
+                                padding: 0.4em 0.6em;
+                                text-align: left;
+                            }
+
+                            .ai-message-markdown th {
+                                background: rgba(0, 0, 0, 0.03);
+                                font-weight: 600;
+                            }
+
+                            .ai-message-markdown a {
+                                color: #6366f1;
+                                text-decoration: none;
+                            }
+
+                            .ai-message-markdown a:hover {
+                                text-decoration: underline;
+                            }
+
+                            .ai-message-markdown hr {
+                                border: none;
+                                border-top: 1px solid rgba(0, 0, 0, 0.1);
+                                margin: 1em 0;
+                            }
+                        `}</style>
+                    </div>
+                )}
             </div>
-            
-            {/* Copy Buttons for Drawing Commands */}
+
+            {/* Action Buttons for AI Messages */}
+            {!isUser && (
+                <MessageActions textContent={textContent} />
+            )}
+
+            {/* Additional Drawing Command Buttons */}
             {!isUser && hasDrawingCommand && (
-                <CopyButtons 
-                    drawingCommand={message.drawingCommand!} 
+                <CopyButtons
+                    drawingCommand={message.drawingCommand!}
                     canvasState={canvasState}
                 />
             )}
-            
+
             {/* Timestamp */}
             <span style={{
                 fontSize: "10px",
@@ -303,9 +583,9 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
                 marginLeft: isUser ? "auto" : "10px",
                 marginRight: isUser ? "10px" : "auto",
             }}>
-                {message.metadata.timestamp.toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
+                {message.metadata.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
                 })}
             </span>
         </div>
