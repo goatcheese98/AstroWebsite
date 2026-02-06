@@ -1542,71 +1542,65 @@ export default function ExcalidrawCanvas({
             // Add long-press support for mobile context menu
             {...(isMobile ? longPressHandlers.handlers : {})}
         >
-            {/* Shared mode banner */}
-            {isSharedMode && (
-                <div className="shared-banner">
-                    <div className="banner-content">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="18" cy="5" r="3"/>
-                            <circle cx="6" cy="12" r="3"/>
-                            <circle cx="18" cy="19" r="3"/>
-                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                        </svg>
-                        <span>
-                            {isConnected ? (
-                                <>
-                                    🌐 <strong>Live collaboration</strong> • {activeUsers} {activeUsers === 1 ? 'user' : 'users'} online • Auto-syncing
-                                </>
-                            ) : (
-                                <>
-                                    🔌 <strong>Connecting...</strong> • Shared mode
-                                </>
-                            )}
-                        </span>
-                    </div>
+            {/* Shared mode indicator */}
+            {isSharedMode && isConnected && (
+                <div className="shared-indicator">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="18" cy="5" r="3"/>
+                        <circle cx="6" cy="12" r="3"/>
+                        <circle cx="18" cy="19" r="3"/>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    </svg>
+                    <span>{activeUsers}</span>
                 </div>
             )}
 
             <style>{`
-                .shared-banner {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 0.75rem 1rem;
-                    z-index: 999;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                    font-family: var(--font-hand, sans-serif);
-                    font-size: 0.85rem;
-                }
-
-                .banner-content {
+                .shared-indicator {
+                    position: fixed;
+                    top: 380px;
+                    right: 20px;
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    gap: 0.5rem;
+                    gap: 6px;
+                    padding: 6px 10px;
+                    background: rgba(0, 0, 0, 0.75);
+                    backdrop-filter: blur(8px);
+                    color: white;
+                    border-radius: 6px;
+                    z-index: 999;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    font-size: 12px;
+                    font-weight: 500;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                    transition: opacity 0.2s;
                 }
 
-                .banner-content svg {
+                .shared-indicator:hover {
+                    opacity: 0.9;
+                }
+
+                .shared-indicator svg {
                     flex-shrink: 0;
                 }
 
-                .banner-content strong {
-                    font-weight: 700;
+                .shared-indicator span {
+                    line-height: 1;
                 }
 
                 @media (max-width: 768px) {
-                    .shared-banner {
-                        font-size: 0.75rem;
-                        padding: 0.5rem 0.75rem;
+                    .shared-indicator {
+                        top: auto;
+                        bottom: 80px;
+                        right: 16px;
+                        padding: 4px 8px;
+                        font-size: 11px;
                     }
 
-                    .banner-content svg {
-                        width: 14px;
-                        height: 14px;
+                    .shared-indicator svg {
+                        width: 10px;
+                        height: 10px;
                     }
                 }
             `}</style>
