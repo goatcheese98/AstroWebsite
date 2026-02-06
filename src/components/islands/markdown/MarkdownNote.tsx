@@ -124,8 +124,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            // Only enable pointer events when selected (for scrolling) or editing
-            pointerEvents: isEditing ? 'auto' : (isSelected && !isNearEdge ? 'auto' : 'none'),
+            // Only enable pointer events when editing (allows dragging when selected)
+            pointerEvents: isEditing ? 'auto' : 'none',
             cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
