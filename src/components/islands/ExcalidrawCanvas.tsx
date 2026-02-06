@@ -31,7 +31,21 @@ const loadMarkdownNote = async () => {
 const STORAGE_KEY = "excalidraw-canvas-data";
 const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
-export default function ExcalidrawCanvas() {
+interface ExcalidrawCanvasProps {
+    isSharedMode?: boolean;
+    shareRoomId?: string;
+    partyKitHost?: string;
+    onMarkdownNotesChange?: (notes: any[]) => void;
+    onImageHistoryChange?: (images: any[]) => void;
+}
+
+export default function ExcalidrawCanvas({
+    isSharedMode = false,
+    shareRoomId,
+    partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev",
+    onMarkdownNotesChange,
+    onImageHistoryChange
+}: ExcalidrawCanvasProps = {}) {
     const { isMobile, isPhone } = useMobileDetection();
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
@@ -50,6 +64,15 @@ export default function ExcalidrawCanvas() {
     // State for triggering React re-renders (updated at controlled intervals)
     const [, forceUpdate] = useState({});
     const [markdownElements, setMarkdownElements] = useState<any[]>([]);
+
+    // Collaboration state
+    const [socket, setSocket] = useState<WebSocket | null>(null);
+    const [activeUsers, setActiveUsers] = useState(1);
+    const [isConnected, setIsConnected] = useState(false);
+    const socketRef = useRef<WebSocket | null>(null);
+    const lastSyncTimeRef = useRef<number>(0);
+    const isApplyingRemoteUpdateRef = useRef<boolean>(false); // Flag to prevent sync loops
+    const SYNC_THROTTLE_MS = 100; // Throttle updates to 10 per second
 
     // Load saved canvas data from localStorage on mount
     useEffect(() => {
@@ -81,6 +104,161 @@ export default function ExcalidrawCanvas() {
             localStorage.removeItem(STORAGE_KEY);
         }
     }, []);
+
+    // Connect to PartyKit room when in shared mode
+    useEffect(() => {
+        if (!isSharedMode || !shareRoomId || !excalidrawAPI) return;
+
+        console.log(`🌐 Connecting to shared room: ${shareRoomId}`);
+        const wsUrl = `wss://${partyKitHost}/parties/main/${shareRoomId}`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log("✅ Connected to shared room:", shareRoomId);
+            setIsConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("📥 Received message:", data.type);
+
+                if (data.type === "init") {
+                    // Initial state when joining room
+                    setActiveUsers(data.activeUsers);
+                    if (data.state) {
+                        console.log("📂 Loading initial shared state");
+                        if (data.state.elements) {
+                            // Set flag to prevent sync loop
+                            isApplyingRemoteUpdateRef.current = true;
+                            excalidrawAPI.updateScene({
+                                elements: data.state.elements,
+                                appState: data.state.appState,
+                            });
+                            if (data.state.files) {
+                                excalidrawAPI.addFiles(Object.values(data.state.files));
+                            }
+                            // Reset flag after browser paint (ensures onChange completes)
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    isApplyingRemoteUpdateRef.current = false;
+                                    console.log("🔓 Remote update flag reset");
+                                });
+                            });
+                        }
+                        if (data.state.markdownNotes) {
+                            // Markdown notes are part of elements, so they're already loaded
+                            console.log("✓ Markdown notes loaded:", data.state.markdownNotes.length);
+                        }
+                        if (data.state.imageHistory) {
+                            // Dispatch event to load image history
+                            window.dispatchEvent(new CustomEvent("imagegen:load-history", {
+                                detail: { images: data.state.imageHistory }
+                            }));
+                        }
+                    }
+                } else if (data.type === "canvas-update") {
+                    // Another user updated canvas
+                    console.log("🔄 Applying canvas update from collaborator");
+
+                    // Smart merge: Combine local and remote elements
+                    const currentElements = excalidrawAPI.getSceneElements();
+                    const remoteElements = data.elements || [];
+
+                    // Create map of remote elements by ID
+                    const remoteById = new Map();
+                    remoteElements.forEach((el: any) => {
+                        remoteById.set(el.id, el);
+                    });
+
+                    // Create map of current elements by ID
+                    const currentById = new Map();
+                    currentElements.forEach((el: any) => {
+                        currentById.set(el.id, el);
+                    });
+
+                    // Merge: keep local elements not in remote, and add/update from remote
+                    const merged = [...currentElements];
+
+                    // Add or update remote elements
+                    remoteElements.forEach((remoteEl: any) => {
+                        const localEl = currentById.get(remoteEl.id);
+                        if (!localEl) {
+                            // New element from remote, add it
+                            merged.push(remoteEl);
+                            console.log("➕ Adding new element from remote:", remoteEl.id);
+                        } else {
+                            // Element exists locally, update if remote is newer
+                            const localIndex = merged.findIndex((el: any) => el.id === remoteEl.id);
+                            if (localIndex >= 0) {
+                                // Use version to determine which is newer
+                                if (remoteEl.version > localEl.version ||
+                                    (remoteEl.version === localEl.version && remoteEl.versionNonce > localEl.versionNonce)) {
+                                    merged[localIndex] = remoteEl;
+                                    console.log("🔄 Updating element from remote:", remoteEl.id);
+                                }
+                            }
+                        }
+                    });
+
+                    // Set flag to prevent sync loop
+                    isApplyingRemoteUpdateRef.current = true;
+                    excalidrawAPI.updateScene({
+                        elements: merged,
+                        appState: data.appState,
+                    });
+                    if (data.files) {
+                        excalidrawAPI.addFiles(Object.values(data.files));
+                    }
+                    // Reset flag after browser paint (ensures onChange completes)
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            isApplyingRemoteUpdateRef.current = false;
+                            console.log("🔓 Remote update flag reset");
+                        });
+                    });
+                } else if (data.type === "markdown-update") {
+                    // Another user updated markdown notes
+                    console.log("📝 Applying markdown update from collaborator");
+                    // Markdown notes are stored as elements with customData.type === "markdown"
+                    // They're already part of the canvas update
+                } else if (data.type === "image-update") {
+                    // Another user generated an image
+                    console.log("🖼️ Applying image history update from collaborator");
+                    window.dispatchEvent(new CustomEvent("imagegen:load-history", {
+                        detail: { images: data.imageHistory }
+                    }));
+                } else if (data.type === "user-joined") {
+                    console.log("👋 User joined:", data.userId);
+                    setActiveUsers(data.activeUsers);
+                } else if (data.type === "user-left") {
+                    console.log("👋 User left:", data.userId);
+                    setActiveUsers(data.activeUsers);
+                }
+            } catch (err) {
+                console.error("❌ Error processing message:", err);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error("❌ WebSocket error:", error);
+            setIsConnected(false);
+        };
+
+        ws.onclose = () => {
+            console.log("🔌 Disconnected from shared room");
+            setIsConnected(false);
+        };
+
+        setSocket(ws);
+        socketRef.current = ws;
+
+        return () => {
+            console.log("🔌 Closing WebSocket connection");
+            ws.close();
+            socketRef.current = null;
+        };
+    }, [isSharedMode, shareRoomId, excalidrawAPI, partyKitHost]);
 
     // Load components on mount
     useEffect(() => {
@@ -1158,6 +1336,76 @@ export default function ExcalidrawCanvas() {
         excalidrawAPIRef.current = excalidrawAPI;
     }, [excalidrawAPI]);
 
+    // Sync canvas changes to PartyKit (throttled)
+    const syncCanvasToPartyKit = useCallback((elements: any[], appState: any, files: any) => {
+        if (!isSharedMode || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current < SYNC_THROTTLE_MS) {
+            return; // Throttle updates
+        }
+
+        lastSyncTimeRef.current = now;
+
+        try {
+            socketRef.current.send(JSON.stringify({
+                type: "canvas-update",
+                elements,
+                appState: {
+                    viewBackgroundColor: appState.viewBackgroundColor,
+                    currentItemStrokeColor: appState.currentItemStrokeColor,
+                    currentItemBackgroundColor: appState.currentItemBackgroundColor,
+                    currentItemFillStyle: appState.currentItemFillStyle,
+                    currentItemStrokeWidth: appState.currentItemStrokeWidth,
+                    currentItemRoughness: appState.currentItemRoughness,
+                    currentItemOpacity: appState.currentItemOpacity,
+                    currentItemFontFamily: appState.currentItemFontFamily,
+                    currentItemFontSize: appState.currentItemFontSize,
+                    currentItemTextAlign: appState.currentItemTextAlign,
+                    currentItemStrokeStyle: appState.currentItemStrokeStyle,
+                    currentItemRoundness: appState.currentItemRoundness,
+                },
+                files,
+            }));
+        } catch (err) {
+            console.error("Failed to sync canvas to PartyKit:", err);
+        }
+    }, [isSharedMode]);
+
+    // Sync markdown notes to PartyKit
+    const syncMarkdownNotes = useCallback((notes: any[]) => {
+        if (!isSharedMode || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        try {
+            socketRef.current.send(JSON.stringify({
+                type: "markdown-update",
+                markdownNotes: notes
+            }));
+        } catch (err) {
+            console.error("Failed to sync markdown notes to PartyKit:", err);
+        }
+    }, [isSharedMode]);
+
+    // Sync image history to PartyKit
+    const syncImageHistory = useCallback((images: any[]) => {
+        if (!isSharedMode || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        try {
+            socketRef.current.send(JSON.stringify({
+                type: "image-update",
+                imageHistory: images
+            }));
+        } catch (err) {
+            console.error("Failed to sync image history to PartyKit:", err);
+        }
+    }, [isSharedMode]);
+
     // Handle creating new markdown element
     const handleCreateMarkdown = useCallback(async () => {
         const api = excalidrawAPIRef.current;
@@ -1294,6 +1542,74 @@ export default function ExcalidrawCanvas() {
             // Add long-press support for mobile context menu
             {...(isMobile ? longPressHandlers.handlers : {})}
         >
+            {/* Shared mode banner */}
+            {isSharedMode && (
+                <div className="shared-banner">
+                    <div className="banner-content">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                        <span>
+                            {isConnected ? (
+                                <>
+                                    🌐 <strong>Live collaboration</strong> • {activeUsers} {activeUsers === 1 ? 'user' : 'users'} online • Auto-syncing
+                                </>
+                            ) : (
+                                <>
+                                    🔌 <strong>Connecting...</strong> • Shared mode
+                                </>
+                            )}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                .shared-banner {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 0.75rem 1rem;
+                    z-index: 999;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    font-family: var(--font-hand, sans-serif);
+                    font-size: 0.85rem;
+                }
+
+                .banner-content {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                }
+
+                .banner-content svg {
+                    flex-shrink: 0;
+                }
+
+                .banner-content strong {
+                    font-weight: 700;
+                }
+
+                @media (max-width: 768px) {
+                    .shared-banner {
+                        font-size: 0.75rem;
+                        padding: 0.5rem 0.75rem;
+                    }
+
+                    .banner-content svg {
+                        width: 14px;
+                        height: 14px;
+                    }
+                }
+            `}</style>
             <style>{`
                 /* Hide Excalidraw's native selection UI for markdown notes */
                 .excalidraw-container .excalidraw__canvas {
@@ -1506,12 +1822,35 @@ export default function ExcalidrawCanvas() {
                         const files = api.getFiles();
                         console.log("📝 onChange - files count:", Object.keys(files || {}).length);
 
-                        // If canvas is empty, clear localStorage
-                        if (elements.length === 0) {
+                        // If canvas is empty, clear localStorage (only in non-shared mode)
+                        if (elements.length === 0 && !isSharedMode) {
                             localStorage.removeItem(STORAGE_KEY);
                             console.log("🗑️ Canvas cleared - localStorage removed");
-                        } else {
+                        } else if (!isSharedMode) {
+                            // Only save to localStorage in non-shared mode
                             saveToLocalStorage(elements, appState, files);
+                        }
+
+                        // Sync to PartyKit in shared mode (but not when applying remote updates)
+                        if (isSharedMode) {
+                            if (isApplyingRemoteUpdateRef.current) {
+                                console.log("⏸️ Skipping sync - applying remote update");
+                            } else {
+                                console.log("📤 Syncing to PartyKit - elements:", elements.length);
+                                syncCanvasToPartyKit(elements, appState, files);
+
+                                // Extract and sync markdown notes
+                                const mdNotes = elements.filter((el: any) =>
+                                    el.customData?.type === "markdown" && !el.isDeleted
+                                );
+                                if (mdNotes.length > 0) {
+                                    console.log("📝 Syncing markdown notes:", mdNotes.length);
+                                }
+                                if (onMarkdownNotesChange) {
+                                    onMarkdownNotesChange(mdNotes);
+                                }
+                                syncMarkdownNotes(mdNotes);
+                            }
                         }
                     } else {
                         console.log("📝 onChange - API not ready yet");

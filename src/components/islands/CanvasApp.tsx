@@ -3,6 +3,7 @@ import CanvasControls from "./CanvasControls";
 import { AIChatContainer, ImageGenerationModal, useImageGeneration, useElementSelection } from "../ai-chat";
 import MyAssetsPanel from "./MyAssetsPanel";
 import SaveOptionsModal from "./SaveOptionsModal";
+import ShareModal from "./ShareModal";
 import {
     collectCanvasState,
     saveCanvasStateToFile,
@@ -114,6 +115,9 @@ export default function CanvasApp() {
 
     // Image generation modal state - managed independently of AI chat
     const [showImageModal, setShowImageModal] = useState(false);
+
+    // Share modal state
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     // Toast state
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -260,6 +264,16 @@ export default function CanvasApp() {
     const handleCloseAssets = () => {
         console.log("Closing Assets");
         setIsAssetsOpen(false);
+    };
+
+    const handleShare = () => {
+        console.log("Opening Share modal");
+        setIsShareModalOpen(true);
+    };
+
+    const handleCloseShare = () => {
+        console.log("Closing Share modal");
+        setIsShareModalOpen(false);
     };
 
     /**
@@ -419,6 +433,16 @@ export default function CanvasApp() {
         window.addEventListener("canvas:debug-save", handleDebugSave);
         return () => window.removeEventListener("canvas:debug-save", handleDebugSave);
     }, [handleSaveState]);
+
+    // Listen for share modal open requests (from WelcomeScreen)
+    useEffect(() => {
+        const handleShareOpen = () => {
+            console.log("🔧 Share modal opened from WelcomeScreen");
+            setIsShareModalOpen(true);
+        };
+        window.addEventListener("share:open", handleShareOpen);
+        return () => window.removeEventListener("share:open", handleShareOpen);
+    }, []);
 
     // === IMAGE GENERATION (moved from AIChatContainer) ===
 
@@ -671,6 +695,7 @@ export default function CanvasApp() {
                 onSaveState={handleSaveState}
                 onLoadState={handleLoadState}
                 onCreateMarkdown={handleCreateNote}
+                onShare={handleShare}
             />
 
             {/* Use new AIChatContainer with element selection feature */}
@@ -705,6 +730,13 @@ export default function CanvasApp() {
                     imageCount={pendingSaveState.images.history.length}
                 />
             )}
+
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={isShareModalOpen}
+                onClose={handleCloseShare}
+                currentCanvasState={null}
+            />
 
             {/* Image Generation Modal - now independent of AI chat */}
             <ImageGenerationModal

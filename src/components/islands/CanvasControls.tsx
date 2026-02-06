@@ -8,16 +8,18 @@ interface CanvasControlsProps {
     onSaveState?: () => void;
     onLoadState?: () => void;
     onCreateMarkdown?: () => void;
+    onShare?: () => void;
 }
 
-export default function CanvasControls({ 
-    onOpenChat, 
-    onOpenAssets, 
-    isChatOpen, 
-    isAssetsOpen, 
-    onSaveState, 
+export default function CanvasControls({
+    onOpenChat,
+    onOpenAssets,
+    isChatOpen,
+    isAssetsOpen,
+    onSaveState,
     onLoadState,
-    onCreateMarkdown 
+    onCreateMarkdown,
+    onShare
 }: CanvasControlsProps) {
     const [message, setMessage] = useState<string | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -205,6 +207,19 @@ export default function CanvasControls({
                         </svg>
                         <span className="label">My Assets</span>
                     </button>
+
+                    {onShare && (
+                        <button onClick={onShare} className="control-btn share-btn" title="Share for real-time collaboration">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="18" cy="5" r="3"/>
+                                <circle cx="6" cy="12" r="3"/>
+                                <circle cx="18" cy="19" r="3"/>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                            </svg>
+                            <span className="label">Share</span>
+                        </button>
+                    )}
 
                     {/* Divider */}
                     <div className="divider"></div>
@@ -503,6 +518,17 @@ export default function CanvasControls({
                     background: #ebfbee;
                     border-color: #2f9e44;
                     box-shadow: 2px 2px 0 #2f9e44;
+                }
+
+                .share-btn:hover {
+                    background: #f3e8ff;
+                    border-color: #9c36b5;
+                }
+
+                .share-btn:hover .label {
+                    background: #f3e8ff;
+                    border-color: #9c36b5;
+                    box-shadow: 2px 2px 0 #9c36b5;
                 }
 
                 .note-btn:hover {

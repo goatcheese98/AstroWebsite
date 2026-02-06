@@ -1,0 +1,71 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import ExcalidrawCanvas from "@/components/islands/ExcalidrawCanvas";
+import CanvasApp from "@/components/islands/CanvasApp";
+
+const { roomId } = Astro.params;
+
+if (!roomId) {
+  return Astro.redirect("/");
+}
+---
+
+<BaseLayout title={`Shared Canvas - ${roomId}`}>
+  <div class="canvas-layout">
+    <div class="canvas-container">
+      <ExcalidrawCanvas
+        client:only="react"
+        isSharedMode={true}
+        shareRoomId={roomId}
+      />
+      <CanvasApp client:only="react" />
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .canvas-layout {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+  }
+
+  .canvas-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    /* Always white background for canvas (Excalidraw default) */
+    background: #ffffff !important;
+    background-image: none !important;
+  }
+
+  /* Ensure body doesn't scroll when canvas is open */
+  :global(body) {
+    overflow: hidden !important;
+    /* Prevent browser pinch zoom - let Excalidraw handle it */
+    touch-action: none;
+  }
+
+  /* Prevent browser zoom on the canvas container */
+  .canvas-container {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Make Excalidraw fill entire viewport */
+  :global(.excalidraw-wrapper),
+  :global(.excalidraw) {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Hide Excalidraw's default theme toggle since we sync with site theme */
+  :global(.excalidraw .layer-ui__wrapper__top-right) {
+    display: none;
+  }
+</style>
