@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { nanoid } from "nanoid";
+import { encode, decode } from "@msgpack/msgpack";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
 import "@excalidraw/excalidraw/index.css";
@@ -72,6 +73,7 @@ export default function ExcalidrawCanvas({
     const socketRef = useRef<WebSocket | null>(null);
     const lastSyncTimeRef = useRef<number>(0);
     const isApplyingRemoteUpdateRef = useRef<boolean>(false); // Flag to prevent sync loops
+    const elementCacheRef = useRef<Map<string, any>>(new Map()); // Cache for optimized merge
     const SYNC_THROTTLE_MS = 100; // Throttle updates to 10 per second
 
     // Load saved canvas data from localStorage on mount
@@ -118,9 +120,13 @@ export default function ExcalidrawCanvas({
             setIsConnected(true);
         };
 
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
             try {
-                const data = JSON.parse(event.data);
+                // Decode MessagePack binary
+                const arrayBuffer = event.data instanceof ArrayBuffer
+                    ? event.data
+                    : await event.data.arrayBuffer();
+                const data = decode(new Uint8Array(arrayBuffer)) as any;
                 console.log("📥 Received message:", data.type);
 
                 if (data.type === "init") {
@@ -129,6 +135,12 @@ export default function ExcalidrawCanvas({
                     if (data.state) {
                         console.log("📂 Loading initial shared state");
                         if (data.state.elements) {
+                            // Populate cache with initial elements
+                            elementCacheRef.current.clear();
+                            data.state.elements.forEach((el: any) => {
+                                elementCacheRef.current.set(el.id, el);
+                            });
+
                             // Set flag to prevent sync loop
                             isApplyingRemoteUpdateRef.current = true;
                             excalidrawAPI.updateScene({
@@ -161,62 +173,71 @@ export default function ExcalidrawCanvas({
                     // Another user updated canvas
                     console.log("🔄 Applying canvas update from collaborator");
 
-                    // Smart merge: Combine local and remote elements
+                    // OPTIMIZED MERGE: Use cached elements for faster merge
                     const currentElements = excalidrawAPI.getSceneElements();
                     const remoteElements = data.elements || [];
 
-                    // Create map of remote elements by ID
-                    const remoteById = new Map();
-                    remoteElements.forEach((el: any) => {
-                        remoteById.set(el.id, el);
-                    });
-
-                    // Create map of current elements by ID
+                    // Build current element map with indices
                     const currentById = new Map();
-                    currentElements.forEach((el: any) => {
-                        currentById.set(el.id, el);
+                    currentElements.forEach((el: any, index: number) => {
+                        currentById.set(el.id, { element: el, index });
                     });
 
-                    // Merge: keep local elements not in remote, and add/update from remote
                     const merged = [...currentElements];
+                    let hasChanges = false;
 
-                    // Add or update remote elements
+                    // Process remote elements using cache
                     remoteElements.forEach((remoteEl: any) => {
-                        const localEl = currentById.get(remoteEl.id);
-                        if (!localEl) {
-                            // New element from remote, add it
+                        const cachedEl = elementCacheRef.current.get(remoteEl.id);
+                        const localEntry = currentById.get(remoteEl.id);
+
+                        // Skip if this exact version is already cached (no change)
+                        if (cachedEl && cachedEl.version === remoteEl.version &&
+                            cachedEl.versionNonce === remoteEl.versionNonce) {
+                            return;
+                        }
+
+                        // Update cache
+                        elementCacheRef.current.set(remoteEl.id, remoteEl);
+
+                        if (!localEntry) {
+                            // New element from remote
                             merged.push(remoteEl);
+                            hasChanges = true;
                             console.log("➕ Adding new element from remote:", remoteEl.id);
                         } else {
-                            // Element exists locally, update if remote is newer
-                            const localIndex = merged.findIndex((el: any) => el.id === remoteEl.id);
-                            if (localIndex >= 0) {
-                                // Use version to determine which is newer
-                                if (remoteEl.version > localEl.version ||
-                                    (remoteEl.version === localEl.version && remoteEl.versionNonce > localEl.versionNonce)) {
-                                    merged[localIndex] = remoteEl;
-                                    console.log("🔄 Updating element from remote:", remoteEl.id);
-                                }
+                            const localEl = localEntry.element;
+                            // Update if remote is newer
+                            if (remoteEl.version > localEl.version ||
+                                (remoteEl.version === localEl.version && remoteEl.versionNonce > localEl.versionNonce)) {
+                                merged[localEntry.index] = remoteEl;
+                                hasChanges = true;
+                                console.log("🔄 Updating element from remote:", remoteEl.id);
                             }
                         }
                     });
 
-                    // Set flag to prevent sync loop
-                    isApplyingRemoteUpdateRef.current = true;
-                    excalidrawAPI.updateScene({
-                        elements: merged,
-                        appState: data.appState,
-                    });
-                    if (data.files) {
-                        excalidrawAPI.addFiles(Object.values(data.files));
-                    }
-                    // Reset flag after browser paint (ensures onChange completes)
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            isApplyingRemoteUpdateRef.current = false;
-                            console.log("🔓 Remote update flag reset");
+                    // Only update scene if there were actual changes
+                    if (hasChanges) {
+                        // Set flag to prevent sync loop
+                        isApplyingRemoteUpdateRef.current = true;
+                        excalidrawAPI.updateScene({
+                            elements: merged,
+                            appState: data.appState,
                         });
-                    });
+                        if (data.files) {
+                            excalidrawAPI.addFiles(Object.values(data.files));
+                        }
+                        // Reset flag after browser paint (ensures onChange completes)
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                isApplyingRemoteUpdateRef.current = false;
+                                console.log("🔓 Remote update flag reset");
+                            });
+                        });
+                    } else {
+                        console.log("⏭️ No changes detected, skipping update");
+                    }
                 } else if (data.type === "markdown-update") {
                     // Another user updated markdown notes
                     console.log("📝 Applying markdown update from collaborator");
@@ -1350,7 +1371,13 @@ export default function ExcalidrawCanvas({
         lastSyncTimeRef.current = now;
 
         try {
-            socketRef.current.send(JSON.stringify({
+            // Update cache with current elements
+            elements.forEach((el: any) => {
+                elementCacheRef.current.set(el.id, el);
+            });
+
+            // Encode as MessagePack binary
+            const message = encode({
                 type: "canvas-update",
                 elements,
                 appState: {
@@ -1368,7 +1395,9 @@ export default function ExcalidrawCanvas({
                     currentItemRoundness: appState.currentItemRoundness,
                 },
                 files,
-            }));
+            });
+
+            socketRef.current.send(message);
         } catch (err) {
             console.error("Failed to sync canvas to PartyKit:", err);
         }
@@ -1381,10 +1410,11 @@ export default function ExcalidrawCanvas({
         }
 
         try {
-            socketRef.current.send(JSON.stringify({
+            const message = encode({
                 type: "markdown-update",
                 markdownNotes: notes
-            }));
+            });
+            socketRef.current.send(message);
         } catch (err) {
             console.error("Failed to sync markdown notes to PartyKit:", err);
         }
@@ -1397,10 +1427,11 @@ export default function ExcalidrawCanvas({
         }
 
         try {
-            socketRef.current.send(JSON.stringify({
+            const message = encode({
                 type: "image-update",
                 imageHistory: images
-            }));
+            });
+            socketRef.current.send(message);
         } catch (err) {
             console.error("Failed to sync image history to PartyKit:", err);
         }
@@ -1468,12 +1499,16 @@ export default function ExcalidrawCanvas({
                         ...el.customData,
                         content: newContent,
                     },
+                    // Increment version to trigger sync
+                    version: (el.version || 0) + 1,
+                    versionNonce: Date.now(), // Use timestamp for unique nonce
                 };
             }
             return el;
         });
 
         excalidrawAPI.updateScene({ elements: updatedElements });
+        console.log("📝 Markdown updated for element:", elementId, "- new version:", updatedElements.find((el: any) => el.id === elementId)?.version);
     }, [excalidrawAPI]);
 
     // Register markdown note ref
@@ -1545,40 +1580,42 @@ export default function ExcalidrawCanvas({
             {/* Shared mode indicator */}
             {isSharedMode && isConnected && (
                 <div className="shared-indicator">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="18" cy="5" r="3"/>
                         <circle cx="6" cy="12" r="3"/>
                         <circle cx="18" cy="19" r="3"/>
                         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
                         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                     </svg>
-                    <span>{activeUsers}</span>
+                    <span>{activeUsers} {activeUsers === 1 ? 'user' : 'users'} online</span>
                 </div>
             )}
 
             <style>{`
                 .shared-indicator {
                     position: fixed;
-                    top: 380px;
+                    bottom: 20px;
                     right: 20px;
                     display: flex;
                     align-items: center;
                     gap: 6px;
-                    padding: 6px 10px;
-                    background: rgba(0, 0, 0, 0.75);
+                    padding: 8px 12px;
+                    background: rgba(0, 0, 0, 0.85);
                     backdrop-filter: blur(8px);
                     color: white;
-                    border-radius: 6px;
-                    z-index: 999;
+                    border-radius: 8px;
+                    z-index: 9999;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                    font-size: 12px;
+                    font-size: 13px;
                     font-weight: 500;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-                    transition: opacity 0.2s;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+                    transition: opacity 0.2s, transform 0.2s;
+                    pointer-events: auto;
                 }
 
                 .shared-indicator:hover {
-                    opacity: 0.9;
+                    opacity: 0.95;
+                    transform: translateY(-2px);
                 }
 
                 .shared-indicator svg {
@@ -1591,11 +1628,10 @@ export default function ExcalidrawCanvas({
 
                 @media (max-width: 768px) {
                     .shared-indicator {
-                        top: auto;
-                        bottom: 80px;
+                        bottom: 16px;
                         right: 16px;
-                        padding: 4px 8px;
-                        font-size: 11px;
+                        padding: 6px 10px;
+                        font-size: 12px;
                     }
 
                     .shared-indicator svg {

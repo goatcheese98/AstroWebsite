@@ -1,4 +1,5 @@
 import type * as Party from "partykit/server";
+import { encode, decode } from "@msgpack/msgpack";
 
 interface SharedState {
   elements: any[];           // Excalidraw elements
@@ -21,37 +22,32 @@ export default class ExcalidrawParty implements Party.Server {
 
     // Send current room state to new user
     const state = await this.room.storage.get<SharedState>("canvasState");
-    if (state) {
-      conn.send(JSON.stringify({
-        type: "init",
-        state,
-        activeUsers: connections.length
-      }));
-    } else {
-      // First user - no state yet
-      conn.send(JSON.stringify({
-        type: "init",
-        state: null,
-        activeUsers: 1
-      }));
-    }
+    const initMessage = {
+      type: "init",
+      state: state || null,
+      activeUsers: state ? connections.length : 1
+    };
+
+    // Send as MessagePack binary
+    conn.send(encode(initMessage) as any);
 
     // Broadcast user joined event
     this.room.broadcast(
-      JSON.stringify({
+      encode({
         type: "user-joined",
         userId: conn.id,
         activeUsers: connections.length
-      }),
+      }) as any,
       [conn.id]
     );
   }
 
   // Called when a message is received from any connection
-  async onMessage(message: string, sender: Party.Connection) {
-    const data = JSON.parse(message);
+  async onMessage(message: string | ArrayBuffer, sender: Party.Connection) {
+    // Decode MessagePack binary
+    const data = decode(message instanceof ArrayBuffer ? message : new Uint8Array(Buffer.from(message))) as any;
 
-    // Broadcast to all other connections
+    // Broadcast to all other connections (already encoded)
     this.room.broadcast(message, [sender.id]);
 
     // Save latest state based on update type
@@ -90,11 +86,11 @@ export default class ExcalidrawParty implements Party.Server {
     const connections = [...this.room.getConnections()];
 
     // Broadcast user left event
-    this.room.broadcast(JSON.stringify({
+    this.room.broadcast(encode({
       type: "user-left",
       userId: conn.id,
       activeUsers: connections.length
-    }));
+    }) as any);
   }
 }
 

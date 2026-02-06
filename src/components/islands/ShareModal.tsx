@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
+import { encode } from "@msgpack/msgpack";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -49,8 +50,8 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           ws.onopen = () => {
             console.log("✅ Connected to PartyKit, sending initial state...");
 
-            // Send initial canvas state
-            ws.send(JSON.stringify({
+            // Send initial canvas state (MessagePack encoded)
+            const message = encode({
               type: "canvas-update",
               elements,
               appState: {
@@ -68,9 +69,10 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
                 currentItemRoundness: appState.currentItemRoundness,
               },
               files,
-            }));
+            });
 
-            console.log("✅ Initial state sent to PartyKit");
+            ws.send(message);
+            console.log("✅ Initial state sent to PartyKit (MessagePack)");
 
             // Close connection after sending initial state
             setTimeout(() => {
