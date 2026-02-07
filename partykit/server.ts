@@ -7,7 +7,12 @@ interface SharedState {
   files: any;               // Excalidraw files (images)
   markdownNotes: any[];     // Custom markdown notes
   imageHistory: any[];      // Gemini generated images
+  lastActivity?: number;    // Timestamp of last activity (for expiration)
+  createdAt?: number;       // Timestamp of room creation
 }
+
+// Expiration: 90 days of inactivity
+const EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000; // 90 days in milliseconds
 
 export default class ExcalidrawParty implements Party.Server {
   constructor(readonly room: Party.Room) {}
@@ -21,7 +26,33 @@ export default class ExcalidrawParty implements Party.Server {
     console.log(`[${this.room.id}] Active users: ${connections.length}`);
 
     // Send current room state to new user
-    const state = await this.room.storage.get<SharedState>("canvasState");
+    let state = await this.room.storage.get<SharedState>("canvasState");
+
+    // Check if room has expired (90 days of inactivity)
+    if (state && state.lastActivity) {
+      const inactiveTime = Date.now() - state.lastActivity;
+      if (inactiveTime > EXPIRATION_MS) {
+        console.log(`[${this.room.id}] Room expired after ${Math.floor(inactiveTime / (24 * 60 * 60 * 1000))} days of inactivity`);
+
+        // Delete expired state
+        await this.room.storage.delete("canvasState");
+        state = null;
+
+        // Send expiration notification
+        conn.send(encode({
+          type: "room-expired",
+          message: "This room expired after 90 days of inactivity",
+          inactiveDays: Math.floor(inactiveTime / (24 * 60 * 60 * 1000))
+        }) as any);
+      }
+    }
+
+    // Update last activity on connect
+    if (state) {
+      state.lastActivity = Date.now();
+      await this.room.storage.put("canvasState", state);
+    }
+
     const initMessage = {
       type: "init",
       state: state || null,
@@ -50,6 +81,8 @@ export default class ExcalidrawParty implements Party.Server {
     // Broadcast to all other connections (already encoded)
     this.room.broadcast(message, [sender.id]);
 
+    const now = Date.now();
+
     // Save latest state based on update type
     if (data.type === "canvas-update") {
       // Excalidraw elements, appState, files
@@ -59,6 +92,8 @@ export default class ExcalidrawParty implements Party.Server {
         elements: data.elements,
         appState: data.appState,
         files: data.files,
+        lastActivity: now,
+        createdAt: currentState.createdAt || now,
       });
     }
     else if (data.type === "markdown-update") {
@@ -67,6 +102,8 @@ export default class ExcalidrawParty implements Party.Server {
       await this.room.storage.put("canvasState", {
         ...currentState,
         markdownNotes: data.markdownNotes,
+        lastActivity: now,
+        createdAt: currentState.createdAt || now,
       });
     }
     else if (data.type === "image-update") {
@@ -75,6 +112,8 @@ export default class ExcalidrawParty implements Party.Server {
       await this.room.storage.put("canvasState", {
         ...currentState,
         imageHistory: data.imageHistory,
+        lastActivity: now,
+        createdAt: currentState.createdAt || now,
       });
     }
   }

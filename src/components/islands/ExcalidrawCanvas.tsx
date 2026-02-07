@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { encode, decode } from "@msgpack/msgpack";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
+import { useSmoothCollaboration } from "./useSmoothCollaboration";
 import "@excalidraw/excalidraw/index.css";
 
 // Dynamically import Excalidraw to avoid SSR issues
@@ -219,15 +220,16 @@ export default function ExcalidrawCanvas({
 
                     // Only update scene if there were actual changes
                     if (hasChanges) {
+                        // Apply smoothing to remote updates (springs + fade-in)
+                        smoothRemoteUpdate(merged);
+
                         // Set flag to prevent sync loop
                         isApplyingRemoteUpdateRef.current = true;
-                        excalidrawAPI.updateScene({
-                            elements: merged,
-                            appState: data.appState,
-                        });
+
                         if (data.files) {
                             excalidrawAPI.addFiles(Object.values(data.files));
                         }
+
                         // Reset flag after browser paint (ensures onChange completes)
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
@@ -255,6 +257,10 @@ export default function ExcalidrawCanvas({
                 } else if (data.type === "user-left") {
                     console.log("👋 User left:", data.userId);
                     setActiveUsers(data.activeUsers);
+                } else if (data.type === "room-expired") {
+                    console.log("⏰ Room expired:", data.message);
+                    // Show notification to user
+                    alert(`⏰ ${data.message}\n\nThis room was inactive for ${data.inactiveDays} days and has been cleared. You can start fresh!`);
                 }
             } catch (err) {
                 console.error("❌ Error processing message:", err);
@@ -1357,6 +1363,9 @@ export default function ExcalidrawCanvas({
         excalidrawAPIRef.current = excalidrawAPI;
     }, [excalidrawAPI]);
 
+    // Smooth collaboration system (springs + fade-in)
+    const { smoothRemoteUpdate, isSmoothingUpdate } = useSmoothCollaboration(excalidrawAPI);
+
     // Sync canvas changes to PartyKit (throttled)
     const syncCanvasToPartyKit = useCallback((elements: any[], appState: any, files: any) => {
         if (!isSharedMode || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
@@ -1861,10 +1870,12 @@ export default function ExcalidrawCanvas({
                             saveToLocalStorage(elements, appState, files);
                         }
 
-                        // Sync to PartyKit in shared mode (but not when applying remote updates)
+                        // Sync to PartyKit in shared mode (but not when applying remote updates or smoothing)
                         if (isSharedMode) {
                             if (isApplyingRemoteUpdateRef.current) {
                                 console.log("⏸️ Skipping sync - applying remote update");
+                            } else if (isSmoothingUpdate()) {
+                                console.log("⏸️ Skipping sync - smoothing animation");
                             } else {
                                 console.log("📤 Syncing to PartyKit - elements:", elements.length);
                                 syncCanvasToPartyKit(elements, appState, files);

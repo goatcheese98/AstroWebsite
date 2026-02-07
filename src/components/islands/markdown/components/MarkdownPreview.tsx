@@ -4,7 +4,8 @@
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  👤 I render markdown content beautifully. I use react-markdown with        ║
  * ║     syntax highlighting via Prism. I support GFM (tables, checkboxes,       ║
- * ║     strikethrough). I support both light and dark modes.                    ║
+ * ║     strikethrough), LaTeX math equations via KaTeX, and both light and      ║
+ * ║     dark modes.                                                              ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
  * 💬 WHO IS IN MY SOCIAL CIRCLE?
@@ -16,10 +17,10 @@
  *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
  *      │   │ useMarkdown │─────▶│      ME      │─────▶│react-markdown│  │
  *      │   │    Note     │      │   Preview    │      │remark-gfm    │  │
- *      │   └─────────────┘      └──────────────┘      └─────────────┘   │
- *      │                               │                                │
- *      │                               ▼                                │
- *      │              SyntaxHighlighter (Prism themes)                   │
+ *      │   └─────────────┘      └──────────────┘      │remark-math   │  │
+ *      │                               │              │rehype-katex  │  │
+ *      │                               ▼              └─────────────┘   │
+ *      │              SyntaxHighlighter (Prism) + KaTeX                 │
  *      │                                                                  │
  *      └─────────────────────────────────────────────────────────────────┘
  * 
@@ -38,27 +39,33 @@
  * 
  * 🎬 MAIN ACTIONS I PROVIDE:
  * - Parse and render markdown with GFM support
+ * - Render LaTeX math equations (inline with $ and block with $$)
  * - Syntax-highlight code blocks
  * - Render interactive checkboxes for task lists
- * 
+ *
  * 🔑 KEY CONCEPTS:
- * - Uses react-markdown with remark-gfm plugin
+ * - Uses react-markdown with remark-gfm and remark-math plugins
+ * - KaTeX for LaTeX math rendering
  * - Custom components for each markdown element type
  * - Prism for syntax highlighting (oneDark/oneLight themes)
  * - Checkboxes are functional (toggle updates content)
  * 
  * 📝 REFACTOR JOURNAL:
+ * 2026-02-06: Added LaTeX math equation support using remark-math and rehype-katex
  * 2026-02-03: Extracted from monolithic MarkdownNote.tsx to separate component
  * 
  * @module markdown/components/MarkdownPreview
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Components } from 'react-markdown';
+import 'katex/dist/katex.min.css';
 
 interface MarkdownPreviewProps {
     /** Markdown content to render */
@@ -349,7 +356,11 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
     return (
         <div className="markdown-preview">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={components}
+            >
                 {content || '# Empty Note\n\nDouble-click to edit and add your content.'}
             </ReactMarkdown>
         </div>

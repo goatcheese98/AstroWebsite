@@ -68,6 +68,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const [content, setContent] = useState(element.customData?.content || '');
         const [isHovered, setIsHovered] = useState(false);
         const [isNearEdge, setIsNearEdge] = useState(false);
+        const [isDragging, setIsDragging] = useState(false);
         const contentRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
 
@@ -124,9 +125,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            // Only enable pointer events when editing (allows dragging when selected)
-            pointerEvents: isEditing ? 'auto' : 'none',
-            cursor: isEditing ? 'text' : 'default',
+            // Enable pointer events when editing OR when selected and hovered (but not dragging)
+            pointerEvents: isEditing ? 'auto' : (isSelected && isHovered && !isDragging ? 'auto' : 'none'),
+            cursor: isEditing ? 'text' : (isSelected && isHovered ? 'default' : 'default'),
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
             WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -139,17 +140,18 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             // If near edge, let it bubble (it will be pointer-events: none anyway)
             if (isNearEdge) return;
 
-            // Otherwise, we've caught the click in the auto zone.
-            // We should trigger selection in Excalidraw manually.
-            const api = (window as any).excalidrawAPI;
-            if (api) {
-                api.selectShape({ id: element.id });
-            }
+            // When user clicks on selected note, assume they want to drag
+            // Disable pointer-events so Excalidraw can handle it
+            setIsDragging(true);
 
-            // We don't implement full drag logic here to avoid duplication,
-            // but since it's a click in the center, most users expect to select.
-            // For dragging, they can still use the edges which are pointer-events: none.
-        }, [isEditing, isNearEdge, element.id]);
+            // Re-enable after drag completes
+            const handleMouseUp = () => {
+                setIsDragging(false);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+            document.addEventListener('mouseup', handleMouseUp);
+
+        }, [isEditing, isNearEdge]);
 
         // Enter edit mode
         const enterEditMode = useCallback(() => {
