@@ -30,6 +30,17 @@ const loadMarkdownNote = async () => {
     return { MarkdownNote };
 };
 
+// Lazy-loaded WebEmbed
+let WebEmbed: any = null;
+
+const loadWebEmbed = async () => {
+    if (!WebEmbed) {
+        const mod = await import("./web-embed");
+        WebEmbed = mod.WebEmbed;
+    }
+    return { WebEmbed };
+};
+
 const STORAGE_KEY = "excalidraw-canvas-data";
 const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
@@ -54,18 +65,22 @@ export default function ExcalidrawCanvas({
     const [isLoading, setIsLoading] = useState(true);
     const [ExcalidrawComponent, setExcalidrawComponent] = useState<any>(null);
     const [MarkdownNoteComponent, setMarkdownNoteComponent] = useState<any>(null);
+    const [WebEmbedComponent, setWebEmbedComponent] = useState<any>(null);
     const [initialCanvasData, setInitialCanvasData] = useState<any>(null);
 
     // Use refs to avoid triggering re-renders from RAF loop
     const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
     const markdownElementsRef = useRef<any[]>([]);
     const markdownNoteRefsRef = useRef<Map<string, any>>(new Map());
+    const webEmbedElementsRef = useRef<any[]>([]);
+    const webEmbedRefsRef = useRef<Map<string, any>>(new Map());
     const saveTimeoutRef = useRef<number | null>(null);
     const pendingSaveDataRef = useRef<{ elements: any[]; appState: any; files: any } | null>(null);
 
     // State for triggering React re-renders (updated at controlled intervals)
     const [, forceUpdate] = useState({});
     const [markdownElements, setMarkdownElements] = useState<any[]>([]);
+    const [webEmbedElements, setWebEmbedElements] = useState<any[]>([]);
 
     // Collaboration state
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -293,14 +308,16 @@ export default function ExcalidrawCanvas({
 
         const init = async () => {
             try {
-                const [{ Excalidraw }, { MarkdownNote }] = await Promise.all([
+                const [{ Excalidraw }, { MarkdownNote }, { WebEmbed }] = await Promise.all([
                     loadExcalidraw(),
-                    loadMarkdownNote()
+                    loadMarkdownNote(),
+                    loadWebEmbed()
                 ]);
 
                 if (mounted) {
                     setExcalidrawComponent(() => Excalidraw);
                     setMarkdownNoteComponent(() => MarkdownNote);
+                    setWebEmbedComponent(() => WebEmbed);
                     setIsLoading(false);
                 }
             } catch (err) {
@@ -441,9 +458,15 @@ export default function ExcalidrawCanvas({
                 );
                 markdownElementsRef.current = mdElements;
 
+                const embedElements = elements.filter(
+                    (el: any) => el.customData?.type === "web-embed" && !el.isDeleted
+                );
+                webEmbedElementsRef.current = embedElements;
+
                 // Only trigger React update at controlled intervals
                 if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
                     setMarkdownElements([...mdElements]); // Create new array to trigger render
+                    setWebEmbedElements([...embedElements]); // Create new array to trigger render
                     lastUpdateTime = timestamp;
                 }
             } catch (err) {
@@ -1520,6 +1543,128 @@ export default function ExcalidrawCanvas({
         console.log("📝 Markdown updated for element:", elementId, "- new version:", updatedElements.find((el: any) => el.id === elementId)?.version);
     }, [excalidrawAPI]);
 
+    // Handle creating a new web embed
+    const handleCreateWebEmbed = useCallback(async (initialUrl?: string) => {
+        const api = excalidrawAPIRef.current;
+        if (!api) {
+            console.warn("⚠️ Cannot create web embed: Excalidraw API not ready");
+            return;
+        }
+
+        const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+
+        // Get viewport center for proper positioning
+        const appState = api.getAppState();
+        const viewportCenterX = appState.width / 2;
+        const viewportCenterY = appState.height / 2;
+
+        // Convert viewport center to scene coordinates
+        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+        const newElement = {
+            type: "rectangle",
+            x: sceneX - 350,
+            y: sceneY - 250,
+            width: 700,
+            height: 500,
+            backgroundColor: "#ffffff",
+            strokeColor: "#6366f1", // Indigo border to distinguish from markdown
+            strokeWidth: 2,
+            roughness: 0,
+            opacity: 100,
+            fillStyle: "solid",
+            id: nanoid(),
+            locked: false,
+            customData: {
+                type: "web-embed",
+                url: initialUrl || "",
+                title: "Web Embed",
+            },
+        };
+
+        const converted = converter([newElement]);
+        const currentElements = api.getSceneElements();
+
+        api.updateScene({
+            elements: [...currentElements, ...converted],
+        });
+
+        console.log("✅ Created new web embed at viewport center");
+    }, []);
+
+    // Handle web embed URL update
+    const handleWebEmbedUpdate = useCallback((elementId: string, newUrl: string) => {
+        if (!excalidrawAPI) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((el: any) => {
+            if (el.id === elementId) {
+                return {
+                    ...el,
+                    customData: {
+                        ...el.customData,
+                        url: newUrl,
+                    },
+                    // Increment version to trigger sync
+                    version: (el.version || 0) + 1,
+                    versionNonce: Date.now(),
+                };
+            }
+            return el;
+        });
+
+        excalidrawAPI.updateScene({ elements: updatedElements });
+        console.log("🌐 Web embed updated for element:", elementId, "- URL:", newUrl);
+    }, [excalidrawAPI]);
+
+    // Handle web embed position change (dragging)
+    const handleWebEmbedPositionChange = useCallback((elementId: string, newX: number, newY: number) => {
+        if (!excalidrawAPI) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((el: any) => {
+            if (el.id === elementId) {
+                return {
+                    ...el,
+                    x: newX,
+                    y: newY,
+                    version: (el.version || 0) + 1,
+                    versionNonce: Date.now(),
+                };
+            }
+            return el;
+        });
+
+        excalidrawAPI.updateScene({ elements: updatedElements });
+    }, [excalidrawAPI]);
+
+    // Handle web embed deletion
+    const handleWebEmbedDelete = useCallback((elementId: string) => {
+        if (!excalidrawAPI) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        excalidrawAPI.updateScene({
+            elements: elements.filter((el: any) => el.id !== elementId),
+        });
+        console.log("🗑️ Deleted web embed:", elementId);
+    }, [excalidrawAPI]);
+
+    // Listen for web embed creation events from AI chat
+    useEffect(() => {
+        const handleCreateWebEmbedEvent = (event: CustomEvent<{ url: string }>) => {
+            const { url } = event.detail;
+            console.log("🌐 Canvas received web embed request:", url);
+            handleCreateWebEmbed(url);
+        };
+        
+        window.addEventListener("canvas:create-web-embed", handleCreateWebEmbedEvent as EventListener);
+        
+        return () => {
+            window.removeEventListener("canvas:create-web-embed", handleCreateWebEmbedEvent as EventListener);
+        };
+    }, [handleCreateWebEmbed]);
+
     // Register markdown note ref
     const registerMarkdownNoteRef = useCallback((id: string, ref: any) => {
         if (ref) {
@@ -1730,6 +1875,7 @@ export default function ExcalidrawCanvas({
                     if (typeof window !== "undefined") {
                         (window as any).excalidrawAPI = api;
                         (window as any).createMarkdownNote = handleCreateMarkdown;
+                        (window as any).createWebEmbed = handleCreateWebEmbed;
 
                         // Add utility to clear all canvas localStorage (for debugging)
                         (window as any).clearCanvasStorage = () => {
@@ -1911,6 +2057,18 @@ export default function ExcalidrawCanvas({
                     appState={viewStateRef.current}
                     onChange={handleMarkdownUpdate}
                     ref={(ref: any) => registerMarkdownNoteRef(element.id, ref)}
+                />
+            ))}
+
+            {/* Render WebEmbed overlays for each web embed element */}
+            {WebEmbedComponent && webEmbedElements.map((element) => (
+                <WebEmbedComponent
+                    key={element.id}
+                    element={element}
+                    appState={viewStateRef.current}
+                    onChange={handleWebEmbedUpdate}
+                    onPositionChange={handleWebEmbedPositionChange}
+                    onDelete={handleWebEmbedDelete}
                 />
             ))}
         </div>

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "dev:canvas": "DEPLOY_TARGET=canvas astro dev",
+    "dev:party": "npx partykit dev",
     "build": "astro build",
     "build:canvas": "node scripts/build-canvas.js prepare && DEPLOY_TARGET=canvas astro build && node scripts/build-canvas.js restore",
     "preview": "astro preview",

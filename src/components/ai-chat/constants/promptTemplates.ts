@@ -100,6 +100,14 @@ export const QUICK_TEMPLATES: PromptTemplate[] = [
         variables: [{ name: "scenario", label: "Scenario", type: "text" }]
     },
     {
+        id: "web-embed",
+        icon: "🌐",
+        title: "Embed Website",
+        description: "Embed a web page on canvas",
+        template: "Embed this website on the canvas: {url}",
+        variables: [{ name: "url", label: "Website URL", type: "text" }]
+    },
+    {
         id: "architecture",
         icon: "🏗️",
         title: "Architecture",

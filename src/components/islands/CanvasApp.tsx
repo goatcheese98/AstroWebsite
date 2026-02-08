@@ -424,6 +424,15 @@ export default function CanvasApp() {
         }
     }, []);
 
+    const handleCreateWebEmbed = useCallback(() => {
+        const createFn = (window as any).createWebEmbed;
+        if (createFn) {
+            createFn();
+        } else {
+            console.warn("Web embed creation not available yet");
+        }
+    }, []);
+
     // Debug: Add global save trigger for testing
     useEffect(() => {
         const handleDebugSave = () => {
@@ -695,6 +704,7 @@ export default function CanvasApp() {
                 onSaveState={handleSaveState}
                 onLoadState={handleLoadState}
                 onCreateMarkdown={handleCreateNote}
+                onCreateWebEmbed={handleCreateWebEmbed}
                 onShare={handleShare}
             />
 

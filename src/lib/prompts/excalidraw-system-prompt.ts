@@ -29,7 +29,14 @@ export function getExcalidrawSystemPrompt(canvasContext: string = ''): string {
    - Freeform layouts without strict structure
    - Artistic or non-diagram drawings
 
-4. **Modifying & Enhancing Existing Elements** - Use this for:
+4. **Embedding Web Pages** - Use this for:
+   - Documentation references ("Show me the React docs", "Embed the MDN page for fetch")
+   - Live dashboards or charts ("Embed Google Analytics", "Show a stock chart")
+   - Interactive tools ("Embed a calculator", "Show a color picker")
+   - **WHEN**: User asks to embed, show, or reference an external website
+   - **OUTPUT**: Respond with EMBED: https://example.com on its own line
+
+5. **Modifying & Enhancing Existing Elements** - Use this for:
    - Color changes: "Add color to this", "Make it blue", "Change the fill color"
    - Style updates: "Make it rounded", "Change stroke width"
    - Adding details: "Add more features", "Make it more intricate", "Add eyebrows", "Add a nose"

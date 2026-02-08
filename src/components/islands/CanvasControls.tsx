@@ -8,6 +8,7 @@ interface CanvasControlsProps {
     onSaveState?: () => void;
     onLoadState?: () => void;
     onCreateMarkdown?: () => void;
+    onCreateWebEmbed?: () => void;
     onShare?: () => void;
 }
 
@@ -19,6 +20,7 @@ export default function CanvasControls({
     onSaveState,
     onLoadState,
     onCreateMarkdown,
+    onCreateWebEmbed,
     onShare
 }: CanvasControlsProps) {
     const [message, setMessage] = useState<string | null>(null);
@@ -198,6 +200,17 @@ export default function CanvasControls({
                                 <line x1="9" y1="15" x2="15" y2="15"/>
                             </svg>
                             <span className="label">Add Note</span>
+                        </button>
+                    )}
+
+                    {onCreateWebEmbed && (
+                        <button onClick={onCreateWebEmbed} className="control-btn embed-btn" title="Embed a website">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            <span className="label">Web Embed</span>
                         </button>
                     )}
 

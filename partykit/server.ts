@@ -14,11 +14,11 @@ interface SharedState {
 // Expiration: 90 days of inactivity
 const EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000; // 90 days in milliseconds
 
-export default class ExcalidrawParty implements Party.Server {
-  constructor(readonly room: Party.Room) {}
+export default class ExcalidrawParty implements Party.PartyKitServer {
+  constructor(readonly room: Party.PartyKitRoom) { }
 
   // Called when a new WebSocket connection is made
-  async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+  async onConnect(conn: Party.PartyKitConnection, ctx: Party.PartyKitContext) {
     console.log(`[${this.room.id}] User ${conn.id} connected`);
 
     // Get active connection count
@@ -74,7 +74,7 @@ export default class ExcalidrawParty implements Party.Server {
   }
 
   // Called when a message is received from any connection
-  async onMessage(message: string | ArrayBuffer, sender: Party.Connection) {
+  async onMessage(message: string | ArrayBuffer, sender: Party.PartyKitConnection) {
     // Decode MessagePack binary
     const data = decode(message instanceof ArrayBuffer ? message : new Uint8Array(Buffer.from(message))) as any;
 
@@ -118,8 +118,63 @@ export default class ExcalidrawParty implements Party.Server {
     }
   }
 
+  // Handle HTTP requests (proxy for web embeds)
+  async onRequest(req: Party.PartyKitRequest): Promise<Response> {
+    const url = new URL(req.url);
+    const targetUrl = url.searchParams.get("url");
+
+    if (req.method === "GET" && targetUrl) {
+      try {
+        const response = await fetch(targetUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          }
+        });
+
+        // Get content type
+        const contentType = response.headers.get("content-type") || "";
+
+        // Only process HTML
+        if (contentType.includes("text/html")) {
+          let body = await response.text();
+
+          // Inject <base> tag to fix relative links
+          // Using target URL origin as base
+          const baseUrl = new URL(targetUrl).origin;
+          const baseTag = `<base href="${baseUrl}/">`;
+          body = body.replace('<head>', `<head>${baseTag}`);
+
+          // Create new headers
+          const headers = new Headers(response.headers);
+          headers.delete("x-frame-options");
+          headers.delete("content-security-policy");
+          headers.set("access-control-allow-origin", "*");
+
+          return new Response(body, {
+            status: response.status,
+            headers
+          });
+        }
+
+        // For non-HTML (images, etc), just stream through with CORS headers
+        const headers = new Headers(response.headers);
+        headers.set("access-control-allow-origin", "*");
+
+        return new Response(response.body, {
+          status: response.status,
+          headers
+        });
+
+      } catch (e) {
+        return new Response("Error fetching url: " + (e as Error).message, { status: 500 });
+      }
+    }
+
+    return new Response("Not found", { status: 404 });
+  }
+
   // Called when a connection closes
-  onClose(conn: Party.Connection) {
+  onClose(conn: Party.PartyKitConnection) {
     console.log(`[${this.room.id}] User ${conn.id} disconnected`);
 
     const connections = [...this.room.getConnections()];

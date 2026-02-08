@@ -147,6 +147,20 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     // === 🔄 Request Tracking ===
     const chatRequestIdRef = useRef<string | null>(null);
 
+    // === 🌐 Web Embed Content Tracking ===
+    const selectedWebEmbedRef = useRef<{ url: string; title: string; elementId: string } | null>(null);
+
+    // Listen for web embed selections
+    useEffect(() => {
+        const handleWebEmbedSelected = (e: CustomEvent<{ elementId: string; url: string; title: string }>) => {
+            selectedWebEmbedRef.current = e.detail;
+            console.log("🌐 Web embed selected for AI context:", e.detail.url);
+        };
+
+        window.addEventListener("webembed:selected", handleWebEmbedSelected as EventListener);
+        return () => window.removeEventListener("webembed:selected", handleWebEmbedSelected as EventListener);
+    }, []);
+
     // Cleanup on unmount if still open
     useEffect(() => {
         return () => {
@@ -203,15 +217,27 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         }
 
         const counts: Record<string, number> = {};
+        let webEmbedCount = 0;
         canvasState.elements.forEach((el: any) => {
             counts[el.type] = (counts[el.type] || 0) + 1;
+            if (el.customData?.type === 'web-embed') {
+                webEmbedCount++;
+            }
         });
 
         const desc = Object.entries(counts)
             .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
             .join(', ');
 
-        return `Canvas has ${canvasState.elements.length} elements: ${desc}`;
+        let description = `Canvas has ${canvasState.elements.length} elements: ${desc}`;
+
+        // Add web embed info if selected
+        if (selectedWebEmbedRef.current) {
+            description += `\n\nSelected Web Embed: ${selectedWebEmbedRef.current.url}`;
+            description += `\nThe user has a web page embedded that they may want you to analyze or reference.`;
+        }
+
+        return description;
     }, [canvasState]);
 
     /**
@@ -406,6 +432,27 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                         console.error("Failed to parse drawing command:", err);
                     }
                 }
+            }
+
+            // Check for web embed command (EMBED: https://example.com)
+            const embedMatch = data.message.match(/EMBED:\s*(https?:\/\/\S+)/i);
+            if (embedMatch) {
+                const url = embedMatch[1];
+                console.log("🌐 Web embed requested:", url);
+                
+                // Dispatch event to create web embed
+                window.dispatchEvent(new CustomEvent("canvas:create-web-embed", {
+                    detail: { url },
+                }));
+                
+                // Replace EMBED: line with success message
+                displayMessage = displayMessage.replace(
+                    embedMatch[0],
+                    "\n\n✅ **Web page embedded**\n"
+                );
+                
+                // Store the embed command as source code
+                sourceCode = embedMatch[0];
             }
 
             // Create assistant message
