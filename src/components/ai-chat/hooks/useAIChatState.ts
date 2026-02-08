@@ -352,24 +352,59 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             // Parse any drawing commands from response
             let displayMessage = data.message;
             let drawingCommand: any[] | null = null;
+            let isMermaidDiagram = false;
+            let sourceCode: string | undefined = undefined; // Store original code for "Show Code" feature
 
-            const jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/)
-                || data.message.match(/```\s*\n([\s\S]*?)\n```/)
-                || data.message.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-
-            if (jsonMatch) {
+            // Check for Mermaid diagrams first
+            const mermaidMatch = data.message.match(/```mermaid\s*\n([\s\S]*?)\n```/);
+            if (mermaidMatch) {
                 try {
-                    const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-                    if (Array.isArray(parsed)) {
-                        drawingCommand = parsed;
-                        // Replace JSON block with success message
+                    // Store original Mermaid code BEFORE conversion
+                    sourceCode = mermaidMatch[0]; // Full code block including ```mermaid
+                    
+                    // Lazy import Mermaid converter
+                    const { convertMermaidToCanvas } = await import("@/lib/mermaid-converter");
+                    const { elements } = await convertMermaidToCanvas(mermaidMatch[1]);
+                    
+                    if (elements && elements.length > 0) {
+                        drawingCommand = elements;
+                        isMermaidDiagram = true;
+                        // Replace Mermaid block with success message
                         displayMessage = data.message.replace(
-                            jsonMatch[0],
-                            "\n\n✅ **Drawing command received**\n"
+                            mermaidMatch[0],
+                            "\n\n✅ **Mermaid diagram converted to editable shapes**\n"
                         );
+                        console.log(`🧜‍♀️ Converted Mermaid to ${elements.length} Excalidraw elements`);
                     }
                 } catch (err) {
-                    console.error("Failed to parse drawing command:", err);
+                    console.error("Failed to convert Mermaid diagram:", err);
+                    // Keep the original message if conversion fails
+                    sourceCode = undefined; // Don't store code if conversion failed
+                }
+            }
+
+            // If no Mermaid, check for JSON drawing commands
+            if (!drawingCommand) {
+                const jsonMatch = data.message.match(/```json\s*\n([\s\S]*?)\n```/)
+                    || data.message.match(/```\s*\n([\s\S]*?)\n```/)
+                    || data.message.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+
+                if (jsonMatch) {
+                    try {
+                        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                        if (Array.isArray(parsed)) {
+                            drawingCommand = parsed;
+                            // Store original JSON code BEFORE replacement
+                            sourceCode = jsonMatch[0];
+                            // Replace JSON block with success message
+                            displayMessage = data.message.replace(
+                                jsonMatch[0],
+                                "\n\n✅ **Drawing command received**\n"
+                            );
+                        }
+                    } catch (err) {
+                        console.error("Failed to parse drawing command:", err);
+                    }
                 }
             }
 
@@ -386,6 +421,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 reactions: [],
                 status: "sent",
                 drawingCommand: drawingCommand || undefined,
+                sourceCode: sourceCode, // Store original code for "Show Code" button
             };
 
             setMessages(prev => [...prev, assistantMessage]);

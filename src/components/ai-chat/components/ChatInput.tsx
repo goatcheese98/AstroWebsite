@@ -139,7 +139,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             ? "Ask AI to draw..."
             : contextMode === "selected" && hasSelection
                 ? `Ask about ${selectedElementsCount} selected elements...`
-                : "Ask AI to draw, explain, or modify...";
+                : "Ask AI to draw, create Mermaid diagrams, or explain...";
         
         return (
             <div style={{

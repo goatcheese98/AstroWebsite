@@ -87,9 +87,17 @@ export const QUICK_TEMPLATES: PromptTemplate[] = [
         id: "flowchart",
         icon: "🔄",
         title: "Flowchart",
-        description: "Process flow diagram",
-        template: "Create a flowchart for: {process}",
+        description: "Process flow diagram (Mermaid)",
+        template: "Create a Mermaid flowchart for: {process}",
         variables: [{ name: "process", label: "Process", type: "text" }]
+    },
+    {
+        id: "mermaid-sequence",
+        icon: "📡",
+        title: "Sequence",
+        description: "API/service interactions",
+        template: "Create a Mermaid sequence diagram for: {scenario}",
+        variables: [{ name: "scenario", label: "Scenario", type: "text" }]
     },
     {
         id: "architecture",
@@ -153,8 +161,8 @@ export const TEMPLATE_CATEGORIES: Record<string, PromptTemplate[]> = {
             id: "flowchart",
             icon: "🔄",
             title: "Flowchart",
-            description: "Process flow diagram",
-            template: "Create a flowchart for: {process}",
+            description: "Process flow diagram (Mermaid)",
+            template: "Create a flowchart using Mermaid for: {process}. Include decision points and process steps.",
             variables: [{ name: "process", label: "Process", type: "text" }]
         },
         {
@@ -162,8 +170,32 @@ export const TEMPLATE_CATEGORIES: Record<string, PromptTemplate[]> = {
             icon: "🏗️",
             title: "Architecture",
             description: "System design diagram",
-            template: "Design system architecture for: {system}",
+            template: "Design a system architecture diagram showing: {system}",
             variables: [{ name: "system", label: "System", type: "text" }]
+        },
+        {
+            id: "sequence",
+            icon: "📡",
+            title: "Sequence Diagram",
+            description: "API/Service interactions (Mermaid)",
+            template: "Create a Mermaid sequence diagram showing: {interaction}. Include all participants and message flows.",
+            variables: [{ name: "interaction", label: "Interaction", type: "text" }]
+        },
+        {
+            id: "class",
+            icon: "🧱",
+            title: "Class Diagram",
+            description: "OO design with classes (Mermaid)",
+            template: "Create a Mermaid class diagram for: {domain}. Include classes, attributes, methods, and relationships.",
+            variables: [{ name: "domain", label: "Domain/System", type: "text" }]
+        },
+        {
+            id: "state",
+            icon: "🔀",
+            title: "State Diagram",
+            description: "State machine (Mermaid)",
+            template: "Create a Mermaid state diagram for: {subject}. Show all states and transitions.",
+            variables: [{ name: "subject", label: "Subject", type: "text" }]
         },
         {
             id: "erd",
@@ -175,14 +207,6 @@ export const TEMPLATE_CATEGORIES: Record<string, PromptTemplate[]> = {
                 { name: "database", label: "Database Name", type: "text" },
                 { name: "entities", label: "Main Entities", type: "text" }
             ]
-        },
-        {
-            id: "sequence",
-            icon: "📡",
-            title: "Sequence Diagram",
-            description: "API/Service interactions",
-            template: "Create a sequence diagram for {interaction}",
-            variables: [{ name: "interaction", label: "Interaction", type: "text" }]
         }
     ],
     "Business": [

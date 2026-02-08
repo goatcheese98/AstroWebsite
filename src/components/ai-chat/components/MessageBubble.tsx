@@ -85,15 +85,17 @@ export interface MessageBubbleProps {
 }
 
 /**
- * Action buttons for AI messages - Copy and Add as Note
+ * Action buttons for AI messages - Copy and Show Code
  */
 function MessageActions({
     textContent,
+    sourceCode,
 }: {
     textContent: string;
+    sourceCode?: string;
 }) {
     const [copied, setCopied] = useState(false);
-    const [addedAsNote, setAddedAsNote] = useState(false);
+    const [showingCode, setShowingCode] = useState(false);
 
     /**
      * Copy message text to clipboard
@@ -109,9 +111,9 @@ function MessageActions({
     };
 
     /**
-     * Add message as markdown note to canvas
+     * Show source code (Mermaid or JSON) as markdown note on canvas
      */
-    const addAsNote = async () => {
+    const showCode = async () => {
         try {
             // Dynamically load the markdown note creator
             const excalidrawAPI = (window as any).excalidrawAPI;
@@ -132,13 +134,17 @@ function MessageActions({
             // Import converter
             const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
 
+            // Use source code if available, otherwise fall back to text content
+            // sourceCode already contains the triple backticks, so we don't wrap it again
+            const codeToShow = sourceCode || textContent;
+
             const markdownElement = {
                 type: "rectangle",
                 x: sceneX - 250,
                 y: sceneY - 175,
                 width: 500,
                 height: 350,
-                backgroundColor: "#ffffff",
+                backgroundColor: "#f8f9fa", // Light gray background for better readability
                 strokeColor: "transparent",
                 strokeWidth: 0,
                 roughness: 0,
@@ -148,7 +154,7 @@ function MessageActions({
                 locked: false,
                 customData: {
                     type: "markdown",
-                    content: textContent,
+                    content: codeToShow, // Already has backticks from sourceCode
                 },
             };
 
@@ -159,14 +165,17 @@ function MessageActions({
                 elements: [...currentElements, ...converted],
             });
 
-            setAddedAsNote(true);
-            setTimeout(() => setAddedAsNote(false), 2000);
+            setShowingCode(true);
+            setTimeout(() => setShowingCode(false), 2000);
 
-            console.log("✅ Added AI response as markdown note");
+            console.log("✅ Added source code as markdown note");
         } catch (err) {
-            console.error("Failed to add as note:", err);
+            console.error("Failed to show code:", err);
         }
     };
+
+    // Only show "Show Code" button if there's source code available
+    const hasSourceCode = !!sourceCode;
 
     return (
         <div style={{
@@ -202,33 +211,33 @@ function MessageActions({
                 {copied ? "Copied!" : "Copy"}
             </button>
 
-            {/* Add as Note Button */}
-            <button
-                onClick={addAsNote}
-                title="Add as markdown note to canvas"
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "4px 8px",
-                    background: addedAsNote ? "#dcfce7" : "var(--color-accent, #6366f1)",
-                    border: "1px solid var(--color-accent, #6366f1)",
-                    borderRadius: "6px",
-                    fontSize: "11px",
-                    color: addedAsNote ? "#166534" : "white",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    fontWeight: 500,
-                }}
-            >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="18" x2="12" y2="12"/>
-                    <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
-                {addedAsNote ? "Added!" : "Add as Note"}
-            </button>
+            {/* Show Code Button - only visible when source code is available */}
+            {hasSourceCode && (
+                <button
+                    onClick={showCode}
+                    title="Show source code (Mermaid/JSON) as note"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "4px 8px",
+                        background: showingCode ? "#dcfce7" : "var(--color-accent, #6366f1)",
+                        border: "1px solid var(--color-accent, #6366f1)",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        color: showingCode ? "#166534" : "white",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                        fontWeight: 500,
+                    }}
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    {showingCode ? "Added!" : "Show Code"}
+                </button>
+            )}
         </div>
     );
 }
@@ -239,13 +248,16 @@ function MessageActions({
 function CopyButtons({
     drawingCommand,
     canvasState,
+    sourceCode,
 }: {
     drawingCommand: any[];
     canvasState?: any;
+    sourceCode?: string;
 }) {
     const [copiedJson, setCopiedJson] = useState(false);
     const [copiedSvg, setCopiedSvg] = useState(false);
     const [addedToCanvas, setAddedToCanvas] = useState(false);
+    const [showingCode, setShowingCode] = useState(false);
     
     /**
      * Copy JSON to clipboard
@@ -304,6 +316,63 @@ function CopyButtons({
             setTimeout(() => setAddedToCanvas(false), 2000);
         } catch (err) {
             console.error("Failed to add to canvas:", err);
+        }
+    };
+
+    /**
+     * Show source code (Mermaid or JSON) as markdown note on canvas
+     */
+    const showCode = async () => {
+        if (!sourceCode) return;
+        
+        try {
+            const excalidrawAPI = (window as any).excalidrawAPI;
+            if (!excalidrawAPI) {
+                console.warn("⚠️ Excalidraw API not ready yet");
+                return;
+            }
+
+            const appState = excalidrawAPI.getAppState();
+            const viewportCenterX = appState.width / 2;
+            const viewportCenterY = appState.height / 2;
+            const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+            const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+            const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+
+            const markdownElement = {
+                type: "rectangle",
+                x: sceneX - 250,
+                y: sceneY - 175,
+                width: 500,
+                height: 350,
+                backgroundColor: "#f8f9fa", // Light gray background for better readability
+                strokeColor: "transparent",
+                strokeWidth: 0,
+                roughness: 0,
+                opacity: 100,
+                fillStyle: "solid",
+                id: nanoid(),
+                locked: false,
+                customData: {
+                    type: "markdown",
+                    content: sourceCode, // Already has backticks from sourceCode
+                },
+            };
+
+            const converted = convertToExcalidrawElements([markdownElement]);
+            const currentElements = excalidrawAPI.getSceneElements();
+
+            excalidrawAPI.updateScene({
+                elements: [...currentElements, ...converted],
+            });
+
+            setShowingCode(true);
+            setTimeout(() => setShowingCode(false), 2000);
+
+            console.log("✅ Added source code as markdown note");
+        } catch (err) {
+            console.error("Failed to show code:", err);
         }
     };
     
@@ -395,6 +464,34 @@ function CopyButtons({
                 </svg>
                 {copiedSvg ? "Copied!" : "SVG"}
             </button>
+
+            {/* Show Code Button - only visible when source code is available */}
+            {sourceCode && (
+                <button
+                    onClick={showCode}
+                    title="Show source code (Mermaid/JSON) as note"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "4px 8px",
+                        background: showingCode ? "#dcfce7" : "var(--color-accent, #6366f1)",
+                        border: "1px solid var(--color-accent, #6366f1)",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        color: showingCode ? "#166534" : "white",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                        fontWeight: 500,
+                    }}
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    {showingCode ? "Added!" : "Show Code"}
+                </button>
+            )}
         </div>
     );
 }
@@ -594,7 +691,7 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
 
             {/* Action Buttons for AI Messages */}
             {!isUser && (
-                <MessageActions textContent={textContent} />
+                <MessageActions textContent={textContent} sourceCode={message.sourceCode} />
             )}
 
             {/* Additional Drawing Command Buttons */}
@@ -602,6 +699,7 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
                 <CopyButtons
                     drawingCommand={message.drawingCommand!}
                     canvasState={canvasState}
+                    sourceCode={message.sourceCode}
                 />
             )}
 

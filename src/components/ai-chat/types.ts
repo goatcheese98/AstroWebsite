@@ -10,6 +10,7 @@ export interface Message {
     parentId?: string;
     status: "sending" | "sent" | "error" | "editing";
     drawingCommand?: any[]; // Store the parsed JSON elements for copy functionality
+    sourceCode?: string; // Original Mermaid/JSON code before processing (for "Show Code" feature)
 }
 
 export type MessageContent = 
