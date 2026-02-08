@@ -34,6 +34,7 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         const [isEditing, setIsEditing] = useState(!element.customData?.url);
         const [isDragging, setIsDragging] = useState(false);
         const [showFallback, setShowFallback] = useState(false);
+        const [currentUrl, setCurrentUrl] = useState('');
         const iframeRef = useRef<HTMLIFrameElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
         const dragStartRef = useRef<{ x: number; y: number; elementX: number; elementY: number } | null>(null);
@@ -57,9 +58,17 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         }, [isSelected, element.id]);
 
         // Get embed-friendly URL
-        const { url: processedUrl, isSearch, embedUrl } = rawUrl ? enhanceUrl(rawUrl) : { url: '', isSearch: false };
+        const { url: processedUrl, isSearch, embedUrl, warning } = rawUrl ? enhanceUrl(rawUrl) : { url: '', isSearch: false };
         const displayUrl = embedUrl || processedUrl;
         const isReliableEmbed = isKnownEmbeddable(processedUrl);
+        const hasWarning = !!warning;
+
+        // Initialize and update current URL display
+        useEffect(() => {
+            if (processedUrl) {
+                setCurrentUrl(processedUrl);
+            }
+        }, [processedUrl]);
 
         // Calculate screen position
         const zoom = appState.zoom.value;
@@ -223,14 +232,52 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             }
         };
 
+        // Listen for URL changes in iframe (via postMessage when available)
+        useEffect(() => {
+            const handleMessage = (event: MessageEvent) => {
+                // Accept messages from any origin (for embedded content)
+                // Check if it's a navigation message
+                if (event.data && typeof event.data === 'object') {
+                    if (event.data.type === 'iframe-navigation' && event.data.url) {
+                        setCurrentUrl(event.data.url);
+                    }
+                }
+            };
+
+            window.addEventListener('message', handleMessage);
+            return () => window.removeEventListener('message', handleMessage);
+        }, []);
+
+        // Try to track URL changes via iframe (limited by CORS)
+        useEffect(() => {
+            if (!iframeRef.current) return;
+
+            const checkUrl = setInterval(() => {
+                try {
+                    // This will fail for cross-origin iframes due to CORS
+                    const iframeWindow = iframeRef.current?.contentWindow;
+                    if (iframeWindow && iframeWindow.location.href) {
+                        const newUrl = iframeWindow.location.href;
+                        if (newUrl !== currentUrl && !newUrl.startsWith('about:')) {
+                            setCurrentUrl(newUrl);
+                        }
+                    }
+                } catch (e) {
+                    // Expected error for cross-origin iframes - silently ignore
+                }
+            }, 1000);
+
+            return () => clearInterval(checkUrl);
+        }, [currentUrl]);
+
         // Selection event for AI
         useEffect(() => {
             if (isSelected && processedUrl) {
                 window.dispatchEvent(new CustomEvent('webembed:selected', {
-                    detail: { elementId: element.id, url: processedUrl, title: rawUrl },
+                    detail: { elementId: element.id, url: currentUrl || processedUrl, title: rawUrl },
                 }));
             }
-        }, [isSelected, processedUrl, rawUrl, element.id]);
+        }, [isSelected, currentUrl, processedUrl, rawUrl, element.id]);
 
         return (
             <div
@@ -339,14 +386,14 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         cursor: 'text',
                                         minWidth: 0,
                                     }}
-                                    title="Double-click to edit"
+                                    title={`Double-click to edit - Current URL: ${currentUrl || processedUrl}`}
                                 >
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                                     </svg>
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {isSearch ? `🔍 ${rawUrl}` : getDomain(processedUrl)}
+                                        {isSearch ? `🔍 ${rawUrl}` : (currentUrl || processedUrl)}
                                     </span>
                                 </div>
                                 <button onClick={handleRefresh} onMouseDown={(e) => e.stopPropagation()} title="Refresh" style={{
@@ -406,9 +453,71 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                     <line x1="8" y1="21" x2="16" y2="21" />
                                     <line x1="12" y1="17" x2="12" y2="21" />
                                 </svg>
-                                <div style={{ fontSize: '14px' }}>Enter a URL or search query</div>
+                                <div style={{ fontSize: '14px' }}>Enter a website URL</div>
                                 <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
-                                    Try: youtube.com, figma.com, or "react hooks"
+                                    Try: youtube.com/watch?v=..., en.wikipedia.org/wiki/..., figma.com
+                                </div>
+                            </div>
+                        ) : hasWarning ? (
+                            <div style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: '#fef3c7',
+                                color: '#92400e',
+                                gap: '16px',
+                                padding: '24px',
+                                textAlign: 'center',
+                            }}>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <div>
+                                    <div style={{ fontSize: '15px', fontWeight: 600, color: '#78350f', marginBottom: '8px' }}>
+                                        This site can't be embedded
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: '#92400e', maxWidth: '320px', lineHeight: 1.6 }}>
+                                        {warning}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                    <a
+                                        href={processedUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            padding: '8px 16px',
+                                            background: '#f59e0b',
+                                            color: 'white',
+                                            borderRadius: '6px',
+                                            textDecoration: 'none',
+                                            fontSize: '12px',
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        Open in New Tab
+                                    </a>
+                                    <button
+                                        onClick={handleEdit}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        style={{
+                                            padding: '8px 16px',
+                                            background: 'white',
+                                            color: '#92400e',
+                                            border: '1px solid #fbbf24',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Try Different URL
+                                    </button>
                                 </div>
                             </div>
                         ) : showFallback ? (
@@ -496,8 +605,8 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         // CRITICAL: Only allow pointer events when selected
                                         pointerEvents: isSelected ? 'auto' : 'none',
                                     }}
-                                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation-by-user-activation allow-modals allow-popups-to-escape-sandbox allow-downloads"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                                     autoFocus={true}
                                     referrerPolicy="no-referrer-when-downgrade"
                                     title="Web embed"

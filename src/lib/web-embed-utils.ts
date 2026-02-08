@@ -5,10 +5,15 @@
 
 // Known embed-friendly URL patterns
 const EMBED_PATTERNS = [
-    // YouTube
+    // YouTube - match various YouTube URL formats
     {
-        pattern: /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
-        convert: (id: string) => `https://www.youtube.com/embed/${id}`,
+        pattern: /(?:(?:youtube\.com\/watch\?v=)|(?:youtu\.be\/)|(?:youtube\.com\/embed\/)|(?:youtube\.com\/v\/)|(?:youtube\.com\/shorts\/))([a-zA-Z0-9_-]+)/,
+        convert: (id: string) => `https://www.youtube.com/embed/${id}?autoplay=0&rel=0`,
+    },
+    // YouTube homepage or domain without video ID
+    {
+        pattern: /^https?:\/\/(?:www\.)?youtube\.com\/?$/,
+        convert: () => null, // Return null to use proxy for homepage
     },
     // Vimeo
     {
@@ -35,9 +40,14 @@ const EMBED_PATTERNS = [
         pattern: /docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)/,
         convert: (type: string, id: string) => `https://docs.google.com/${type}/d/${id}/preview`,
     },
-    // Wikipedia (mobile version allows framing)
+    // Wikipedia - always use mobile version for better iframe support
     {
-        pattern: /wikipedia\.org\/wiki\/(.+)/,
+        pattern: /(?:en\.)?wikipedia\.org\/wiki\/(.+)/,
+        convert: (article: string) => `https://en.m.wikipedia.org/wiki/${article}`,
+    },
+    // Wikipedia mobile - keep as-is
+    {
+        pattern: /(?:en\.)?m\.wikipedia\.org\/wiki\/(.+)/,
         convert: (article: string) => `https://en.m.wikipedia.org/wiki/${article}`,
     },
     // Excalidraw libraries
@@ -55,7 +65,10 @@ export function convertToEmbedUrl(url: string): string | null {
     for (const { pattern, convert } of EMBED_PATTERNS) {
         const match = url.match(pattern);
         if (match) {
-            return convert(...match.slice(1));
+            const result = convert(...match.slice(1));
+            // If convert returns null, continue to next pattern
+            if (result === null) continue;
+            return result;
         }
     }
     return null;
@@ -65,29 +78,35 @@ export function convertToEmbedUrl(url: string): string | null {
  * Check if a URL is known to work in iframes
  */
 export function isKnownEmbeddable(url: string): boolean {
-    const embeddableDomains = [
-        'youtube.com',
-        'youtu.be',
-        'vimeo.com',
-        'figma.com',
-        'codepen.io',
-        'stackblitz.com',
-        'docs.google.com',
-        'm.wikipedia.org',
-        'excalidraw.com',
-        'wikipedia.org',
-        'wikimedia.org',
-        'archive.org',
-        'replit.com',
-        'glitch.com',
-        'observablehq.com',
-        'notion.site',
-        'loom.com',
-        'canva.com',
-    ];
-
     try {
-        const hostname = new URL(url).hostname.toLowerCase();
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.toLowerCase();
+
+        // List of domains that work well in iframes
+        const embeddableDomains = [
+            'vimeo.com',
+            'figma.com',
+            'codepen.io',
+            'stackblitz.com',
+            'docs.google.com',
+            'm.wikipedia.org',
+            'excalidraw.com',
+            'wikipedia.org',
+            'wikimedia.org',
+            'archive.org',
+            'replit.com',
+            'glitch.com',
+            'observablehq.com',
+            'notion.site',
+            'loom.com',
+            'canva.com',
+        ];
+
+        // YouTube embeds work, but only the /embed/ URLs
+        if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+            return url.includes('/embed/') || url.includes('/watch?v=') || url.includes('youtu.be/');
+        }
+
         return embeddableDomains.some(domain => hostname.includes(domain));
     } catch {
         return false;
@@ -95,9 +114,23 @@ export function isKnownEmbeddable(url: string): boolean {
 }
 
 /**
+ * Sites that are known to NOT work in iframes
+ */
+const BLOCKED_SITES = [
+    { domain: 'google.com', message: 'Google doesn\'t allow embedding. Click "Open in New Tab" to visit the site.' },
+    { domain: 'youtube.com', message: 'YouTube homepage doesn\'t work in embeds. Try pasting a specific video URL (e.g., youtube.com/watch?v=...)' },
+    { domain: 'facebook.com', message: 'Facebook doesn\'t allow embedding due to security policies.' },
+    { domain: 'twitter.com', message: 'Twitter/X doesn\'t allow embedding. Try using Twitter\'s embed tools instead.' },
+    { domain: 'instagram.com', message: 'Instagram doesn\'t allow embedding due to security policies.' },
+    { domain: 'gmail.com', message: 'Gmail doesn\'t allow embedding due to security policies.' },
+    { domain: 'drive.google.com', message: 'Google Drive files don\'t work in embeds. Try using Google Docs/Sheets/Slides publish links instead.' },
+    { domain: 'search.brave.com', message: 'Search engines don\'t allow embedding. Click "Open in New Tab" to search.' },
+];
+
+/**
  * Smart URL enhancer - handles search queries and embed conversion
  */
-export function enhanceUrl(input: string): { url: string; isSearch: boolean; embedUrl?: string } {
+export function enhanceUrl(input: string): { url: string; isSearch: boolean; embedUrl?: string; warning?: string } {
     let url = input.trim();
 
     if (!url) return { url: '', isSearch: false };
@@ -106,10 +139,14 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
     const isSearch = !url.includes('.') || url.includes(' ');
 
     if (isSearch) {
-        // Convert to DuckDuckGo search (iframe-friendly)
+        // Search engines don't allow embedding - show warning
         const searchQuery = encodeURIComponent(url);
-        const searchUrl = `https://duckduckgo.com/?q=${searchQuery}&ia=web`;
-        return { url: searchUrl, isSearch: true };
+        const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
+        return {
+            url: googleUrl,
+            isSearch: true,
+            warning: 'Search engines don\'t allow embedding. Click "Open in New Tab" to search in your browser.'
+        };
     }
 
     // Add https:// if no protocol
@@ -120,6 +157,28 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
     // Security: Block dangerous protocols
     if (url.match(/^(javascript|data|vbscript|file|ftp):/i)) {
         return { url: '', isSearch: false };
+    }
+
+    // Check if it's a blocked site
+    try {
+        const urlObj = new URL(url);
+        const blocked = BLOCKED_SITES.find(site => urlObj.hostname.includes(site.domain));
+
+        // Special case: YouTube videos are OK, but not the homepage
+        if (blocked && blocked.domain === 'youtube.com') {
+            if (!url.includes('/watch?v=') && !url.includes('/embed/') && !url.includes('youtu.be/')) {
+                return { url, isSearch: false, warning: blocked.message };
+            }
+        } else if (blocked && blocked.domain === 'google.com') {
+            // Google search is OK (we convert it), but not the homepage
+            if (!url.includes('/search?')) {
+                return { url, isSearch: false, warning: blocked.message };
+            }
+        } else if (blocked) {
+            return { url, isSearch: false, warning: blocked.message };
+        }
+    } catch (e) {
+        // Invalid URL, continue
     }
 
     // Try to convert to embed-friendly URL
@@ -135,8 +194,6 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
         const protocol = isDev ? "http" : "https";
 
         // Construct proxy URL
-        // We use the 'main' party (default) with a specific 'proxy' room
-        // The onRequest handler in server.ts intercepts this regardless of room
         embedUrl = `${protocol}://${host}/parties/main/proxy?url=${encodeURIComponent(url)}`;
     }
 

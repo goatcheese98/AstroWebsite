@@ -127,28 +127,91 @@ export default class ExcalidrawParty implements Party.PartyKitServer {
       try {
         const response = await fetch(targetUrl, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
           }
         });
 
         // Get content type
         const contentType = response.headers.get("content-type") || "";
 
-        // Only process HTML
+        // Only process HTML - inject navigation tracking
         if (contentType.includes("text/html")) {
           let body = await response.text();
 
-          // Inject <base> tag to fix relative links
-          // Using target URL origin as base
-          const baseUrl = new URL(targetUrl).origin;
-          const baseTag = `<base href="${baseUrl}/">`;
-          body = body.replace('<head>', `<head>${baseTag}`);
+          // Inject navigation interceptor script (minimal - just for tracking)
+          const script = `
+            <script>
+              (function() {
+                const PROXY_BASE = window.location.origin + window.location.pathname;
 
-          // Create new headers
+                // Notify parent window of current URL
+                function notifyParent(url) {
+                  try {
+                    if (window.parent && window.parent !== window) {
+                      window.parent.postMessage({
+                        type: 'iframe-navigation',
+                        url: url
+                      }, '*');
+                    }
+                  } catch (e) {
+                    console.error('Failed to notify parent:', e);
+                  }
+                }
+
+                // Notify parent of initial URL
+                const currentUrl = new URLSearchParams(window.location.search).get('url');
+                if (currentUrl) {
+                  notifyParent(currentUrl);
+                }
+
+                function wrapUrl(targetUrl) {
+                  try {
+                    const base = currentUrl || '${targetUrl}';
+                    return PROXY_BASE + '?url=' + encodeURIComponent(new URL(targetUrl, base).href);
+                  } catch (e) { return targetUrl; }
+                }
+
+                // Intercept link clicks
+                document.addEventListener('click', function(e) {
+                  const link = e.target.closest('a');
+                  if (link && link.href && !link.href.startsWith('javascript:')) {
+                    e.preventDefault();
+                    const targetUrl = link.getAttribute('href');
+                    const absoluteUrl = new URL(targetUrl, currentUrl || '${targetUrl}').href;
+                    notifyParent(absoluteUrl);
+                    window.location.href = wrapUrl(targetUrl);
+                  }
+                }, true);
+
+                // Intercept form submissions
+                document.addEventListener('submit', function(e) {
+                  e.preventDefault();
+                  const form = e.target;
+                  const targetUrl = new URL(form.getAttribute('action') || '', currentUrl || '${targetUrl}');
+
+                  if (form.method.toLowerCase() === 'get') {
+                    const formData = new FormData(form);
+                    for (let [k, v] of formData.entries()) {
+                      targetUrl.searchParams.append(k, v);
+                    }
+                    notifyParent(targetUrl.href);
+                    window.location.href = PROXY_BASE + '?url=' + encodeURIComponent(targetUrl.href);
+                  }
+                }, true);
+              })();
+            </script>
+          `;
+
+          body = body.replace('</head>', `${script}</head>`);
+
+          // Create new headers - remove security restrictions
           const headers = new Headers(response.headers);
           headers.delete("x-frame-options");
           headers.delete("content-security-policy");
+          headers.delete("content-security-policy-report-only");
           headers.set("access-control-allow-origin", "*");
+          headers.set("access-control-allow-methods", "*");
+          headers.set("access-control-allow-headers", "*");
 
           return new Response(body, {
             status: response.status,
@@ -156,9 +219,11 @@ export default class ExcalidrawParty implements Party.PartyKitServer {
           });
         }
 
-        // For non-HTML (images, etc), just stream through with CORS headers
+        // For non-HTML (images, CSS, JS, videos, etc), stream through with CORS headers
         const headers = new Headers(response.headers);
         headers.set("access-control-allow-origin", "*");
+        headers.set("access-control-allow-methods", "*");
+        headers.set("access-control-allow-headers", "*");
 
         return new Response(response.body, {
           status: response.status,
