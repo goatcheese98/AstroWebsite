@@ -14,8 +14,9 @@ import {
 import { useCanvasSession } from "../../hooks/useCanvasSession";
 import { useAutoSave } from "../../hooks/useAutoSave";
 import WelcomeOverlay from "../onboarding/WelcomeOverlay";
-import AuthPrompt from "../onboarding/AuthPrompt";
 import FeatureTour from "../onboarding/FeatureTour";
+import CanvasStatusBadge from "./CanvasStatusBadge";
+import LocalFeaturePopover from "./LocalFeaturePopover";
 import TemplateGallery from "../onboarding/TemplateGallery";
 import type { Message } from "../ai-chat/types";
 import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
@@ -112,16 +113,6 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     );
 }
 
-function getTimeAgo(date: Date): string {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 5) return 'just now';
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-}
-
 export default function CanvasApp() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
@@ -143,6 +134,7 @@ export default function CanvasApp() {
 
     // Onboarding state
     const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
+    const [isLocalPopoverOpen, setIsLocalPopoverOpen] = useState(false);
 
     // === CLOUD PERSISTENCE ===
     const session = useCanvasSession();
@@ -248,13 +240,38 @@ export default function CanvasApp() {
     }, [session.isAuthenticated, session.isLoading]);
 
     // Handle template selection from TemplateGallery
-    const handleSelectTemplate = useCallback((elements: any[]) => {
+    const handleSelectTemplate = useCallback(async (elements: any[]) => {
         const api = (window as any).excalidrawAPI;
         if (!api || elements.length === 0) return;
 
-        // Load template elements into canvas
-        api.updateScene({ elements });
-        api.scrollToContent();
+        try {
+            // Use convertToExcalidrawElements to properly initialize template elements
+            const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+            const converted = convertToExcalidrawElements(elements);
+            api.updateScene({ elements: converted });
+            setTimeout(() => api.scrollToContent(), 100);
+        } catch (err) {
+            console.error("Template load failed:", err);
+            // Fallback: add required fields manually
+            const patched = elements.map((el: any) => ({
+                ...el,
+                seed: Math.floor(Math.random() * 2000000000),
+                version: 1,
+                versionNonce: Math.floor(Math.random() * 2000000000),
+                isDeleted: false,
+                groupIds: [],
+                boundElements: null,
+                updated: Date.now(),
+                link: null,
+                locked: false,
+                opacity: 100,
+                strokeWidth: el.strokeWidth ?? 2,
+                roughness: el.roughness ?? 1,
+                angle: 0,
+            }));
+            api.updateScene({ elements: patched });
+            setTimeout(() => api.scrollToContent(), 100);
+        }
     }, []);
 
     // Refs to access state from child components
@@ -831,108 +848,35 @@ export default function CanvasApp() {
                 ))}
             </div>
 
-            {/* Cloud Save Indicator — top-left */}
-            {session.isAuthenticated && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: '12px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 14px',
-                        background: 'white',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '20px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: '#6b7280',
-                        zIndex: 999,
-                        fontFamily: 'var(--font-hand, sans-serif)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    }}
-                >
-                    {/* Cloud icon */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={autoSave.isSaving ? '#6366f1' : autoSave.error ? '#ef4444' : '#22c55e'} strokeWidth="2">
-                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
-                    </svg>
-                    <span>
-                        {autoSave.isSaving
-                            ? 'Saving...'
-                            : autoSave.error
-                            ? 'Save error'
-                            : autoSave.lastSaved
-                            ? `Saved ${getTimeAgo(autoSave.lastSaved)}`
-                            : 'Cloud sync active'}
-                    </span>
-                    {/* Save Version button */}
-                    <button
-                        onClick={async () => {
-                            if (!session.canvasId) return;
-                            try {
-                                await autoSave.saveNow();
-                                const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
-                                    method: 'POST',
-                                    credentials: 'include',
-                                });
-                                if (res.ok) {
-                                    addToast('Version saved', 'success', 2000);
-                                }
-                            } catch {
-                                addToast('Failed to save version', 'info', 3000);
-                            }
-                        }}
-                        style={{
-                            marginLeft: '4px',
-                            padding: '2px 8px',
-                            background: 'transparent',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '10px',
-                            fontSize: '0.7rem',
-                            color: '#6b7280',
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            fontWeight: 600,
-                        }}
-                        title="Save a named version snapshot"
-                    >
-                        Save Version
-                    </button>
-                </div>
-            )}
+            {/* Status badge — bottom-center (Local / Cloud save) */}
+            <CanvasStatusBadge
+                isAuthenticated={session.isAuthenticated}
+                isLoading={session.isLoading}
+                autoSave={autoSave}
+                canvasId={session.canvasId}
+                onSaveVersion={async () => {
+                    if (!session.canvasId) return;
+                    try {
+                        await autoSave.saveNow();
+                        const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
+                            method: 'POST',
+                            credentials: 'include',
+                        });
+                        if (res.ok) {
+                            addToast('Version saved', 'success', 2000);
+                        }
+                    } catch {
+                        addToast('Failed to save version', 'info', 3000);
+                    }
+                }}
+                onLocalClick={() => setIsLocalPopoverOpen(true)}
+            />
 
-            {/* Anonymous user — subtle sign-in indicator */}
-            {!session.isAuthenticated && !session.isLoading && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: '12px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        background: 'white',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '20px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: '#9ca3af',
-                        zIndex: 999,
-                        fontFamily: 'var(--font-hand, sans-serif)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    }}
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
-                        <line x1="1" y1="1" x2="23" y2="23" stroke="#d1d5db" strokeWidth="2"/>
-                    </svg>
-                    <span>Local only</span>
-                </div>
-            )}
+            {/* Local feature popover — appears above the badge */}
+            <LocalFeaturePopover
+                isOpen={isLocalPopoverOpen}
+                onClose={() => setIsLocalPopoverOpen(false)}
+            />
 
             <CanvasControls
                 onOpenChat={handleOpenChat}
@@ -1021,16 +965,6 @@ export default function CanvasApp() {
             {/* Feature tour — triggers on first canvas interaction */}
             <FeatureTour />
 
-            {/* Auth prompt — for anonymous users after activity */}
-            {!session.isAuthenticated && !session.isLoading && (
-                <AuthPrompt
-                    elementCount={(() => {
-                        const api = (window as any).excalidrawAPI;
-                        return api?.getSceneElements?.()?.length || 0;
-                    })()}
-                />
-            )}
-
             {/* Toast message for save/load feedback */}
             {saveMessage && (
                 <div className="canvas-toast">
@@ -1038,7 +972,7 @@ export default function CanvasApp() {
                     <style>{`
                         .canvas-toast {
                             position: fixed;
-                            top: 1.5rem;
+                            bottom: 4rem;
                             left: 50%;
                             transform: translateX(-50%);
                             padding: 0.875rem 1.5rem;
@@ -1051,10 +985,10 @@ export default function CanvasApp() {
                             color: var(--color-text, #333);
                             box-shadow: 4px 4px 0 var(--color-stroke, #333);
                             z-index: 1001;
-                            animation: slideDown 0.2s ease;
+                            animation: slideUp 0.2s ease;
                         }
-                        @keyframes slideDown {
-                            from { transform: translate(-50%, -20px); opacity: 0; }
+                        @keyframes slideUp {
+                            from { transform: translate(-50%, 20px); opacity: 0; }
                             to { transform: translate(-50%, 0); opacity: 1; }
                         }
                     `}</style>

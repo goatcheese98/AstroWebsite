@@ -4,6 +4,8 @@ import { encode, decode } from "@msgpack/msgpack";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
 import { useSmoothCollaboration } from "./useSmoothCollaboration";
+import { useCanvasSession } from "../../hooks/useCanvasSession";
+import CanvasAvatar from "./CanvasAvatar";
 import "@excalidraw/excalidraw/index.css";
 
 // Dynamically import Excalidraw to avoid SSR issues
@@ -60,6 +62,7 @@ export default function ExcalidrawCanvas({
     onImageHistoryChange
 }: ExcalidrawCanvasProps = {}) {
     const { isMobile, isPhone } = useMobileDetection();
+    const session = useCanvasSession();
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -2088,8 +2091,11 @@ export default function ExcalidrawCanvas({
                     }
                 }}
                 renderTopRightUI={() => (
-                    // Top-right UI now empty - Add Note moved to right-side controls
-                    null
+                    <CanvasAvatar
+                        user={session.user}
+                        isAuthenticated={session.isAuthenticated}
+                        isLoading={session.isLoading}
+                    />
                 )}
             />
 

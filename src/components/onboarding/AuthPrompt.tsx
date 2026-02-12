@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { authClient } from '@/lib/auth-client';
 
 interface AuthPromptProps {
   elementCount: number;
@@ -15,11 +14,9 @@ interface AuthPromptProps {
 export default function AuthPrompt({ elementCount, onSaveAttempt }: AuthPromptProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
-  const [loading, setLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Check if already dismissed this session
     if (sessionStorage.getItem('astroweb-auth-prompt-dismissed')) {
       setIsDismissed(true);
       return;
@@ -55,16 +52,8 @@ export default function AuthPrompt({ elementCount, onSaveAttempt }: AuthPromptPr
     sessionStorage.setItem('astroweb-auth-prompt-dismissed', '1');
   };
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      await authClient.signIn.social({
-        provider: 'google',
-        callbackURL: window.location.href,
-      });
-    } catch {
-      setLoading(false);
-    }
+  const handleSignIn = () => {
+    window.location.href = '/login';
   };
 
   if (!isVisible || isDismissed) return null;
@@ -97,8 +86,7 @@ export default function AuthPrompt({ elementCount, onSaveAttempt }: AuthPromptPr
       </span>
 
       <button
-        onClick={handleGoogleSignIn}
-        disabled={loading}
+        onClick={handleSignIn}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -121,7 +109,7 @@ export default function AuthPrompt({ elementCount, onSaveAttempt }: AuthPromptPr
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
         </svg>
-        Google
+        Sign in
       </button>
 
       <button
