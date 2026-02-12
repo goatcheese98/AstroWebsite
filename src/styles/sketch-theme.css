@@ -1,8 +1,10 @@
 :root {
-  /* Typography */
-  --font-hand: 'Excalifont', 'Virgil', cursive;
-  --font-mono: 'Cascadia Code', 'Comic Shanns', monospace;
-  --font-body: 'Comic Shanns', system-ui, sans-serif;
+  /* Typography - System fonts for clean Excalidraw-like aesthetic */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Deprecated: --font-hand kept for backward compatibility during transition */
+  --font-hand: var(--font-ui);
 
   /* Fluid sizing - enhanced scale */
   --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
@@ -27,94 +29,90 @@
   --max-width: 1200px;
   --content-padding: var(--space-md);
 
-  /* Rough.js defaults */
-  --rough-roughness: 1.5;
-  --rough-bowing: 1;
-  --rough-stroke-width: 2;
+  /* Border radius - clean, subtle */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
 
-  /* Border radius - more organic */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-
-  /* Shadows - enhanced depth */
-  --shadow-sm:
-    2px 2px 0 var(--color-stroke-muted),
-    0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md:
-    4px 4px 0 var(--color-stroke-muted),
-    0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg:
-    6px 6px 0 var(--color-stroke-muted),
-    0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 30px var(--color-accent-glow);
+  /* Shadows - subtle elevation (no offset borders) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 20px var(--color-accent-glow);
+  
+  /* Legacy shadows for backward compatibility - map to elevation shadows */
+  --shadow-sketch-sm: var(--shadow-sm);
+  --shadow-sketch-md: var(--shadow-md);
+  --shadow-sketch-lg: var(--shadow-lg);
 }
 
-/* Light theme - warm paper aesthetic */
+/* Light theme - clean white aesthetic matching Excalidraw */
 [data-theme="light"] {
-  --color-bg: #faf8f5;
-  --color-surface: #ffffff;
+  --color-bg: #ffffff;
+  --color-surface: #f8f9fa;
   --color-surface-elevated: #ffffff;
-  --color-text: #1a1a2e;
-  --color-text-muted: #6b7280;
-  --color-stroke: #1a1a2e;
-  --color-stroke-muted: #d1d5db;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --color-accent-glow: rgba(37, 99, 235, 0.15);
+  --color-surface-hover: #f1f3f5;
+  --color-text: #1d1d1d;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-stroke: #1d1d1d;
+  --color-stroke-muted: #e5e5e5;
+  --color-border: #e5e5e5;
+  --color-border-hover: #d1d5db;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-light: #dbeafe;
+  --color-accent-glow: rgba(59, 130, 246, 0.15);
   --color-fill-1: #dbeafe;
   --color-fill-2: #dcfce7;
   --color-fill-3: #fef3c7;
   --color-fill-4: #fee2e2;
   --color-fill-5: #e0e7ff;
-  --color-gradient-start: #2563eb;
-  --color-gradient-end: #3b82f6;
-  --dot-color-rgb: 160, 160, 160;
-  --dot-opacity: 0.25;
+  --color-gradient-start: #3b82f6;
+  --color-gradient-end: #2563eb;
+  --dot-color-rgb: 200, 200, 200;
+  --dot-opacity: 0.2;
   --glow-opacity: 0.4;
-  --color-bg-rgb: 250, 248, 245;
+  --color-bg-rgb: 255, 255, 255;
   color-scheme: light;
 }
 
-/* Dark theme - deep slate aesthetic */
+/* Dark theme - clean dark aesthetic */
 [data-theme="dark"] {
-  --color-bg: #020617;
-  /* Deepest Midnight Navy */
-  --color-surface: #0f172a;
-  /* Elevated Surface for Contrast */
-  --color-surface-elevated: #1e293b;
-  --color-text: #94a3b8;
-  /* Pure White for Max Contrast */
-  --color-text-muted: #64748b;
-  /* Light Slate for Readability */
-  --color-stroke: #94a3b8;
-  /* Crisp, Non-translucent Strokes */
-  --color-stroke-muted: #475569;
+  --color-bg: #121212;
+  --color-surface: #1e1e1e;
+  --color-surface-elevated: #2a2a2a;
+  --color-surface-hover: #333333;
+  --color-text: #e5e5e5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+  --color-stroke: #e5e5e5;
+  --color-stroke-muted: #404040;
+  --color-border: #404040;
+  --color-border-hover: #525252;
   --color-accent: #3b82f6;
-  /* Primary Brand Blue */
   --color-accent-hover: #60a5fa;
+  --color-accent-light: rgba(59, 130, 246, 0.2);
   --color-accent-glow: rgba(59, 130, 246, 0.25);
   --color-fill-1: rgba(30, 64, 175, 0.4);
-  /* Deep Electric Blue */
   --color-fill-2: rgba(6, 78, 59, 0.4);
-  /* Deep Emerald */
   --color-fill-3: rgba(146, 64, 14, 0.4);
-  /* Rich Burning Amber (High Contrast) */
   --color-fill-4: rgba(153, 27, 27, 0.4);
-  /* Deep Ruby */
   --color-fill-5: rgba(55, 48, 163, 0.4);
-  /* Deep Indigo */
   --color-gradient-start: #3b82f6;
   --color-gradient-end: #60a5fa;
-  --dot-color-rgb: 180, 180, 180;
+  --dot-color-rgb: 100, 100, 100;
   --dot-opacity: 0.15;
   --glow-opacity: 0.4;
-  --color-bg-rgb: 2, 6, 23;
+  --color-bg-rgb: 18, 18, 18;
   color-scheme: dark;
 }
 
-/* Smooth background transition - only background changes slowly */
+/* Smooth background transition */
 body {
   transition: background-color 200ms ease-out;
 }
@@ -162,21 +160,21 @@ body {
   }
 }
 
-/* Light mode: sun-like warm glow - simplified for performance */
+/* Light mode: subtle glow */
 [data-theme="light"] .theme-page-ripple {
-  background: radial-gradient(circle, rgba(255, 200, 80, 0.6) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%);
 }
 
-/* Dark mode: moon-like cool glow - simplified for performance */
+/* Dark mode: subtle glow */
 [data-theme="dark"] .theme-page-ripple {
-  background: radial-gradient(circle, rgba(180, 200, 255, 0.6) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%);
 }
 
-/* Mobile: Further simplify ripple to prevent artifacts */
+/* Mobile: Simplified ripple */
 @media (max-width: 768px) {
   [data-theme="light"] .theme-page-ripple,
   [data-theme="dark"] .theme-page-ripple {
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, transparent 60%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 60%);
     box-shadow: none;
   }
 }

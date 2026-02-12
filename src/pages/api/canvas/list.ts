@@ -53,21 +53,60 @@ export const GET: APIRoute = async (context) => {
 
     const { limit, offset } = validation.data;
 
+    // Check KV cache first (5-minute TTL)
+    const cacheKey = `canvas-list:${auth.userId}:${limit}:${offset}`;
+    const kv = (runtime.env as any).CANVAS_KV as { get: (key: string) => Promise<string | null>; put: (key: string, value: string, opts?: { expirationTtl?: number }) => Promise<void> } | undefined;
+    if (kv) {
+      try {
+        const cached = await kv.get(cacheKey);
+        if (cached) {
+          return new Response(cached, {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Cache': 'HIT',
+            },
+          });
+        }
+      } catch {
+        // KV unavailable, fall through to DB
+      }
+    }
+
     // Get user's canvases
     const canvases = await getUserCanvases(runtime.env.DB, auth.userId, limit, offset);
 
-    // Transform to response format
-    const canvasesResponse = canvases.map((canvas) => ({
-      id: canvas.id,
-      userId: canvas.user_id,
-      title: canvas.title,
-      description: canvas.description,
-      thumbnailUrl: canvas.thumbnail_url,
-      isPublic: canvas.is_public === 1,
-      version: canvas.version,
-      createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at,
-    }));
+    // Also fetch metadata for each canvas
+    const canvasesResponse = await Promise.all(
+      canvases.map(async (canvas) => {
+        let metadata = {};
+        let sizeBytes = 0;
+        try {
+          const row = await runtime.env.DB
+            .prepare('SELECT metadata, size_bytes FROM canvases WHERE id = ?')
+            .bind(canvas.id)
+            .first<{ metadata: string | null; size_bytes: number | null }>();
+          if (row?.metadata) {
+            try { metadata = JSON.parse(row.metadata); } catch { metadata = {}; }
+          }
+          sizeBytes = row?.size_bytes || 0;
+        } catch { /* ignore */ }
+
+        return {
+          id: canvas.id,
+          userId: canvas.user_id,
+          title: canvas.title,
+          description: canvas.description,
+          thumbnailUrl: canvas.thumbnail_url,
+          isPublic: canvas.is_public === 1,
+          version: canvas.version,
+          createdAt: canvas.created_at,
+          updatedAt: canvas.updated_at,
+          metadata,
+          sizeBytes,
+        };
+      })
+    );
 
     const response: CanvasListResponse = {
       canvases: canvasesResponse,
@@ -76,9 +115,23 @@ export const GET: APIRoute = async (context) => {
       offset,
     };
 
-    return new Response(JSON.stringify(response), {
+    const responseJson = JSON.stringify(response);
+
+    // Cache in KV (5-minute TTL)
+    if (kv) {
+      try {
+        await kv.put(cacheKey, responseJson, { expirationTtl: 300 });
+      } catch {
+        // KV write failure is non-critical
+      }
+    }
+
+    return new Response(responseJson, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (error) {
     console.error('Canvas list error:', error);

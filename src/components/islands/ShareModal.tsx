@@ -132,7 +132,7 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
       <div className="modal-overlay" onClick={handleClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
-            <h2>🌐 Share Canvas</h2>
+            <h2>Share Canvas</h2>
             <button className="close-button" onClick={handleClose} title="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -195,9 +195,9 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
                 <div>
                   <strong>Auto-synced features:</strong>
                   <ul>
-                    <li>✓ Drawing elements</li>
-                    <li>✓ Markdown notes</li>
-                    <li>✓ Generated images</li>
+                    <li>Drawing elements</li>
+                    <li>Markdown notes</li>
+                    <li>Generated images</li>
                   </ul>
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
                 <div>
                   <strong>Local only:</strong>
                   <ul>
-                    <li>🔒 AI chat messages (private per user)</li>
+                    <li>AI chat messages (private per user)</li>
                   </ul>
                 </div>
               </div>
@@ -265,13 +265,13 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
+          background: rgba(0, 0, 0, 0.4);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 10000;
           padding: 1rem;
-          backdrop-filter: blur(4px);
+          backdrop-filter: blur(2px);
           animation: fadeIn 0.2s ease;
         }
 
@@ -285,21 +285,21 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
         }
 
         .modal-content {
-          background: white;
-          border-radius: 16px;
-          border: 3px solid var(--color-stroke, #333);
-          box-shadow: 6px 6px 0 var(--color-stroke, #333);
-          max-width: 600px;
+          background: var(--color-surface);
+          border-radius: 12px;
+          border: 1px solid var(--color-border);
+          box-shadow: var(--shadow-2xl);
+          max-width: 560px;
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
-          animation: slideUp 0.3s ease;
-          font-family: var(--font-hand, sans-serif);
+          animation: slideUp 0.2s ease;
+          font-family: var(--font-ui);
         }
 
         @keyframes slideUp {
           from {
-            transform: translateY(20px);
+            transform: translateY(10px);
             opacity: 0;
           }
           to {
@@ -312,65 +312,69 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 1.5rem;
-          border-bottom: 2px solid var(--color-stroke-muted, #e5e5e5);
+          padding: 1.25rem;
+          border-bottom: 1px solid var(--color-border);
         }
 
         .modal-header h2 {
           margin: 0;
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: var(--color-text, #333);
+          font-size: 1.125rem;
+          font-weight: 600;
+          color: var(--color-text);
+          letter-spacing: -0.01em;
         }
 
         .close-button {
           background: transparent;
           border: none;
           cursor: pointer;
-          padding: 0.25rem;
-          color: var(--color-text-muted, #666);
-          transition: color 0.2s ease;
+          padding: 0.375rem;
+          border-radius: 6px;
+          color: var(--color-text-secondary);
+          transition: all 0.15s;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .close-button:hover {
-          color: var(--color-text, #333);
+          color: var(--color-text);
+          background: var(--color-surface-hover);
         }
 
         .modal-body {
-          padding: 1.5rem;
+          padding: 1.25rem;
         }
 
         .description {
-          margin: 0 0 1.5rem 0;
-          font-size: 0.95rem;
-          color: var(--color-text-muted, #666);
-          line-height: 1.6;
+          margin: 0 0 1.25rem 0;
+          font-size: 0.875rem;
+          color: var(--color-text-secondary);
+          line-height: 1.5;
         }
 
         .share-url-container {
-          margin-bottom: 1.5rem;
+          margin-bottom: 1.25rem;
         }
 
         .share-url-input {
           width: 100%;
-          padding: 0.875rem 1rem;
-          border: 2px solid var(--color-stroke, #333);
+          padding: 0.75rem 1rem;
+          border: 1px solid var(--color-border);
           border-radius: 8px;
-          font-family: 'Monaco', 'Courier New', monospace;
-          font-size: 0.85rem;
-          color: var(--color-text, #333);
-          background: var(--color-fill-1, #f8f9fa);
+          font-family: var(--font-mono);
+          font-size: 0.8125rem;
+          color: var(--color-text);
+          background: var(--color-bg);
           margin-bottom: 0.75rem;
           box-sizing: border-box;
+          transition: all 0.15s;
         }
 
         .share-url-input:focus {
           outline: none;
-          border-color: #667eea;
-          background: white;
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px var(--color-accent-light);
         }
 
         .button-group {
@@ -384,70 +388,58 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
-          padding: 0.75rem 1rem;
-          border: 2px solid var(--color-stroke, #333);
-          border-radius: 8px;
-          font-family: var(--font-hand, sans-serif);
-          font-size: 0.9rem;
-          font-weight: 600;
+          gap: 0.375rem;
+          padding: 0.625rem 1rem;
+          border: 1px solid var(--color-border);
+          border-radius: 6px;
+          font-family: var(--font-ui);
+          font-size: 0.8125rem;
+          font-weight: 500;
           cursor: pointer;
           transition: all 0.15s ease;
-          box-shadow: 2px 2px 0 var(--color-stroke, #333);
         }
 
         .copy-btn {
-          background: #667eea;
+          background: var(--color-accent);
           color: white;
+          border-color: var(--color-accent);
         }
 
         .copy-btn:hover {
-          background: #5568d3;
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 var(--color-stroke, #333);
-        }
-
-        .copy-btn:active {
-          transform: translate(1px, 1px);
-          box-shadow: 1px 1px 0 var(--color-stroke, #333);
+          background: var(--color-accent-hover);
+          border-color: var(--color-accent-hover);
         }
 
         .open-btn {
-          background: white;
-          color: var(--color-text, #333);
+          background: var(--color-bg);
+          color: var(--color-text);
         }
 
         .open-btn:hover {
-          background: var(--color-fill-1, #f8f9fa);
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 var(--color-stroke, #333);
-        }
-
-        .open-btn:active {
-          transform: translate(1px, 1px);
-          box-shadow: 1px 1px 0 var(--color-stroke, #333);
+          background: var(--color-surface-hover);
+          border-color: var(--color-border-hover);
         }
 
         .info-section {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 0.75rem;
         }
 
         .info-item {
           display: flex;
-          gap: 1rem;
+          gap: 0.875rem;
           align-items: flex-start;
-          padding: 1rem;
-          background: var(--color-fill-1, #f8f9fa);
+          padding: 0.875rem;
+          background: var(--color-bg);
           border-radius: 8px;
-          border: 2px solid var(--color-stroke-muted, #e5e5e5);
+          border: 1px solid var(--color-border);
         }
 
         .info-icon {
           flex-shrink: 0;
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -455,43 +447,45 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
         }
 
         .info-icon.synced {
-          background: #e3f2ff;
-          color: #1971c2;
+          background: #dbeafe;
+          color: #2563eb;
         }
 
         .info-icon.local {
-          background: #fff9db;
-          color: #fab005;
+          background: #fef3c7;
+          color: #d97706;
         }
 
         .info-item strong {
           display: block;
-          margin-bottom: 0.5rem;
-          font-size: 0.9rem;
+          margin-bottom: 0.375rem;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: var(--color-text);
         }
 
         .info-item ul {
           margin: 0;
-          padding-left: 1.25rem;
-          font-size: 0.85rem;
-          color: var(--color-text-muted, #666);
-          line-height: 1.6;
+          padding-left: 1rem;
+          font-size: 0.8125rem;
+          color: var(--color-text-secondary);
+          line-height: 1.5;
         }
 
         .info-item li {
-          margin-bottom: 0.25rem;
+          margin-bottom: 0.125rem;
         }
 
         .warning-box {
           display: flex;
-          gap: 1rem;
-          padding: 1rem;
-          background: #fff5f5;
-          border: 2px solid #ffc9c9;
+          gap: 0.75rem;
+          padding: 0.875rem;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
           border-radius: 8px;
-          color: #c92a2a;
-          font-size: 0.85rem;
-          line-height: 1.6;
+          color: #dc2626;
+          font-size: 0.8125rem;
+          line-height: 1.5;
         }
 
         .warning-box svg {
@@ -501,15 +495,15 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
 
         .action-box {
           display: flex;
-          gap: 1rem;
-          padding: 1rem;
-          background: #e3f2ff;
-          border: 2px solid #74c0fc;
+          gap: 0.75rem;
+          padding: 0.875rem;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
           border-radius: 8px;
-          color: #1971c2;
-          font-size: 0.85rem;
-          line-height: 1.6;
-          margin-top: 1rem;
+          color: #2563eb;
+          font-size: 0.8125rem;
+          line-height: 1.5;
+          margin-top: 0.5rem;
         }
 
         .action-box svg {
@@ -518,11 +512,11 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
         }
 
         .modal-footer {
-          padding: 1.5rem;
-          border-top: 2px solid var(--color-stroke-muted, #e5e5e5);
+          padding: 1.25rem;
+          border-top: 1px solid var(--color-border);
           display: flex;
           justify-content: space-between;
-          gap: 1rem;
+          gap: 0.75rem;
         }
 
         .start-btn {
@@ -530,53 +524,40 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
-          padding: 0.875rem 1.5rem;
-          background: #667eea;
+          gap: 0.375rem;
+          padding: 0.75rem 1.25rem;
+          background: var(--color-accent);
           color: white;
-          border: 2px solid var(--color-stroke, #333);
+          border: 1px solid var(--color-accent);
           border-radius: 8px;
-          font-family: var(--font-hand, sans-serif);
-          font-size: 0.95rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          box-shadow: 3px 3px 0 var(--color-stroke, #333);
-        }
-
-        .start-btn:hover {
-          background: #5568d3;
-          transform: translate(-1px, -1px);
-          box-shadow: 4px 4px 0 var(--color-stroke, #333);
-        }
-
-        .start-btn:active {
-          transform: translate(1px, 1px);
-          box-shadow: 2px 2px 0 var(--color-stroke, #333);
-        }
-
-        .done-btn {
-          padding: 0.75rem 2rem;
-          background: white;
-          border: 2px solid var(--color-stroke, #333);
-          border-radius: 8px;
-          font-family: var(--font-hand, sans-serif);
-          font-size: 0.9rem;
+          font-family: var(--font-ui);
+          font-size: 0.875rem;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.15s ease;
-          box-shadow: 2px 2px 0 var(--color-stroke, #333);
+        }
+
+        .start-btn:hover {
+          background: var(--color-accent-hover);
+          border-color: var(--color-accent-hover);
+        }
+
+        .done-btn {
+          padding: 0.75rem 1.5rem;
+          background: var(--color-bg);
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          font-family: var(--font-ui);
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: var(--color-text);
+          cursor: pointer;
+          transition: all 0.15s ease;
         }
 
         .done-btn:hover {
-          background: var(--color-fill-1, #f8f9fa);
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 var(--color-stroke, #333);
-        }
-
-        .done-btn:active {
-          transform: translate(1px, 1px);
-          box-shadow: 1px 1px 0 var(--color-stroke, #333);
+          background: var(--color-surface-hover);
+          border-color: var(--color-border-hover);
         }
 
         @media (max-width: 640px) {
@@ -591,7 +572,7 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           }
 
           .modal-header h2 {
-            font-size: 1.25rem;
+            font-size: 1rem;
           }
 
           .modal-body {
@@ -604,17 +585,17 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
 
           .info-item {
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.625rem;
           }
 
           .warning-box {
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.625rem;
           }
 
           .action-box {
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.625rem;
           }
 
           .modal-footer {

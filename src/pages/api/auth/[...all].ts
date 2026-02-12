@@ -68,8 +68,6 @@ export const ALL: APIRoute = async (ctx) => {
       BETTER_AUTH_URL: runtime.env.BETTER_AUTH_URL,
       GOOGLE_CLIENT_ID: runtime.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: runtime.env.GOOGLE_CLIENT_SECRET,
-      GITHUB_CLIENT_ID: runtime.env.GITHUB_CLIENT_ID,
-      GITHUB_CLIENT_SECRET: runtime.env.GITHUB_CLIENT_SECRET,
     });
 
     // Pass the request directly to Better Auth handler

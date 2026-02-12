@@ -247,7 +247,7 @@ export default function TemplateModal({
                     width: "90%",
                     maxWidth: "800px",
                     maxHeight: "85vh",
-                    background: "var(--color-surface, #ffffff)",
+                    background: "var(--color-surface)",
                     borderRadius: "16px",
                     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
                     zIndex: 2001,
@@ -260,8 +260,8 @@ export default function TemplateModal({
                 {/* Header */}
                 <div style={{
                     padding: "20px 24px",
-                    borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                    background: "var(--color-bg, #fafafa)",
+                    borderBottom: "1px solid var(--color-border)",
+                    background: "var(--color-surface-hover)",
                 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -281,14 +281,14 @@ export default function TemplateModal({
                                     margin: 0,
                                     fontSize: "18px",
                                     fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
+                                    color: "var(--color-text)",
                                 }}>
                                     Template Library
                                 </h2>
                                 <p style={{
                                     margin: 0,
                                     fontSize: "12px",
-                                    color: "var(--color-text-muted, #6b7280)",
+                                    color: "var(--color-text-secondary)",
                                 }}>
                                     {selectedElementsCount > 0
                                         ? `${selectedElementsCount} element${selectedElementsCount !== 1 ? 's' : ''} selected`
@@ -304,7 +304,7 @@ export default function TemplateModal({
                                 cursor: "pointer",
                                 padding: "8px",
                                 borderRadius: "8px",
-                                color: "var(--color-text-muted, #6b7280)",
+                                color: "var(--color-text-secondary)",
                                 transition: "all 0.15s",
                             }}
                         >
@@ -324,21 +324,21 @@ export default function TemplateModal({
                             style={{
                                 width: "100%",
                                 padding: "10px 14px 10px 40px",
-                                border: "2px solid var(--color-stroke-muted, #e5e7eb)",
+                                border: "1px solid var(--color-border)",
                                 borderRadius: "10px",
                                 fontSize: "14px",
                                 outline: "none",
                                 transition: "border-color 0.15s",
                             }}
-                            onFocus={(e) => e.target.style.borderColor = "var(--color-accent, #6366f1)"}
-                            onBlur={(e) => e.target.style.borderColor = "var(--color-stroke-muted, #e5e7eb)"}
+                            onFocus={(e) => e.target.style.borderColor = "var(--color-accent)"}
+                            onBlur={(e) => e.target.style.borderColor = "var(--color-border)"}
                         />
                         <svg
                             width="18"
                             height="18"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="var(--color-text-muted, #6b7280)"
+                            stroke="var(--color-text-secondary)"
                             strokeWidth="2"
                             style={{
                                 position: "absolute",
@@ -366,7 +366,7 @@ export default function TemplateModal({
                             <div style={{
                                 fontSize: "11px",
                                 fontWeight: 600,
-                                color: "var(--color-text-muted, #6b7280)",
+                                color: "var(--color-text-secondary)",
                                 textTransform: "uppercase",
                                 letterSpacing: "0.5px",
                                 marginBottom: "12px",
@@ -385,11 +385,11 @@ export default function TemplateModal({
                                         border: "none",
                                         borderRadius: "8px",
                                         background: selectedCategory === category
-                                            ? "var(--color-accent, #6366f1)"
+                                            ? "var(--color-accent)"
                                             : "transparent",
                                         color: selectedCategory === category
                                             ? "white"
-                                            : "var(--color-text, #1f2937)",
+                                            : "var(--color-text)",
                                         fontSize: "13px",
                                         fontWeight: selectedCategory === category ? 600 : 400,
                                         cursor: "pointer",
@@ -414,7 +414,7 @@ export default function TemplateModal({
                                 <h3 style={{
                                     fontSize: "13px",
                                     fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
+                                    color: "var(--color-text)",
                                     marginBottom: "12px",
                                     display: "flex",
                                     alignItems: "center",
@@ -449,7 +449,7 @@ export default function TemplateModal({
                                 <h3 style={{
                                     fontSize: "13px",
                                     fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
+                                    color: "var(--color-text)",
                                     marginBottom: "12px",
                                 }}>
                                     {category}
@@ -476,7 +476,7 @@ export default function TemplateModal({
                             <div style={{
                                 textAlign: "center",
                                 padding: "40px 20px",
-                                color: "var(--color-text-muted, #6b7280)",
+                                color: "var(--color-text-secondary)",
                             }}>
                                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "12px", opacity: 0.5, margin: "0 auto" }}>
                                     <circle cx="11" cy="11" r="8" />
@@ -529,8 +529,8 @@ function TemplateCard({ template, onSelect }: { template: PromptTemplate; onSele
                 alignItems: "flex-start",
                 gap: "8px",
                 padding: "14px",
-                background: "var(--color-surface, #ffffff)",
-                border: "2px solid var(--color-stroke-muted, #e5e7eb)",
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
                 borderRadius: "12px",
                 cursor: "pointer",
                 transition: "all 0.15s",
@@ -552,14 +552,14 @@ function TemplateCard({ template, onSelect }: { template: PromptTemplate; onSele
                 <div style={{
                     fontSize: "13px",
                     fontWeight: 600,
-                    color: "var(--color-text, #1f2937)",
+                    color: "var(--color-text)",
                     marginBottom: "2px",
                 }}>
                     {template.title}
                 </div>
                 <div style={{
                     fontSize: "11px",
-                    color: "var(--color-text-muted, #6b7280)",
+                    color: "var(--color-text-secondary)",
                     lineHeight: 1.4,
                 }}>
                     {template.description}

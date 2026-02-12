@@ -1,6 +1,7 @@
 /**
  * Save Options Modal
- * Allows user to choose between different save formats
+ * For authenticated users: primary = cloud save, secondary = export
+ * For anonymous users: primary = sign in prompt, secondary = download
  */
 
 export interface SaveOptions {
@@ -15,6 +16,8 @@ interface SaveOptionsModalProps {
     elementCount: number;
     messageCount: number;
     imageCount: number;
+    isAuthenticated?: boolean;
+    onCloudSave?: () => void;
 }
 
 export default function SaveOptionsModal({
@@ -24,6 +27,8 @@ export default function SaveOptionsModal({
     elementCount,
     messageCount,
     imageCount,
+    isAuthenticated = false,
+    onCloudSave,
 }: SaveOptionsModalProps) {
     if (!isOpen) return null;
 
@@ -59,7 +64,7 @@ export default function SaveOptionsModal({
         >
             <div
                 style={{
-                    backgroundColor: "var(--color-bg, white)",
+                    backgroundColor: "var(--color-surface)",
                     borderRadius: "12px",
                     padding: "24px",
                     width: "90%",
@@ -72,20 +77,22 @@ export default function SaveOptionsModal({
                         margin: "0 0 8px 0",
                         fontSize: "1.25rem",
                         fontWeight: 600,
-                        color: "var(--color-text, #1f2937)",
+                        color: "var(--color-text)",
                     }}
                 >
-                    Save Canvas State
+                    Save Canvas
                 </h3>
-                
+
                 <p
                     style={{
                         margin: "0 0 20px 0",
                         fontSize: "0.875rem",
-                        color: "var(--color-text-muted, #6b7280)",
+                        color: "var(--color-text-secondary)",
                     }}
                 >
-                    Choose how you want to save your canvas:
+                    {isAuthenticated
+                        ? "Your canvas auto-saves to the cloud. Export a local copy below:"
+                        : "Sign in to save your work to the cloud, or download a local copy:"}
                 </p>
 
                 <div
@@ -96,6 +103,106 @@ export default function SaveOptionsModal({
                         marginBottom: "20px",
                     }}
                 >
+                    {/* Cloud save (authenticated) or Sign in prompt (anonymous) */}
+                    {isAuthenticated ? (
+                        onCloudSave && (
+                            <button
+                                onClick={() => {
+                                    onCloudSave();
+                                    onClose();
+                                }}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: "12px",
+                                    padding: "14px",
+                                    border: "2px solid #22c55e",
+                                    borderRadius: "8px",
+                                    backgroundColor: "rgba(34, 197, 94, 0.08)",
+                                    cursor: "pointer",
+                                    textAlign: "left",
+                                    transition: "all 0.2s",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: "36px",
+                                        height: "36px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#22c55e",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                                        <polyline points="16 16 12 12 8 16"/>
+                                    </svg>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 600, color: "var(--color-text)", fontSize: "0.9rem", marginBottom: "2px" }}>
+                                        Save to Cloud Now
+                                    </div>
+                                    <div style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: "1.3" }}>
+                                        Force an immediate cloud save.
+                                    </div>
+                                </div>
+                            </button>
+                        )
+                    ) : (
+                        <a
+                            href="/login"
+                            style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "12px",
+                                padding: "14px",
+                                border: "2px solid var(--color-primary, #6366f1)",
+                                borderRadius: "8px",
+                                backgroundColor: "var(--color-primary-light, rgba(99,102,241,0.1))",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                textDecoration: "none",
+                                transition: "all 0.2s",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "var(--color-accent)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                                    <polyline points="16 16 12 12 8 16"/>
+                                </svg>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, color: "var(--color-text, #1f2937)", fontSize: "0.9rem", marginBottom: "2px" }}>
+                                    Sign in to save to cloud
+                                </div>
+                                <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted, #6b7280)", lineHeight: "1.3" }}>
+                                    Your canvas will be preserved and synced across devices.
+                                </div>
+                            </div>
+                        </a>
+                    )}
+
+                    {/* Divider */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "4px 0" }}>
+                        <div style={{ flex: 1, height: "1px", background: "#e5e7eb" }} />
+                        <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Export to file</span>
+                        <div style={{ flex: 1, height: "1px", background: "#e5e7eb" }} />
+                    </div>
+
                     {/* Option 1: Compressed Full */}
                     <button
                         onClick={handleCompressedFull}
@@ -104,18 +211,20 @@ export default function SaveOptionsModal({
                             alignItems: "flex-start",
                             gap: "12px",
                             padding: "14px",
-                            border: "2px solid var(--color-primary, #6366f1)",
+                            border: "1px solid var(--color-border)",
                             borderRadius: "8px",
-                            backgroundColor: "var(--color-primary-light, rgba(99,102,241,0.1))",
+                            backgroundColor: "transparent",
                             cursor: "pointer",
                             textAlign: "left",
                             transition: "all 0.2s",
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "var(--color-primary-light-hover, rgba(99,102,241,0.15))";
+                            e.currentTarget.style.borderColor = "var(--color-border-hover)";
+                            e.currentTarget.style.backgroundColor = "var(--color-surface-hover)";
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "var(--color-primary-light, rgba(99,102,241,0.1))";
+                            e.currentTarget.style.borderColor = "var(--color-border)";
+                            e.currentTarget.style.backgroundColor = "transparent";
                         }}
                     >
                         <div
@@ -123,44 +232,24 @@ export default function SaveOptionsModal({
                                 width: "36px",
                                 height: "36px",
                                 borderRadius: "8px",
-                                backgroundColor: "var(--color-primary, #6366f1)",
+                                backgroundColor: "var(--color-surface-hover)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
                             }}
                         >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="white"
-                                strokeWidth="2"
-                            >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                                 <polyline points="7 10 12 15 17 10" />
                                 <line x1="12" y1="15" x2="12" y2="3" />
                             </svg>
                         </div>
                         <div style={{ flex: 1 }}>
-                            <div
-                                style={{
-                                    fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
-                                    fontSize: "0.9rem",
-                                    marginBottom: "2px",
-                                }}
-                            >
+                            <div style={{ fontWeight: 600, color: "var(--color-text, #1f2937)", fontSize: "0.9rem", marginBottom: "2px" }}>
                                 Compressed — Full
                             </div>
-                            <div
-                                style={{
-                                    fontSize: "0.8rem",
-                                    color: "var(--color-text-muted, #6b7280)",
-                                    lineHeight: "1.3",
-                                }}
-                            >
+                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted, #6b7280)", lineHeight: "1.3" }}>
                                 Everything included. ~25-30% smaller. Best for backups.
                             </div>
                         </div>
@@ -174,18 +263,20 @@ export default function SaveOptionsModal({
                             alignItems: "flex-start",
                             gap: "12px",
                             padding: "14px",
-                            border: "2px solid var(--color-success, #22c55e)",
+                            border: "2px solid var(--color-border, #e5e7eb)",
                             borderRadius: "8px",
-                            backgroundColor: "rgba(34, 197, 94, 0.08)",
+                            backgroundColor: "transparent",
                             cursor: "pointer",
                             textAlign: "left",
                             transition: "all 0.2s",
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.12)";
+                            e.currentTarget.style.borderColor = "var(--color-border-hover, #d1d5db)";
+                            e.currentTarget.style.backgroundColor = "var(--color-bg-hover, rgba(0,0,0,0.02))";
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.08)";
+                            e.currentTarget.style.borderColor = "var(--color-border, #e5e7eb)";
+                            e.currentTarget.style.backgroundColor = "transparent";
                         }}
                     >
                         <div
@@ -193,21 +284,14 @@ export default function SaveOptionsModal({
                                 width: "36px",
                                 height: "36px",
                                 borderRadius: "8px",
-                                backgroundColor: "var(--color-success, #22c55e)",
+                                backgroundColor: "var(--color-bg-tertiary, #f3f4f6)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
                             }}
                         >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="white"
-                                strokeWidth="2"
-                            >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted, #6b7280)" strokeWidth="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                                 <polyline points="7 10 12 15 17 10" />
                                 <line x1="12" y1="15" x2="12" y2="3" />
@@ -215,40 +299,12 @@ export default function SaveOptionsModal({
                             </svg>
                         </div>
                         <div style={{ flex: 1 }}>
-                            <div
-                                style={{
-                                    fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
-                                    fontSize: "0.9rem",
-                                    marginBottom: "2px",
-                                }}
-                            >
-                                Compressed — Without Image History
-                                <span
-                                    style={{
-                                        marginLeft: "6px",
-                                        padding: "2px 6px",
-                                        fontSize: "0.65rem",
-                                        fontWeight: 700,
-                                        textTransform: "uppercase",
-                                        backgroundColor: "var(--color-success, #22c55e)",
-                                        color: "white",
-                                        borderRadius: "4px",
-                                        verticalAlign: "middle",
-                                    }}
-                                >
-                                    Smallest
-                                </span>
+                            <div style={{ fontWeight: 600, color: "var(--color-text, #1f2937)", fontSize: "0.9rem", marginBottom: "2px" }}>
+                                Compressed — No Image History
+                                <span style={{ marginLeft: "6px", padding: "2px 6px", fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase" as const, backgroundColor: "#22c55e", color: "white", borderRadius: "4px", verticalAlign: "middle" }}>Smallest</span>
                             </div>
-                            <div
-                                style={{
-                                    fontSize: "0.8rem",
-                                    color: "var(--color-text-muted, #6b7280)",
-                                    lineHeight: "1.3",
-                                }}
-                            >
-                                Excludes generated image gallery. ~50%+ smaller. 
-                                Canvas images and everything else preserved.
+                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted, #6b7280)", lineHeight: "1.3" }}>
+                                Excludes generated image gallery. ~50%+ smaller.
                             </div>
                         </div>
                     </button>
@@ -289,14 +345,7 @@ export default function SaveOptionsModal({
                                 flexShrink: 0,
                             }}
                         >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="var(--color-text-muted, #6b7280)"
-                                strokeWidth="2"
-                            >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted, #6b7280)" strokeWidth="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                 <polyline points="14 2 14 8 20 8" />
                                 <line x1="16" y1="13" x2="8" y2="13" />
@@ -305,25 +354,11 @@ export default function SaveOptionsModal({
                             </svg>
                         </div>
                         <div style={{ flex: 1 }}>
-                            <div
-                                style={{
-                                    fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
-                                    fontSize: "0.9rem",
-                                    marginBottom: "2px",
-                                }}
-                            >
+                            <div style={{ fontWeight: 600, color: "var(--color-text, #1f2937)", fontSize: "0.9rem", marginBottom: "2px" }}>
                                 Full Size (Readable JSON)
                             </div>
-                            <div
-                                style={{
-                                    fontSize: "0.8rem",
-                                    color: "var(--color-text-muted, #6b7280)",
-                                    lineHeight: "1.3",
-                                }}
-                            >
-                                Human-readable format. Largest size. 
-                                Use for debugging or manual editing.
+                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted, #6b7280)", lineHeight: "1.3" }}>
+                                Human-readable format. Use for debugging or manual editing.
                             </div>
                         </div>
                     </button>
@@ -335,17 +370,17 @@ export default function SaveOptionsModal({
                         display: "flex",
                         gap: "16px",
                         padding: "12px 16px",
-                        backgroundColor: "var(--color-bg-secondary, #f9fafb)",
+                        backgroundColor: "var(--color-surface-hover)",
                         borderRadius: "8px",
                         marginBottom: "16px",
                         fontSize: "0.875rem",
-                        color: "var(--color-text-muted, #6b7280)",
+                        color: "var(--color-text-secondary)",
                     }}
                 >
                     <span>{elementCount} elements</span>
-                    <span>•</span>
+                    <span>&bull;</span>
                     <span>{messageCount} messages</span>
-                    <span>•</span>
+                    <span>&bull;</span>
                     <span>{imageCount} images</span>
                 </div>
 
@@ -358,13 +393,13 @@ export default function SaveOptionsModal({
                         border: "none",
                         borderRadius: "8px",
                         backgroundColor: "transparent",
-                        color: "var(--color-text-muted, #6b7280)",
+                        color: "var(--color-text-secondary)",
                         cursor: "pointer",
                         fontSize: "0.875rem",
                         transition: "background-color 0.2s",
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "var(--color-bg-hover, rgba(0,0,0,0.05))";
+                        e.currentTarget.style.backgroundColor = "var(--color-surface-hover)";
                     }}
                     onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = "transparent";

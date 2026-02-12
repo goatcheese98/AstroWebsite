@@ -89,8 +89,8 @@ export function ChatHeader({ onClose }: { onClose: () => void }) {
             alignItems: "center",
             justifyContent: "flex-start",
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
-            background: "var(--color-bg, #fafafa)",
+            borderBottom: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
             flexShrink: 0,
         }}>
             {/* Close Button */}
@@ -102,16 +102,16 @@ export function ChatHeader({ onClose }: { onClose: () => void }) {
                     cursor: "pointer",
                     padding: "6px",
                     borderRadius: "6px",
-                    color: "var(--color-text-muted, #6b7280)",
+                    color: "var(--color-text-secondary)",
                     transition: "all 0.15s",
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--color-fill-1, #f3f4f6)";
-                    e.currentTarget.style.color = "var(--color-text, #1f2937)";
+                    e.currentTarget.style.background = "var(--color-surface-hover)";
+                    e.currentTarget.style.color = "var(--color-text)";
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--color-text-muted, #6b7280)";
+                    e.currentTarget.style.color = "var(--color-text-secondary)";
                 }}
             >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

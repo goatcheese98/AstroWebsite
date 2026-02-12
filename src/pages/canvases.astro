@@ -280,6 +280,81 @@ import { CanvasLibrary } from '@/components/auth/CanvasLibrary';
     margin: 0 0 1.5rem;
   }
 
+  :global(.library-toolbar) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  :global(.library-controls) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :global(.canvas-favorite-btn) {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  :global(.canvas-card:hover .canvas-favorite-btn) {
+    opacity: 1;
+  }
+
+  :global(.canvas-list) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  :global(.canvas-list-item) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.15s;
+  }
+
+  :global(.canvas-list-item:hover) {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  }
+
+  :global(.canvas-list-thumb) {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  :global(.canvas-list-thumb img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
   :global(.loading-state),
   :global(.error-state) {
     text-align: center;

@@ -65,8 +65,6 @@ interface AuthEnv {
   BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  GITHUB_CLIENT_ID?: string;
-  GITHUB_CLIENT_SECRET?: string;
 }
 
 /**
@@ -82,9 +80,6 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
   const authUrl = env?.BETTER_AUTH_URL || process.env.BETTER_AUTH_URL || 'http://localhost:4321';
   const googleClientId = env?.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = env?.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
-  const githubClientId = env?.GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID;
-  const githubClientSecret = env?.GITHUB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET;
-
   return betterAuth({
     // Base URL must point to where the Better Auth handler is mounted
     // In our case: http://localhost:4321/api/auth (local) or https://yourdomain.com/api/auth (production)
@@ -120,18 +115,12 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
       },
     },
 
-    // OAuth Providers (optional - configure with env variables)
+    // OAuth Providers — Google only
     socialProviders: googleClientId && googleClientSecret ? {
       google: {
         clientId: googleClientId,
         clientSecret: googleClientSecret,
       },
-      ...(githubClientId && githubClientSecret ? {
-        github: {
-          clientId: githubClientId,
-          clientSecret: githubClientSecret,
-        },
-      } : {}),
     } : undefined,
 
     // Session configuration

@@ -69,7 +69,7 @@ export default function ExcalidrawCanvas({
     const [initialCanvasData, setInitialCanvasData] = useState<any>(null);
 
     // Use refs to avoid triggering re-renders from RAF loop
-    const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
+    const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 }, selectedElementIds: {} });
     const markdownElementsRef = useRef<any[]>([]);
     const markdownNoteRefsRef = useRef<Map<string, any>>(new Map());
     const webEmbedElementsRef = useRef<any[]>([]);
@@ -422,13 +422,13 @@ export default function ExcalidrawCanvas({
         return () => observer.disconnect();
     }, []);
 
-    // RAF polling loop - update view state and selection state
+    // RAF polling loop - unified clock for zero-lag overlay sync
     useEffect(() => {
         if (!excalidrawAPI) return;
 
         let rafId: number;
         let lastUpdateTime = 0;
-        const UPDATE_INTERVAL = 8; // Update React state at ~120fps for ultra-smooth overlay sync
+        const UPDATE_INTERVAL = 16; // React state updates only at ~60fps (for mounting/unmounting)
         let lastSelectedIds: string = "";
 
         const pollExcalidrawState = (timestamp: number) => {
@@ -463,10 +463,43 @@ export default function ExcalidrawCanvas({
                 );
                 webEmbedElementsRef.current = embedElements;
 
-                // Only trigger React update at controlled intervals
+                // UNIFIED CLOCK: Update transforms directly on existing refs (every frame, no React)
+                mdElements.forEach((el: any) => {
+                    const ref = markdownNoteRefsRef.current.get(el.id);
+                    if (ref?.updateTransform) {
+                        ref.updateTransform(
+                            el.x,
+                            el.y,
+                            el.width,
+                            el.height,
+                            el.angle || 0,
+                            appState.zoom.value,
+                            appState.scrollX,
+                            appState.scrollY
+                        );
+                    }
+                });
+
+                embedElements.forEach((el: any) => {
+                    const ref = webEmbedRefsRef.current.get(el.id);
+                    if (ref?.updateTransform) {
+                        ref.updateTransform(
+                            el.x,
+                            el.y,
+                            el.width,
+                            el.height,
+                            el.angle || 0,
+                            appState.zoom.value,
+                            appState.scrollX,
+                            appState.scrollY
+                        );
+                    }
+                });
+
+                // React state updates ONLY for mounting/unmounting (less frequent)
                 if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
-                    setMarkdownElements([...mdElements]); // Create new array to trigger render
-                    setWebEmbedElements([...embedElements]); // Create new array to trigger render
+                    setMarkdownElements([...mdElements]);
+                    setWebEmbedElements([...embedElements]);
                     lastUpdateTime = timestamp;
                 }
             } catch (err) {
@@ -1245,8 +1278,8 @@ export default function ExcalidrawCanvas({
                     if (item.kind !== 'file') return false;
                     const file = item.getAsFile();
                     return file?.name?.endsWith('.rj') ||
-                           file?.name?.endsWith('.excalidraw') ||
-                           file?.name?.endsWith('.md');
+                        file?.name?.endsWith('.excalidraw') ||
+                        file?.name?.endsWith('.md');
                 }
             );
 
@@ -1657,9 +1690,9 @@ export default function ExcalidrawCanvas({
             console.log("🌐 Canvas received web embed request:", url);
             handleCreateWebEmbed(url);
         };
-        
+
         window.addEventListener("canvas:create-web-embed", handleCreateWebEmbedEvent as EventListener);
-        
+
         return () => {
             window.removeEventListener("canvas:create-web-embed", handleCreateWebEmbedEvent as EventListener);
         };
@@ -1671,6 +1704,15 @@ export default function ExcalidrawCanvas({
             markdownNoteRefsRef.current.set(id, ref);
         } else {
             markdownNoteRefsRef.current.delete(id);
+        }
+    }, []);
+
+    // Register web embed ref
+    const registerWebEmbedRef = useCallback((id: string, ref: any) => {
+        if (ref) {
+            webEmbedRefsRef.current.set(id, ref);
+        } else {
+            webEmbedRefsRef.current.delete(id);
         }
     }, []);
 
@@ -1735,11 +1777,11 @@ export default function ExcalidrawCanvas({
             {isSharedMode && isConnected && (
                 <div className="shared-indicator">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="18" cy="5" r="3"/>
-                        <circle cx="6" cy="12" r="3"/>
-                        <circle cx="18" cy="19" r="3"/>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                     </svg>
                     <span>{activeUsers} {activeUsers === 1 ? 'user' : 'users'} online</span>
                 </div>
@@ -1999,22 +2041,24 @@ export default function ExcalidrawCanvas({
                         scrollX: appState.scrollX,
                         scrollY: appState.scrollY,
                         zoom: appState.zoom,
+                        selectedElementIds: appState.selectedElementIds || {},
                     };
 
                     // Auto-save to localStorage - use ref to avoid closure issues
                     const api = excalidrawAPIRef.current;
                     if (api) {
                         const files = api.getFiles();
-                        console.log("📝 onChange - files count:", Object.keys(files || {}).length);
 
                         // If canvas is empty, clear localStorage (only in non-shared mode)
                         if (elements.length === 0 && !isSharedMode) {
                             localStorage.removeItem(STORAGE_KEY);
-                            console.log("🗑️ Canvas cleared - localStorage removed");
                         } else if (!isSharedMode) {
-                            // Only save to localStorage in non-shared mode
+                            // Save to localStorage in non-shared mode
                             saveToLocalStorage(elements, appState, files);
                         }
+
+                        // Dispatch change event for cloud auto-save
+                        window.dispatchEvent(new CustomEvent("canvas:data-change"));
 
                         // Sync to PartyKit in shared mode (but not when applying remote updates or smoothing)
                         if (isSharedMode) {
@@ -2069,6 +2113,7 @@ export default function ExcalidrawCanvas({
                     onChange={handleWebEmbedUpdate}
                     onPositionChange={handleWebEmbedPositionChange}
                     onDelete={handleWebEmbedDelete}
+                    ref={(ref: any) => registerWebEmbedRef(element.id, ref)}
                 />
             ))}
         </div>

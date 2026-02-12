@@ -253,43 +253,11 @@ export default function CanvasControls({
                         </button>
 
                         {isMenuOpen && (
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    right: "100%",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
-                                    marginRight: "10px",
-                                    background: "white",
-                                    border: "2px solid var(--color-stroke, #333)",
-                                    borderRadius: "10px",
-                                    boxShadow: "3px 3px 0 var(--color-stroke, #333)",
-                                    minWidth: "160px",
-                                    zIndex: 1001,
-                                    overflow: "hidden",
-                                }}
-                            >
+                            <div className="dropdown-menu">
                                 <button
                                     onClick={handleSave}
                                     disabled={false}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        border: "none",
-                                        borderBottom: "1px solid #eee",
-                                        background: "white",
-                                        textAlign: "left",
-                                        cursor: "pointer",
-                                        fontSize: "0.85rem",
-                                        color: "#333",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        fontFamily: "var(--font-hand, sans-serif)",
-                                        fontWeight: 600,
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                    className="dropdown-item"
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -301,24 +269,8 @@ export default function CanvasControls({
                                 <button
                                     onClick={handleLoad}
                                     disabled={!onLoadState}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        border: "none",
-                                        borderBottom: "1px solid #eee",
-                                        background: "white",
-                                        textAlign: "left",
-                                        cursor: onLoadState ? "pointer" : "not-allowed",
-                                        fontSize: "0.85rem",
-                                        color: onLoadState ? "#333" : "#999",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        fontFamily: "var(--font-hand, sans-serif)",
-                                        fontWeight: 600,
-                                    }}
-                                    onMouseEnter={(e) => onLoadState && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                    className="dropdown-item"
+                                    style={{ opacity: onLoadState ? 1 : 0.5, cursor: onLoadState ? 'pointer' : 'not-allowed' }}
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -329,24 +281,7 @@ export default function CanvasControls({
                                 </button>
                                 <button
                                     onClick={handleBulkMarkdownLoad}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        border: "none",
-                                        borderBottom: "1px solid #eee",
-                                        background: "white",
-                                        textAlign: "left",
-                                        cursor: "pointer",
-                                        fontSize: "0.85rem",
-                                        color: "#333",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        fontFamily: "var(--font-hand, sans-serif)",
-                                        fontWeight: 600,
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                    className="dropdown-item"
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -357,28 +292,12 @@ export default function CanvasControls({
                                     </svg>
                                     Load Markdown (Bulk)
                                 </button>
-                                <div style={{ height: "1px", background: "#eee" }} />
+                                <div className="dropdown-divider" />
                                 <button
                                     onClick={handleExportPNG}
                                     disabled={isExporting}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        border: "none",
-                                        borderBottom: "1px solid #eee",
-                                        background: "white",
-                                        textAlign: "left",
-                                        cursor: isExporting ? "not-allowed" : "pointer",
-                                        fontSize: "0.85rem",
-                                        color: "#333",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        fontFamily: "var(--font-hand, sans-serif)",
-                                        fontWeight: 600,
-                                    }}
-                                    onMouseEnter={(e) => !isExporting && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                    className="dropdown-item"
+                                    style={{ opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }}
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -390,23 +309,8 @@ export default function CanvasControls({
                                 <button
                                     onClick={handleExportSVG}
                                     disabled={isExporting}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        border: "none",
-                                        background: "white",
-                                        textAlign: "left",
-                                        cursor: isExporting ? "not-allowed" : "pointer",
-                                        fontSize: "0.85rem",
-                                        color: "#333",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        fontFamily: "var(--font-hand, sans-serif)",
-                                        fontWeight: 600,
-                                    }}
-                                    onMouseEnter={(e) => !isExporting && (e.currentTarget.style.backgroundColor = "#f5f5f5")}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                    className="dropdown-item"
+                                    style={{ opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }}
                                 >
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -429,7 +333,7 @@ export default function CanvasControls({
             <style>{`
                 .canvas-controls {
                     position: fixed;
-                    right: 1.5rem;
+                    right: 1rem;
                     top: 50%;
                     transform: translateY(-50%);
                     display: flex;
@@ -451,16 +355,16 @@ export default function CanvasControls({
                     padding: 0.5rem;
                     min-width: 2.25rem;
                     min-height: 2.25rem;
-                    background: var(--color-surface, white);
-                    border: 2px solid var(--color-stroke, #333);
-                    border-radius: 8px;
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: 6px;
                     cursor: pointer;
-                    font-family: var(--font-hand, sans-serif);
+                    font-family: var(--font-ui);
                     font-size: 0.75rem;
-                    font-weight: 600;
-                    color: var(--color-text, #333);
-                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
-                    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+                    font-weight: 500;
+                    color: var(--color-text);
+                    box-shadow: var(--shadow-sm);
+                    transition: all 0.15s ease;
                     position: relative;
                     overflow: visible;
                 }
@@ -474,107 +378,97 @@ export default function CanvasControls({
                 .control-btn .label {
                     position: absolute;
                     right: 100%;
-                    margin-right: 0.625rem;
-                    padding: 0.5rem 0.875rem;
-                    background: var(--color-surface, white);
-                    border: 2px solid var(--color-stroke, #333);
-                    border-radius: 8px;
-                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
+                    margin-right: 0.5rem;
+                    padding: 0.375rem 0.75rem;
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: 6px;
+                    box-shadow: var(--shadow-md);
                     white-space: nowrap;
                     opacity: 0;
                     pointer-events: none;
                     transition: opacity 0.2s ease, transform 0.2s ease;
                     transform: translateX(10px);
                     z-index: 1;
+                    font-weight: 500;
+                    font-size: 0.75rem;
                 }
 
                 .control-btn:hover {
-                    transform: translate(-1px, -1px);
-                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
-                    background: var(--color-fill-1, #f8f9fa);
+                    background: var(--color-surface-hover);
+                    border-color: var(--color-border-hover);
+                    box-shadow: var(--shadow-md);
                 }
 
                 .control-btn:active {
-                    transform: translate(1px, 1px);
-                    box-shadow: 1px 1px 0 var(--color-stroke, #333);
+                    transform: translateY(1px);
+                    box-shadow: var(--shadow-sm);
                 }
 
                 .control-btn:disabled {
                     opacity: 0.5;
                     cursor: not-allowed;
-                    transform: none;
                 }
 
                 .control-btn:disabled:hover {
                     transform: none;
-                    box-shadow: 2px 2px 0 var(--color-stroke, #333);
+                    box-shadow: var(--shadow-sm);
                 }
 
-                /* Specific button styles */
+                /* Specific button hover styles */
                 .chat-btn:hover {
-                    background: #ffe8d6;
-                    border-color: #d97706;
+                    color: #d97706;
+                    border-color: #fed7aa;
+                    background: #fff7ed;
                 }
 
                 .chat-btn:hover .label {
-                    background: #ffe8d6;
-                    border-color: #d97706;
-                    box-shadow: 2px 2px 0 #d97706;
+                    color: #d97706;
                 }
 
                 .assets-btn:hover {
-                    background: #ebfbee;
-                    border-color: #2f9e44;
+                    color: #16a34a;
+                    border-color: #bbf7d0;
+                    background: #f0fdf4;
                 }
 
                 .assets-btn:hover .label {
-                    background: #ebfbee;
-                    border-color: #2f9e44;
-                    box-shadow: 2px 2px 0 #2f9e44;
+                    color: #16a34a;
                 }
 
                 .share-btn:hover {
-                    background: #f3e8ff;
-                    border-color: #9c36b5;
+                    color: #9333ea;
+                    border-color: #e9d5ff;
+                    background: #faf5ff;
                 }
 
                 .share-btn:hover .label {
-                    background: #f3e8ff;
-                    border-color: #9c36b5;
-                    box-shadow: 2px 2px 0 #9c36b5;
+                    color: #9333ea;
                 }
 
                 .note-btn:hover {
-                    background: #fff9db;
-                    border-color: #fab005;
+                    color: #ca8a04;
+                    border-color: #fde047;
+                    background: #fefce8;
                 }
 
                 .note-btn:hover .label {
-                    background: #fff9db;
-                    border-color: #fab005;
-                    box-shadow: 2px 2px 0 #fab005;
+                    color: #ca8a04;
                 }
 
                 .menu-btn:hover {
-                    background: #f8f9fa;
-                    border-color: #868e96;
-                }
-
-                .menu-btn:hover .label {
-                    background: #f8f9fa;
-                    border-color: #868e96;
-                    box-shadow: 2px 2px 0 #868e96;
+                    color: var(--color-text-secondary);
+                    background: var(--color-surface-hover);
                 }
 
                 .image-gen-btn:hover {
-                    background: #e3f2ff;
-                    border-color: #1971c2;
+                    color: #2563eb;
+                    border-color: #bfdbfe;
+                    background: #eff6ff;
                 }
 
                 .image-gen-btn:hover .label {
-                    background: #e3f2ff;
-                    border-color: #1971c2;
-                    box-shadow: 2px 2px 0 #1971c2;
+                    color: #2563eb;
                 }
 
                 .image-gen-btn.has-selection {
@@ -583,51 +477,62 @@ export default function CanvasControls({
 
                 @keyframes selection-pulse {
                     0%, 100% {
-                        box-shadow: 2px 2px 0 var(--color-stroke, #333), 0 0 0 0 rgba(0, 0, 0, 0.2);
+                        box-shadow: var(--shadow-sm), 0 0 0 0 rgba(59, 130, 246, 0.3);
                     }
                     50% {
-                        box-shadow: 2px 2px 0 var(--color-stroke, #333), 0 0 0 8px rgba(0, 0, 0, 0);
+                        box-shadow: var(--shadow-sm), 0 0 0 4px rgba(59, 130, 246, 0);
                     }
-                }
-
-                .export-btn:hover:not(:disabled) {
-                    background: #fff3bf;
-                    border-color: #f59f00;
-                }
-
-                .export-btn:hover:not(:disabled) .label {
-                    background: #fff3bf;
-                    border-color: #f59f00;
-                    box-shadow: 2px 2px 0 #f59f00;
-                }
-
-                .save-btn:hover:not(:disabled) {
-                    background: #e7f5ff;
-                    border-color: #339af0;
-                }
-
-                .save-btn:hover:not(:disabled) .label {
-                    background: #e7f5ff;
-                    border-color: #339af0;
-                    box-shadow: 2px 2px 0 #339af0;
-                }
-
-                .load-btn:hover:not(:disabled) {
-                    background: #f3f0ff;
-                    border-color: #7950f2;
-                }
-
-                .load-btn:hover:not(:disabled) .label {
-                    background: #f3f0ff;
-                    border-color: #7950f2;
-                    box-shadow: 2px 2px 0 #7950f2;
                 }
 
                 .divider {
-                    height: 2px;
-                    background: var(--color-stroke-muted, #ddd);
+                    height: 1px;
+                    background: var(--color-border);
                     margin: 0.25rem 0.5rem;
-                    border-radius: 1px;
+                }
+
+                /* Dropdown menu styles */
+                .dropdown-menu {
+                    position: absolute;
+                    right: 100%;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    margin-right: 0.5rem;
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    box-shadow: var(--shadow-lg);
+                    min-width: 180px;
+                    z-index: 1001;
+                    overflow: hidden;
+                    padding: 0.25rem;
+                }
+
+                .dropdown-item {
+                    width: 100%;
+                    padding: 0.625rem 0.75rem;
+                    border: none;
+                    border-radius: 6px;
+                    background: transparent;
+                    text-align: left;
+                    cursor: pointer;
+                    font-size: 0.8125rem;
+                    color: var(--color-text);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.625rem;
+                    font-family: var(--font-ui);
+                    font-weight: 400;
+                    transition: background 0.15s ease;
+                }
+
+                .dropdown-item:hover {
+                    background: var(--color-surface-hover);
+                }
+
+                .dropdown-divider {
+                    height: 1px;
+                    background: var(--color-border);
+                    margin: 0.25rem 0.5rem;
                 }
 
                 .toast-message {
@@ -635,15 +540,15 @@ export default function CanvasControls({
                     top: 1.5rem;
                     left: 50%;
                     transform: translateX(-50%);
-                    padding: 0.875rem 1.5rem;
-                    background: var(--color-surface, white);
-                    border: 2px solid var(--color-stroke, #333);
-                    border-radius: 10px;
-                    font-family: var(--font-hand, sans-serif);
+                    padding: 0.75rem 1.25rem;
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    font-family: var(--font-ui);
                     font-size: 0.875rem;
-                    font-weight: 600;
-                    color: var(--color-text, #333);
-                    box-shadow: 4px 4px 0 var(--color-stroke, #333);
+                    font-weight: 500;
+                    color: var(--color-text);
+                    box-shadow: var(--shadow-lg);
                     z-index: 1001;
                     animation: slideDown 0.2s ease;
                 }
@@ -667,7 +572,7 @@ export default function CanvasControls({
 
                 @media (max-width: 768px) {
                     .canvas-controls {
-                        right: 1rem;
+                        right: 0.75rem;
                         gap: 0.5rem;
                     }
 
@@ -682,12 +587,17 @@ export default function CanvasControls({
                         height: 18px;
                     }
 
-                    .control-btn:hover {
-                        padding: 0.625rem;
-                    }
-
                     .control-btn:hover .label {
                         display: none;
+                    }
+
+                    .dropdown-menu {
+                        position: fixed;
+                        right: 0.75rem;
+                        top: auto;
+                        bottom: 5rem;
+                        transform: none;
+                        margin-right: 0;
                     }
                 }
 

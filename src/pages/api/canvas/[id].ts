@@ -300,6 +300,94 @@ export const PUT: APIRoute = async (context) => {
 };
 
 // ============================================================================
+// PATCH Canvas (lightweight auto-save — data only, no version creation)
+// ============================================================================
+
+export const PATCH: APIRoute = async (context) => {
+  try {
+    const auth = await requireAuth(context);
+    if (!auth.authenticated) return auth.response;
+
+    const canvasId = context.params.id;
+    if (!canvasId) {
+      return new Response(
+        JSON.stringify({ error: 'Canvas ID is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const runtime = context.locals.runtime;
+    if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
+      return new Response(
+        JSON.stringify({ error: 'Storage not configured' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let canvasData: any;
+    try {
+      canvasData = await context.request.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!canvasData || !Array.isArray(canvasData.elements)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid canvas data' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify ownership
+    const canvas = await getCanvasByIdAndUser(runtime.env.DB, canvasId, auth.userId);
+    if (!canvas) {
+      return new Response(
+        JSON.stringify({ error: 'Canvas not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check size
+    if (isCanvasTooLarge(canvasData)) {
+      return new Response(
+        JSON.stringify({ error: 'Canvas data exceeds 10MB limit' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Save to R2 (overwrites current data)
+    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
+
+    // Update D1 metadata
+    const now = Math.floor(Date.now() / 1000);
+    const sizeBytes = new TextEncoder().encode(JSON.stringify(canvasData)).length;
+
+    await runtime.env.DB
+      .prepare('UPDATE canvases SET updated_at = ?, size_bytes = ? WHERE id = ? AND user_id = ?')
+      .bind(now, sizeBytes, canvasId, auth.userId)
+      .run();
+
+    return new Response(
+      JSON.stringify({
+        canvasId,
+        savedAt: new Date().toISOString(),
+        sizeBytes,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Canvas auto-save error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Auto-save failed', details: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+};
+
+// ============================================================================
 // DELETE Canvas
 // ============================================================================
 

@@ -125,9 +125,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
-            // Enable pointer events when editing OR when selected and hovered (but not dragging)
-            pointerEvents: isEditing ? 'auto' : (isSelected && isHovered && !isDragging ? 'auto' : 'none'),
-            cursor: isEditing ? 'text' : (isSelected && isHovered ? 'default' : 'default'),
+            // Only enable pointer events when actively editing - allows scroll/zoom to pass through when just selected
+            pointerEvents: isEditing ? 'auto' : 'none',
+            cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
             WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -250,25 +250,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 }
             };
 
-            const handleGlobalWheel = (e: WheelEvent) => {
-                const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
-                // Only intercept wheel events when the note is selected
-                if (inNote && isSelected) {
-                    // Prevent scroll chaining and canvas zooming (unless Ctrl is held for intentional zoom)
-                    if (!e.ctrlKey) {
-                        e.stopPropagation();
-                        // If we are near the edge (pointer-events: none), we must scroll manually
-                        if (edge) {
-                            const contentEl = contentRef.current;
-                            if (contentEl) {
-                                e.preventDefault();
-                                contentEl.scrollTop += e.deltaY;
-                            }
-                        }
-                    }
-                }
-            };
-
             const handleGlobalMouseMove = (e: MouseEvent) => {
                 const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
                 if (inNote !== isHovered) {
@@ -280,12 +261,10 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             };
 
             document.addEventListener('dblclick', handleGlobalDblClick, true);
-            document.addEventListener('wheel', handleGlobalWheel, { capture: true, passive: false });
             document.addEventListener('mousemove', handleGlobalMouseMove, true);
 
             return () => {
                 document.removeEventListener('dblclick', handleGlobalDblClick, true);
-                document.removeEventListener('wheel', handleGlobalWheel, true);
                 document.removeEventListener('mousemove', handleGlobalMouseMove, true);
             };
         }, [isEditing, isHovered, isNearEdge, isSelected, enterEditMode, isPointInNote]);
@@ -320,8 +299,28 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             };
         }, [element]);
 
-        // Expose export method
-        useImperativeHandle(ref, () => ({ exportAsImage }), [exportAsImage]);
+        // Update transform directly on DOM (bypasses React for silky-smooth 60fps sync)
+        const updateTransform = useCallback((x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => {
+            if (!containerRef.current) return;
+
+            // Calculate screen center position using passed-in values (all from same frame)
+            const screenCenterX = (x + width / 2 + scrollX) * zoom;
+            const screenCenterY = (y + height / 2 + scrollY) * zoom;
+
+            // Apply transform directly to DOM using GPU-accelerated translate3d
+            const container = containerRef.current;
+            container.style.top = `${screenCenterY - height / 2}px`;
+            container.style.left = `${screenCenterX - width / 2}px`;
+            container.style.width = `${width}px`;
+            container.style.height = `${height}px`;
+            container.style.transform = `scale(${zoom}) rotate(${angle}rad)`;
+        }, []); // No dependencies - uses only passed parameters
+
+        // Expose both methods via ref
+        useImperativeHandle(ref, () => ({
+            exportAsImage,
+            updateTransform
+        }), [exportAsImage, updateTransform]);
 
         // Toggle checkbox in preview mode
         const toggleCheckbox = useCallback((lineIndex: number) => {

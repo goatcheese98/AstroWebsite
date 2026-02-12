@@ -82,7 +82,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                         maxHeight: maxHeight,
                         minHeight: "300px",
                         background: "var(--color-surface, #ffffff)",
-                        border: isMobile ? "none" : "1px solid var(--color-stroke-muted, #e5e7eb)",
+                        border: isMobile ? "none" : "1px solid var(--color-border)",
                         borderRadius: isMobile ? 0 : "16px",
                         boxShadow: isMobile
                             ? "-8px 0 30px rgba(0, 0, 0, 0.15)"
@@ -115,15 +115,15 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                             <div style={{
                                 width: "40px",
                                 height: "4px",
-                                background: "var(--color-stroke-muted, #e5e7eb)",
+                                background: "var(--color-border)",
                                 borderRadius: "2px",
                                 transition: "background 0.15s",
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "var(--color-accent, #6366f1)";
+                                e.currentTarget.style.background = "var(--color-accent)";
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "var(--color-stroke-muted, #e5e7eb)";
+                                e.currentTarget.style.background = "var(--color-border)";
                             }}
                             />
                         </div>

@@ -190,6 +190,120 @@ export function validateCanvasData(data: unknown): data is CanvasData {
   return true;
 }
 
+// ============================================================================
+// Compressed Storage Functions (gzip)
+// ============================================================================
+
+/**
+ * Gzip compress a string to ArrayBuffer using CompressionStream
+ */
+async function gzipCompress(data: string): Promise<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(data));
+      controller.close();
+    },
+  });
+  const compressed = stream.pipeThrough(new CompressionStream('gzip'));
+  const reader = compressed.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLen = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLen += value.length;
+  }
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result.buffer;
+}
+
+/**
+ * Gzip decompress an ArrayBuffer to string using DecompressionStream
+ */
+async function gzipDecompress(data: ArrayBuffer): Promise<string> {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(data));
+      controller.close();
+    },
+  });
+  const decompressed = stream.pipeThrough(new DecompressionStream('gzip'));
+  const reader = decompressed.getReader();
+  const decoder = new TextDecoder();
+  let result = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value, { stream: true });
+  }
+  result += decoder.decode();
+  return result;
+}
+
+/**
+ * Check if data is gzip compressed (magic bytes 0x1f 0x8b)
+ */
+function isGzipped(data: ArrayBuffer): boolean {
+  const view = new Uint8Array(data);
+  return view.length >= 2 && view[0] === 0x1f && view[1] === 0x8b;
+}
+
+/**
+ * Save canvas data to R2 with gzip compression
+ */
+export async function saveCanvasToR2Compressed(
+  bucket: R2Bucket,
+  r2Key: string,
+  canvasData: CanvasData
+): Promise<number> {
+  const jsonString = JSON.stringify(canvasData);
+  const compressed = await gzipCompress(jsonString);
+
+  await bucket.put(r2Key, compressed, {
+    httpMetadata: {
+      contentType: 'application/json',
+      contentEncoding: 'gzip',
+      cacheControl: 'public, max-age=31536000',
+    },
+    customMetadata: {
+      savedAt: new Date().toISOString(),
+      compressed: 'gzip',
+      originalSize: jsonString.length.toString(),
+    },
+  });
+
+  return compressed.byteLength;
+}
+
+/**
+ * Load canvas data from R2 with auto-detection of gzip
+ */
+export async function loadCanvasFromR2Compressed(
+  bucket: R2Bucket,
+  r2Key: string
+): Promise<CanvasData | null> {
+  const object = await bucket.get(r2Key);
+  if (!object) return null;
+
+  const buffer = await object.arrayBuffer();
+
+  let jsonString: string;
+  if (isGzipped(buffer)) {
+    jsonString = await gzipDecompress(buffer);
+  } else {
+    jsonString = new TextDecoder().decode(buffer);
+  }
+
+  return JSON.parse(jsonString) as CanvasData;
+}
+
 /**
  * Calculate storage size for canvas data
  */

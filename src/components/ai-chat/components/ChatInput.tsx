@@ -144,8 +144,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         return (
             <div style={{
                 padding: isMobile ? "12px 16px 16px" : "14px 18px 18px",
-                background: "var(--color-bg, #fafafa)",
-                borderTop: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                background: "var(--color-surface)",
+                borderTop: "1px solid var(--color-border)",
                 flexShrink: 0,
                 // Ensure input area is above mobile keyboard
                 paddingBottom: isMobile ? "max(16px, env(safe-area-inset-bottom))" : "18px",
@@ -176,10 +176,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                                 gap: "4px",
                                 padding: isMobile ? "8px 12px" : "5px 10px",
                                 background: "transparent",
-                                border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                border: "1px solid var(--color-border)",
                                 borderRadius: "6px",
                                 fontSize: isMobile ? "13px" : "11px",
-                                color: "var(--color-text-muted, #6b7280)",
+                                color: "var(--color-text-secondary)",
                                 cursor: "pointer",
                                 transition: "all 0.15s",
                                 flexShrink: 0,
@@ -187,11 +187,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                                 touchAction: "manipulation",
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
-                                e.currentTarget.style.background = "var(--color-accent-light, #e0e7ff)";
+                                e.currentTarget.style.borderColor = "var(--color-accent)";
+                                e.currentTarget.style.background = "var(--color-accent-light)";
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = "var(--color-stroke-muted, #e5e7eb)";
+                                e.currentTarget.style.borderColor = "var(--color-border)";
                                 e.currentTarget.style.background = "transparent";
                             }}
                         >
@@ -206,9 +206,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                                 alignItems: "center",
                                 gap: "4px",
                                 padding: "2px",
-                                background: "var(--color-fill-1, #f3f4f6)",
+                                background: "var(--color-surface-hover)",
                                 borderRadius: "6px",
-                                border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                border: "1px solid var(--color-border)",
                             }}>
                                 <button
                                     onClick={() => onContextModeChange("selected")}
@@ -319,9 +319,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         style={{
                             flex: 1,
                             padding: isMobile ? "12px 14px" : "10px 14px",
-                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                            border: "1px solid var(--color-border)",
                             borderRadius: "10px",
-                            background: "var(--color-surface, #ffffff)",
+                            background: "var(--color-bg)",
                             fontSize: isMobile ? "16px" : "13px", // 16px prevents iOS zoom
                             lineHeight: 1.5,
                             resize: "none",
@@ -377,7 +377,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     <div style={{
                         marginTop: "6px",
                         fontSize: "10px",
-                        color: "var(--color-text-muted, #6b7280)",
+                        color: "var(--color-text-secondary)",
                     }}>
                         Enter to send • Shift+Enter for new line • ESC to close
                     </div>

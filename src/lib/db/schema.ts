@@ -1,12 +1,11 @@
 /**
  * Drizzle ORM Schema for Better Auth with Cloudflare D1
- * This schema matches the tables created in db/migrations/0001_initial_schema.sql
+ * Aligned to match actual SQL migrations (0001-0006)
  */
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 // Users table
-// IMPORTANT: Use camelCase for TypeScript property names, Drizzle maps to snake_case columns
 export const users = sqliteTable('users', {
   id: text('id').primaryKey().notNull(),
   email: text('email').unique().notNull(),
@@ -14,6 +13,7 @@ export const users = sqliteTable('users', {
   name: text('name'),
   image: text('avatar_url'), // Better Auth uses 'image', maps to 'avatar_url' column
   password: text('password_hash'), // Better Auth uses 'password', maps to 'password_hash' column
+  metadata: text('metadata').default('{}'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -24,8 +24,8 @@ export const sessions = sqliteTable('sessions', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: text('token').unique().notNull(),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  ipAddress: text('ip_address'), // Better Auth expects this
-  userAgent: text('user_agent'), // Better Auth expects this
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -39,7 +39,7 @@ export const accounts = sqliteTable('accounts', {
   password: text('password_hash'), // For email/password auth (hashed)
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
-  accessTokenExpiresAt: integer('expires_at', { mode: 'timestamp' }), // Better Auth uses 'accessTokenExpiresAt'
+  accessTokenExpiresAt: integer('expires_at', { mode: 'timestamp' }),
   tokenType: text('token_type'),
   scope: text('scope'),
   idToken: text('id_token'),
@@ -47,7 +47,7 @@ export const accounts = sqliteTable('accounts', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
-// Verification tokens table
+// Verification tokens table (matches migration 0005)
 export const verificationTokens = sqliteTable('verification_tokens', {
   id: text('id').primaryKey().notNull(),
   identifier: text('identifier').notNull(),
@@ -57,34 +57,38 @@ export const verificationTokens = sqliteTable('verification_tokens', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
-// Canvases table (for Excalidraw canvases)
+// Canvases table (matches SQL migration with thumbnail_url, version, metadata, size_bytes, anonymous_id)
 export const canvases = sqliteTable('canvases', {
   id: text('id').primaryKey().notNull(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
-  r2Key: text('r2_key').unique().notNull(),
+  r2Key: text('r2_key').notNull(),
+  thumbnailUrl: text('thumbnail_url'),
   isPublic: integer('is_public', { mode: 'boolean' }).default(false).notNull(),
+  version: integer('version').default(1).notNull(),
+  metadata: text('metadata').default('{}'),
+  sizeBytes: integer('size_bytes').default(0),
+  anonymousId: text('anonymous_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
-// Canvas versions table (for version history)
+// Canvas versions table (matches SQL: version, no version_number, no created_by)
 export const canvasVersions = sqliteTable('canvas_versions', {
   id: text('id').primaryKey().notNull(),
   canvasId: text('canvas_id').notNull().references(() => canvases.id, { onDelete: 'cascade' }),
-  versionNumber: integer('version_number').notNull(),
-  r2Key: text('r2_key').unique().notNull(),
+  version: integer('version').notNull(),
+  r2Key: text('r2_key').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  createdBy: text('created_by').notNull().references(() => users.id),
 });
 
-// Canvas shares table (for sharing canvases)
+// Canvas shares table (matches SQL: share_token, expires_at)
 export const canvasShares = sqliteTable('canvas_shares', {
   id: text('id').primaryKey().notNull(),
   canvasId: text('canvas_id').notNull().references(() => canvases.id, { onDelete: 'cascade' }),
-  sharedWith: text('shared_with').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  permission: text('permission').notNull(), // 'view' or 'edit'
+  shareToken: text('share_token').unique().notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

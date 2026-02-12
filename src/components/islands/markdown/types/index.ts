@@ -35,6 +35,8 @@ export interface MarkdownNoteRef {
             angle: number;
         };
     }>;
+    /** Update position/transform directly on DOM (bypasses React render for smooth animation) */
+    updateTransform: (x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => void;
 }
 
 /**

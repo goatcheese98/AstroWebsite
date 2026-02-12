@@ -24,6 +24,7 @@ export interface WebEmbedProps {
 
 export interface WebEmbedRef {
     exportAsImage: () => Promise<{ imageData: string; position: any }>;
+    updateTransform: (x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => void;
 }
 
 const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
@@ -96,8 +97,8 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             boxShadow: isSelected
                 ? '0 0 0 2px #6366f1, 0 10px 20px -3px rgba(0, 0, 0, 0.2)'
                 : '0 4px 12px -1px rgba(0, 0, 0, 0.15)',
-            // CRITICAL: Only enable pointer events when selected
-            pointerEvents: isSelected ? 'auto' : 'none',
+            // Keep pointer-events none to allow scroll/zoom to pass through
+            pointerEvents: 'none',
             display: 'flex',
             flexDirection: 'column',
         };
@@ -222,7 +223,27 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             };
         }, [element]);
 
-        useImperativeHandle(ref, () => ({ exportAsImage }), [exportAsImage]);
+        // Update transform directly on DOM (bypasses React for smooth sync)
+        const updateTransform = useCallback((x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => {
+            if (!containerRef.current) return;
+
+            // Calculate screen center position using passed-in values (all from same frame)
+            const screenCenterX = (x + width / 2 + scrollX) * zoom;
+            const screenCenterY = (y + height / 2 + scrollY) * zoom;
+
+            // Apply transform directly to DOM
+            const container = containerRef.current;
+            container.style.top = `${screenCenterY - height / 2}px`;
+            container.style.left = `${screenCenterX - width / 2}px`;
+            container.style.width = `${width}px`;
+            container.style.height = `${height}px`;
+            container.style.transform = `scale(${zoom})`;
+        }, []); // No dependencies - uses only passed parameters
+
+        useImperativeHandle(ref, () => ({
+            exportAsImage,
+            updateTransform
+        }), [exportAsImage, updateTransform]);
 
         const getDomain = (url: string) => {
             try {
@@ -431,8 +452,8 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                         flex: 1,
                         position: 'relative',
                         overflow: 'hidden',
-                        // When not selected, let clicks pass through to canvas
-                        pointerEvents: isSelected ? 'auto' : 'none',
+                        // Keep disabled to allow scroll/zoom pass-through - iframe opens in new tab for interaction
+                        pointerEvents: 'none',
                     }}>
 
                         {isEditing ? (
@@ -602,8 +623,8 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         height: '100%',
                                         border: 'none',
                                         opacity: isLoading ? 0 : 1,
-                                        // CRITICAL: Only allow pointer events when selected
-                                        pointerEvents: isSelected ? 'auto' : 'none',
+                                        // Disabled to allow canvas scroll/zoom - users can open in new tab for interaction
+                                        pointerEvents: 'none',
                                     }}
                                     sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation-by-user-activation allow-modals allow-popups-to-escape-sandbox allow-downloads"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"

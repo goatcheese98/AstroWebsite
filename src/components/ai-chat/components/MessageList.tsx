@@ -106,7 +106,7 @@ function EmptyState() {
             alignItems: "center",
             justifyContent: "center",
             height: "100%",
-            color: "var(--color-text-muted, #6b7280)",
+            color: "var(--color-text-secondary)",
             textAlign: "center",
         }}>
             <div style={{ marginBottom: "16px" }}>
@@ -116,7 +116,7 @@ function EmptyState() {
                 margin: "0 0 6px",
                 fontSize: "15px",
                 fontWeight: 600,
-                color: "var(--color-text, #1f2937)",
+                color: "var(--color-text)",
             }}>
                 Start creating with AI
             </h3>
@@ -149,14 +149,14 @@ function LoadingIndicator({ provider }: { provider: "kimi" | "claude" }) {
             <div style={{
                 width: "16px",
                 height: "16px",
-                border: "2px solid var(--color-stroke-muted, #e5e7eb)",
-                borderTopColor: "var(--color-accent, #6366f1)",
+                border: "2px solid var(--color-border)",
+                borderTopColor: "var(--color-accent)",
                 borderRadius: "50%",
                 animation: "spin 0.8s linear infinite",
             }} />
             <span style={{
                 fontSize: "13px",
-                color: "var(--color-text-muted, #6b7280)",
+                color: "var(--color-text-secondary)",
             }}>
                 {provider === "kimi" ? "Kimi is thinking..." : "Claude is thinking..."}
             </span>

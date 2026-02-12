@@ -413,13 +413,13 @@ export default function MyAssetsPanel({
                     right: 0;
                     top: 0;
                     height: 100vh;
-                    background: var(--color-surface, white);
-                    border-left: 2px solid var(--color-stroke, #333);
-                    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+                    background: var(--color-surface);
+                    border-left: 1px solid var(--color-border);
+                    box-shadow: var(--shadow-lg);
                     display: flex;
                     flex-direction: column;
                     z-index: 1000;
-                    font-family: var(--font-hand, sans-serif);
+                    font-family: var(--font-ui);
                 }
 
                 .resize-handle {
@@ -434,44 +434,48 @@ export default function MyAssetsPanel({
                 }
 
                 .resize-handle:hover {
-                    background: var(--color-accent, #667eea);
+                    background: var(--color-accent);
                 }
 
                 .panel-header {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 1.5rem;
-                    border-bottom: 2px solid var(--color-stroke-muted, #e5e5e5);
+                    padding: 1rem 1.25rem;
+                    border-bottom: 1px solid var(--color-border);
                 }
 
                 .panel-header h2 {
                     margin: 0;
-                    font-size: 1.5rem;
-                    font-weight: 700;
-                    color: var(--color-text, #333);
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: var(--color-text);
+                    letter-spacing: -0.01em;
                 }
 
                 .close-btn {
                     background: transparent;
                     border: none;
                     cursor: pointer;
-                    padding: 0.25rem;
-                    color: var(--color-text-muted, #666);
-                    transition: color 0.2s;
+                    padding: 0.375rem;
+                    border-radius: 6px;
+                    color: var(--color-text-secondary);
+                    transition: all 0.15s;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                 }
 
                 .close-btn:hover {
-                    color: var(--color-text, #333);
+                    color: var(--color-text);
+                    background: var(--color-surface-hover);
                 }
 
                 .tabs {
                     display: flex;
-                    gap: 0.5rem;
-                    padding: 1rem 1.5rem 0;
+                    gap: 0;
+                    padding: 0 1.25rem;
+                    border-bottom: 1px solid var(--color-border);
                 }
 
                 .tab {
@@ -479,119 +483,127 @@ export default function MyAssetsPanel({
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1rem;
+                    gap: 0.375rem;
+                    padding: 0.75rem 0.5rem;
                     background: transparent;
-                    border: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    border-bottom: none;
-                    border-radius: 8px 8px 0 0;
-                    font-family: var(--font-hand, sans-serif);
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    color: var(--color-text-muted, #666);
+                    border: none;
+                    border-bottom: 2px solid transparent;
+                    font-family: var(--font-ui);
+                    font-size: 0.8125rem;
+                    font-weight: 500;
+                    color: var(--color-text-secondary);
                     cursor: pointer;
-                    transition: all 0.2s;
+                    transition: all 0.15s;
+                    margin-bottom: -1px;
                 }
 
                 .tab:hover {
-                    background: var(--color-fill-1, #f8f9fa);
+                    color: var(--color-text);
+                    background: var(--color-surface-hover);
                 }
 
                 .tab.active {
-                    background: var(--color-surface, white);
-                    border-color: var(--color-stroke, #333);
-                    color: var(--color-text, #333);
+                    color: var(--color-accent);
+                    border-bottom-color: var(--color-accent);
+                    background: transparent;
                 }
 
                 .search-container {
                     position: relative;
-                    padding: 1rem 1.5rem;
-                    border-bottom: 2px solid var(--color-stroke-muted, #e5e5e5);
+                    padding: 0.875rem 1.25rem;
+                    border-bottom: 1px solid var(--color-border);
                 }
 
                 .search-icon {
                     position: absolute;
-                    left: 2rem;
+                    left: 1.75rem;
                     top: 50%;
                     transform: translateY(-50%);
-                    color: var(--color-text-muted, #666);
+                    color: var(--color-text-muted);
                     pointer-events: none;
                 }
 
                 .search-input {
                     width: 100%;
-                    padding: 0.75rem 2.5rem 0.75rem 2.75rem;
-                    border: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    border-radius: 8px;
-                    font-family: var(--font-hand, sans-serif);
-                    font-size: 0.9rem;
-                    color: var(--color-text, #333);
-                    background: var(--color-fill-1, #f8f9fa);
-                    transition: all 0.2s;
+                    padding: 0.625rem 2.25rem 0.625rem 2.25rem;
+                    border: 1px solid var(--color-border);
+                    border-radius: 6px;
+                    font-family: var(--font-ui);
+                    font-size: 0.8125rem;
+                    color: var(--color-text);
+                    background: var(--color-bg);
+                    transition: all 0.15s;
                     box-sizing: border-box;
                 }
 
                 .search-input:focus {
                     outline: none;
-                    border-color: var(--color-accent, #667eea);
-                    background: white;
+                    border-color: var(--color-accent);
+                    box-shadow: 0 0 0 3px var(--color-accent-light);
+                }
+
+                .search-input::placeholder {
+                    color: var(--color-text-muted);
                 }
 
                 .clear-search {
                     position: absolute;
-                    right: 2rem;
+                    right: 1.75rem;
                     top: 50%;
                     transform: translateY(-50%);
                     background: transparent;
                     border: none;
                     cursor: pointer;
                     padding: 0.25rem;
-                    color: var(--color-text-muted, #666);
+                    border-radius: 4px;
+                    color: var(--color-text-secondary);
                     display: flex;
                     align-items: center;
-                    transition: color 0.2s;
+                    transition: all 0.15s;
                 }
 
                 .clear-search:hover {
-                    color: var(--color-text, #333);
+                    color: var(--color-text);
+                    background: var(--color-surface-hover);
                 }
 
                 .collections {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 0.5rem;
-                    padding: 1rem 1.5rem;
-                    border-bottom: 2px solid var(--color-stroke-muted, #e5e5e5);
+                    gap: 0.375rem;
+                    padding: 0.875rem 1.25rem;
+                    border-bottom: 1px solid var(--color-border);
                 }
 
                 .collection-btn {
-                    padding: 0.5rem 0.875rem;
-                    background: var(--color-fill-1, #f8f9fa);
-                    border: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    border-radius: 6px;
-                    font-family: var(--font-hand, sans-serif);
-                    font-size: 0.8rem;
-                    font-weight: 600;
-                    color: var(--color-text-muted, #666);
+                    padding: 0.375rem 0.625rem;
+                    background: var(--color-surface-hover);
+                    border: 1px solid var(--color-border);
+                    border-radius: 4px;
+                    font-family: var(--font-ui);
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    color: var(--color-text-secondary);
                     cursor: pointer;
-                    transition: all 0.2s;
+                    transition: all 0.15s;
                 }
 
                 .collection-btn:hover {
-                    background: white;
-                    border-color: var(--color-stroke, #333);
+                    background: var(--color-bg);
+                    border-color: var(--color-border-hover);
+                    color: var(--color-text);
                 }
 
                 .collection-btn.active {
-                    background: var(--color-accent, #667eea);
-                    border-color: var(--color-accent, #667eea);
+                    background: var(--color-accent);
+                    border-color: var(--color-accent);
                     color: white;
                 }
 
                 .content {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 1.5rem;
+                    padding: 1rem 1.25rem;
                 }
 
                 .loading {
@@ -600,14 +612,14 @@ export default function MyAssetsPanel({
                     align-items: center;
                     justify-content: center;
                     height: 200px;
-                    gap: 1rem;
+                    gap: 0.75rem;
                 }
 
                 .spinner {
-                    width: 40px;
-                    height: 40px;
-                    border: 3px solid var(--color-stroke-muted, #e5e5e5);
-                    border-top-color: var(--color-accent, #667eea);
+                    width: 32px;
+                    height: 32px;
+                    border: 2px solid var(--color-border);
+                    border-top-color: var(--color-accent);
                     border-radius: 50%;
                     animation: spin 0.8s linear infinite;
                 }
@@ -616,68 +628,73 @@ export default function MyAssetsPanel({
                     to { transform: rotate(360deg); }
                 }
 
+                .loading p {
+                    margin: 0;
+                    font-size: 0.8125rem;
+                    color: var(--color-text-secondary);
+                }
+
                 .empty-state {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
                     padding: 3rem 1rem;
-                    color: var(--color-text-muted, #666);
+                    color: var(--color-text-secondary);
                     text-align: center;
                 }
 
                 .empty-state svg {
-                    margin-bottom: 1rem;
-                    opacity: 0.5;
+                    margin-bottom: 0.875rem;
+                    opacity: 0.4;
                 }
 
                 .empty-state p {
-                    margin: 0.5rem 0;
-                    font-weight: 600;
+                    margin: 0.25rem 0;
+                    font-weight: 500;
+                    font-size: 0.875rem;
                 }
 
                 .empty-state .hint {
-                    font-size: 0.85rem;
+                    font-size: 0.75rem;
                     font-weight: 400;
-                    opacity: 0.7;
+                    color: var(--color-text-muted);
                 }
 
                 .icon-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-                    gap: 0.75rem;
+                    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+                    gap: 0.5rem;
                 }
 
                 .icon-item {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.875rem;
-                    background: var(--color-fill-1, #f8f9fa);
-                    border: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    border-radius: 8px;
+                    gap: 0.375rem;
+                    padding: 0.75rem 0.5rem;
+                    background: var(--color-bg);
+                    border: 1px solid var(--color-border);
+                    border-radius: 6px;
                     cursor: pointer;
-                    transition: all 0.2s;
-                    box-shadow: 2px 2px 0 var(--color-stroke-muted, #e5e5e5);
+                    transition: all 0.15s;
                 }
 
                 .icon-item:hover {
-                    background: white;
-                    border-color: var(--color-accent, #667eea);
-                    transform: translate(-1px, -1px);
-                    box-shadow: 3px 3px 0 var(--color-accent, #667eea);
+                    background: var(--color-surface-hover);
+                    border-color: var(--color-accent);
+                    box-shadow: var(--shadow-sm);
                 }
 
                 .icon-item img {
-                    width: 32px;
-                    height: 32px;
+                    width: 24px;
+                    height: 24px;
                     object-fit: contain;
                 }
 
                 .icon-name {
-                    font-size: 0.7rem;
-                    color: var(--color-text-muted, #666);
+                    font-size: 0.65rem;
+                    color: var(--color-text-secondary);
                     text-align: center;
                     line-height: 1.2;
                     max-width: 100%;
@@ -689,24 +706,22 @@ export default function MyAssetsPanel({
 
                 .image-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                    gap: 1rem;
+                    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                    gap: 0.75rem;
                 }
 
                 .image-item {
                     position: relative;
-                    border-radius: 8px;
+                    border-radius: 6px;
                     overflow: hidden;
-                    border: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    background: var(--color-fill-1, #f8f9fa);
-                    box-shadow: 2px 2px 0 var(--color-stroke-muted, #e5e5e5);
-                    transition: all 0.2s;
+                    border: 1px solid var(--color-border);
+                    background: var(--color-bg);
+                    transition: all 0.15s;
                 }
 
                 .image-item:hover {
-                    border-color: var(--color-stroke, #333);
-                    transform: translate(-1px, -1px);
-                    box-shadow: 3px 3px 0 var(--color-stroke, #333);
+                    border-color: var(--color-accent);
+                    box-shadow: var(--shadow-md);
                 }
 
                 .image-preview {
@@ -718,18 +733,20 @@ export default function MyAssetsPanel({
                 }
 
                 .image-info {
-                    padding: 0.75rem;
+                    padding: 0.625rem;
                     display: flex;
                     align-items: flex-start;
                     justify-content: space-between;
                     gap: 0.5rem;
+                    background: var(--color-surface);
+                    border-top: 1px solid var(--color-border);
                 }
 
                 .image-prompt {
                     flex: 1;
                     margin: 0;
-                    font-size: 0.75rem;
-                    color: var(--color-text-muted, #666);
+                    font-size: 0.6875rem;
+                    color: var(--color-text-secondary);
                     line-height: 1.3;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -744,33 +761,35 @@ export default function MyAssetsPanel({
                     border: none;
                     cursor: pointer;
                     padding: 0.25rem;
-                    color: var(--color-text-muted, #666);
-                    transition: color 0.2s;
+                    border-radius: 4px;
+                    color: var(--color-text-secondary);
+                    transition: all 0.15s;
                     display: flex;
                     align-items: center;
                 }
 
                 .delete-btn:hover {
-                    color: #e03131;
+                    color: #ef4444;
+                    background: #fef2f2;
                 }
 
                 .panel-footer {
-                    padding: 1rem 1.5rem;
-                    border-top: 2px solid var(--color-stroke-muted, #e5e5e5);
-                    background: var(--color-fill-1, #f8f9fa);
+                    padding: 0.875rem 1.25rem;
+                    border-top: 1px solid var(--color-border);
+                    background: var(--color-surface-hover);
                 }
 
                 .footer-text {
                     margin: 0;
-                    font-size: 0.75rem;
-                    color: var(--color-text-muted, #666);
+                    font-size: 0.6875rem;
+                    color: var(--color-text-muted);
                     text-align: center;
                 }
 
                 .footer-text a {
-                    color: var(--color-accent, #667eea);
+                    color: var(--color-accent);
                     text-decoration: none;
-                    font-weight: 600;
+                    font-weight: 500;
                 }
 
                 .footer-text a:hover {

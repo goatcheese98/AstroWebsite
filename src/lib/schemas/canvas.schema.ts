@@ -109,6 +109,8 @@ export const CanvasMetadataResponseSchema = z.object({
   version: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  metadata: z.record(z.any()).optional(),
+  sizeBytes: z.number().optional(),
 });
 
 /**

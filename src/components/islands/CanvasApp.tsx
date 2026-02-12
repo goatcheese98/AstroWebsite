@@ -11,6 +11,12 @@ import {
     type CanvasState,
     type SaveOptions
 } from "../../lib/canvas-state-manager";
+import { useCanvasSession } from "../../hooks/useCanvasSession";
+import { useAutoSave } from "../../hooks/useAutoSave";
+import WelcomeOverlay from "../onboarding/WelcomeOverlay";
+import AuthPrompt from "../onboarding/AuthPrompt";
+import FeatureTour from "../onboarding/FeatureTour";
+import TemplateGallery from "../onboarding/TemplateGallery";
 import type { Message } from "../ai-chat/types";
 import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
 import type { GenerationOptions } from "../ai-chat/ImageGenerationModal";
@@ -106,6 +112,16 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     );
 }
 
+function getTimeAgo(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 5) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+}
+
 export default function CanvasApp() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
@@ -121,6 +137,125 @@ export default function CanvasApp() {
 
     // Toast state
     const [toasts, setToasts] = useState<Toast[]>([]);
+
+    // Canvas title state (editable)
+    const [canvasTitle, setCanvasTitle] = useState('Untitled Canvas');
+
+    // Onboarding state
+    const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
+
+    // === CLOUD PERSISTENCE ===
+    const session = useCanvasSession();
+
+    const getCanvasData = useCallback(() => {
+        const api = (window as any).excalidrawAPI;
+        if (!api) return null;
+        return {
+            elements: api.getSceneElements() || [],
+            appState: api.getAppState() || {},
+            files: api.getFiles() || {},
+        };
+    }, []);
+
+    const autoSave = useAutoSave({
+        canvasId: session.canvasId,
+        isAuthenticated: session.isAuthenticated,
+        getCanvasData,
+        onCanvasCreated: (newId) => {
+            session.setCanvasId(newId);
+        },
+    });
+
+    // Listen for canvas data changes from ExcalidrawCanvas
+    useEffect(() => {
+        const handleDataChange = () => {
+            autoSave.markDirty();
+        };
+        window.addEventListener("canvas:data-change", handleDataChange);
+        return () => window.removeEventListener("canvas:data-change", handleDataChange);
+    }, [autoSave.markDirty]);
+
+    // Load canvas from server when authenticated with a canvas ID
+    useEffect(() => {
+        if (!session.isAuthenticated || !session.canvasId || session.isLoading) return;
+
+        let cancelled = false;
+        async function loadFromServer() {
+            try {
+                const response = await fetch(`/api/canvas/${session.canvasId}`, {
+                    credentials: 'include',
+                });
+                if (!response.ok || cancelled) return;
+
+                const data = await response.json();
+                if (data.canvasData && !cancelled) {
+                    setCanvasTitle(data.title || 'Untitled Canvas');
+                    // Dispatch event to load server data into canvas
+                    window.dispatchEvent(new CustomEvent("canvas:load-state", {
+                        detail: {
+                            state: {
+                                canvas: data.canvasData,
+                                chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
+                                images: { history: [] },
+                            }
+                        }
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to load canvas from server:", err);
+            }
+        }
+
+        loadFromServer();
+        return () => { cancelled = true; };
+    }, [session.isAuthenticated, session.canvasId, session.isLoading]);
+
+    // Anonymous → Authenticated migration: on first auth, migrate localStorage canvas
+    useEffect(() => {
+        if (!session.isAuthenticated || session.isLoading) return;
+        const anonId = localStorage.getItem('astroweb-anonymous-id');
+        if (!anonId) return;
+        // Check if we already migrated
+        if (localStorage.getItem('astroweb-migration-done')) return;
+
+        const api = (window as any).excalidrawAPI;
+        if (!api) return;
+
+        const elements = api.getSceneElements() || [];
+        if (elements.length === 0) return;
+
+        const canvasData = {
+            elements,
+            appState: api.getAppState() || {},
+            files: api.getFiles() || {},
+        };
+
+        fetch('/api/user/migrate-anonymous', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ anonymousId: anonId, canvasData }),
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.canvasId) {
+                    localStorage.setItem('astroweb-migration-done', '1');
+                    session.setCanvasId(data.canvasId);
+                    addToast('Canvas migrated to cloud', 'success', 3000);
+                }
+            })
+            .catch(err => console.error('Migration failed:', err));
+    }, [session.isAuthenticated, session.isLoading]);
+
+    // Handle template selection from TemplateGallery
+    const handleSelectTemplate = useCallback((elements: any[]) => {
+        const api = (window as any).excalidrawAPI;
+        if (!api || elements.length === 0) return;
+
+        // Load template elements into canvas
+        api.updateScene({ elements });
+        api.scrollToContent();
+    }, []);
 
     // Refs to access state from child components
     const stateContainerRef = useRef<CanvasStateContainer>({
@@ -696,6 +831,109 @@ export default function CanvasApp() {
                 ))}
             </div>
 
+            {/* Cloud Save Indicator — top-left */}
+            {session.isAuthenticated && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: '12px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 14px',
+                        background: 'white',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        zIndex: 999,
+                        fontFamily: 'var(--font-hand, sans-serif)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                >
+                    {/* Cloud icon */}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={autoSave.isSaving ? '#6366f1' : autoSave.error ? '#ef4444' : '#22c55e'} strokeWidth="2">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                    </svg>
+                    <span>
+                        {autoSave.isSaving
+                            ? 'Saving...'
+                            : autoSave.error
+                            ? 'Save error'
+                            : autoSave.lastSaved
+                            ? `Saved ${getTimeAgo(autoSave.lastSaved)}`
+                            : 'Cloud sync active'}
+                    </span>
+                    {/* Save Version button */}
+                    <button
+                        onClick={async () => {
+                            if (!session.canvasId) return;
+                            try {
+                                await autoSave.saveNow();
+                                const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                });
+                                if (res.ok) {
+                                    addToast('Version saved', 'success', 2000);
+                                }
+                            } catch {
+                                addToast('Failed to save version', 'info', 3000);
+                            }
+                        }}
+                        style={{
+                            marginLeft: '4px',
+                            padding: '2px 8px',
+                            background: 'transparent',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            color: '#6b7280',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontWeight: 600,
+                        }}
+                        title="Save a named version snapshot"
+                    >
+                        Save Version
+                    </button>
+                </div>
+            )}
+
+            {/* Anonymous user — subtle sign-in indicator */}
+            {!session.isAuthenticated && !session.isLoading && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: '12px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: 'white',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: '#9ca3af',
+                        zIndex: 999,
+                        fontFamily: 'var(--font-hand, sans-serif)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                        <line x1="1" y1="1" x2="23" y2="23" stroke="#d1d5db" strokeWidth="2"/>
+                    </svg>
+                    <span>Local only</span>
+                </div>
+            )}
+
             <CanvasControls
                 onOpenChat={handleOpenChat}
                 onOpenAssets={handleOpenAssets}
@@ -738,6 +976,8 @@ export default function CanvasApp() {
                     elementCount={pendingSaveState.canvas.elements.length}
                     messageCount={pendingSaveState.chat.messages.length}
                     imageCount={pendingSaveState.images.history.length}
+                    isAuthenticated={session.isAuthenticated}
+                    onCloudSave={() => autoSave.saveNow()}
                 />
             )}
 
@@ -761,6 +1001,35 @@ export default function CanvasApp() {
                 onGenerate={handleImageGenerationRequest}
                 isGenerating={isGeneratingImage}
             />
+
+            {/* === ONBOARDING COMPONENTS === */}
+
+            {/* Welcome overlay — first visit only */}
+            <WelcomeOverlay
+                onStartBlank={() => { /* just dismiss */ }}
+                onBrowseTemplates={() => setIsTemplateGalleryOpen(true)}
+                onSignIn={() => { window.location.href = '/login'; }}
+            />
+
+            {/* Template gallery modal */}
+            <TemplateGallery
+                isOpen={isTemplateGalleryOpen}
+                onClose={() => setIsTemplateGalleryOpen(false)}
+                onSelectTemplate={handleSelectTemplate}
+            />
+
+            {/* Feature tour — triggers on first canvas interaction */}
+            <FeatureTour />
+
+            {/* Auth prompt — for anonymous users after activity */}
+            {!session.isAuthenticated && !session.isLoading && (
+                <AuthPrompt
+                    elementCount={(() => {
+                        const api = (window as any).excalidrawAPI;
+                        return api?.getSceneElements?.()?.length || 0;
+                    })()}
+                />
+            )}
 
             {/* Toast message for save/load feedback */}
             {saveMessage && (
