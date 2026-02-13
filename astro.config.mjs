@@ -90,7 +90,12 @@ console.log(`[astro-config] Site URL: ${siteUrl}`);
 export default defineConfig({
     site: siteUrl,
     output: 'server',
-    adapter: cloudflare(),
+    adapter: cloudflare({
+        platformProxy: {
+            enabled: true,
+            configPath: './wrangler.jsonc',
+        },
+    }),
     integrations: [
         // Disable sitemap for canvas-only builds
         ...(DEPLOY_TARGET === 'full' ? [sitemap()] : []),

@@ -2,12 +2,15 @@
   "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/schemas/config/v2.json",
   "name": "astroweb",
   "compatibility_date": "2025-01-20",
+  "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": "./dist",
+  "migrations_dir": "./db/migrations",
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "astroweb-db",
-      "database_id": "1daa4434-4ec6-472d-8bf9-ab6e71c11dbf"
+      "database_id": "1daa4434-4ec6-472d-8bf9-ab6e71c11dbf",
+      "migrations_dir": "./db/migrations"
     }
   ],
   "kv_namespaces": [

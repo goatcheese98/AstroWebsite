@@ -1,5 +1,6 @@
 name = "ai-canvas"
 compatibility_date = "2025-01-20"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 # D1 Database binding (shared with main site)
@@ -22,3 +23,7 @@ id = "598df9d2488549df9929db888147772f"
 binding = "CANVAS_STORAGE"
 bucket_name = "astroweb-canvases"
 preview_bucket_name = "astroweb-canvases-preview"
+
+# Environment variables (secrets should be set via wrangler pages secret put)
+[env.production]
+BETTER_AUTH_URL = "https://canvas.rohanjasani.com"

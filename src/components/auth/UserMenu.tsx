@@ -22,7 +22,7 @@ export function UserMenu() {
     // Fetch current session
     async function fetchSession() {
       try {
-        const response = await fetch('/api/auth/get-session', {
+        const response = await fetch('/api/auth/session', {
           credentials: 'include',
         });
 

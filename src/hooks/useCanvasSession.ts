@@ -55,7 +55,7 @@ export function useCanvasSession(): CanvasSession {
 
     async function checkSession() {
       try {
-        const response = await fetch('/api/auth/get-session', {
+        const response = await fetch('/api/auth/session', {
           credentials: 'include',
         });
 
