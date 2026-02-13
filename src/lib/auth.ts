@@ -136,9 +136,23 @@ export function createAuth(db: D1Database, env?: AuthEnv) {
     // Security settings
     advanced: {
       cookiePrefix: 'astroweb',
-      useSecureCookies: authUrl.startsWith('https'),
+      useSecureCookies: false, // Disable for localhost (both http and https)
       crossSubDomainCookies: {
         enabled: false,
+      },
+    },
+    
+    // Cookie configuration for session persistence
+    cookies: {
+      sessionToken: {
+        name: 'astroweb_session',
+        options: {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: false, // Allow http on localhost
+          path: '/',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+        },
       },
     },
 

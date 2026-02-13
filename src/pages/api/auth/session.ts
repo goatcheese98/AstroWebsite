@@ -1,8 +1,3 @@
-/**
- * Better Auth API Handler - Catch-All Route
- * Handles ALL auth endpoints: session, sign-in, sign-out, callback, etc.
- */
-
 import type { APIRoute } from 'astro';
 import { createAuth } from '@/lib/auth';
 
@@ -25,40 +20,31 @@ function getEnv(runtime: any) {
   };
 }
 
-// Handle ALL HTTP methods
-const handler: APIRoute = async (ctx) => {
+export const GET: APIRoute = async (ctx) => {
   try {
     const runtime = ctx.locals.runtime;
     const env = getEnv(runtime);
     
     if (!runtime?.env?.DB) {
-      return new Response(JSON.stringify({ 
-        error: 'Database not configured',
-        details: 'D1 database binding is missing'
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Database not configured' }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     
+    // Use auth.api.getSession directly instead of handler
     const auth = createAuth(runtime.env.DB, env);
+    const session = await auth.api.getSession({ headers: ctx.request.headers });
     
-    // Debug logging
-    console.log(`[Auth] ${ctx.request.method} ${ctx.url.pathname}`);
-    
-    return await auth.handler(ctx.request);
+    return new Response(JSON.stringify(session || { user: null, session: null }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error) {
-    console.error('[Auth] Handler error:', error);
+    console.error('Session error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Authentication error', 
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }), 
+      JSON.stringify({ error: 'Session error', details: error instanceof Error ? error.message : 'Unknown' }), 
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 };
-
-export const GET = handler;
-export const POST = handler;
-export const PUT = handler;
-export const DELETE = handler;
-export const OPTIONS = handler;
-export const PATCH = handler;
