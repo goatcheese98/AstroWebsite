@@ -9,8 +9,9 @@ import { VisualTableEditor } from './VisualTableEditor';
 interface MarkdownBlockEditorProps {
     block: MarkdownBlock;
     isEditing: boolean;
+    isSelectionActive: boolean;
     isDark: boolean;
-    onEdit: (blockId: string) => void;
+    onEdit: (blockId: string, isShift?: boolean) => void;
     onChange: (blockId: string, newContent: string) => void;
     onBlur: () => void;
     onAddBlock: (afterBlockId: string) => void; // New: Add block after this one
@@ -23,6 +24,7 @@ interface MarkdownBlockEditorProps {
 export const MarkdownBlockEditor = memo(({
     block,
     isEditing,
+    isSelectionActive,
     isDark,
     onEdit,
     onChange,
@@ -32,7 +34,6 @@ export const MarkdownBlockEditor = memo(({
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [localContent, setLocalContent] = useState(block.rawContent);
     const [isHovered, setIsHovered] = useState(false);
-    const [isShiftSelected, setIsShiftSelected] = useState(false);
 
     // Focus textarea when entering edit mode
     useEffect(() => {
@@ -53,13 +54,7 @@ export const MarkdownBlockEditor = memo(({
 
     const handleClick = (e: React.MouseEvent) => {
         if (!isEditing) {
-            // Shift-click for multi-select
-            if (e.shiftKey) {
-                setIsShiftSelected(!isShiftSelected);
-                e.stopPropagation();
-            } else {
-                onEdit(block.id);
-            }
+            onEdit(block.id, e.shiftKey);
         }
     };
 
@@ -249,13 +244,15 @@ export const MarkdownBlockEditor = memo(({
                 cursor: 'pointer',
                 borderRadius: '6px',
                 padding: '4px 8px',
-                margin: '0 -8px',
+                marginLeft: '-8px',
+                marginRight: '-8px',
+                marginTop: '0px',
                 marginBottom: block.type === 'heading' ? '0.5em' : '0',
                 transition: 'background-color 0.15s ease',
-                background: isShiftSelected
+                background: isSelectionActive
                     ? (isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)')
                     : 'transparent',
-                outline: isShiftSelected
+                outline: isSelectionActive
                     ? `2px solid ${isDark ? 'rgba(99, 102, 241, 0.4)' : 'rgba(99, 102, 241, 0.3)'}`
                     : 'none',
             }}

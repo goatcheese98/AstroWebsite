@@ -66,6 +66,7 @@ import html2canvas from 'html2canvas';
 const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
     ({ element, appState, onChange }, ref) => {
         const [isEditing, setIsEditing] = useState(false);
+        const [editMode, setEditMode] = useState<'raw' | 'hybrid'>('raw');
         const [content, setContent] = useState(element.customData?.content || '');
         const [isHovered, setIsHovered] = useState(false);
         const [isNearEdge, setIsNearEdge] = useState(false);
@@ -86,9 +87,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const height = element.height;
         const angle = element.angle || 0;
 
-        // Determine theme
-        const isDark = typeof document !== 'undefined' &&
-            document.documentElement.getAttribute('data-theme') === 'dark';
+        // Determine theme - always light mode on canvas
+        const isDark = false; // Canvas is always light mode
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
@@ -158,13 +158,15 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         }, [isEditing, isNearEdge]);
 
         // Enter edit mode
-        const enterEditMode = useCallback(() => {
+        const enterEditMode = useCallback((mode: 'raw' | 'hybrid' = 'raw') => {
+            setEditMode(mode);
             setIsEditing(true);
         }, []);
 
         // Exit edit mode and save
         const exitEditMode = useCallback(() => {
             setIsEditing(false);
+            setEditMode('raw'); // Reset to raw for next time
             if (content !== element.customData?.content) {
                 onChange(element.id, content);
             }
@@ -452,12 +454,54 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                     onMouseDown={handleMouseDown}
                 >
                     {isEditing ? (
-                        <HybridMarkdownEditor
-                            content={content}
-                            onChange={updateContent}
-                            isDark={isDark}
-                            isScrollMode={true}
-                        />
+                        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            {/* Mode Toggle Button */}
+                            <button
+                                onClick={() => setEditMode(prev => prev === 'raw' ? 'hybrid' : 'raw')}
+                                style={{
+                                    position: 'absolute',
+                                    top: '8px',
+                                    right: '8px',
+                                    zIndex: 1000,
+                                    padding: '4px 12px',
+                                    borderRadius: '12px',
+                                    border: 'none',
+                                    background: editMode === 'raw' ? '#818cf8' : '#6366f1',
+                                    color: 'white',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)',
+                                    transition: 'all 0.2s ease',
+                                }}
+                            >
+                                {editMode === 'raw' ? '✨ Pretty' : '📝 Raw'}
+                            </button>
+
+                            {editMode === 'hybrid' ? (
+                                <HybridMarkdownEditor
+                                    content={content}
+                                    onChange={updateContent}
+                                    isDark={isDark}
+                                    isScrollMode={true}
+                                />
+                            ) : (
+                                <div style={{
+                                    padding: '40px 20px 20px',
+                                    width: '100%',
+                                    height: '100%',
+                                    boxSizing: 'border-box',
+                                    overflow: 'auto'
+                                }}>
+                                    <MarkdownEditor
+                                        value={content}
+                                        onChange={updateContent}
+                                        onBlur={() => { }} // We handle save on click outside
+                                        onKeyDown={handleKeyDown}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <div
                             className="markdown-preview"

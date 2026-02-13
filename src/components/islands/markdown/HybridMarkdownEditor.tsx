@@ -30,6 +30,9 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
     // Track which block is currently being edited (null = none)
     const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
 
+    // Track multi-selected blocks (for group actions)
+    const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+
     // Local state for blocks to handle real-time updates
     const [localBlocks, setLocalBlocks] = useState<MarkdownBlock[]>(blocks);
 
@@ -39,10 +42,24 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
     }, [blocks]);
 
     /**
-     * Handle clicking a block to edit it
+     * Handle clicking a block to edit it or multi-select
      */
-    const handleEdit = useCallback((blockId: string) => {
-        setEditingBlockId(blockId);
+    const handleEdit = useCallback((blockId: string, isShift?: boolean) => {
+        if (isShift) {
+            setSelectedBlockIds(prev => {
+                const next = new Set(prev);
+                if (next.has(blockId)) {
+                    next.delete(blockId);
+                } else {
+                    next.add(blockId);
+                }
+                return next;
+            });
+            setEditingBlockId(null);
+        } else {
+            setEditingBlockId(blockId);
+            setSelectedBlockIds(new Set());
+        }
     }, []);
 
     /**
@@ -99,8 +116,27 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
         });
     }, [onChange]);
 
+    /**
+     * Group actions
+     */
+    const handleGroupCopy = useCallback(async () => {
+        const selectedBlocks = localBlocks.filter(b => selectedBlockIds.has(b.id));
+        const combinedContent = selectedBlocks.map(b => b.rawContent).join('\n\n');
+        try {
+            await navigator.clipboard.writeText(combinedContent);
+            setSelectedBlockIds(new Set());
+        } catch (err) {
+            console.error('Failed to copy group:', err);
+        }
+    }, [localBlocks, selectedBlockIds]);
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedBlockIds(new Set());
+    }, []);
+
     return (
         <div
+            className="hybrid-markdown-editor-container"
             style={{
                 width: '100%',
                 height: '100%',
@@ -108,19 +144,93 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
                 padding: '18px 22px',
                 paddingTop: '38px',
                 pointerEvents: isScrollMode ? 'auto' : 'none',
+                position: 'relative',
             }}
             onClick={(e) => {
-                // Allow clicking on the container to deselect block
+                // Allow clicking on the container to deselect block and clear multi-selection
                 if (e.target === e.currentTarget) {
                     setEditingBlockId(null);
+                    setSelectedBlockIds(new Set());
                 }
             }}
         >
+            {/* Multi-selection Toolbar */}
+            {selectedBlockIds.size > 1 && (
+                <div
+                    style={{
+                        position: 'sticky',
+                        top: '8px',
+                        left: '0',
+                        right: '0',
+                        marginLeft: 'auto',
+                        marginRight: 'auto',
+                        maxWidth: 'fit-content',
+                        zIndex: 2000,
+                        display: 'flex',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        background: isDark ? 'rgba(30,30,30,0.98)' : 'rgba(255,255,255,0.98)',
+                        border: `1px solid ${isDark ? '#444' : '#ddd'}`,
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                        backdropFilter: 'blur(16px)',
+                        alignItems: 'center',
+                        marginBottom: '16px',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#a1a1aa' : '#71717a', marginRight: '8px' }}>
+                        {selectedBlockIds.size} blocks selected
+                    </span>
+                    <button
+                        onClick={handleGroupCopy}
+                        style={{
+                            padding: '6px 12px',
+                            background: '#6366f1',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        📋 Copy Combined
+                    </button>
+                    <button
+                        onClick={handleClearSelection}
+                        style={{
+                            padding: '6px 12px',
+                            background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                            color: isDark ? '#e5e5e5' : '#1a1a1a',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        ✕ Cancel
+                    </button>
+                </div>
+            )}
             {localBlocks.map((block) => (
                 <MarkdownBlockEditor
                     key={block.id}
                     block={block}
                     isEditing={editingBlockId === block.id}
+                    isSelectionActive={selectedBlockIds.has(block.id)}
                     isDark={isDark}
                     onEdit={handleEdit}
                     onChange={handleChange}

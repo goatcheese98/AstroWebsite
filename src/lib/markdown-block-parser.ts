@@ -42,7 +42,7 @@ export function parseMarkdownBlocks(content: string): MarkdownBlock[] {
         // Horizontal rule
         if (/^(\*\*\*+|---+|___+)\s*$/.test(line.trim())) {
             blocks.push({
-                id: generateId(),
+                id: generateId('hr', currentLine),
                 type: 'hr',
                 rawContent: line,
                 startLine: currentLine,
@@ -56,7 +56,7 @@ export function parseMarkdownBlocks(content: string): MarkdownBlock[] {
         if (/^#{1,6}\s/.test(line.trim())) {
             const match = line.trim().match(/^(#{1,6})\s/);
             blocks.push({
-                id: generateId(),
+                id: generateId('heading', currentLine),
                 type: 'heading',
                 rawContent: line,
                 startLine: currentLine,
@@ -98,7 +98,7 @@ export function parseMarkdownBlocks(content: string): MarkdownBlock[] {
         // Empty line
         if (line.trim() === '') {
             blocks.push({
-                id: generateId(),
+                id: generateId('empty', currentLine),
                 type: 'empty',
                 rawContent: line,
                 startLine: currentLine,
@@ -132,7 +132,7 @@ function parseCodeBlock(lines: string[], startLine: number): MarkdownBlock {
     const rawContent = lines.slice(startLine, endLine + 1).join('\n');
 
     return {
-        id: generateId(),
+        id: generateId('code', startLine),
         type: 'code',
         rawContent,
         startLine,
@@ -155,7 +155,7 @@ function parseBlockquote(lines: string[], startLine: number): MarkdownBlock {
     const rawContent = lines.slice(startLine, endLine + 1).join('\n');
 
     return {
-        id: generateId(),
+        id: generateId('blockquote', startLine),
         type: 'blockquote',
         rawContent,
         startLine,
@@ -178,7 +178,7 @@ function parseTable(lines: string[], startLine: number): MarkdownBlock {
     const rawContent = lines.slice(startLine, endLine + 1).join('\n');
 
     return {
-        id: generateId(),
+        id: generateId('table', startLine),
         type: 'table',
         rawContent,
         startLine,
@@ -221,7 +221,7 @@ function parseList(lines: string[], startLine: number): MarkdownBlock {
     const rawContent = lines.slice(startLine, endLine + 1).join('\n');
 
     return {
-        id: generateId(),
+        id: generateId('list', startLine),
         type: 'list',
         rawContent,
         startLine,
@@ -262,7 +262,7 @@ function parseParagraph(lines: string[], startLine: number): MarkdownBlock {
     const rawContent = lines.slice(startLine, endLine + 1).join('\n');
 
     return {
-        id: generateId(),
+        id: generateId('paragraph', startLine),
         type: 'paragraph',
         rawContent,
         startLine,
@@ -271,11 +271,10 @@ function parseParagraph(lines: string[], startLine: number): MarkdownBlock {
 }
 
 /**
- * Generate a unique ID for blocks
+ * Generate a unique but stable ID for blocks
  */
-let blockIdCounter = 0;
-function generateId(): string {
-    return `block-${Date.now()}-${blockIdCounter++}`;
+function generateId(type: string, line: number): string {
+    return `block-${type}-${line}`;
 }
 
 /**

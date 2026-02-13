@@ -4,9 +4,38 @@ import { encode, decode } from "@msgpack/msgpack";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
 import { useSmoothCollaboration } from "./useSmoothCollaboration";
+import { useCursorTracking } from "./useCursorTracking";
 import { useCanvasSession } from "../../hooks/useCanvasSession";
 import CanvasAvatar from "./CanvasAvatar";
+import CollaboratorCursor from "./CollaboratorCursor";
+import SelectionLockOverlay from "./SelectionLockOverlay";
+import ToastNotification, { type Toast } from "./ToastNotification";
+import { useSelectionLocking } from "./useSelectionLocking";
 import "@excalidraw/excalidraw/index.css";
+
+// Helper to merge remote elements into local state
+const reconcileElements = (local: any[], remote: any[]) => {
+    // Map existing elements for fast lookup
+    const elementMap = new Map();
+    local.forEach(el => elementMap.set(el.id, el));
+
+    // Process remote elements
+    remote.forEach(remoteEl => {
+        const localEl = elementMap.get(remoteEl.id);
+
+        // Update if:
+        // 1. New element (not in local) OR
+        // 2. Remote version is newer OR
+        // 3. Same version but remote nonce is higher (prevent flicker)
+        if (!localEl ||
+            (remoteEl.version > (localEl.version || 0)) ||
+            (remoteEl.version === localEl.version && remoteEl.versionNonce > (localEl.versionNonce || 0))) {
+            elementMap.set(remoteEl.id, remoteEl);
+        }
+    });
+
+    return Array.from(elementMap.values());
+};
 
 // Dynamically import Excalidraw to avoid SSR issues
 let ExcalidrawModule: any = null;
@@ -107,9 +136,14 @@ export default function ExcalidrawCanvas({
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<WebSocket | null>(null);
     const lastSyncTimeRef = useRef<number>(0);
-    const isApplyingRemoteUpdateRef = useRef<boolean>(false); // Flag to prevent sync loops
-    const elementCacheRef = useRef<Map<string, any>>(new Map()); // Cache for optimized merge
+    const lastRemoteUpdateTimeRef = useRef<number>(0); // Timestamp of last remote update
+    const mySequenceRef = useRef<number>(0); // Sequence number for echo suppression
+    const syncedVersionsRef = useRef<Map<string, number>>(new Map()); // Track synced versions to prevent loops
+    const lastReceivedSeqsRef = useRef<Map<string, number>>(new Map()); // Track last received sequence per user
+    const lastSyncedAppStateRef = useRef<string>(""); // Track last synced app state
+
     const SYNC_THROTTLE_MS = 100; // Throttle updates to 10 per second
+    const REMOTE_UPDATE_WINDOW_MS = 20; // Minimal suppression, relying on Delta Sync to prevent loops
 
     // Load saved canvas data from localStorage on mount
     useEffect(() => {
@@ -167,17 +201,19 @@ export default function ExcalidrawCanvas({
                 if (data.type === "init") {
                     // Initial state when joining room
                     setActiveUsers(data.activeUsers);
+
+                    // Set user ID for cursor tracking
+                    if (data.userId) {
+                        setCurrentUserId(data.userId);
+                        console.log("👤 User ID assigned:", data.userId);
+                    }
+
                     if (data.state) {
                         console.log("📂 Loading initial shared state");
                         if (data.state.elements) {
-                            // Populate cache with initial elements
-                            elementCacheRef.current.clear();
-                            data.state.elements.forEach((el: any) => {
-                                elementCacheRef.current.set(el.id, el);
-                            });
+                            // Mark timestamp to suppress onChange during update
+                            lastRemoteUpdateTimeRef.current = Date.now();
 
-                            // Set flag to prevent sync loop
-                            isApplyingRemoteUpdateRef.current = true;
                             excalidrawAPI.updateScene({
                                 elements: data.state.elements,
                                 appState: data.state.appState,
@@ -185,13 +221,6 @@ export default function ExcalidrawCanvas({
                             if (data.state.files) {
                                 excalidrawAPI.addFiles(Object.values(data.state.files));
                             }
-                            // Reset flag after browser paint (ensures onChange completes)
-                            requestAnimationFrame(() => {
-                                requestAnimationFrame(() => {
-                                    isApplyingRemoteUpdateRef.current = false;
-                                    console.log("🔓 Remote update flag reset");
-                                });
-                            });
                         }
                         if (data.state.markdownNotes) {
                             // Markdown notes are part of elements, so they're already loaded
@@ -203,76 +232,72 @@ export default function ExcalidrawCanvas({
                                 detail: { images: data.state.imageHistory }
                             }));
                         }
+                        // Load initial cursors
+                        if (data.state.cursors) {
+                            Object.values(data.state.cursors).forEach((cursor: any) => {
+                                if (cursor.userId !== data.userId) {
+                                    handleCursorUpdate(cursor);
+                                }
+                            });
+                            console.log("👆 Loaded initial cursors:", Object.keys(data.state.cursors).length);
+                        }
                     }
+                } else if (data.type === "cursor-update") {
+                    // Another user moved their cursor
+                    handleCursorUpdate(data);
                 } else if (data.type === "canvas-update") {
-                    // Another user updated canvas
-                    console.log("🔄 Applying canvas update from collaborator");
+                    // Another user updated canvas - FULL STATE SYNC
 
-                    // OPTIMIZED MERGE: Use cached elements for faster merge
-                    const currentElements = excalidrawAPI.getSceneElements();
-                    const remoteElements = data.elements || [];
+                    // ROBUST ECHO SUPPRESSION: Check if this is our own update
+                    if (data.userId === currentUserIdRef.current && currentUserIdRef.current) {
+                        return;
+                    }
+                    // RE MOVED: sentSequencesRef - it causes collisions if multiple users have same seq number!
 
-                    // Build current element map with indices
-                    const currentById = new Map();
-                    currentElements.forEach((el: any, index: number) => {
-                        currentById.set(el.id, { element: el, index });
-                    });
-
-                    const merged = [...currentElements];
-                    let hasChanges = false;
-
-                    // Process remote elements using cache
-                    remoteElements.forEach((remoteEl: any) => {
-                        const cachedEl = elementCacheRef.current.get(remoteEl.id);
-                        const localEntry = currentById.get(remoteEl.id);
-
-                        // Skip if this exact version is already cached (no change)
-                        if (cachedEl && cachedEl.version === remoteEl.version &&
-                            cachedEl.versionNonce === remoteEl.versionNonce) {
+                    // Track sequence per user to detect duplicates
+                    if (data.userId && data.seq !== undefined) {
+                        const lastSeq = lastReceivedSeqsRef.current.get(data.userId) || -1;
+                        if (data.seq <= lastSeq) {
+                            console.log("⏭️ Skipping duplicate update from", data.userId, "(seq:", data.seq, ")");
                             return;
                         }
+                        lastReceivedSeqsRef.current.set(data.userId, data.seq);
+                    } else if (data.seq !== undefined) {
+                        // Fallback for legacy messages without userId (though we should avoid this)
+                        console.warn("⚠️ Received update without userId, skipping strict seq check");
+                    }
 
-                        // Update cache
-                        elementCacheRef.current.set(remoteEl.id, remoteEl);
+                    console.log("🔄 Applying merged state from collaborator (seq:", data.seq, ")");
 
-                        if (!localEntry) {
-                            // New element from remote
-                            merged.push(remoteEl);
-                            hasChanges = true;
-                            console.log("➕ Adding new element from remote:", remoteEl.id);
-                        } else {
-                            const localEl = localEntry.element;
-                            // Update if remote is newer
-                            if (remoteEl.version > localEl.version ||
-                                (remoteEl.version === localEl.version && remoteEl.versionNonce > localEl.versionNonce)) {
-                                merged[localEntry.index] = remoteEl;
-                                hasChanges = true;
-                                console.log("🔄 Updating element from remote:", remoteEl.id);
-                            }
-                        }
+                    // Update synced versions for incoming elements so we don't echo them
+                    if (data.elements) {
+                        data.elements.forEach((el: any) => {
+                            syncedVersionsRef.current.set(el.id, el.version);
+                        });
+                    }
+
+                    // Update last synced app state if provided
+                    if (data.appState) {
+                        lastSyncedAppStateRef.current = JSON.stringify(data.appState);
+                    }
+
+                    // Mark timestamp to suppress onChange during this update
+                    lastRemoteUpdateTimeRef.current = Date.now();
+
+                    // MERGE local and remote elements to avoid overwriting newer local changes
+                    const currentElements = excalidrawAPI.getSceneElements();
+                    const mergedElements = reconcileElements(currentElements, data.elements || []);
+
+                    excalidrawAPI.updateScene({
+                        elements: mergedElements,
+                        appState: {
+                            viewBackgroundColor: data.appState?.viewBackgroundColor,
+                            // Only update visual properties, keep view state (scroll/zoom) local
+                        },
                     });
 
-                    // Only update scene if there were actual changes
-                    if (hasChanges) {
-                        // Apply smoothing to remote updates (springs + fade-in)
-                        smoothRemoteUpdate(merged);
-
-                        // Set flag to prevent sync loop
-                        isApplyingRemoteUpdateRef.current = true;
-
-                        if (data.files) {
-                            excalidrawAPI.addFiles(Object.values(data.files));
-                        }
-
-                        // Reset flag after browser paint (ensures onChange completes)
-                        requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                isApplyingRemoteUpdateRef.current = false;
-                                console.log("🔓 Remote update flag reset");
-                            });
-                        });
-                    } else {
-                        console.log("⏭️ No changes detected, skipping update");
+                    if (data.files) {
+                        excalidrawAPI.addFiles(Object.values(data.files));
                     }
                 } else if (data.type === "markdown-update") {
                     // Another user updated markdown notes
@@ -285,12 +310,16 @@ export default function ExcalidrawCanvas({
                     window.dispatchEvent(new CustomEvent("imagegen:load-history", {
                         detail: { images: data.imageHistory }
                     }));
+                } else if (data.type === "selection-update") {
+                    handleSelectionUpdate(data);
                 } else if (data.type === "user-joined") {
                     console.log("👋 User joined:", data.userId);
                     setActiveUsers(data.activeUsers);
                 } else if (data.type === "user-left") {
                     console.log("👋 User left:", data.userId);
                     setActiveUsers(data.activeUsers);
+                    removeCursor(data.userId);
+                    removeUserSelection(data.userId);
                 } else if (data.type === "room-expired") {
                     console.log("⏰ Room expired:", data.message);
                     // Show notification to user
@@ -1465,7 +1494,57 @@ export default function ExcalidrawCanvas({
     // Smooth collaboration system (springs + fade-in)
     const { smoothRemoteUpdate, isSmoothingUpdate } = useSmoothCollaboration(excalidrawAPI);
 
-    // Sync canvas changes to PartyKit (throttled)
+    // User ID for cursor tracking (generated once per session)
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [userColor, setUserColor] = useState<string>('#3b82f6');
+
+    // Generate consistent color for user
+    useEffect(() => {
+        if (currentUserId) {
+            const colors = [
+                '#ef4444', '#f59e0b', '#10b981', '#3b82f6',
+                '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+            ];
+            let hash = 0;
+            for (let i = 0; i < currentUserId.length; i++) {
+                hash = currentUserId.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash) % colors.length;
+            setUserColor(colors[index]);
+        }
+    }, [currentUserId]);
+
+    // Keep ref in sync for event handlers
+    const currentUserIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        currentUserIdRef.current = currentUserId;
+    }, [currentUserId]);
+
+    // Cursor tracking system
+    const { cursors, handleCursorUpdate, removeCursor } = useCursorTracking(
+        socket,
+        excalidrawAPI,
+        currentUserId
+    );
+
+    // Selection locking system
+    const [toast, setToast] = useState<Toast | null>(null);
+    const {
+        selections,
+        lockedElements,
+        isElementLocked,
+        getLockedElementsDetails,
+        sendSelectionUpdate,
+        handleSelectionUpdate,
+        removeUserSelection
+    } = useSelectionLocking(
+        socket,
+        excalidrawAPI,
+        currentUserId,
+        userColor
+    );
+
+    // Optimized sync function that sends only changed elements (deltas)
     const syncCanvasToPartyKit = useCallback((elements: any[], appState: any, files: any) => {
         if (!isSharedMode || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
             return;
@@ -1476,40 +1555,65 @@ export default function ExcalidrawCanvas({
             return; // Throttle updates
         }
 
+        // 1. Calculate Changed Elements (Deltas)
+        const changedElements: any[] = [];
+        elements.forEach((el: any) => {
+            const lastSyncedVersion = syncedVersionsRef.current.get(el.id) || -1;
+            // Send if newer version OR if deleted (version increments on delete)
+            if (el.version > lastSyncedVersion || (el.isDeleted && el.version > lastSyncedVersion)) {
+                changedElements.push(el);
+                // Optimistically update tracker
+                syncedVersionsRef.current.set(el.id, el.version);
+            }
+        });
+
+        // 2. Check AppState Changes
+        // We only care about visual properties
+        const appStateSnapshot = {
+            viewBackgroundColor: appState.viewBackgroundColor,
+            currentItemStrokeColor: appState.currentItemStrokeColor,
+            currentItemBackgroundColor: appState.currentItemBackgroundColor,
+            currentItemFillStyle: appState.currentItemFillStyle,
+            currentItemStrokeWidth: appState.currentItemStrokeWidth,
+            currentItemRoughness: appState.currentItemRoughness,
+            currentItemOpacity: appState.currentItemOpacity,
+            currentItemFontFamily: appState.currentItemFontFamily,
+            currentItemFontSize: appState.currentItemFontSize,
+            currentItemTextAlign: appState.currentItemTextAlign,
+            currentItemStrokeStyle: appState.currentItemStrokeStyle,
+            currentItemRoundness: appState.currentItemRoundness,
+        };
+        const appStateStr = JSON.stringify(appStateSnapshot);
+        const appStateChanged = appStateStr !== lastSyncedAppStateRef.current;
+
+        // 3. Stop if nothing changed (Loop Breaker)
+        if (changedElements.length === 0 && !appStateChanged) {
+            return;
+        }
+
+        if (appStateChanged) lastSyncedAppStateRef.current = appStateStr;
         lastSyncTimeRef.current = now;
 
         try {
-            // Update cache with current elements
-            elements.forEach((el: any) => {
-                elementCacheRef.current.set(el.id, el);
-            });
+            // Increment sequence for this update
+            const seq = mySequenceRef.current++;
 
-            // Encode as MessagePack binary
+            // Encode as MessagePack binary - DELTA SYNC
             const message = encode({
                 type: "canvas-update",
-                elements,
-                appState: {
-                    viewBackgroundColor: appState.viewBackgroundColor,
-                    currentItemStrokeColor: appState.currentItemStrokeColor,
-                    currentItemBackgroundColor: appState.currentItemBackgroundColor,
-                    currentItemFillStyle: appState.currentItemFillStyle,
-                    currentItemStrokeWidth: appState.currentItemStrokeWidth,
-                    currentItemRoughness: appState.currentItemRoughness,
-                    currentItemOpacity: appState.currentItemOpacity,
-                    currentItemFontFamily: appState.currentItemFontFamily,
-                    currentItemFontSize: appState.currentItemFontSize,
-                    currentItemTextAlign: appState.currentItemTextAlign,
-                    currentItemStrokeStyle: appState.currentItemStrokeStyle,
-                    currentItemRoundness: appState.currentItemRoundness,
-                },
+                userId: currentUserId, // Add user ID for per-user sequence tracking
+                seq, // Add sequence number for echo suppression
+                elements: changedElements, // Send only deltas
+                appState: appStateSnapshot,
                 files,
             });
 
             socketRef.current.send(message);
+            console.log("📤 Sent delta update (seq:", seq, ") - elements:", changedElements.length);
         } catch (err) {
             console.error("Failed to sync canvas to PartyKit:", err);
         }
-    }, [isSharedMode]);
+    }, [isSharedMode, currentUserId]);
 
     // Sync markdown notes to PartyKit
     const syncMarkdownNotes = useCallback((notes: any[]) => {
@@ -2200,6 +2304,44 @@ export default function ExcalidrawCanvas({
                     return true;
                 }}
                 onChange={(elements: any[], appState: any) => {
+                    // SELECTION LOCKING LOGIC
+                    if (isSharedMode) {
+                        const selectedIds = Object.keys(appState.selectedElementIds || {});
+
+                        // Check for collisions with locked elements
+                        let blocked = false;
+                        const allowedSelection: Record<string, boolean> = { ...appState.selectedElementIds };
+
+                        for (const id of selectedIds) {
+                            const lock = isElementLocked(id);
+                            if (lock) {
+                                delete allowedSelection[id];
+                                blocked = true;
+                                // Show toast notification (throttled)
+                                setToast({
+                                    id: Date.now().toString(),
+                                    message: `Element locked by ${lock.userName}`,
+                                    type: 'warning'
+                                });
+                            }
+                        }
+
+                        if (blocked) {
+                            // Revert selection immediately
+                            // Use setTimeout to avoid state update loops during render
+                            setTimeout(() => {
+                                excalidrawAPI.updateScene({
+                                    appState: {
+                                        selectedElementIds: allowedSelection
+                                    }
+                                });
+                            }, 0);
+                        } else {
+                            // Send selection update to server
+                            sendSelectionUpdate(selectedIds);
+                        }
+                    }
+
                     // Update view state ref without triggering React renders
                     viewStateRef.current = {
                         scrollX: appState.scrollX,
@@ -2226,8 +2368,10 @@ export default function ExcalidrawCanvas({
 
                         // Sync to PartyKit in shared mode (but not when applying remote updates or smoothing)
                         if (isSharedMode) {
-                            if (isApplyingRemoteUpdateRef.current) {
-                                console.log("⏸️ Skipping sync - applying remote update");
+                            // Check if this onChange was triggered by a recent remote update (within 50ms)
+                            const timeSinceRemoteUpdate = Date.now() - lastRemoteUpdateTimeRef.current;
+                            if (timeSinceRemoteUpdate < REMOTE_UPDATE_WINDOW_MS) {
+                                console.log("⏸️ Skipping sync - recent remote update (" + timeSinceRemoteUpdate + "ms ago)");
                             } else if (isSmoothingUpdate()) {
                                 console.log("⏸️ Skipping sync - smoothing animation");
                             } else {
@@ -2295,6 +2439,33 @@ export default function ExcalidrawCanvas({
                     ref={(ref: any) => registerLexicalNoteRef(element.id, ref)}
                 />
             ))}
+
+            {/* Render collaborator cursors in shared mode */}
+            {isSharedMode && excalidrawAPI && Array.from(cursors.values()).map((cursor) => (
+                <CollaboratorCursor
+                    key={cursor.userId}
+                    userId={cursor.userId}
+                    userName={cursor.userName}
+                    x={cursor.x}
+                    y={cursor.y}
+                    color={cursor.color}
+                    zoom={viewStateRef.current.zoom.value}
+                    scrollX={viewStateRef.current.scrollX}
+                    scrollY={viewStateRef.current.scrollY}
+                />
+            ))}
+
+            {/* Selection Lock Overlay */}
+            {isSharedMode && excalidrawAPI && (
+                <SelectionLockOverlay
+                    lockedElements={getLockedElementsDetails()}
+                    zoom={(viewStateRef.current.zoom as any)?.value || (viewStateRef.current.zoom as unknown as number) || 1}
+                    scrollX={viewStateRef.current.scrollX}
+                    scrollY={viewStateRef.current.scrollY}
+                />
+            )}
+
+            <ToastNotification toast={toast} />
 
         </div>
     );

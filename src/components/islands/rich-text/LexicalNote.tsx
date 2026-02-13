@@ -73,9 +73,8 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
             }
         }, [element.customData?.lexicalState, element.customData?.backgroundOpacity, element.customData?.blurAmount, lexicalState]);
 
-        // Determine theme
-        const isDark = typeof document !== 'undefined' &&
-            document.documentElement.getAttribute('data-theme') === 'dark';
+        // Determine theme - always light mode on canvas
+        const isDark = false; // Canvas is always light mode
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;

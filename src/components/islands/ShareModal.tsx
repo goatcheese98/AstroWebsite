@@ -104,6 +104,12 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       console.log("✓ Share URL copied to clipboard");
+
+      // Automatically redirect to shared canvas after copying
+      setTimeout(() => {
+        console.log("🔗 Redirecting to shared canvas");
+        window.location.href = shareUrl;
+      }, 300); // Small delay so user sees "Copied!" feedback
     } catch (err) {
       console.error("Failed to copy:", err);
     }
@@ -112,12 +118,10 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
   const handleOpenInNewTab = () => {
     window.open(shareUrl, '_blank');
     console.log("🔗 Opening share URL in new tab");
-  };
-
-  const handleStartCollaborating = () => {
-    // Redirect to share URL so creator also uses shared canvas
-    console.log("🔗 Redirecting to shared canvas");
-    window.location.href = shareUrl;
+    // Also redirect current tab
+    setTimeout(() => {
+      window.location.href = shareUrl;
+    }, 500);
   };
 
   const handleClose = () => {
@@ -135,15 +139,15 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
             <h2>Share Canvas</h2>
             <button className="close-button" onClick={handleClose} title="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
 
           <div className="modal-body">
             <p className="description">
-              Anyone with this link can <strong>view and edit</strong> your canvas in real-time.
+              Anyone with this link can <strong>view and edit</strong> your canvas in real-time. Sharing automatically enables collaborative editing with live cursors.
             </p>
 
             <div className="share-url-container">
@@ -159,15 +163,15 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
                   {copied ? (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"/>
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                       Copied!
                     </>
                   ) : (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                       </svg>
                       Copy Link
                     </>
@@ -175,9 +179,9 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
                 </button>
                 <button onClick={handleOpenInNewTab} className="open-btn">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                    <polyline points="15 3 21 3 21 9"/>
-                    <line x1="10" y1="14" x2="21" y2="3"/>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
                   </svg>
                   Open
                 </button>
@@ -188,14 +192,15 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
               <div className="info-item">
                 <div className="info-icon synced">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="23 4 23 10 17 10"/>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                   </svg>
                 </div>
                 <div>
-                  <strong>Auto-synced features:</strong>
+                  <strong>Real-time collaboration features:</strong>
                   <ul>
-                    <li>Drawing elements</li>
+                    <li>Live cursor tracking</li>
+                    <li>Instant canvas sync</li>
                     <li>Markdown notes</li>
                     <li>Generated images</li>
                   </ul>
@@ -205,23 +210,23 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
               <div className="info-item">
                 <div className="info-icon local">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </div>
                 <div>
-                  <strong>Local only:</strong>
+                  <strong>Stays private per user:</strong>
                   <ul>
-                    <li>AI chat messages (private per user)</li>
+                    <li>AI chat messages</li>
                   </ul>
                 </div>
               </div>
 
               <div className="warning-box">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
                 <div>
                   <strong>Public collaboration:</strong> Anyone with the link can edit or clear the canvas.
@@ -231,28 +236,18 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
 
               <div className="action-box">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
                 <div>
-                  <strong>Important:</strong> To sync your future edits, click "Start Collaborating" below to switch to the shared canvas. Otherwise, continue editing here and only the current state will be shared.
+                  <strong>Version tracking:</strong> A snapshot of the current state is saved when you share. All future changes are synced in real-time to all collaborators.
                 </div>
               </div>
             </div>
           </div>
 
           <div className="modal-footer">
-            <button onClick={handleStartCollaborating} className="start-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="18" cy="5" r="3"/>
-                <circle cx="6" cy="12" r="3"/>
-                <circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
-              Start Collaborating
-            </button>
             <button onClick={handleClose} className="done-btn">
-              Done
+              Close
             </button>
           </div>
         </div>
