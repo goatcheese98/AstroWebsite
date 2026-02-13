@@ -9,6 +9,7 @@ interface CanvasControlsProps {
     onLoadState?: () => void;
     onCreateMarkdown?: () => void;
     onCreateWebEmbed?: () => void;
+    onCreateLexical?: () => void;
     onShare?: () => void;
 }
 
@@ -21,6 +22,7 @@ export default function CanvasControls({
     onLoadState,
     onCreateMarkdown,
     onCreateWebEmbed,
+    onCreateLexical,
     onShare
 }: CanvasControlsProps) {
     const [message, setMessage] = useState<string | null>(null);
@@ -192,14 +194,26 @@ export default function CanvasControls({
                     </button>
 
                     {onCreateMarkdown && (
-                        <button onClick={onCreateMarkdown} className="control-btn note-btn" title="Add a note">
+                        <button onClick={onCreateMarkdown} className="control-btn note-btn" title="Add a markdown note">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                 <polyline points="14 2 14 8 20 8"/>
                                 <line x1="12" y1="18" x2="12" y2="12"/>
                                 <line x1="9" y1="15" x2="15" y2="15"/>
                             </svg>
-                            <span className="label">Add Note</span>
+                            <span className="label">Markdown Note</span>
+                        </button>
+                    )}
+
+                    {onCreateLexical && (
+                        <button onClick={onCreateLexical} className="control-btn rich-text-btn" title="Add a rich text note">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M4 7V4h16v3"/>
+                                <path d="M9 20h6"/>
+                                <path d="M12 4v16"/>
+                                <path d="M8 12h8"/>
+                            </svg>
+                            <span className="label">Rich Text</span>
                         </button>
                     )}
 
@@ -454,6 +468,16 @@ export default function CanvasControls({
 
                 .note-btn:hover .label {
                     color: #ca8a04;
+                }
+
+                .rich-text-btn:hover {
+                    color: #6366f1;
+                    border-color: #c7d2fe;
+                    background: #eef2ff;
+                }
+
+                .rich-text-btn:hover .label {
+                    color: #6366f1;
                 }
 
                 .menu-btn:hover {

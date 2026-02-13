@@ -43,6 +43,17 @@ const loadWebEmbed = async () => {
     return { WebEmbed };
 };
 
+// Lazy-loaded LexicalNote
+let LexicalNote: any = null;
+
+const loadLexicalNote = async () => {
+    if (!LexicalNote) {
+        const mod = await import("./rich-text");
+        LexicalNote = mod.LexicalNote;
+    }
+    return { LexicalNote };
+};
+
 const STORAGE_KEY = "excalidraw-canvas-data";
 const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
@@ -69,6 +80,7 @@ export default function ExcalidrawCanvas({
     const [ExcalidrawComponent, setExcalidrawComponent] = useState<any>(null);
     const [MarkdownNoteComponent, setMarkdownNoteComponent] = useState<any>(null);
     const [WebEmbedComponent, setWebEmbedComponent] = useState<any>(null);
+    const [LexicalNoteComponent, setLexicalNoteComponent] = useState<any>(null);
     const [initialCanvasData, setInitialCanvasData] = useState<any>(null);
 
     // Use refs to avoid triggering re-renders from RAF loop
@@ -77,6 +89,8 @@ export default function ExcalidrawCanvas({
     const markdownNoteRefsRef = useRef<Map<string, any>>(new Map());
     const webEmbedElementsRef = useRef<any[]>([]);
     const webEmbedRefsRef = useRef<Map<string, any>>(new Map());
+    const lexicalElementsRef = useRef<any[]>([]);
+    const lexicalNoteRefsRef = useRef<Map<string, any>>(new Map());
     const saveTimeoutRef = useRef<number | null>(null);
     const pendingSaveDataRef = useRef<{ elements: any[]; appState: any; files: any } | null>(null);
 
@@ -84,6 +98,7 @@ export default function ExcalidrawCanvas({
     const [, forceUpdate] = useState({});
     const [markdownElements, setMarkdownElements] = useState<any[]>([]);
     const [webEmbedElements, setWebEmbedElements] = useState<any[]>([]);
+    const [lexicalElements, setLexicalElements] = useState<any[]>([]);
 
     // Collaboration state
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -311,16 +326,18 @@ export default function ExcalidrawCanvas({
 
         const init = async () => {
             try {
-                const [{ Excalidraw }, { MarkdownNote }, { WebEmbed }] = await Promise.all([
+                const [{ Excalidraw }, { MarkdownNote }, { WebEmbed }, { LexicalNote }] = await Promise.all([
                     loadExcalidraw(),
                     loadMarkdownNote(),
-                    loadWebEmbed()
+                    loadWebEmbed(),
+                    loadLexicalNote()
                 ]);
 
                 if (mounted) {
                     setExcalidrawComponent(() => Excalidraw);
                     setMarkdownNoteComponent(() => MarkdownNote);
                     setWebEmbedComponent(() => WebEmbed);
+                    setLexicalNoteComponent(() => LexicalNote);
                     setIsLoading(false);
                 }
             } catch (err) {
@@ -466,6 +483,11 @@ export default function ExcalidrawCanvas({
                 );
                 webEmbedElementsRef.current = embedElements;
 
+                const lexElements = elements.filter(
+                    (el: any) => el.customData?.type === "lexical" && !el.isDeleted
+                );
+                lexicalElementsRef.current = lexElements;
+
                 // UNIFIED CLOCK: Update transforms directly on existing refs (every frame, no React)
                 mdElements.forEach((el: any) => {
                     const ref = markdownNoteRefsRef.current.get(el.id);
@@ -499,10 +521,27 @@ export default function ExcalidrawCanvas({
                     }
                 });
 
+                lexElements.forEach((el: any) => {
+                    const ref = lexicalNoteRefsRef.current.get(el.id);
+                    if (ref?.updateTransform) {
+                        ref.updateTransform(
+                            el.x,
+                            el.y,
+                            el.width,
+                            el.height,
+                            el.angle || 0,
+                            appState.zoom.value,
+                            appState.scrollX,
+                            appState.scrollY
+                        );
+                    }
+                });
+
                 // React state updates ONLY for mounting/unmounting (less frequent)
                 if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
                     setMarkdownElements([...mdElements]);
                     setWebEmbedElements([...embedElements]);
+                    setLexicalElements([...lexElements]);
                     lastUpdateTime = timestamp;
                 }
             } catch (err) {
@@ -1701,6 +1740,82 @@ export default function ExcalidrawCanvas({
         };
     }, [handleCreateWebEmbed]);
 
+    // Handle creating new Lexical rich text note
+    const handleCreateLexicalNote = useCallback(async () => {
+        const api = excalidrawAPIRef.current;
+        if (!api) {
+            console.warn("⚠️ Cannot create Lexical note: Excalidraw API not ready");
+            return;
+        }
+
+        const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+        const { DEFAULT_NOTE_STATE } = await import("./rich-text");
+
+        // Get viewport center for proper positioning
+        const appState = api.getAppState();
+        const viewportCenterX = appState.width / 2;
+        const viewportCenterY = appState.height / 2;
+
+        // Convert viewport center to scene coordinates
+        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+        const newElement = {
+            type: "rectangle",
+            x: sceneX - 250,
+            y: sceneY - 200,
+            width: 500,
+            height: 400,
+            backgroundColor: "#ffffff",
+            strokeColor: "#6366f1", // Indigo border to distinguish from markdown
+            strokeWidth: 2,
+            roughness: 0,
+            opacity: 100,
+            fillStyle: "solid",
+            id: nanoid(),
+            locked: false,
+            customData: {
+                type: "lexical",
+                lexicalState: DEFAULT_NOTE_STATE,
+                version: 1,
+            },
+        };
+
+        const converted = converter([newElement]);
+        const currentElements = api.getSceneElements();
+
+        api.updateScene({
+            elements: [...currentElements, ...converted],
+        });
+
+        console.log("✅ Created new Lexical rich text note at viewport center");
+    }, []);
+
+    // Handle Lexical state update
+    const handleLexicalUpdate = useCallback((elementId: string, newLexicalState: string) => {
+        if (!excalidrawAPI) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((el: any) => {
+            if (el.id === elementId) {
+                return {
+                    ...el,
+                    customData: {
+                        ...el.customData,
+                        lexicalState: newLexicalState,
+                    },
+                    // Increment version to trigger sync
+                    version: (el.version || 0) + 1,
+                    versionNonce: Date.now(),
+                };
+            }
+            return el;
+        });
+
+        excalidrawAPI.updateScene({ elements: updatedElements });
+        console.log("🔷 Lexical state updated for element:", elementId);
+    }, [excalidrawAPI]);
+
     // Register markdown note ref
     const registerMarkdownNoteRef = useCallback((id: string, ref: any) => {
         if (ref) {
@@ -1716,6 +1831,15 @@ export default function ExcalidrawCanvas({
             webEmbedRefsRef.current.set(id, ref);
         } else {
             webEmbedRefsRef.current.delete(id);
+        }
+    }, []);
+
+    // Register Lexical note ref
+    const registerLexicalNoteRef = useCallback((id: string, ref: any) => {
+        if (ref) {
+            lexicalNoteRefsRef.current.set(id, ref);
+        } else {
+            lexicalNoteRefsRef.current.delete(id);
         }
     }, []);
 
@@ -1921,6 +2045,7 @@ export default function ExcalidrawCanvas({
                         (window as any).excalidrawAPI = api;
                         (window as any).createMarkdownNote = handleCreateMarkdown;
                         (window as any).createWebEmbed = handleCreateWebEmbed;
+                        (window as any).createLexicalNote = handleCreateLexicalNote;
 
                         // Add utility to clear all canvas localStorage (for debugging)
                         (window as any).clearCanvasStorage = () => {
@@ -2122,6 +2247,18 @@ export default function ExcalidrawCanvas({
                     ref={(ref: any) => registerWebEmbedRef(element.id, ref)}
                 />
             ))}
+
+            {/* Render LexicalNote overlays for each Lexical rich text element */}
+            {LexicalNoteComponent && lexicalElements.map((element) => (
+                <LexicalNoteComponent
+                    key={element.id}
+                    element={element}
+                    appState={viewStateRef.current}
+                    onChange={handleLexicalUpdate}
+                    ref={(ref: any) => registerLexicalNoteRef(element.id, ref)}
+                />
+            ))}
+
         </div>
     );
 }

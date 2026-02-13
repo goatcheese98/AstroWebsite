@@ -585,6 +585,15 @@ export default function CanvasApp() {
         }
     }, []);
 
+    const handleCreateLexicalNote = useCallback(() => {
+        const createFn = (window as any).createLexicalNote;
+        if (createFn) {
+            createFn();
+        } else {
+            console.warn("Lexical note creation not available yet");
+        }
+    }, []);
+
     // Debug: Add global save trigger for testing
     useEffect(() => {
         const handleDebugSave = () => {
@@ -887,6 +896,7 @@ export default function CanvasApp() {
                 onLoadState={handleLoadState}
                 onCreateMarkdown={handleCreateNote}
                 onCreateWebEmbed={handleCreateWebEmbed}
+                onCreateLexical={handleCreateLexicalNote}
                 onShare={handleShare}
             />
 
