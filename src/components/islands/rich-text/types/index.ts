@@ -17,7 +17,9 @@ export interface LexicalNoteProps {
     /** Current app state for positioning calculations */
     appState: AppState;
     /** Callback when content changes */
-    onChange: (id: string, lexicalState: string) => void;
+    onChange: (id: string, updates: { lexicalState?: string; backgroundOpacity?: number }) => void;
+    /** Callback to deselect the note/element */
+    onDeselect?: () => void;
 }
 
 /**
@@ -53,10 +55,18 @@ export interface LexicalElement {
     version?: number;
     versionNonce?: number;
     locked?: boolean;
+    backgroundColor?: string;
+    strokeColor?: string;
+    strokeWidth?: number;
+    strokeStyle?: 'solid' | 'dashed' | 'dotted';
+    fillStyle?: 'hachure' | 'cross-hatch' | 'solid';
+    opacity?: number;
     boundElements?: any[];
     customData?: {
         type: 'lexical';
         lexicalState: string;  // Serialized Lexical editor state (JSON)
+        backgroundOpacity?: number; // 0 to 1
+        blurAmount?: number;        // 0 to 20 (px)
         version: number;       // For migrations
     };
 }

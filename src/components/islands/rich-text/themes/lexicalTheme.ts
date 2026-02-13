@@ -205,12 +205,21 @@ export function getLexicalEditorStyles(): string {
         /* ===== Lists ===== */
         .lexical-ul, .lexical-ol {
             margin: 12px 0;
-            padding-left: 24px;
+            padding-left: 32px;
+        }
+
+        .lexical-ul {
+            list-style-type: disc !important;
+        }
+
+        .lexical-ol {
+            list-style-type: decimal !important;
         }
 
         .lexical-listitem {
             margin: 4px 0;
-            position: relative;
+            line-height: 1.6;
+            display: list-item !important;
         }
 
         .lexical-listitem-checked,
@@ -343,7 +352,8 @@ export function getLexicalEditorStyles(): string {
             padding: 16px;
             margin: 16px 0;
             overflow-x: auto;
-            white-space: pre;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         .lexical-root-dark .lexical-code {

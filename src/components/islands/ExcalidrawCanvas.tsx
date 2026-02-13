@@ -99,6 +99,7 @@ export default function ExcalidrawCanvas({
     const [markdownElements, setMarkdownElements] = useState<any[]>([]);
     const [webEmbedElements, setWebEmbedElements] = useState<any[]>([]);
     const [lexicalElements, setLexicalElements] = useState<any[]>([]);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Collaboration state
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -1644,8 +1645,8 @@ export default function ExcalidrawCanvas({
             width: 700,
             height: 500,
             backgroundColor: "#ffffff",
-            strokeColor: "#6366f1", // Indigo border to distinguish from markdown
-            strokeWidth: 2,
+            strokeColor: "#000000",
+            strokeWidth: 4,
             roughness: 0,
             opacity: 100,
             fillStyle: "solid",
@@ -1764,11 +1765,11 @@ export default function ExcalidrawCanvas({
             type: "rectangle",
             x: sceneX - 250,
             y: sceneY - 200,
-            width: 500,
-            height: 400,
+            width: 1000,
+            height: 1200,
             backgroundColor: "#ffffff",
-            strokeColor: "#6366f1", // Indigo border to distinguish from markdown
-            strokeWidth: 2,
+            strokeColor: "#000000",
+            strokeWidth: 4,
             roughness: 0,
             opacity: 100,
             fillStyle: "solid",
@@ -1792,18 +1793,26 @@ export default function ExcalidrawCanvas({
     }, []);
 
     // Handle Lexical state update
-    const handleLexicalUpdate = useCallback((elementId: string, newLexicalState: string) => {
+    const handleLexicalUpdate = useCallback((elementId: string, updates: { lexicalState?: string; backgroundOpacity?: number; blurAmount?: number }) => {
         if (!excalidrawAPI) return;
 
         const elements = excalidrawAPI.getSceneElements();
         const updatedElements = elements.map((el: any) => {
             if (el.id === elementId) {
+                const newCustomData = { ...el.customData };
+                if (updates.lexicalState !== undefined) {
+                    newCustomData.lexicalState = updates.lexicalState;
+                }
+                if (updates.backgroundOpacity !== undefined) {
+                    newCustomData.backgroundOpacity = updates.backgroundOpacity;
+                }
+                if (updates.blurAmount !== undefined) {
+                    newCustomData.blurAmount = updates.blurAmount;
+                }
+
                 return {
                     ...el,
-                    customData: {
-                        ...el.customData,
-                        lexicalState: newLexicalState,
-                    },
+                    customData: newCustomData,
                     // Increment version to trigger sync
                     version: (el.version || 0) + 1,
                     versionNonce: Date.now(),
@@ -1813,7 +1822,7 @@ export default function ExcalidrawCanvas({
         });
 
         excalidrawAPI.updateScene({ elements: updatedElements });
-        console.log("🔷 Lexical state updated for element:", elementId);
+        console.log("🔷 Lexical state updated for element:", elementId, updates);
     }, [excalidrawAPI]);
 
     // Register markdown note ref
@@ -1831,6 +1840,18 @@ export default function ExcalidrawCanvas({
             webEmbedRefsRef.current.set(id, ref);
         } else {
             webEmbedRefsRef.current.delete(id);
+        }
+    }, []);
+
+    // Deselect all elements (used by rich text notes on Escape)
+    const handleDeselectElements = useCallback(() => {
+        const api = excalidrawAPIRef.current;
+        if (api) {
+            api.updateScene({
+                appState: {
+                    selectedElementIds: {},
+                }
+            });
         }
     }, []);
 
@@ -1892,6 +1913,7 @@ export default function ExcalidrawCanvas({
 
     return (
         <div
+            ref={containerRef}
             style={{
                 width: "100%",
                 height: "100%",
@@ -2108,13 +2130,19 @@ export default function ExcalidrawCanvas({
 
                     if (!appState) return;
 
-                    // Convert pointer to scene coordinates
-                    const sceneX = (event.clientX / appState.zoom.value) - appState.scrollX;
-                    const sceneY = (event.clientY / appState.zoom.value) - appState.scrollY;
+                    // Get canvas offset
+                    if (!containerRef.current) return;
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const clientX = event.clientX - rect.left;
+                    const clientY = event.clientY - rect.top;
 
-                    // Check if pointer is over any markdown element
-                    const markdownElement = elements.find((el: any) => {
-                        if (el.customData?.type !== 'markdown' || el.isDeleted) return false;
+                    // Convert pointer to scene coordinates
+                    const sceneX = (clientX / appState.zoom.value) - appState.scrollX;
+                    const sceneY = (clientY / appState.zoom.value) - appState.scrollY;
+
+                    // Check if pointer is over any markdown or lexical element
+                    const hitElement = elements.find((el: any) => {
+                        if (el.isDeleted || (el.customData?.type !== 'markdown' && el.customData?.type !== 'lexical')) return false;
 
                         // Simple hit test (assuming no rotation for simplicity)
                         return sceneX >= el.x &&
@@ -2123,27 +2151,33 @@ export default function ExcalidrawCanvas({
                             sceneY <= el.y + el.height;
                     });
 
-                    if (markdownElement) {
-                        // Select the markdown element instead of entering text mode
+                    if (hitElement) {
+                        // Select the element instead of entering text mode
                         excalidrawAPI.selectShape({
-                            id: markdownElement.id,
+                            id: hitElement.id,
                         });
                     }
                 }}
                 onDoubleClick={(event: any, pointerState: any) => {
-                    // Prevent Excalidraw's native text editing when double-clicking on markdown
+                    // Prevent Excalidraw's native text editing when double-clicking on custom notes
                     const elements = excalidrawAPI?.getSceneElements?.() || [];
                     const appState = excalidrawAPI?.getAppState?.();
 
                     if (!appState) return false;
 
-                    // Convert pointer to scene coordinates
-                    const sceneX = (event.clientX / appState.zoom.value) - appState.scrollX;
-                    const sceneY = (event.clientY / appState.zoom.value) - appState.scrollY;
+                    // Get canvas offset
+                    if (!containerRef.current) return false;
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const clientX = event.clientX - rect.left;
+                    const clientY = event.clientY - rect.top;
 
-                    // Check if double-click is on a markdown element
-                    const markdownElement = elements.find((el: any) => {
-                        if (el.customData?.type !== 'markdown' || el.isDeleted) return false;
+                    // Convert pointer to scene coordinates
+                    const sceneX = (clientX / appState.zoom.value) - appState.scrollX;
+                    const sceneY = (clientY / appState.zoom.value) - appState.scrollY;
+
+                    // Check if double-click is on a markdown or lexical element
+                    const customElement = elements.find((el: any) => {
+                        if (el.isDeleted || (el.customData?.type !== 'markdown' && el.customData?.type !== 'lexical')) return false;
 
                         return sceneX >= el.x &&
                             sceneX <= el.x + el.width &&
@@ -2151,16 +2185,18 @@ export default function ExcalidrawCanvas({
                             sceneY <= el.y + el.height;
                     });
 
-                    if (markdownElement) {
-                        // Dispatch event to trigger markdown edit mode
-                        window.dispatchEvent(new CustomEvent('markdown:edit', {
-                            detail: { elementId: markdownElement.id }
-                        }));
+                    if (customElement) {
+                        if (customElement.customData?.type === 'markdown') {
+                            // Dispatch event to trigger markdown edit mode
+                            window.dispatchEvent(new CustomEvent('markdown:edit', {
+                                detail: { elementId: customElement.id }
+                            }));
+                        }
                         // Return false to prevent Excalidraw's default text editing
                         return false;
                     }
 
-                    // Allow default behavior for non-markdown elements
+                    // Allow default behavior for other elements
                     return true;
                 }}
                 onChange={(elements: any[], appState: any) => {
@@ -2255,6 +2291,7 @@ export default function ExcalidrawCanvas({
                     element={element}
                     appState={viewStateRef.current}
                     onChange={handleLexicalUpdate}
+                    onDeselect={handleDeselectElements}
                     ref={(ref: any) => registerLexicalNoteRef(element.id, ref)}
                 />
             ))}

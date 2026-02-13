@@ -19,7 +19,9 @@ import type {
     Spread,
 } from 'lexical';
 import { $applyNodeReplacement, DecoratorNode } from 'lexical';
+import React, { useEffect, useRef } from 'react';
 import katex from 'katex';
+import type { NodeKey as LexicalNodeKey } from 'lexical';
 
 export type EquationType = 'inline' | 'block';
 
@@ -121,7 +123,7 @@ export class EquationNode extends DecoratorNode<JSX.Element> {
     }
 
     decorate(): JSX.Element {
-        return EquationComponent({
+        return React.createElement(EquationComponent, {
             equation: this.__equation,
             inline: this.__inline,
             nodeKey: this.__key,
@@ -132,7 +134,7 @@ export class EquationNode extends DecoratorNode<JSX.Element> {
 function $convertEquationElement(element: HTMLElement): DOMConversionOutput | null {
     const equation = element.getAttribute('data-lexical-equation');
     const inline = element.getAttribute('data-lexical-inline') === 'true';
-    
+
     if (equation !== null) {
         const node = $createEquationNode(equation, inline);
         return { node };
@@ -150,7 +152,6 @@ export function $isEquationNode(node: LexicalNode | null | undefined): node is E
 }
 
 // React component for rendering
-import React, { useEffect, useRef } from 'react';
 
 interface EquationComponentProps {
     equation: string;
