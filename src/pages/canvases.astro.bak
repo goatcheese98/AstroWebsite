@@ -1,0 +1,399 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { UserMenu } from '@/components/auth/UserMenu';
+import { CanvasLibrary } from '@/components/auth/CanvasLibrary';
+---
+
+<BaseLayout title="My Canvases - AstroWeb" description="Manage your saved canvases">
+  <div class="canvases-page">
+    <header class="page-header">
+      <div class="page-header-content">
+        <div>
+          <h1>My Canvases</h1>
+          <p>View and manage all your saved canvases</p>
+        </div>
+        <UserMenu client:load />
+      </div>
+    </header>
+
+    <main class="page-main">
+      <div class="page-container">
+        <CanvasLibrary client:load />
+      </div>
+    </main>
+  </div>
+</BaseLayout>
+
+<style>
+  .canvases-page {
+    min-height: 100vh;
+    background: #f9fafb;
+  }
+
+  .page-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 2rem 0;
+  }
+
+  .page-header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+  }
+
+  .page-header p {
+    color: #6b7280;
+    margin: 0;
+  }
+
+  .page-main {
+    padding: 3rem 2rem;
+  }
+
+  .page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Canvas Library Styles */
+  :global(.canvas-library) {
+    width: 100%;
+  }
+
+  :global(.library-header) {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  :global(.library-search) {
+    flex: 1;
+    min-width: 300px;
+    position: relative;
+  }
+
+  :global(.library-search svg) {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+  }
+
+  :global(.library-search input) {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  :global(.library-search input:focus) {
+    outline: none;
+    border-color: #667eea;
+  }
+
+  :global(.library-filters) {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  :global(.filter-btn) {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #e5e7eb;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  :global(.filter-btn:hover) {
+    border-color: #667eea;
+    color: #667eea;
+  }
+
+  :global(.filter-btn.active) {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+  }
+
+  :global(.canvas-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  :global(.canvas-card) {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  :global(.canvas-card:hover) {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+
+  :global(.canvas-thumbnail) {
+    aspect-ratio: 16 / 9;
+    background: #f3f4f6;
+    position: relative;
+    overflow: hidden;
+  }
+
+  :global(.canvas-thumbnail img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  :global(.canvas-thumbnail-placeholder) {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d1d5db;
+  }
+
+  :global(.canvas-badge) {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: rgba(16, 185, 129, 0.9);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  :global(.canvas-info) {
+    padding: 1.25rem;
+  }
+
+  :global(.canvas-title) {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.canvas-description) {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin: 0 0 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  :global(.canvas-meta) {
+    display: flex;
+    gap: 0.5rem;
+    color: #9ca3af;
+    font-size: 0.75rem;
+  }
+
+  :global(.canvas-actions) {
+    padding: 0 1.25rem 1.25rem;
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  :global(.action-btn) {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  :global(.action-btn-primary) {
+    background: #667eea;
+    color: white;
+    border: none;
+  }
+
+  :global(.action-btn-primary:hover) {
+    background: #5568d3;
+  }
+
+  :global(.action-btn-danger) {
+    background: white;
+    color: #dc2626;
+    border: 2px solid #fecaca;
+  }
+
+  :global(.action-btn-danger:hover) {
+    background: #fef2f2;
+  }
+
+  :global(.empty-state) {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  :global(.empty-state svg) {
+    color: #d1d5db;
+    margin-bottom: 1.5rem;
+  }
+
+  :global(.empty-state h3) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+  }
+
+  :global(.empty-state p) {
+    color: #6b7280;
+    margin: 0 0 1.5rem;
+  }
+
+  :global(.library-toolbar) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  :global(.library-controls) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :global(.canvas-favorite-btn) {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  :global(.canvas-card:hover .canvas-favorite-btn) {
+    opacity: 1;
+  }
+
+  :global(.canvas-list) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  :global(.canvas-list-item) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.15s;
+  }
+
+  :global(.canvas-list-item:hover) {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  }
+
+  :global(.canvas-list-thumb) {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  :global(.canvas-list-thumb img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  :global(.loading-state),
+  :global(.error-state) {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  :global(.spinner) {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e5e7eb;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .page-header-content {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    :global(.canvas-grid) {
+      grid-template-columns: 1fr;
+    }
+
+    :global(.library-header) {
+      flex-direction: column;
+    }
+
+    :global(.library-search) {
+      min-width: 100%;
+    }
+  }
+</style>
