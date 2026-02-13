@@ -86,6 +86,18 @@ const loadLexicalNote = async () => {
 const STORAGE_KEY = "excalidraw-canvas-data";
 const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
+// Helper to sanitize appState before passing to Excalidraw
+// Specifically fixes: TypeError: appState.collaborators.forEach is not a function
+const sanitizeAppState = (appState: any) => {
+    if (!appState) return undefined;
+    const sanitized = { ...appState };
+    // If collaborators is a plain object (serialized), remove it so Excalidraw can re-init as Map
+    if (sanitized.collaborators && !(sanitized.collaborators instanceof Map)) {
+        delete sanitized.collaborators;
+    }
+    return sanitized;
+};
+
 interface ExcalidrawCanvasProps {
     isSharedMode?: boolean;
     shareRoomId?: string;
@@ -216,7 +228,7 @@ export default function ExcalidrawCanvas({
 
                             excalidrawAPI.updateScene({
                                 elements: data.state.elements,
-                                appState: data.state.appState,
+                                appState: sanitizeAppState(data.state.appState),
                             });
                             if (data.state.files) {
                                 excalidrawAPI.addFiles(Object.values(data.state.files));
@@ -1455,7 +1467,7 @@ export default function ExcalidrawCanvas({
                 // Update the scene
                 excalidrawAPI.updateScene({
                     elements: elements || [],
-                    appState: appState || {},
+                    appState: sanitizeAppState(appState || {}),
                 });
 
                 // Add files if present
@@ -2210,7 +2222,10 @@ export default function ExcalidrawCanvas({
                         console.error("❌ Failed to restore files:", err);
                     }
                 }}
-                initialData={initialCanvasData || {
+                initialData={initialCanvasData ? {
+                    ...initialCanvasData,
+                    appState: sanitizeAppState(initialCanvasData.appState)
+                } : {
                     appState: {
                         viewBackgroundColor: "#ffffff", // Always white background
                         gridSize: 0, // Remove grid dots (0 = no grid)

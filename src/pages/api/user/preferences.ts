@@ -1,11 +1,12 @@
 /**
  * User Preferences API
- * GET /api/user/preferences — returns user.metadata JSON
- * PATCH /api/user/preferences — merges new preferences into user.metadata
+ * GET /api/user/preferences — returns user.unsafeMetadata.preferences JSON
+ * PATCH /api/user/preferences — merges new preferences into user.unsafeMetadata.preferences
  */
 
 import type { APIRoute } from 'astro';
 import { requireAuth } from '@/lib/middleware/auth-middleware';
+import { clerkClient } from '@clerk/astro/server';
 
 export const prerender = false;
 
@@ -14,30 +15,11 @@ export const GET: APIRoute = async (context) => {
     const auth = await requireAuth(context);
     if (!auth.authenticated) return auth.response;
 
-    const runtime = context.locals.runtime;
-    if (!runtime?.env.DB) {
-      return new Response(
-        JSON.stringify({ error: 'Database not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const row = await runtime.env.DB
-      .prepare('SELECT metadata FROM users WHERE id = ?')
-      .bind(auth.userId)
-      .first<{ metadata: string | null }>();
-
-    let metadata = {};
-    if (row?.metadata) {
-      try {
-        metadata = JSON.parse(row.metadata);
-      } catch {
-        metadata = {};
-      }
-    }
+    const user = await clerkClient(context).users.getUser(auth.userId);
+    const preferences = (user.unsafeMetadata?.preferences as Record<string, any>) || {};
 
     return new Response(
-      JSON.stringify(metadata),
+      JSON.stringify(preferences),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -53,14 +35,6 @@ export const PATCH: APIRoute = async (context) => {
   try {
     const auth = await requireAuth(context);
     if (!auth.authenticated) return auth.response;
-
-    const runtime = context.locals.runtime;
-    if (!runtime?.env.DB) {
-      return new Response(
-        JSON.stringify({ error: 'Database not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
 
     let updates: Record<string, any>;
     try {
@@ -79,20 +53,9 @@ export const PATCH: APIRoute = async (context) => {
       );
     }
 
-    // Fetch current metadata
-    const row = await runtime.env.DB
-      .prepare('SELECT metadata FROM users WHERE id = ?')
-      .bind(auth.userId)
-      .first<{ metadata: string | null }>();
-
-    let current: Record<string, any> = {};
-    if (row?.metadata) {
-      try {
-        current = JSON.parse(row.metadata);
-      } catch {
-        current = {};
-      }
-    }
+    const client = clerkClient(context);
+    const user = await client.users.getUser(auth.userId);
+    const current = (user.unsafeMetadata?.preferences as Record<string, any>) || {};
 
     // Merge updates (shallow merge, null values delete keys)
     for (const [key, value] of Object.entries(updates)) {
@@ -103,11 +66,13 @@ export const PATCH: APIRoute = async (context) => {
       }
     }
 
-    // Save back
-    await runtime.env.DB
-      .prepare('UPDATE users SET metadata = ?, updated_at = ? WHERE id = ?')
-      .bind(JSON.stringify(current), Math.floor(Date.now() / 1000), auth.userId)
-      .run();
+    // Save back to Clerk
+    await client.users.updateUser(auth.userId, {
+      unsafeMetadata: {
+        ...user.unsafeMetadata,
+        preferences: current,
+      },
+    });
 
     return new Response(
       JSON.stringify(current),

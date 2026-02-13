@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import clerk from '@clerk/astro';
 import sitemap from '@astrojs/sitemap';
 import react from '@astrojs/react';
 import svelte from '@astrojs/svelte';
@@ -97,6 +98,7 @@ export default defineConfig({
         },
     }),
     integrations: [
+        clerk(),
         // Disable sitemap for canvas-only builds
         ...(DEPLOY_TARGET === 'full' ? [sitemap()] : []),
         react(),

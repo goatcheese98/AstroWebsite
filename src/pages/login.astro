@@ -1,7 +1,7 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import { LoginForm } from '@/components/auth/LoginForm';
-import '@/styles/auth-modern.css';
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { SignIn } from "@clerk/astro/components";
+import "@/styles/auth-modern.css";
 ---
 
 <BaseLayout title="Sign In - AstroWeb" description="Sign in to your account">
@@ -11,13 +11,23 @@ import '@/styles/auth-modern.css';
     <div class="auth-container-modern">
       <a href="/" class="back-link-modern">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path
+            d="M19 12H5M5 12l7 7M5 12l7-7"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
         </svg>
         Back to home
       </a>
 
-      <div class="auth-card-3d">
-        <LoginForm client:load />
+      <div class="auth-card-wrapper">
+        <SignIn
+          path="/login"
+          routing="path"
+          signUpUrl="/signup"
+          forceRedirectUrl="/"
+        />
       </div>
     </div>
   </div>
@@ -68,7 +78,7 @@ import '@/styles/auth-modern.css';
   }
 
   .back-link-modern:hover {
-    color: #3B82F6;
+    color: #3b82f6;
   }
 
   .auth-card-3d {
@@ -91,14 +101,14 @@ import '@/styles/auth-modern.css';
       0 0 0 1px rgba(0, 0, 0, 0.05);
   }
 
+  .auth-card-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+
   @media (max-width: 640px) {
     .auth-page-modern {
       padding: 1rem;
-    }
-
-    .auth-card-3d {
-      padding: 2rem 1.5rem;
-      border-radius: 16px;
     }
 
     .back-link-modern {
@@ -106,4 +116,3 @@ import '@/styles/auth-modern.css';
     }
   }
 </style>
-</BaseLayout>

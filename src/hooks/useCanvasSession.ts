@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { nanoid } from 'nanoid';
+import { useUser } from '@clerk/clerk-react';
 
 export interface CanvasSessionUser {
   id: string;
@@ -35,10 +36,16 @@ function getOrCreateAnonymousId(): string {
 }
 
 export function useCanvasSession(): CanvasSession {
-  const [user, setUser] = useState<CanvasSessionUser | null>(null);
+  const { user: clerkUser, isSignedIn, isLoaded } = useUser();
   const [canvasId, setCanvasId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [anonymousId] = useState(() => getOrCreateAnonymousId());
+
+  const user: CanvasSessionUser | null = isSignedIn && clerkUser ? {
+    id: clerkUser.id,
+    email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    name: clerkUser.fullName || clerkUser.username || undefined,
+    avatarUrl: clerkUser.imageUrl,
+  } : null;
 
   // Check for canvas ID in URL
   useEffect(() => {
@@ -47,38 +54,6 @@ export function useCanvasSession(): CanvasSession {
     if (urlCanvasId) {
       setCanvasId(urlCanvasId);
     }
-  }, []);
-
-  // Check auth state
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      try {
-        const response = await fetch('/api/auth/session', {
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data?.user && !cancelled) {
-            setUser({
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.name || undefined,
-              avatarUrl: data.user.image || undefined,
-            });
-          }
-        }
-      } catch {
-        // Not authenticated, stay anonymous
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-
-    checkSession();
-    return () => { cancelled = true; };
   }, []);
 
   const updateCanvasId = useCallback((id: string | null) => {
@@ -98,10 +73,10 @@ export function useCanvasSession(): CanvasSession {
   return {
     user,
     canvasId,
-    isAnonymous: !user,
+    isAnonymous: !isSignedIn,
     anonymousId,
-    isLoading,
-    isAuthenticated: !!user,
+    isLoading: !isLoaded,
+    isAuthenticated: !!isSignedIn,
     setCanvasId: updateCanvasId,
   };
 }

@@ -28,6 +28,7 @@ interface CanvasStatusBadgeProps {
   canvasId: string | null;
   onSaveVersion: () => void;
   onLocalClick: () => void;
+  onLogin?: () => void;
 }
 
 export default function CanvasStatusBadge({
@@ -37,6 +38,7 @@ export default function CanvasStatusBadge({
   canvasId,
   onSaveVersion,
   onLocalClick,
+  onLogin,
 }: CanvasStatusBadgeProps) {
   const [isHovered, setIsHovered] = useState(false);
   // Re-render periodically to update "Saved Xm ago" text
@@ -50,13 +52,10 @@ export default function CanvasStatusBadge({
 
   if (isLoading) return null;
 
-  // --- Anonymous: purple "Local" badge ---
+  // --- Anonymous: purple "Local" badge with login ---
   if (!isAuthenticated) {
     return (
-      <button
-        onClick={onLocalClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+      <div
         style={{
           position: 'fixed',
           bottom: '12px',
@@ -64,7 +63,7 @@ export default function CanvasStatusBadge({
           transform: 'translateX(-50%)',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: '8px',
           padding: '5px 14px',
           background: '#faf5ff',
           border: '1.5px solid #d8b4fe',
@@ -74,22 +73,41 @@ export default function CanvasStatusBadge({
           color: '#7c3aed',
           zIndex: 50,
           fontFamily: 'var(--font-hand, sans-serif)',
-          boxShadow: isHovered
-            ? '0 4px 12px rgba(124,58,237,0.18)'
-            : '0 1px 4px rgba(124,58,237,0.10)',
-          cursor: 'pointer',
-          transition: 'box-shadow 0.2s, border-color 0.2s',
-          outline: 'none',
+          boxShadow: '0 1px 4px rgba(124,58,237,0.10)',
         }}
-        title="You're working locally — click for details"
       >
         {/* Laptop icon */}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
           <line x1="2" y1="20" x2="22" y2="20" />
         </svg>
-        <span>Local</span>
-      </button>
+        <span>Local Only</span>
+        {/* Login button */}
+        <button
+          onClick={onLogin}
+          style={{
+            marginLeft: '4px',
+            padding: '2px 10px',
+            background: '#7c3aed',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '0.7rem',
+            color: 'white',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontWeight: 600,
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#6d28d9';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#7c3aed';
+          }}
+        >
+          Login to Save
+        </button>
+      </div>
     );
   }
 

@@ -1,20 +1,12 @@
 /// <reference types="astro/client" />
+/// <reference types="@clerk/astro/env" />
 
 // Cloudflare Runtime Types
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
 
 declare namespace App {
   interface Locals extends Runtime {
-    // Better Auth session data (will be populated by auth middleware)
-    session?: {
-      user: {
-        id: string;
-        email: string;
-        name?: string;
-        avatar_url?: string;
-      };
-      sessionId: string;
-    };
+    // Add any custom locals here if needed
   }
 }
 
@@ -39,14 +31,8 @@ interface Env {
   ENABLE_API_AUTH?: string;
   API_SECRET_KEY?: string;
 
-  // Better Auth secrets
-  BETTER_AUTH_SECRET?: string;
-  BETTER_AUTH_URL?: string;
-
-  // OAuth credentials (optional)
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
-  GITHUB_CLIENT_ID?: string;
-  GITHUB_CLIENT_SECRET?: string;
+  // Clerk Secrets (optional for types, but used by Clerk internally)
+  CLERK_SECRET_KEY?: string;
+  PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
 }
 

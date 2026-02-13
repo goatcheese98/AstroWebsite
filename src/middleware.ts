@@ -1,9 +1,9 @@
-import { defineMiddleware } from 'astro:middleware';
-import { getSession } from '@/lib/middleware/auth-middleware';
+import { defineMiddleware, sequence } from 'astro:middleware';
+import { clerkMiddleware } from '@clerk/astro/server';
 
 const DEPLOY_TARGET = process.env.DEPLOY_TARGET || 'full';
 
-export const onRequest = defineMiddleware(async (context, next) => {
+const canvasRouting = defineMiddleware(async (context, next) => {
   // Canvas-only deployment
   if (DEPLOY_TARGET === 'canvas') {
     const url = new URL(context.request.url);
@@ -31,17 +31,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       return new Response('Not Found', { status: 404 });
     }
   }
-
-  // Populate session for SSR pages (silently fail for unauthenticated visitors)
-  try {
-    const session = await getSession(context);
-    if (session) {
-      (context.locals as any).session = session;
-      (context.locals as any).user = session.user;
-    }
-  } catch {
-    // Silently ignore auth errors - visitor is just not logged in
-  }
-
   return next();
 });
+
+export const onRequest = sequence(clerkMiddleware(), canvasRouting);

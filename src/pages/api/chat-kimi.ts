@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getExcalidrawSystemPrompt, buildCanvasContext } from '@/lib/prompts/excalidraw-system-prompt';
-import { checkAuthentication } from '@/lib/api-auth';
+import { requireAuth } from '@/lib/middleware/auth-middleware';
 
 // Enable server-side rendering for this endpoint
 export const prerender = false;
@@ -21,11 +21,12 @@ const KIMI_CONFIG = {
   TEMPERATURE: 1.0,
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request } = context;
   try {
     // Check authentication (if enabled)
-    const authError = checkAuthentication(request);
-    if (authError) return authError;
+    const auth = await requireAuth(context);
+    if (!auth.authenticated) return auth.response;
 
     // Check if API key is available
     if (!MOONSHOT_API_KEY) {

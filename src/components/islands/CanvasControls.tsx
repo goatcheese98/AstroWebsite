@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
+
 interface CanvasControlsProps {
     onOpenChat: () => void;
     onOpenAssets: () => void;
@@ -171,6 +172,9 @@ export default function CanvasControls({
             {/* Right side controls - vertically centered */}
             {!isPanelOpen && (
                 <div className="canvas-controls">
+                    {/* User Menu - Top */}
+
+
                     {/* Generate Image - Top action with animation when selected */}
                     <button
                         onClick={handleGenerateImage}

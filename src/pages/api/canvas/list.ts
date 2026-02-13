@@ -34,10 +34,10 @@ export const GET: APIRoute = async (context) => {
     // Parse and validate query parameters
     const url = new URL(context.request.url);
     const queryParams = {
-      limit: url.searchParams.get('limit'),
-      offset: url.searchParams.get('offset'),
-      sort: url.searchParams.get('sort'),
-      order: url.searchParams.get('order'),
+      limit: url.searchParams.get('limit') || undefined,
+      offset: url.searchParams.get('offset') || undefined,
+      sort: url.searchParams.get('sort') || undefined,
+      order: url.searchParams.get('order') || undefined,
     };
 
     const validation = validateListCanvasesQuery(queryParams);
@@ -73,40 +73,30 @@ export const GET: APIRoute = async (context) => {
       }
     }
 
-    // Get user's canvases
+    // Get user's canvases (already includes metadata and size_bytes from SELECT *)
     const canvases = await getUserCanvases(runtime.env.DB, auth.userId, limit, offset);
 
-    // Also fetch metadata for each canvas
-    const canvasesResponse = await Promise.all(
-      canvases.map(async (canvas) => {
-        let metadata = {};
-        let sizeBytes = 0;
-        try {
-          const row = await runtime.env.DB
-            .prepare('SELECT metadata, size_bytes FROM canvases WHERE id = ?')
-            .bind(canvas.id)
-            .first<{ metadata: string | null; size_bytes: number | null }>();
-          if (row?.metadata) {
-            try { metadata = JSON.parse(row.metadata); } catch { metadata = {}; }
-          }
-          sizeBytes = row?.size_bytes || 0;
-        } catch { /* ignore */ }
+    // Transform canvases to response format
+    const canvasesResponse = canvases.map((canvas) => {
+      let metadata = {};
+      if (canvas.metadata) {
+        try { metadata = JSON.parse(canvas.metadata); } catch { metadata = {}; }
+      }
 
-        return {
-          id: canvas.id,
-          userId: canvas.user_id,
-          title: canvas.title,
-          description: canvas.description,
-          thumbnailUrl: canvas.thumbnail_url,
-          isPublic: canvas.is_public === 1,
-          version: canvas.version,
-          createdAt: canvas.created_at,
-          updatedAt: canvas.updated_at,
-          metadata,
-          sizeBytes,
-        };
-      })
-    );
+      return {
+        id: canvas.id,
+        userId: canvas.user_id,
+        title: canvas.title,
+        description: canvas.description,
+        thumbnailUrl: canvas.thumbnail_url,
+        isPublic: canvas.is_public === 1,
+        version: canvas.version,
+        createdAt: canvas.created_at,
+        updatedAt: canvas.updated_at,
+        metadata,
+        sizeBytes: canvas.size_bytes || 0,
+      };
+    });
 
     const response: CanvasListResponse = {
       canvases: canvasesResponse,

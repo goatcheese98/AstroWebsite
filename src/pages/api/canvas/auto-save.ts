@@ -19,7 +19,9 @@ export const prerender = false;
 export const POST: APIRoute = async (context) => {
   try {
     const auth = await requireAuth(context);
-    if (!auth.authenticated) return auth.response;
+    if (!auth.authenticated) {
+      return auth.response;
+    }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
@@ -64,8 +66,9 @@ export const POST: APIRoute = async (context) => {
     // Save to R2
     await saveCanvasToR2(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
 
-    // Create D1 record
+    // Create D1 record with the SAME ID used for R2
     const canvas = await createCanvas(runtime.env.DB, {
+      id: canvasId, // Pass the same ID used for R2 key
       userId: auth.userId,
       title: title || 'Untitled Canvas',
       r2Key,

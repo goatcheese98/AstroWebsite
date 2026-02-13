@@ -4,7 +4,7 @@ import { validateChatRequest } from '@/lib/schemas';
 import type { ChatResponse, ChatErrorResponse } from '@/lib/schemas';
 import { CLAUDE_CONFIG } from '@/lib/api-config';
 import { getExcalidrawSystemPrompt, buildCanvasContext } from '@/lib/prompts/excalidraw-system-prompt';
-import { checkAuthentication } from '@/lib/api-auth';
+import { requireAuth } from '@/lib/middleware/auth-middleware';
 
 // Enable server-side rendering for this endpoint
 export const prerender = false;
@@ -22,11 +22,12 @@ const client = new Anthropic({
   apiKey: apiKey || 'dummy-key', // Fallback to prevent initialization error
 });
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request } = context;
   try {
     // Check authentication (if enabled)
-    const authError = checkAuthentication(request);
-    if (authError) return authError;
+    const auth = await requireAuth(context);
+    if (!auth.authenticated) return auth.response;
 
     // Check if API key is available
     if (!apiKey) {

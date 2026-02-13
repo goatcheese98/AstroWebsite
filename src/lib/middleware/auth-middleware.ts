@@ -8,43 +8,14 @@
  * 
  * 👤 WHO AM I?
  * I am the sentry standing guard at the entrance of our API routes. I check 
- * every incoming request for a valid session token. If I find one, I let the
- * request through with user details; if not, I either block it (requireAuth)
- * or let it pass quietly (optionalAuth).
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * I ensure that private resources (like a user's own canvases) are only accessible
- * to the rightful owner. I handle:
- * - Session verification via Better Auth
- * - Extraction of userId and user metadata from cookies
- * - Standardized 401 Unauthorized responses
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │ API Routes  │◀─────│      ME      │─────▶│    Auth     │   │
- *      │   │ (Request)   │      │ (Middleware) │      │ (BetterAuth)│   │
- *      │   └─────────────┘      └──────────────┘      └─────────────┘   │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Logged-in users can't access their data; 401 errors even with session;
- *   public data becomes private.
- * - User Impact: Users are effectively locked out of their accounts.
- * - Quick Fix: Verify the DB binding in context.locals.runtime.
+ * every incoming request for a valid session token using Clerk.
  * 
  * 📝 REFACTOR JOURNAL:
- * 2026-02-05: Added personified header.
+ * 2026-02-13: Migrated to Clerk authentication.
  * 
  * @module middleware/auth-middleware
  */
 
-import { createAuth } from '@/lib/auth';
 import type { APIContext } from 'astro';
 
 export interface AuthenticatedContext extends APIContext {
@@ -58,7 +29,7 @@ export interface AuthenticatedContext extends APIContext {
 }
 
 /**
- * Verify user session and extract user info
+ * Verify user session and extract user info using Clerk
  * Returns user data if authenticated, null otherwise
  */
 export async function getSession(context: APIContext): Promise<{
@@ -71,31 +42,29 @@ export async function getSession(context: APIContext): Promise<{
   sessionId: string;
 } | null> {
   try {
-    const runtime = context.locals.runtime;
+    const { userId, sessionId } = context.locals.auth();
 
-    if (!runtime?.env.DB) {
-      console.error('Database binding not available');
+    if (!userId || !sessionId) {
       return null;
     }
 
-    // Create auth instance
-    const auth = createAuth(runtime.env.DB);
+    // Use efficient currentUser() helper which handles caching
+    const user = await context.locals.currentUser();
 
-    // Get session from request
-    const session = await auth.api.getSession({ headers: context.request.headers });
-
-    if (!session || !session.user) {
+    if (!user) {
       return null;
     }
+
+    const email = user.emailAddresses.find(e => e.id === user.primaryEmailAddressId)?.emailAddress || user.emailAddresses[0]?.emailAddress || '';
 
     return {
       user: {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name || undefined,
-        avatarUrl: session.user.image || undefined,
+        id: user.id,
+        email: email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || undefined,
+        avatarUrl: user.imageUrl,
       },
-      sessionId: session.session.id,
+      sessionId: sessionId,
     };
   } catch (error) {
     console.error('Session verification error:', error);

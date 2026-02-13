@@ -7,39 +7,6 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { nanoid } from 'nanoid';
 
 // ============================================================================
-// User Queries
-// ============================================================================
-
-export interface User {
-  id: string;
-  email: string;
-  email_verified: number; // SQLite boolean (0 or 1)
-  name: string | null;
-  avatar_url: string | null;
-  password_hash: string | null;
-  created_at: number;
-  updated_at: number;
-}
-
-export async function getUserById(db: D1Database, userId: string): Promise<User | null> {
-  const result = await db
-    .prepare('SELECT * FROM users WHERE id = ?')
-    .bind(userId)
-    .first<User>();
-
-  return result;
-}
-
-export async function getUserByEmail(db: D1Database, email: string): Promise<User | null> {
-  const result = await db
-    .prepare('SELECT * FROM users WHERE email = ?')
-    .bind(email)
-    .first<User>();
-
-  return result;
-}
-
-// ============================================================================
 // Canvas Queries
 // ============================================================================
 
@@ -54,9 +21,12 @@ export interface Canvas {
   version: number;
   created_at: number;
   updated_at: number;
+  metadata: string | null; // JSON string
+  size_bytes: number | null;
 }
 
 export interface CreateCanvasInput {
+  id?: string; // Optional: if not provided, will generate one
   userId: string;
   title: string;
   description?: string;
@@ -69,7 +39,8 @@ export async function createCanvas(
   db: D1Database,
   input: CreateCanvasInput
 ): Promise<Canvas> {
-  const id = nanoid();
+  // Use provided ID or generate a new one
+  const id = input.id || nanoid();
   const now = Math.floor(Date.now() / 1000); // Unix timestamp
 
   await db

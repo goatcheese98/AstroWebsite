@@ -1,5 +1,6 @@
 ---
 import ThemeToggle from "./ThemeToggle.astro";
+import { UserMenu } from "../auth/UserMenu";
 import { NAV_LINKS, CANVAS_NAV_LINKS } from "../../lib/constants";
 
 const currentPath = Astro.url.pathname;
@@ -7,8 +8,8 @@ const hostname = Astro.url.hostname;
 
 // Canvas-only mode: only true when on canvas.rohanjasani.com subdomain
 // NOT when on main site at /ai-canvas
-const isCanvasOnly = hostname === 'canvas.rohanjasani.com' || 
-                     hostname.startsWith('canvas.');
+const isCanvasOnly =
+  hostname === "canvas.rohanjasani.com" || hostname.startsWith("canvas.");
 
 const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
 ---
@@ -42,7 +43,10 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
       }
     </ul>
 
-    <ThemeToggle />
+    <div class="header__actions">
+      <UserMenu client:only="react" />
+      <ThemeToggle />
+    </div>
   </nav>
 </header>
 
@@ -67,6 +71,12 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     align-items: center;
     justify-content: space-between;
     padding-block: var(--space-sm);
+    gap: var(--space-md);
+  }
+
+  .header__actions {
+    display: flex;
+    align-items: center;
     gap: var(--space-md);
   }
 
@@ -164,6 +174,10 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     .header__link {
       font-size: var(--text-xs);
       padding: var(--space-2xs) var(--space-xs);
+    }
+
+    .header__actions {
+      gap: var(--space-xs);
     }
   }
 </style>

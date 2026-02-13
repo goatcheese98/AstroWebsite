@@ -92,8 +92,9 @@ export const POST: APIRoute = async (context) => {
       await saveThumbnailToR2(runtime.env.CANVAS_STORAGE, thumbnailKey, thumbnailBuffer);
     }
 
-    // Create canvas record in database
+    // Create canvas record in database with the SAME ID used for R2
     const canvas = await createCanvas(runtime.env.DB, {
+      id: canvasId, // Pass the same ID used for R2 key
       userId: auth.userId,
       title,
       description,

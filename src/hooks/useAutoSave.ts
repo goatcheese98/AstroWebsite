@@ -91,14 +91,17 @@ export function useAutoSave({
     thumbTimer.current = setTimeout(uploadThumbnail, 60000);
   }, [isAuthenticated, uploadThumbnail]);
 
-  const performSave = useCallback(async () => {
-    if (!isAuthenticated || isSavingRef.current) return;
+  const performSave = useCallback(async (forceThumbnail = false) => {
+    if (!isAuthenticated) {
+      return; // Silently skip save for anonymous users
+    }
+    if (isSavingRef.current) return;
 
     const data = getCanvasData();
     if (!data) return;
 
     const currentHash = hashElements(data.elements);
-    if (currentHash === lastHash.current && canvasIdRef.current) return;
+    if (currentHash === lastHash.current && canvasIdRef.current && !forceThumbnail) return;
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -158,8 +161,14 @@ export function useAutoSave({
           onCanvasCreated?.(result.canvasId);
         }
 
-        // Schedule thumbnail upload (debounced at 60s)
-        scheduleThumbnail();
+        // Handle thumbnail: immediate or scheduled
+        if (forceThumbnail) {
+          // clear any pending timer
+          if (thumbTimer.current) clearTimeout(thumbTimer.current);
+          uploadThumbnail();
+        } else {
+          scheduleThumbnail();
+        }
       } else {
         const errData = await response.json().catch(() => ({}));
         setError(errData.error || 'Save failed');
@@ -170,10 +179,12 @@ export function useAutoSave({
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [isAuthenticated, getCanvasData, onCanvasCreated, scheduleThumbnail]);
+  }, [isAuthenticated, getCanvasData, onCanvasCreated, scheduleThumbnail, uploadThumbnail]);
 
   const markDirty = useCallback(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      return; // Silently skip for anonymous users
+    }
 
     setIsDirty(true);
 
@@ -205,7 +216,7 @@ export function useAutoSave({
       clearTimeout(maxIntervalTimer.current);
       maxIntervalTimer.current = null;
     }
-    await performSave();
+    await performSave(true);
   }, [performSave]);
 
   return { isSaving, lastSaved, isDirty, error, saveNow, markDirty };

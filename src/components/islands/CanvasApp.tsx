@@ -317,11 +317,6 @@ export default function CanvasApp() {
             const saved = localStorage.getItem(IMAGE_HISTORY_STORAGE_KEY);
             if (saved) {
                 const data = JSON.parse(saved);
-                console.log("📂 Image history from localStorage:", {
-                    version: data.version,
-                    expectedVersion: IMAGE_HISTORY_STORAGE_VERSION,
-                    historyLength: data.history?.length || 0,
-                });
 
                 if (data.version === IMAGE_HISTORY_STORAGE_VERSION && data.history) {
                     // Restore timestamps as Date objects
@@ -330,19 +325,13 @@ export default function CanvasApp() {
                         timestamp: img.timestamp ? new Date(img.timestamp) : new Date(),
                     }));
                     setImageHistory(restoredHistory);
-                    console.log(`✅ Restored ${restoredHistory.length} images from localStorage`);
                 } else {
-                    console.warn(`⚠️ Image history version mismatch (got ${data.version}, expected ${IMAGE_HISTORY_STORAGE_VERSION}), clearing old data`);
                     localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
                 }
-            } else {
-                console.log("📂 No image history in localStorage");
             }
-            // Mark that we've completed initial load
             hasLoadedInitialHistory.current = true;
         } catch (err) {
-            console.error("❌ Failed to load image history from localStorage:", err);
-            // Clear corrupted data
+            console.error("Failed to load image history:", err);
             localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
             hasLoadedInitialHistory.current = true;
         }
@@ -350,18 +339,12 @@ export default function CanvasApp() {
 
     // Save image history to localStorage whenever it changes (after initial load)
     useEffect(() => {
-        // Skip saving on initial mount
-        if (!hasLoadedInitialHistory.current) {
-            return;
-        }
+        if (!hasLoadedInitialHistory.current) return;
 
         try {
             if (imageHistory.length === 0) {
-                // Clear localStorage if history is empty
                 localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
-                console.log("🗑️ Cleared image history from localStorage");
             } else {
-                // Serialize history with timestamps as ISO strings
                 const dataToSave = {
                     version: IMAGE_HISTORY_STORAGE_VERSION,
                     history: imageHistory.map(img => ({
@@ -372,10 +355,9 @@ export default function CanvasApp() {
                     })),
                 };
                 localStorage.setItem(IMAGE_HISTORY_STORAGE_KEY, JSON.stringify(dataToSave));
-                console.log(`💾 Saved ${imageHistory.length} images to localStorage`);
             }
         } catch (err) {
-            console.error("Failed to save image history to localStorage:", err);
+            console.error("Failed to save image history:", err);
         }
     }, [imageHistory]);
 
@@ -396,106 +378,52 @@ export default function CanvasApp() {
         setTimeout(() => setSaveMessage(null), 3000);
     };
 
-    const handleOpenChat = () => {
-        console.log("Opening AI Chat");
-        setIsChatOpen(true);
-        // Allow both panels to be open simultaneously
-    };
-
-    const handleOpenAssets = () => {
-        console.log("Opening Assets");
-        setIsAssetsOpen(true);
-        // Allow both panels to be open simultaneously
-    };
-
-    const handleCloseChat = () => {
-        console.log("Closing AI Chat");
-        setIsChatOpen(false);
-    };
-
-    const handleCloseAssets = () => {
-        console.log("Closing Assets");
-        setIsAssetsOpen(false);
-    };
-
-    const handleShare = () => {
-        console.log("Opening Share modal");
-        setIsShareModalOpen(true);
-    };
-
-    const handleCloseShare = () => {
-        console.log("Closing Share modal");
-        setIsShareModalOpen(false);
-    };
+    const handleOpenChat = () => setIsChatOpen(true);
+    const handleOpenAssets = () => setIsAssetsOpen(true);
+    const handleCloseChat = () => setIsChatOpen(false);
+    const handleCloseAssets = () => setIsAssetsOpen(false);
+    const handleShare = () => setIsShareModalOpen(true);
+    const handleCloseShare = () => setIsShareModalOpen(false);
 
     /**
      * Handle save canvas state - opens modal to choose options
      */
     const handleSaveState = useCallback(() => {
-        console.log("💾 CanvasApp: handleSaveState called");
-        
         const excalidrawAPI = (window as any).excalidrawAPI;
-        console.log("💾 CanvasApp: excalidrawAPI exists:", !!excalidrawAPI);
-        
+
         if (!excalidrawAPI) {
             showMessage("✗ Canvas not ready");
             return;
         }
-
-        // Debug logging
-        const elements = excalidrawAPI?.getSceneElements?.() || [];
-        console.log("📊 Save - Elements count:", elements.length);
-        console.log("📊 Save - Image history count:", imageHistory.length);
-        console.log("📊 Save - Messages count:", stateContainerRef.current.messages.length);
 
         const state = collectCanvasState({
             excalidrawAPI,
             messages: stateContainerRef.current.messages,
             aiProvider: stateContainerRef.current.aiProvider,
             contextMode: stateContainerRef.current.contextMode,
-            imageHistory, // Use imageHistory directly from useImageGeneration hook
+            imageHistory,
         });
 
-        console.log("📊 Save - Total elements in state:", state.canvas.elements.length);
-        console.log("📊 Save - Total images in state:", state.images.history.length);
-        console.log("📊 Save - Opening modal...");
-
-        // Store state and show modal
         setPendingSaveState(state);
         setIsSaveModalOpen(true);
-        console.log("📊 Save - Modal state set");
     }, [imageHistory]);
 
     /**
      * Handle confirm save from modal
      */
     const handleConfirmSave = useCallback(async (options: SaveOptions) => {
-        console.log("💾 CanvasApp: handleConfirmSave called with options:", options);
-        
-        // Use ref to get latest state (avoid stale closure)
         const stateToSave = pendingSaveStateRef.current;
-        console.log("💾 CanvasApp: stateToSave from ref:", stateToSave ? "exists" : "null");
-        
+
         if (!stateToSave) {
-            console.error("❌ Save failed: pendingSaveState is null");
             showMessage("✗ Save failed: no state to save");
             return;
         }
-
-        console.log("💾 Confirming save with:", {
-            elements: stateToSave.canvas.elements.length,
-            images: stateToSave.images.history.length,
-            messages: stateToSave.chat.messages.length,
-            options,
-        });
 
         setIsSaveModalOpen(false);
 
         try {
             await saveCanvasStateToFile(stateToSave, undefined, options);
-            console.log("✅ File saved successfully");
 
-            // Build status message
             let mode = options.compressed ? "compressed" : "full size";
             if (options.excludeHistory) {
                 mode += " (no history)";
@@ -523,12 +451,6 @@ export default function CanvasApp() {
         }
 
         if (result.state) {
-            console.log("📂 Load - State loaded from file:", {
-                elements: result.state.canvas.elements.length,
-                images: result.state.images?.history?.length || 0,
-                messages: result.state.chat.messages.length,
-            });
-
             // Check if this is a markdown file
             const markdownContent = (result.state as any).markdownContent;
             const markdownFilename = (result.state as any).markdownFilename;
@@ -594,22 +516,15 @@ export default function CanvasApp() {
         }
     }, []);
 
-    // Debug: Add global save trigger for testing
+    // Listen for global save trigger
     useEffect(() => {
-        const handleDebugSave = () => {
-            console.log("🔧 Debug save triggered");
-            handleSaveState();
-        };
-        window.addEventListener("canvas:debug-save", handleDebugSave);
-        return () => window.removeEventListener("canvas:debug-save", handleDebugSave);
+        window.addEventListener("canvas:debug-save", handleSaveState);
+        return () => window.removeEventListener("canvas:debug-save", handleSaveState);
     }, [handleSaveState]);
 
-    // Listen for share modal open requests (from WelcomeScreen)
+    // Listen for share modal open requests
     useEffect(() => {
-        const handleShareOpen = () => {
-            console.log("🔧 Share modal opened from WelcomeScreen");
-            setIsShareModalOpen(true);
-        };
+        const handleShareOpen = () => setIsShareModalOpen(true);
         window.addEventListener("share:open", handleShareOpen);
         return () => window.removeEventListener("share:open", handleShareOpen);
     }, []);
@@ -628,15 +543,11 @@ export default function CanvasApp() {
     // Sync loaded image history from file
     useEffect(() => {
         if (pendingLoadStateRef.current?.images?.history) {
-            const historyLength = pendingLoadStateRef.current.images.history.length;
-            console.log(`📂 Sync effect - Loading ${historyLength} images`);
             const loadedHistory = pendingLoadStateRef.current.images.history.map((img: any) => ({
                 ...img,
                 timestamp: img.timestamp instanceof Date ? img.timestamp : new Date(img.timestamp),
             }));
             setImageHistory(loadedHistory);
-            console.log(`✅ Sync effect - Set ${loadedHistory.length} images into state`);
-            // Clear the pending state so we don't reload on next render
             pendingLoadStateRef.current = null;
         }
     }, [setImageHistory]);
@@ -658,28 +569,18 @@ export default function CanvasApp() {
      * Triggers screenshot capture, then calls API
      */
     const handleImageGenerationRequest = useCallback((options: GenerationOptions) => {
-        console.log("🎨 Image generation requested...");
-
-        // Close modal immediately
         setShowImageModal(false);
-
-        // Show loading toast
         loadingToastIdRef.current = addToast("Generating image...", 'loading', 0);
 
         // If no elements are selected, generate without a reference screenshot
         if (selectedElements.length === 0) {
-            console.log("🎨 No elements selected - generating without reference image");
             generateImage(
-                "", // No screenshot data
+                "",
                 { ...options, hasReference: false },
                 {
-                    onSuccess: () => {
-                        console.log("✅ Image generation complete");
-                        // Loading toast will be removed when canvas-inserted event fires
-                    },
+                    onSuccess: () => {},
                     onError: (err) => {
-                        console.error("❌ Image generation failed:", err);
-                        // Remove loading toast and show error
+                        console.error("Image generation failed:", err);
                         if (loadingToastIdRef.current) {
                             removeToast(loadingToastIdRef.current);
                             loadingToastIdRef.current = null;
@@ -716,21 +617,13 @@ export default function CanvasApp() {
         const handleScreenshotCaptured = (event: any) => {
             const { requestId, dataURL, error } = event.detail || {};
 
-            // Only handle generation screenshots (not chat or preview)
             if (!requestId?.startsWith("generation-")) return;
-
-            console.log("📸 Generation screenshot received:", requestId);
-
-            if (!pendingImageGenRef.current?.isCapturing) {
-                console.log("⏭️ No pending image generation, ignoring");
-                return;
-            }
+            if (!pendingImageGenRef.current?.isCapturing) return;
 
             pendingImageGenRef.current.isCapturing = false;
 
             if (error) {
-                console.error("❌ Screenshot error:", error);
-                // Remove loading toast and show error
+                console.error("Screenshot error:", error);
                 if (loadingToastIdRef.current) {
                     removeToast(loadingToastIdRef.current);
                     loadingToastIdRef.current = null;
@@ -740,19 +633,15 @@ export default function CanvasApp() {
             }
 
             if (dataURL && pendingImageGenRef.current.options) {
-                console.log("🚀 Starting API call with screenshot...");
                 generateImage(
                     dataURL,
                     pendingImageGenRef.current.options,
                     {
                         onSuccess: () => {
-                            console.log("✅ Image generation complete");
                             pendingImageGenRef.current = null;
-                            // Loading toast will be removed when canvas-inserted event fires
                         },
                         onError: (err) => {
-                            console.error("❌ Image generation failed:", err);
-                            // Remove loading toast and show error
+                            console.error("Image generation failed:", err);
                             if (loadingToastIdRef.current) {
                                 removeToast(loadingToastIdRef.current);
                                 loadingToastIdRef.current = null;
@@ -766,21 +655,16 @@ export default function CanvasApp() {
         };
 
         window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
-        return () => {
-            window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
-        };
+        return () => window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
     }, [generateImage, addToast, removeToast]);
 
     // Listen for image insertion to canvas
     useEffect(() => {
         const handleImageInserted = () => {
-            console.log("🎨 Image inserted to canvas");
-            // Remove loading toast
             if (loadingToastIdRef.current) {
                 removeToast(loadingToastIdRef.current);
                 loadingToastIdRef.current = null;
             }
-            // Show success toast
             addToast("Added to Canvas", 'success', 2000);
         };
 
@@ -791,8 +675,6 @@ export default function CanvasApp() {
     // Listen for image added to library/assets
     useEffect(() => {
         const handleImageAddedToLibrary = () => {
-            console.log("🎨 Image added to library");
-            // Show library toast (staggered after canvas toast)
             setTimeout(() => {
                 addToast("Added to library", 'info', 2000);
             }, 500);
@@ -863,18 +745,54 @@ export default function CanvasApp() {
                 isLoading={session.isLoading}
                 autoSave={autoSave}
                 canvasId={session.canvasId}
+                onLogin={() => { window.location.href = '/login'; }}
                 onSaveVersion={async () => {
-                    if (!session.canvasId) return;
+                    let loadingToastId: string | null = null;
                     try {
+                        // If no canvas exists yet, save first to create it
+                        if (!session.canvasId) {
+                            loadingToastId = addToast('Creating new canvas...', 'loading', 0);
+                        }
+                        
+                        // Save the canvas (creates if new, updates if existing)
                         await autoSave.saveNow();
+                        
+                        // Wait for canvasId to be set (for new canvases)
+                        let attempts = 0;
+                        while (!session.canvasId && attempts < 10) {
+                            await new Promise(r => setTimeout(r, 100));
+                            attempts++;
+                        }
+                        
+                        // Remove loading toast
+                        if (loadingToastId) {
+                            removeToast(loadingToastId);
+                            loadingToastId = null;
+                        }
+                        
+                        if (!session.canvasId) {
+                            addToast('Failed to create canvas', 'info', 3000);
+                            return;
+                        }
+                        
+                        // Now save the version
                         const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
                             method: 'POST',
                             credentials: 'include',
                         });
+                        
                         if (res.ok) {
                             addToast('Version saved', 'success', 2000);
+                        } else {
+                            const err = await res.json().catch(() => ({}));
+                            addToast(err.error || 'Failed to save version', 'info', 3000);
                         }
-                    } catch {
+                    } catch (err) {
+                        // Remove loading toast on error
+                        if (loadingToastId) {
+                            removeToast(loadingToastId);
+                        }
+                        console.error('Save version error:', err);
                         addToast('Failed to save version', 'info', 3000);
                     }
                 }}

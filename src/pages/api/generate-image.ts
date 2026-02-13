@@ -7,7 +7,7 @@ import type {
   GeminiPart,
 } from '@/lib/schemas';
 import { GEMINI_CONFIG } from '@/lib/api-config';
-import { checkAuthentication } from '@/lib/api-auth';
+import { requireAuth } from '@/lib/middleware/auth-middleware';
 
 // Enable server-side rendering for this endpoint
 export const prerender = false;
@@ -20,11 +20,12 @@ if (!apiKey) {
   console.log('✅ GOOGLE_GEMINI_API_KEY loaded successfully');
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request } = context;
   try {
     // Check authentication (if enabled)
-    const authError = checkAuthentication(request);
-    if (authError) return authError;
+    const auth = await requireAuth(context);
+    if (!auth.authenticated) return auth.response;
 
     // Check if API key is available
     if (!apiKey) {
@@ -79,30 +80,30 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Initialize the Gemini API client
     const genAI = new GoogleGenerativeAI(apiKey);
-    const generativeModel = genAI.getGenerativeModel({ 
-      model: selectedModel || GEMINI_CONFIG.DEFAULT_MODEL 
+    const generativeModel = genAI.getGenerativeModel({
+      model: selectedModel || GEMINI_CONFIG.DEFAULT_MODEL
     });
 
     // Build parts array - include image if provided
     const parts: any[] = [];
-    
+
     // If we have an image (screenshot), add it first so Gemini can see it
     if (imageData && mode === 'visual') {
       // Remove data URL prefix if present
-      const base64Data = imageData.includes(',') 
-        ? imageData.split(',')[1] 
+      const base64Data = imageData.includes(',')
+        ? imageData.split(',')[1]
         : imageData;
-      
+
       parts.push({
         inlineData: {
           mimeType: 'image/png',
           data: base64Data,
         },
       });
-      
+
       console.log('📸 Added screenshot to prompt');
     }
-    
+
     // Add the text prompt
     parts.push({ text: prompt });
 

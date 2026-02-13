@@ -1,7 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import ExcalidrawCanvas from "../components/islands/ExcalidrawCanvas";
-import CanvasApp from "../components/islands/CanvasApp";
+import CanvasRoot from "../components/islands/CanvasRoot";
 ---
 
 <BaseLayout
@@ -10,8 +9,7 @@ import CanvasApp from "../components/islands/CanvasApp";
 >
   <div class="canvas-layout">
     <div class="canvas-container">
-      <ExcalidrawCanvas client:only="react" />
-      <CanvasApp client:only="react" />
+      <CanvasRoot client:only="react" />
     </div>
   </div>
 </BaseLayout>
