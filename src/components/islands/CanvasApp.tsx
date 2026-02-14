@@ -54,7 +54,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     }, [toast, onRemove]);
 
     return (
-        <div 
+        <div
             style={{
                 background: 'white',
                 border: '2px solid #333',
@@ -69,7 +69,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
             }}
         >
             {toast.type === 'loading' && (
-                <div 
+                <div
                     style={{
                         width: '16px',
                         height: '16px',
@@ -82,7 +82,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
                 />
             )}
             {toast.type === 'success' && (
-                <span 
+                <span
                     style={{
                         width: '18px',
                         height: '18px',
@@ -100,7 +100,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
                     ✓
                 </span>
             )}
-            <span 
+            <span
                 style={{
                     fontSize: '14px',
                     fontWeight: 600,
@@ -135,6 +135,13 @@ export default function CanvasApp() {
     // Onboarding state
     const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
     const [isLocalPopoverOpen, setIsLocalPopoverOpen] = useState(false);
+    const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && !localStorage.getItem('astroweb-visited')) {
+            setIsWelcomeOpen(true);
+        }
+    }, []);
 
     // === CLOUD PERSISTENCE ===
     const session = useCanvasSession();
@@ -166,6 +173,8 @@ export default function CanvasApp() {
         window.addEventListener("canvas:data-change", handleDataChange);
         return () => window.removeEventListener("canvas:data-change", handleDataChange);
     }, [autoSave.markDirty]);
+
+
 
     // Load canvas from server when authenticated with a canvas ID
     useEffect(() => {
@@ -201,6 +210,8 @@ export default function CanvasApp() {
         loadFromServer();
         return () => { cancelled = true; };
     }, [session.isAuthenticated, session.canvasId, session.isLoading]);
+
+
 
     // Anonymous → Authenticated migration: on first auth, migrate localStorage canvas
     useEffect(() => {
@@ -293,7 +304,7 @@ export default function CanvasApp() {
 
     // Ref to always have latest pendingSaveState (avoid stale closure)
     const pendingSaveStateRef = useRef<CanvasState | null>(null);
-    
+
     // Keep ref in sync with state
     useEffect(() => {
         pendingSaveStateRef.current = pendingSaveState;
@@ -578,7 +589,7 @@ export default function CanvasApp() {
                 "",
                 { ...options, hasReference: false },
                 {
-                    onSuccess: () => {},
+                    onSuccess: () => { },
                     onError: (err) => {
                         console.error("Image generation failed:", err);
                         if (loadingToastIdRef.current) {
@@ -718,7 +729,7 @@ export default function CanvasApp() {
             `}</style>
 
             {/* Toast Container - Bottom Right */}
-            <div 
+            <div
                 style={{
                     position: 'fixed',
                     bottom: '24px',
@@ -731,10 +742,10 @@ export default function CanvasApp() {
                 }}
             >
                 {toasts.map((toast) => (
-                    <ToastItem 
-                        key={toast.id} 
-                        toast={toast} 
-                        onRemove={removeToast} 
+                    <ToastItem
+                        key={toast.id}
+                        toast={toast}
+                        onRemove={removeToast}
                     />
                 ))}
             </div>
@@ -753,34 +764,34 @@ export default function CanvasApp() {
                         if (!session.canvasId) {
                             loadingToastId = addToast('Creating new canvas...', 'loading', 0);
                         }
-                        
+
                         // Save the canvas (creates if new, updates if existing)
                         await autoSave.saveNow();
-                        
+
                         // Wait for canvasId to be set (for new canvases)
                         let attempts = 0;
                         while (!session.canvasId && attempts < 10) {
                             await new Promise(r => setTimeout(r, 100));
                             attempts++;
                         }
-                        
+
                         // Remove loading toast
                         if (loadingToastId) {
                             removeToast(loadingToastId);
                             loadingToastId = null;
                         }
-                        
+
                         if (!session.canvasId) {
                             addToast('Failed to create canvas', 'info', 3000);
                             return;
                         }
-                        
+
                         // Now save the version
                         const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
                             method: 'POST',
                             credentials: 'include',
                         });
-                        
+
                         if (res.ok) {
                             addToast('Version saved', 'success', 2000);
                         } else {
@@ -829,9 +840,9 @@ export default function CanvasApp() {
             />
 
 
-            <MyAssetsPanel 
-                isOpen={isAssetsOpen} 
-                onClose={handleCloseAssets} 
+            <MyAssetsPanel
+                isOpen={isAssetsOpen}
+                onClose={handleCloseAssets}
                 imageHistory={imageHistory}
                 onImageHistoryChange={setImageHistory}
             />
@@ -878,9 +889,13 @@ export default function CanvasApp() {
 
             {/* Welcome overlay — first visit only */}
             <WelcomeOverlay
-                onStartBlank={() => { /* just dismiss */ }}
-                onBrowseTemplates={() => setIsTemplateGalleryOpen(true)}
+                onStartBlank={() => setIsWelcomeOpen(false)}
+                onBrowseTemplates={() => {
+                    setIsWelcomeOpen(false);
+                    setIsTemplateGalleryOpen(true);
+                }}
                 onSignIn={() => { window.location.href = '/login'; }}
+                onDismiss={() => setIsWelcomeOpen(false)}
             />
 
             {/* Template gallery modal */}
@@ -890,8 +905,8 @@ export default function CanvasApp() {
                 onSelectTemplate={handleSelectTemplate}
             />
 
-            {/* Feature tour — triggers on first canvas interaction */}
-            <FeatureTour />
+            {/* Feature tour — triggers on first canvas interaction, but only after welcome is gone */}
+            <FeatureTour canStart={!isWelcomeOpen} />
 
             {/* Toast message for save/load feedback */}
             {saveMessage && (

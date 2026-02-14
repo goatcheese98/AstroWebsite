@@ -18,6 +18,10 @@ id = "2e40b52270bb4622873e0ba5c545a922"
 binding = "RATE_LIMIT_KV"
 id = "598df9d2488549df9929db888147772f"
 
+[[kv_namespaces]]
+binding = "CANVAS_KV"
+id = "bdd03f9666c84ae7be21826775442318"
+
 # R2 Bucket binding (shared with main site)
 [[r2_buckets]]
 binding = "CANVAS_STORAGE"

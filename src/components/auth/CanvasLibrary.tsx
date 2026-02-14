@@ -109,10 +109,17 @@ export function CanvasLibraryPure() {
   async function handleDelete(id: string) {
     if (!confirm('Are you sure? This cannot be undone.')) return;
     try {
-      await fetch(`/api/canvas/${id}`, { method: 'DELETE', credentials: 'include' });
-      setCanvases(canvases.filter(c => c.id !== id));
+      const res = await fetch(`/api/canvas/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        setCanvases(canvases.filter(c => c.id !== id));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Delete failed:', err);
+        alert(`Failed to delete canvas: ${err.error || 'Unknown error'}`);
+      }
     } catch (err) {
-      console.error('Delete failed', err);
+      console.error('Delete network error:', err);
+      alert('Failed to delete canvas due to network error');
     }
   }
 
@@ -210,7 +217,7 @@ export function CanvasLibraryPure() {
           </div>
           <h3>No canvases found</h3>
           <p>Create a new canvas to get started with your next big idea.</p>
-          <a href="/ai-canvas" className="btn-primary large">Create New Canvas</a>
+          <a href="/ai-canvas?new=true" className="btn-primary large">Create New Canvas</a>
         </div>
       ) : (
         <div className={`canvas-grid ${viewMode}`}>

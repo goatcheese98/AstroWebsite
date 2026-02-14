@@ -104,6 +104,7 @@ interface ExcalidrawCanvasProps {
     partyKitHost?: string;
     onMarkdownNotesChange?: (notes: any[]) => void;
     onImageHistoryChange?: (images: any[]) => void;
+    shouldClearOnMount?: boolean;
 }
 
 export default function ExcalidrawCanvas({
@@ -111,7 +112,8 @@ export default function ExcalidrawCanvas({
     shareRoomId,
     partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev",
     onMarkdownNotesChange,
-    onImageHistoryChange
+    onImageHistoryChange,
+    shouldClearOnMount = false
 }: ExcalidrawCanvasProps = {}) {
     const { isMobile, isPhone } = useMobileDetection();
     const session = useCanvasSession();
@@ -123,6 +125,10 @@ export default function ExcalidrawCanvas({
     const [WebEmbedComponent, setWebEmbedComponent] = useState<any>(null);
     const [LexicalNoteComponent, setLexicalNoteComponent] = useState<any>(null);
     const [initialCanvasData, setInitialCanvasData] = useState<any>(null);
+
+    // Check if we should ignore local storage (e.g. new canvas requested)
+    const shouldIgnoreLocalStorage = shouldClearOnMount || (typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('new') === 'true');
 
     // Use refs to avoid triggering re-renders from RAF loop
     const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 }, selectedElementIds: {} });
@@ -157,8 +163,13 @@ export default function ExcalidrawCanvas({
     const SYNC_THROTTLE_MS = 100; // Throttle updates to 10 per second
     const REMOTE_UPDATE_WINDOW_MS = 20; // Minimal suppression, relying on Delta Sync to prevent loops
 
-    // Load saved canvas data from localStorage on mount
+    // Load saved canvas data from localStorage on mount (unless ignored)
     useEffect(() => {
+        if (shouldIgnoreLocalStorage) {
+            console.log("🧹 Skipping local storage load (new canvas requested)");
+            return;
+        }
+
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
@@ -2140,12 +2151,12 @@ export default function ExcalidrawCanvas({
                 }
 
                 .markdown-note-container [data-note-id]::-webkit-scrollbar-thumb {
-                    background: rgba(129, 140, 248, 0.3);
+                    background: rgba(156, 163, 175, 0.4);
                     border-radius: 3px;
                 }
 
                 .markdown-note-container [data-note-id]::-webkit-scrollbar-thumb:hover {
-                    background: rgba(129, 140, 248, 0.5);
+                    background: rgba(107, 114, 128, 0.6);
                 }
 
                 /* Prevent browser zoom on markdown notes - let Excalidraw handle it */
@@ -2222,7 +2233,17 @@ export default function ExcalidrawCanvas({
                         console.error("❌ Failed to restore files:", err);
                     }
                 }}
-                initialData={initialCanvasData ? {
+                initialData={shouldClearOnMount ? {
+                    elements: [],
+                    appState: {
+                        viewBackgroundColor: "#ffffff",
+                        currentItemStrokeColor: "#000000",
+                        scrollX: 0,
+                        scrollY: 0,
+                        zoom: { value: 1 },
+                    },
+                    scrollToContent: true
+                } : (initialCanvasData ? {
                     ...initialCanvasData,
                     appState: sanitizeAppState(initialCanvasData.appState)
                 } : {
@@ -2230,7 +2251,7 @@ export default function ExcalidrawCanvas({
                         viewBackgroundColor: "#ffffff", // Always white background
                         gridSize: 0, // Remove grid dots (0 = no grid)
                     },
-                }}
+                })}
                 UIOptions={{
                     canvasActions: {
                         changeViewBackgroundColor: !isMobile, // Disable on mobile

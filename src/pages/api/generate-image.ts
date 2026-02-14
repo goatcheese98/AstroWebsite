@@ -7,28 +7,26 @@ import type {
   GeminiPart,
 } from '@/lib/schemas';
 import { GEMINI_CONFIG } from '@/lib/api-config';
-import { requireAuth } from '@/lib/middleware/auth-middleware';
+import { optionalAuth } from '@/lib/middleware/auth-middleware';
 
 // Enable server-side rendering for this endpoint
 export const prerender = false;
 
-const apiKey = import.meta.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-
-if (!apiKey) {
-  console.error('❌ GOOGLE_GEMINI_API_KEY is not set in environment variables');
-} else {
-  console.log('✅ GOOGLE_GEMINI_API_KEY loaded successfully');
-}
-
 export const POST: APIRoute = async (context) => {
-  const { request } = context;
+  const { request, locals } = context;
   try {
-    // Check authentication (if enabled)
-    const auth = await requireAuth(context);
-    if (!auth.authenticated) return auth.response;
+    // Check authentication (optional - allow guest usage)
+    const auth = await optionalAuth(context);
+
+    // Get runtime env for Cloudflare
+    const runtime = locals.runtime as any;
+    const envApiKey = runtime?.env?.GOOGLE_GEMINI_API_KEY ||
+      import.meta.env.GOOGLE_GEMINI_API_KEY ||
+      process.env.GOOGLE_GEMINI_API_KEY;
 
     // Check if API key is available
-    if (!apiKey) {
+    if (!envApiKey) {
+      console.error('❌ GOOGLE_GEMINI_API_KEY is missing');
       const errorResponse: ImageGenerationErrorResponse = {
         error: 'API key not configured',
         details: 'GOOGLE_GEMINI_API_KEY environment variable is missing',
@@ -79,7 +77,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     // Initialize the Gemini API client
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenerativeAI(envApiKey);
     const generativeModel = genAI.getGenerativeModel({
       model: selectedModel || GEMINI_CONFIG.DEFAULT_MODEL
     });

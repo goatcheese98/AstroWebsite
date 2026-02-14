@@ -80,15 +80,16 @@ export function useAutoSave({
         credentials: 'include',
         body: blob,
       });
-    } catch {
-      // Thumbnail is non-critical, silently ignore
+      console.log('Thumbnail uploaded successfully');
+    } catch (err) {
+      console.error('Thumbnail upload failed:', err);
     }
   }, [isAuthenticated]);
 
   const scheduleThumbnail = useCallback(() => {
     if (!isAuthenticated || !canvasIdRef.current) return;
     if (thumbTimer.current) clearTimeout(thumbTimer.current);
-    thumbTimer.current = setTimeout(uploadThumbnail, 60000);
+    thumbTimer.current = setTimeout(uploadThumbnail, 10000);
   }, [isAuthenticated, uploadThumbnail]);
 
   const performSave = useCallback(async (forceThumbnail = false) => {
@@ -116,10 +117,29 @@ export function useAutoSave({
         gridSize: data.appState.gridSize,
       } : undefined;
 
+      // Prune unused files
+      const usedFileIds = new Set<string>();
+      if (data.elements) {
+        for (const element of data.elements) {
+          if (element.fileId) {
+            usedFileIds.add(element.fileId);
+          }
+        }
+      }
+
+      const prunedFiles: Record<string, any> = {};
+      if (data.files) {
+        for (const [fileId, fileData] of Object.entries(data.files)) {
+          if (usedFileIds.has(fileId)) {
+            prunedFiles[fileId] = fileData;
+          }
+        }
+      }
+
       const payload = JSON.stringify({
         elements: data.elements,
         appState: essentialAppState,
-        files: data.files || {},
+        files: prunedFiles,
       });
 
       let response: Response;
@@ -143,7 +163,7 @@ export function useAutoSave({
             canvasData: {
               elements: data.elements,
               appState: essentialAppState,
-              files: data.files || {},
+              files: prunedFiles,
             },
           }),
         });

@@ -12,7 +12,7 @@ import { createCanvas } from '@/lib/db';
 import {
   generateCanvasKey,
   generateThumbnailKey,
-  saveCanvasToR2,
+  saveCanvasToR2Compressed,
   saveThumbnailToR2,
   isCanvasTooLarge,
 } from '@/lib/storage/canvas-storage';
@@ -65,6 +65,39 @@ export const POST: APIRoute = async (context) => {
     }
 
     const { title, description, canvasData, isPublic, thumbnailData } = validation.data;
+    let finalTitle = title || 'Untitled Canvas';
+
+    // Unique Title Logic
+    if (finalTitle.startsWith('Untitled Canvas')) {
+      const existing = await runtime.env.DB.prepare(
+        'SELECT title FROM canvases WHERE user_id = ? AND title LIKE ?'
+      )
+        .bind(auth.userId, 'Untitled Canvas%')
+        .all();
+
+      if (existing.results && existing.results.length > 0) {
+        let maxNum = 0;
+        const hasExact = (existing.results as any[]).some((r: any) => r.title === 'Untitled Canvas');
+        if (hasExact) maxNum = 1;
+
+        const regex = /^Untitled Canvas (\d+)$/;
+        for (const row of (existing.results as any[])) {
+          const match = (row as any).title.match(regex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        }
+
+        if (maxNum > 0) {
+          finalTitle = `Untitled Canvas ${maxNum + 1}`;
+        } else if (hasExact) {
+          finalTitle = 'Untitled Canvas 2';
+        }
+      }
+    }
 
     // Check canvas size (max 10MB)
     if (isCanvasTooLarge(canvasData)) {
@@ -82,24 +115,24 @@ export const POST: APIRoute = async (context) => {
     const r2Key = generateCanvasKey(auth.userId, canvasId);
     const thumbnailKey = thumbnailData ? generateThumbnailKey(auth.userId, canvasId) : null;
 
-    // Save canvas data to R2
-    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    // Save canvas data to R2 (compressed)
+    await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
 
     // Save thumbnail if provided
     if (thumbnailData && thumbnailKey) {
       // Decode base64 thumbnail
       const thumbnailBuffer = Buffer.from(thumbnailData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      await saveThumbnailToR2(runtime.env.CANVAS_STORAGE, thumbnailKey, thumbnailBuffer);
+      await saveThumbnailToR2(runtime.env.CANVAS_STORAGE, thumbnailKey, new Uint8Array(thumbnailBuffer).buffer);
     }
 
     // Create canvas record in database with the SAME ID used for R2
     const canvas = await createCanvas(runtime.env.DB, {
       id: canvasId, // Pass the same ID used for R2 key
       userId: auth.userId,
-      title,
+      title: finalTitle,
       description,
       r2Key,
-      thumbnailUrl: thumbnailKey,
+      thumbnailUrl: thumbnailKey ?? undefined,
       isPublic: isPublic || false,
     });
 

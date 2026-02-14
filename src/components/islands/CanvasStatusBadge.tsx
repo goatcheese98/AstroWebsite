@@ -52,10 +52,11 @@ export default function CanvasStatusBadge({
 
   if (isLoading) return null;
 
-  // --- Anonymous: purple "Local" badge with login ---
+  // --- Anonymous: minimal "Local" badge ---
   if (!isAuthenticated) {
     return (
-      <div
+      <button
+        onClick={onLocalClick}
         style={{
           position: 'fixed',
           bottom: '12px',
@@ -63,51 +64,36 @@ export default function CanvasStatusBadge({
           transform: 'translateX(-50%)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '5px 14px',
-          background: '#faf5ff',
-          border: '1.5px solid #d8b4fe',
+          gap: '6px',
+          padding: '4px 12px',
+          background: 'white',
+          border: '1px solid #e5e7eb',
           borderRadius: '20px',
-          fontSize: '0.8rem',
+          fontSize: '0.75rem',
           fontWeight: 600,
-          color: '#7c3aed',
+          color: '#4b5563',
           zIndex: 50,
-          fontFamily: 'var(--font-hand, sans-serif)',
-          boxShadow: '0 1px 4px rgba(124,58,237,0.10)',
+          fontFamily: 'var(--font-ui, sans-serif)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = '#f9fafb';
+          e.currentTarget.style.borderColor = '#d1d5db';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'white';
+          e.currentTarget.style.borderColor = '#e5e7eb';
         }}
       >
         {/* Laptop icon */}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
           <line x1="2" y1="20" x2="22" y2="20" />
         </svg>
-        <span>Local Only</span>
-        {/* Login button */}
-        <button
-          onClick={onLogin}
-          style={{
-            marginLeft: '4px',
-            padding: '2px 10px',
-            background: '#7c3aed',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '0.7rem',
-            color: 'white',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontWeight: 600,
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#6d28d9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#7c3aed';
-          }}
-        >
-          Login to Save
-        </button>
-      </div>
+        <span>Local</span>
+      </button>
     );
   }
 
@@ -115,16 +101,16 @@ export default function CanvasStatusBadge({
   const strokeColor = autoSave.isSaving
     ? '#7c3aed'
     : autoSave.error
-    ? '#ef4444'
-    : '#22c55e';
+      ? '#ef4444'
+      : '#22c55e';
 
   const statusText = autoSave.isSaving
     ? 'Saving...'
     : autoSave.error
-    ? 'Save error'
-    : autoSave.lastSaved
-    ? `Saved ${getTimeAgo(autoSave.lastSaved)}`
-    : 'Cloud sync active';
+      ? 'Save error'
+      : autoSave.lastSaved
+        ? `Saved ${getTimeAgo(autoSave.lastSaved)}`
+        : 'Cloud sync active';
 
   return (
     <div

@@ -10,6 +10,7 @@ import { createCanvas } from '@/lib/db';
 import {
   generateCanvasKey,
   saveCanvasToR2,
+  saveCanvasToR2Compressed,
   validateCanvasData,
   getCanvasDataSize,
   isCanvasTooLarge,
@@ -83,10 +84,8 @@ export const POST: APIRoute = async (context) => {
     const { nanoid } = await import('nanoid');
     const canvasId = nanoid();
     const r2Key = generateCanvasKey(auth.userId, canvasId);
-    const sizeBytes = getCanvasDataSize(canvasData);
-
-    // Save to R2
-    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    // Save to R2 (compressed)
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
 
     // Create D1 record with anonymous_id for dedup
     const canvas = await createCanvas(runtime.env.DB, {
@@ -98,14 +97,14 @@ export const POST: APIRoute = async (context) => {
     // Update anonymous_id and size_bytes
     await runtime.env.DB
       .prepare('UPDATE canvases SET anonymous_id = ?, size_bytes = ? WHERE id = ?')
-      .bind(anonymousId, sizeBytes, canvas.id)
+      .bind(anonymousId, compressedSize, canvas.id)
       .run();
 
     return new Response(
       JSON.stringify({
         canvasId: canvas.id,
         migrated: true,
-        sizeBytes,
+        sizeBytes: compressedSize,
       }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
     );

@@ -20,26 +20,26 @@ const HOME_INDEX_BACKUP = path.join(backupDir, 'index-home.astro');
  */
 export function prepareCanvasBuild() {
   console.log('🔧 Preparing canvas-only build...\n');
-  
+
   // Create backup directory
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
   }
-  
+
   // Backup the home page index.astro
   const indexPath = path.join(pagesDir, 'index.astro');
   if (fs.existsSync(indexPath)) {
     fs.copyFileSync(indexPath, HOME_INDEX_BACKUP);
     console.log('  📦 Backed up home page');
   }
-  
+
   // Replace index.astro with ai-canvas.astro content
   const aiCanvasPath = path.join(pagesDir, 'ai-canvas.astro');
   if (fs.existsSync(aiCanvasPath)) {
     fs.copyFileSync(aiCanvasPath, indexPath);
     console.log('  ✨ Set index.astro to canvas page');
   }
-  
+
   // Move blog directory to backup
   const blogDir = path.join(pagesDir, 'blog');
   const blogBackupDir = path.join(backupDir, 'blog');
@@ -47,9 +47,9 @@ export function prepareCanvasBuild() {
     fs.renameSync(blogDir, blogBackupDir);
     console.log('  📦 Excluded: blog/');
   }
-  
+
   // List of pages to exclude
-  const pagesToExclude = ['blog.astro', 'canvases.astro', 'dashboard.astro'];
+  const pagesToExclude = ['blog.astro', 'canvases.astro'];
   pagesToExclude.forEach(page => {
     const pagePath = path.join(pagesDir, page);
     const backupPath = path.join(backupDir, page);
@@ -58,7 +58,7 @@ export function prepareCanvasBuild() {
       console.log(`  📦 Excluded: ${page}`);
     }
   });
-  
+
   console.log('\n✅ Canvas build preparation complete\n');
 }
 
@@ -67,14 +67,14 @@ export function prepareCanvasBuild() {
  */
 export function restorePages() {
   console.log('\n🔄 Restoring pages...\n');
-  
+
   // Restore home page index.astro
   const indexPath = path.join(pagesDir, 'index.astro');
   if (fs.existsSync(HOME_INDEX_BACKUP)) {
     fs.copyFileSync(HOME_INDEX_BACKUP, indexPath);
     console.log('  ↩️  Restored home page');
   }
-  
+
   // Restore blog directory
   const blogDir = path.join(pagesDir, 'blog');
   const blogBackupDir = path.join(backupDir, 'blog');
@@ -82,9 +82,9 @@ export function restorePages() {
     fs.renameSync(blogBackupDir, blogDir);
     console.log('  ↩️  Restored: blog/');
   }
-  
+
   // Restore excluded pages
-  const pagesToRestore = ['blog.astro', 'canvases.astro', 'dashboard.astro'];
+  const pagesToRestore = ['blog.astro', 'canvases.astro'];
   pagesToRestore.forEach(page => {
     const pagePath = path.join(pagesDir, page);
     const backupPath = path.join(backupDir, page);
@@ -93,7 +93,7 @@ export function restorePages() {
       console.log(`  ↩️  Restored: ${page}`);
     }
   });
-  
+
   // Clean up backup directory
   if (fs.existsSync(backupDir)) {
     const remaining = fs.readdirSync(backupDir);
@@ -101,7 +101,7 @@ export function restorePages() {
       fs.rmdirSync(backupDir);
     }
   }
-  
+
   console.log('\n✅ Pages restored\n');
 }
 

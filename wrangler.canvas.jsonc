@@ -18,6 +18,10 @@
     {
       "binding": "RATE_LIMIT_KV",
       "id": "598df9d2488549df9929db888147772f"
+    },
+    {
+      "binding": "CANVAS_KV",
+      "id": "bdd03f9666c84ae7be21826775442318"
     }
   ],
   "r2_buckets": [

@@ -9,6 +9,7 @@ import { createCanvas } from '@/lib/db';
 import {
   generateCanvasKey,
   saveCanvasToR2,
+  saveCanvasToR2Compressed,
   validateCanvasData,
   getCanvasDataSize,
   isCanvasTooLarge,
@@ -42,6 +43,41 @@ export const POST: APIRoute = async (context) => {
     }
 
     const { title, canvasData } = body;
+    let finalTitle = title || 'Untitled Canvas';
+
+    // Unique Title Logic
+    if (finalTitle.startsWith('Untitled Canvas')) {
+      const existing = await runtime.env.DB.prepare(
+        'SELECT title FROM canvases WHERE user_id = ? AND title LIKE ?'
+      )
+        .bind(auth.userId, 'Untitled Canvas%')
+        .all();
+
+      if (existing.results && existing.results.length > 0) {
+        let maxNum = 0;
+        // Check for exact "Untitled Canvas"
+        const hasExact = existing.results.some((r: any) => r.title === 'Untitled Canvas');
+        if (hasExact) maxNum = 1; // At least one exists, so next should be 2+
+
+        // Check for "Untitled Canvas X"
+        const regex = /^Untitled Canvas (\d+)$/;
+        for (const row of existing.results) {
+          const match = (row as any).title.match(regex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        }
+
+        if (maxNum > 0) {
+          finalTitle = `Untitled Canvas ${maxNum + 1}`;
+        } else if (hasExact) {
+          finalTitle = 'Untitled Canvas 2'; // Fallback if my logic above was slightly off
+        }
+      }
+    }
 
     if (!canvasData || !validateCanvasData(canvasData)) {
       return new Response(
@@ -63,28 +99,28 @@ export const POST: APIRoute = async (context) => {
     const r2Key = generateCanvasKey(auth.userId, canvasId);
     const sizeBytes = getCanvasDataSize(canvasData);
 
-    // Save to R2
-    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    // Save to R2 (compressed)
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
 
     // Create D1 record with the SAME ID used for R2
     const canvas = await createCanvas(runtime.env.DB, {
       id: canvasId, // Pass the same ID used for R2 key
       userId: auth.userId,
-      title: title || 'Untitled Canvas',
+      title: finalTitle,
       r2Key,
     });
 
-    // Update size_bytes
+    // Update size_bytes (use compressed size)
     await runtime.env.DB
       .prepare('UPDATE canvases SET size_bytes = ? WHERE id = ?')
-      .bind(sizeBytes, canvas.id)
+      .bind(compressedSize, canvas.id)
       .run();
 
     return new Response(
       JSON.stringify({
         canvasId: canvas.id,
         savedAt: new Date().toISOString(),
-        sizeBytes,
+        sizeBytes: compressedSize,
       }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
     );

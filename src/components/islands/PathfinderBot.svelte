@@ -157,9 +157,12 @@
 
 <div bind:this={containerRef} class="container">
   <div
-    on:click={handleClick}
-    on:mouseenter={handleMouseEnter}
-    on:mouseleave={handleMouseLeave}
+    role="button"
+    tabindex="0"
+    onclick={handleClick}
+    onkeydown={(e) => e.key === 'Enter' && handleClick()}
+    onmouseenter={handleMouseEnter}
+    onmouseleave={handleMouseLeave}
     class="bot"
     class:hovering={isHovering}
     class:anim-right-arm={clickAnimation === "right-arm"}

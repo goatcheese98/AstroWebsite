@@ -1,7 +1,6 @@
 ---
-import SketchHighlight from '../sketch/SketchHighlight.astro';
-import ResumeRequestForm from '../islands/ResumeRequestForm.svelte';
-import { EXPERIENCES } from '../../lib/constants';
+import SketchHighlight from "../sketch/SketchHighlight.astro";
+import { EXPERIENCES } from "../../lib/constants";
 ---
 
 <section class="experience section-gap" id="experience" aria-label="Experience">
@@ -15,54 +14,65 @@ import { EXPERIENCES } from '../../lib/constants';
     </div>
 
     <div class="timeline">
-      {EXPERIENCES.map((exp) => (
-        <article class="timeline__item">
-          <div class="timeline__marker" aria-hidden="true">
-            <div class:list={['timeline__dot', { 'timeline__dot--active': exp.current }]}>
-              {exp.current && <span class="timeline__pulse"></span>}
-            </div>
-            <div class="timeline__line"></div>
-          </div>
-          <div class="timeline__card">
-            <div class="timeline__content">
-              <div class="timeline__header">
-                <div class="timeline__title-group">
-                  <h3 class="timeline__role">
-                    {exp.current ? (
-                      <SketchHighlight>{exp.role}</SketchHighlight>
-                    ) : (
-                      exp.role
-                    )}
-                  </h3>
-                  <p class="timeline__company">{exp.company}</p>
-                </div>
-                <span class="timeline__period">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                  {exp.period}
-                </span>
+      {
+        EXPERIENCES.map((exp) => (
+          <article class="timeline__item">
+            <div class="timeline__marker" aria-hidden="true">
+              <div
+                class:list={[
+                  "timeline__dot",
+                  { "timeline__dot--active": exp.current },
+                ]}
+              >
+                {exp.current && <span class="timeline__pulse" />}
               </div>
-              <p class="timeline__desc">{exp.description}</p>
-              <ul class="timeline__highlights">
-                {exp.highlights.map((highlight) => (
-                  <li class="timeline__highlight">
-                    <span class="highlight__bullet"></span>
-                    {highlight}
-                  </li>
-                ))}
-              </ul>
+              <div class="timeline__line" />
             </div>
-          </div>
-        </article>
-      ))}
-    </div>
-
-    <div class="experience__footer">
-      <ResumeRequestForm client:load />
+            <div class="timeline__card">
+              <div class="timeline__content">
+                <div class="timeline__header">
+                  <div class="timeline__title-group">
+                    <h3 class="timeline__role">
+                      {exp.current ? (
+                        <SketchHighlight>{exp.role}</SketchHighlight>
+                      ) : (
+                        exp.role
+                      )}
+                    </h3>
+                    <p class="timeline__company">{exp.company}</p>
+                  </div>
+                  <span class="timeline__period">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    {exp.period}
+                  </span>
+                </div>
+                <p class="timeline__desc">{exp.description}</p>
+                <ul class="timeline__highlights">
+                  {exp.highlights.map((highlight) => (
+                    <li class="timeline__highlight">
+                      <span class="highlight__bullet" />
+                      {highlight}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </article>
+        ))
+      }
     </div>
   </div>
 </section>
@@ -92,7 +102,11 @@ import { EXPERIENCES } from '../../lib/constants';
   .experience__header-line {
     width: 60px;
     height: 4px;
-    background: linear-gradient(90deg, var(--color-accent), var(--color-gradient-end));
+    background: linear-gradient(
+      90deg,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
     border-radius: 2px;
     filter: url(#sketch-filter);
   }
@@ -137,7 +151,9 @@ import { EXPERIENCES } from '../../lib/constants';
     filter: url(#sketch-filter);
     position: relative;
     z-index: 2;
-    transition: border-color 0.3s ease, background 0.3s ease;
+    transition:
+      border-color 0.3s ease,
+      background 0.3s ease;
   }
 
   .timeline__dot--active {
@@ -155,14 +171,24 @@ import { EXPERIENCES } from '../../lib/constants';
   }
 
   @keyframes pulse-ring {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(1.8); opacity: 0; }
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.8);
+      opacity: 0;
+    }
   }
 
   .timeline__line {
     width: 2px;
     flex: 1;
-    background: linear-gradient(to bottom, var(--color-stroke-muted), transparent);
+    background: linear-gradient(
+      to bottom,
+      var(--color-stroke-muted),
+      transparent
+    );
     margin-top: var(--space-sm);
     min-height: 40px;
   }
@@ -174,19 +200,25 @@ import { EXPERIENCES } from '../../lib/constants';
     border-radius: var(--radius-md);
     padding: var(--space-lg);
     filter: url(#sketch-filter);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
     position: relative;
     overflow: hidden;
   }
 
   .timeline__card::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     width: 4px;
     height: 100%;
-    background: linear-gradient(to bottom, var(--color-accent), var(--color-gradient-end));
+    background: linear-gradient(
+      to bottom,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
     opacity: 0;
     transition: opacity 0.3s ease;
   }

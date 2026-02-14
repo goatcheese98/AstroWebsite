@@ -9,11 +9,12 @@ interface WelcomeOverlayProps {
   onStartBlank: () => void;
   onBrowseTemplates: () => void;
   onSignIn: () => void;
+  onDismiss?: () => void;
 }
 
 const VISITED_KEY = 'astroweb-visited';
 
-export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSignIn }: WelcomeOverlayProps) {
+export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSignIn, onDismiss }: WelcomeOverlayProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSign
   const handleDismiss = (action: () => void) => {
     localStorage.setItem(VISITED_KEY, '1');
     setIsVisible(false);
+    onDismiss?.();
     action();
   };
 
@@ -37,49 +39,51 @@ export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSign
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(255,255,255,0.85)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(255,255,255,0.7)',
+      backdropFilter: 'blur(4px)',
       zIndex: 1100,
-      animation: 'fadeIn 0.3s ease',
+      animation: 'fadeIn 0.2s ease',
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '16px',
-        padding: '40px 32px',
-        maxWidth: '400px',
+        borderRadius: '12px',
+        padding: '32px',
+        maxWidth: '360px',
         width: '90%',
         textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
-        border: '1px solid #e5e7eb',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+        border: '1px solid #eee',
       }}>
-        <div style={{ marginBottom: '8px', fontSize: '2rem' }}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" style={{ margin: '0 auto' }}>
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <path d="M12 8v8M8 12h8" strokeLinecap="round"/>
+        <div style={{ marginBottom: '16px' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2.5" style={{ margin: '0 auto' }}>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v8M8 12h8" strokeLinecap="round" />
           </svg>
         </div>
 
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1f2937', margin: '0 0 8px' }}>
-          Welcome to AstroWeb
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#111827', margin: '0 0 8px' }}>
+          Welcome to AI Canvas
         </h2>
-        <p style={{ fontSize: '0.95rem', color: '#6b7280', margin: '0 0 28px', lineHeight: 1.5 }}>
-          AI-powered canvas for diagrams, wireframes, and ideas.
+        <p style={{ fontSize: '0.9rem', color: '#6b7280', margin: '0 0 24px', lineHeight: 1.4 }}>
+          A minimal workspace for diagrams and ideas powered by AI.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button
             onClick={() => handleDismiss(onStartBlank)}
             style={{
-              padding: '14px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              padding: '12px',
+              background: '#111827',
               color: 'white',
               border: 'none',
-              borderRadius: '10px',
-              fontSize: '1rem',
-              fontWeight: 600,
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: 500,
               cursor: 'pointer',
-              transition: 'transform 0.15s',
+              transition: 'background 0.2s',
             }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#000'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#111827'}
           >
             Start with blank canvas
           </button>
@@ -87,16 +91,18 @@ export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSign
           <button
             onClick={() => handleDismiss(onBrowseTemplates)}
             style={{
-              padding: '14px',
-              background: 'white',
-              color: '#374151',
-              border: '2px solid #e5e7eb',
-              borderRadius: '10px',
-              fontSize: '1rem',
-              fontWeight: 600,
+              padding: '12px',
+              background: '#f9fafb',
+              color: '#111827',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: 500,
               cursor: 'pointer',
-              transition: 'border-color 0.15s',
+              transition: 'background 0.2s',
             }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#f9fafb'}
           >
             Browse templates
           </button>
@@ -104,15 +110,16 @@ export default function WelcomeOverlay({ onStartBlank, onBrowseTemplates, onSign
           <button
             onClick={() => handleDismiss(onSignIn)}
             style={{
-              padding: '10px',
+              marginTop: '12px',
               background: 'none',
               color: '#6b7280',
               border: 'none',
-              fontSize: '0.9rem',
+              fontSize: '0.85rem',
               cursor: 'pointer',
-              textDecoration: 'underline',
-              textUnderlineOffset: '3px',
+              textDecoration: 'none',
             }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#111827'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
           >
             Sign in to your account
           </button>

@@ -11,6 +11,8 @@ import {
   generateCanvasVersionKey,
   loadCanvasFromR2,
   saveCanvasToR2,
+  loadCanvasFromR2Compressed,
+  saveCanvasToR2Compressed,
 } from '@/lib/storage/canvas-storage';
 
 export const prerender = false;
@@ -84,8 +86,8 @@ export const POST: APIRoute = async (context) => {
       });
     }
 
-    // Load current canvas data
-    const currentData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+    // Load current canvas data (compressed or not)
+    const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
     if (!currentData) {
       return new Response(JSON.stringify({ error: 'Canvas data not found in storage' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
@@ -99,8 +101,9 @@ export const POST: APIRoute = async (context) => {
       : 1;
 
     // Save snapshot to R2
+    // Save snapshot to R2 (compressed)
     const versionKey = generateCanvasVersionKey(auth.userId, canvasId, nextVersion);
-    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, versionKey, currentData);
+    await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, versionKey, currentData);
 
     // Create D1 record
     const versionRecord = await createCanvasVersion(

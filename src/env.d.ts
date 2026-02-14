@@ -18,6 +18,7 @@ interface Env {
   // KV Namespaces
   SESSION_KV: import('@cloudflare/workers-types').KVNamespace;
   RATE_LIMIT_KV: import('@cloudflare/workers-types').KVNamespace;
+  CANVAS_KV: import('@cloudflare/workers-types').KVNamespace;
 
   // R2 Bucket
   CANVAS_STORAGE: import('@cloudflare/workers-types').R2Bucket;

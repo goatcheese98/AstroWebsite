@@ -22,6 +22,8 @@ import {
   generateThumbnailKey,
   loadCanvasFromR2,
   saveCanvasToR2,
+  loadCanvasFromR2Compressed,
+  saveCanvasToR2Compressed,
   saveThumbnailToR2,
   deleteAllCanvasFiles,
   isCanvasTooLarge,
@@ -88,8 +90,8 @@ export const GET: APIRoute = async (context) => {
       );
     }
 
-    // Load canvas data from R2
-    const canvasData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+    // Load canvas data from R2 (auto-detects gzip)
+    const canvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
 
     if (!canvasData) {
       return new Response(
@@ -229,22 +231,22 @@ export const PUT: APIRoute = async (context) => {
         const versionKey = generateCanvasVersionKey(auth.userId, canvasId, canvas.version);
 
         // Save current version
-        const currentData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+        const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
         if (currentData) {
-          await saveCanvasToR2(runtime.env.CANVAS_STORAGE, versionKey, currentData);
+          await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, versionKey, currentData);
           await createCanvasVersion(runtime.env.DB, canvasId, canvas.version, versionKey);
         }
       }
 
-      // Save updated canvas data
-      await saveCanvasToR2(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
+      // Save updated canvas data (compressed)
+      await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
     }
 
     // Update thumbnail if provided
     if (thumbnailData) {
       const thumbnailKey = generateThumbnailKey(auth.userId, canvasId);
       const thumbnailBuffer = Buffer.from(thumbnailData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      await saveThumbnailToR2(runtime.env.CANVAS_STORAGE, thumbnailKey, thumbnailBuffer);
+      await saveThumbnailToR2(runtime.env.CANVAS_STORAGE, thumbnailKey, new Uint8Array(thumbnailBuffer).buffer);
     }
 
     // Update metadata in database
@@ -266,7 +268,7 @@ export const PUT: APIRoute = async (context) => {
     }
 
     // Load final canvas data
-    const finalCanvasData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, updatedCanvas.r2_key);
+    const finalCanvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, updatedCanvas.r2_key);
 
     // Build response
     const response: CanvasResponse = {
@@ -358,23 +360,23 @@ export const PATCH: APIRoute = async (context) => {
       );
     }
 
-    // Save to R2 (overwrites current data)
-    await saveCanvasToR2(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
+    // Save to R2 (overwrites current data, compressed)
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
 
     // Update D1 metadata
     const now = Math.floor(Date.now() / 1000);
-    const sizeBytes = new TextEncoder().encode(JSON.stringify(canvasData)).length;
+    // const sizeBytes = new TextEncoder().encode(JSON.stringify(canvasData)).length;
 
     await runtime.env.DB
       .prepare('UPDATE canvases SET updated_at = ?, size_bytes = ? WHERE id = ? AND user_id = ?')
-      .bind(now, sizeBytes, canvasId, auth.userId)
+      .bind(now, compressedSize, canvasId, auth.userId)
       .run();
 
     return new Response(
       JSON.stringify({
         canvasId,
         savedAt: new Date().toISOString(),
-        sizeBytes,
+        sizeBytes: compressedSize,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );

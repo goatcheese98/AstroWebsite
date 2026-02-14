@@ -58,7 +58,6 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "resend": "^6.9.1",
     "rough-notation": "^0.5.1",
     "roughjs": "^4.6.6",
     "svelte": "^5.49.1",
