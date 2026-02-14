@@ -5,15 +5,17 @@
 
 import type { APIRoute } from 'astro';
 import { requireAuth } from '@/lib/middleware/auth-middleware';
-import { createCanvas } from '@/lib/db';
+import { createCanvas, updateCanvas } from '@/lib/db';
 import {
   generateCanvasKey,
   saveCanvasToR2,
   saveCanvasToR2Compressed,
-  validateCanvasData,
   getCanvasDataSize,
   isCanvasTooLarge,
 } from '@/lib/storage/canvas-storage';
+import { validateCanvasData } from '@/lib/schemas/canvas.schema';
+import { generateUniqueCanvasName } from '@/lib/utils/canvas-naming';
+import { successResponse, apiErrors } from '@/lib/utils/api-response';
 
 export const prerender = false;
 
@@ -26,70 +28,33 @@ export const POST: APIRoute = async (context) => {
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(
-        JSON.stringify({ error: 'Storage not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     let body: any;
     try {
       body = await context.request.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.invalidJson();
     }
 
     const { title, canvasData } = body;
-    let finalTitle = title || 'Untitled Canvas';
 
-    // Unique Title Logic
-    if (finalTitle.startsWith('Untitled Canvas')) {
-      const existing = await runtime.env.DB.prepare(
-        'SELECT title FROM canvases WHERE user_id = ? AND title LIKE ?'
-      )
-        .bind(auth.userId, 'Untitled Canvas%')
-        .all();
-
-      if (existing.results && existing.results.length > 0) {
-        let maxNum = 0;
-        // Check for exact "Untitled Canvas"
-        const hasExact = existing.results.some((r: any) => r.title === 'Untitled Canvas');
-        if (hasExact) maxNum = 1; // At least one exists, so next should be 2+
-
-        // Check for "Untitled Canvas X"
-        const regex = /^Untitled Canvas (\d+)$/;
-        for (const row of existing.results) {
-          const match = (row as any).title.match(regex);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
-          }
-        }
-
-        if (maxNum > 0) {
-          finalTitle = `Untitled Canvas ${maxNum + 1}`;
-        } else if (hasExact) {
-          finalTitle = 'Untitled Canvas 2'; // Fallback if my logic above was slightly off
-        }
-      }
-    }
+    // Generate unique title using utility function
+    const finalTitle = await generateUniqueCanvasName(
+      runtime.env.DB,
+      auth.userId,
+      title || 'Untitled Canvas'
+    );
 
     if (!canvasData || !validateCanvasData(canvasData)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid canvas data' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.validationError('Invalid canvas data structure');
     }
 
-    if (isCanvasTooLarge(canvasData)) {
-      return new Response(
-        JSON.stringify({ error: 'Canvas data exceeds 10MB limit' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+    if (isCanvasTooLarge(canvasData as any)) {
+      return apiErrors.badRequest(
+        'Canvas too large',
+        'Canvas data exceeds 50MB limit'
       );
     }
 
@@ -97,10 +62,10 @@ export const POST: APIRoute = async (context) => {
     const { nanoid } = await import('nanoid');
     const canvasId = nanoid();
     const r2Key = generateCanvasKey(auth.userId, canvasId);
-    const sizeBytes = getCanvasDataSize(canvasData);
+    const sizeBytes = getCanvasDataSize(canvasData as any);
 
     // Save to R2 (compressed)
-    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData as any);
 
     // Create D1 record with the SAME ID used for R2
     const canvas = await createCanvas(runtime.env.DB, {
@@ -108,27 +73,22 @@ export const POST: APIRoute = async (context) => {
       userId: auth.userId,
       title: finalTitle,
       r2Key,
+      sizeBytes: compressedSize,
     });
 
-    // Update size_bytes (use compressed size)
-    await runtime.env.DB
-      .prepare('UPDATE canvases SET size_bytes = ? WHERE id = ?')
-      .bind(compressedSize, canvas.id)
-      .run();
-
-    return new Response(
-      JSON.stringify({
+    return successResponse(
+      {
         canvasId: canvas.id,
         savedAt: new Date().toISOString(),
         sizeBytes: compressedSize,
-      }),
-      { status: 201, headers: { 'Content-Type': 'application/json' } }
+      },
+      201
     );
   } catch (error) {
     console.error('Auto-save error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Auto-save failed', details: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return apiErrors.serverError(
+      'Auto-save failed',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 };

@@ -191,7 +191,7 @@ export default function CanvasAvatar({ user, isAuthenticated, isLoading }: Canva
                 </div>
                 <div style={{ padding: '6px 0' }}>
                   <a
-                    href="/ai-canvas"
+                    href="/ai-canvas?new=true"
                     style={{
                       display: 'block',
                       padding: '8px 16px',

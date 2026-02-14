@@ -5,21 +5,8 @@
 
 import type { R2Bucket } from '@cloudflare/workers-types';
 import { nanoid } from 'nanoid';
-
-// ============================================================================
-// Canvas Data Types
-// ============================================================================
-
-export interface CanvasData {
-  elements: any[]; // Excalidraw elements
-  appState?: {
-    viewBackgroundColor?: string;
-    currentItemStrokeColor?: string;
-    currentItemBackgroundColor?: string;
-    [key: string]: any;
-  };
-  files?: Record<string, any>; // Excalidraw files (images, etc.)
-}
+import type { CanvasData } from '@/lib/types/excalidraw';
+import { validateCanvasData } from '@/lib/schemas/canvas.schema';
 
 // ============================================================================
 // Storage Functions
@@ -162,33 +149,8 @@ export async function deleteAllCanvasFiles(
   }
 }
 
-/**
- * Validate canvas data structure
- */
-export function validateCanvasData(data: unknown): data is CanvasData {
-  if (typeof data !== 'object' || data === null) {
-    return false;
-  }
-
-  const canvas = data as Partial<CanvasData>;
-
-  // Must have elements array
-  if (!Array.isArray(canvas.elements)) {
-    return false;
-  }
-
-  // appState is optional but must be object if present
-  if (canvas.appState !== undefined && typeof canvas.appState !== 'object') {
-    return false;
-  }
-
-  // files is optional but must be object if present
-  if (canvas.files !== undefined && typeof canvas.files !== 'object') {
-    return false;
-  }
-
-  return true;
-}
+// validateCanvasData is now imported from @/lib/schemas/canvas.schema
+// This ensures single source of truth for validation logic
 
 // ============================================================================
 // Compressed Storage Functions (gzip)
@@ -316,7 +278,7 @@ export function getCanvasDataSize(canvasData: CanvasData): number {
  */
 export function isCanvasTooLarge(
   canvasData: CanvasData,
-  maxSizeBytes: number = 10 * 1024 * 1024
+  maxSizeBytes: number = 50 * 1024 * 1024
 ): boolean {
   return getCanvasDataSize(canvasData) > maxSizeBytes;
 }

@@ -8,7 +8,8 @@
 import type { APIRoute } from 'astro';
 import { requireAuth, optionalAuth } from '@/lib/middleware/auth-middleware';
 import { validateUpdateCanvasRequest } from '@/lib/schemas/canvas.schema';
-import type { CanvasResponse, CanvasErrorResponse } from '@/lib/schemas/canvas.schema';
+import type { CanvasResponse, CanvasErrorResponse, CanvasData } from '@/lib/schemas/canvas.schema';
+import { successResponse, apiErrors } from '@/lib/utils/api-response';
 import {
   getCanvasById,
   getCanvasByIdAndUser,
@@ -40,24 +41,12 @@ export const GET: APIRoute = async (context) => {
     const canvasId = context.params.id;
 
     if (!canvasId) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request',
-          details: 'Canvas ID is required',
-        } as CanvasErrorResponse),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.badRequest('Invalid request', 'Canvas ID is required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(
-        JSON.stringify({
-          error: 'Storage not configured',
-          details: 'Database or R2 storage is not available',
-        } as CanvasErrorResponse),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     // Check for optional session (public canvases are visible without login)
@@ -67,69 +56,44 @@ export const GET: APIRoute = async (context) => {
     const canvas = await getCanvasById(runtime.env.DB, canvasId);
 
     if (!canvas) {
-      return new Response(
-        JSON.stringify({
-          error: 'Canvas not found',
-          details: 'The requested canvas does not exist',
-        } as CanvasErrorResponse),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.notFound('Canvas');
     }
 
-    // Check permissions
-    const isOwner = auth.userId === canvas.user_id;
-    const isPublic = canvas.is_public === 1;
+    // Check permissions (canvas now has camelCase properties from Drizzle)
+    const isOwner = auth.userId === canvas.userId;
+    const isPublic = canvas.isPublic;
 
     if (!isOwner && !isPublic) {
-      return new Response(
-        JSON.stringify({
-          error: 'Access denied',
-          details: 'You do not have permission to view this canvas',
-        } as CanvasErrorResponse),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.forbidden('You do not have permission to view this canvas');
     }
 
     // Load canvas data from R2 (auto-detects gzip)
-    const canvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+    const canvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key);
 
     if (!canvasData) {
-      return new Response(
-        JSON.stringify({
-          error: 'Canvas data not found',
-          details: 'Canvas metadata exists but data is missing from storage',
-        } as CanvasErrorResponse),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Canvas metadata exists but data is missing from storage');
     }
 
     // Build response
     const response: CanvasResponse = {
       id: canvas.id,
-      userId: canvas.user_id,
+      userId: canvas.userId,
       title: canvas.title,
       description: canvas.description,
-      thumbnailUrl: canvas.thumbnail_url,
-      isPublic: canvas.is_public === 1,
+      thumbnailUrl: canvas.thumbnailUrl,
+      isPublic: canvas.isPublic,
       version: canvas.version,
-      createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at,
-      canvasData,
+      createdAt: canvas.createdAt,
+      updatedAt: canvas.updatedAt,
+      canvasData: canvasData as any,
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return successResponse(response);
   } catch (error) {
     console.error('Canvas fetch error:', error);
-
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to fetch canvas',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      } as CanvasErrorResponse),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return apiErrors.serverError(
+      'Failed to fetch canvas',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 };
@@ -149,24 +113,12 @@ export const PUT: APIRoute = async (context) => {
     const canvasId = context.params.id;
 
     if (!canvasId) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request',
-          details: 'Canvas ID is required',
-        } as CanvasErrorResponse),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.badRequest('Invalid request', 'Canvas ID is required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(
-        JSON.stringify({
-          error: 'Storage not configured',
-          details: 'Database or R2 storage is not available',
-        } as CanvasErrorResponse),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     // Parse and validate request body
@@ -200,29 +152,17 @@ export const PUT: APIRoute = async (context) => {
     const canvas = await getCanvasByIdAndUser(runtime.env.DB, canvasId, auth.userId);
 
     if (!canvas) {
-      return new Response(
-        JSON.stringify({
-          error: 'Canvas not found',
-          details: 'Canvas does not exist or you do not have permission to edit it',
-        } as CanvasErrorResponse),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.notFound('Canvas');
     }
 
     // Update canvas data if provided
-    let newR2Key = canvas.r2_key;
+    let newR2Key = canvas.r2Key;
     let newVersion = canvas.version;
 
     if (canvasData) {
       // Check canvas size
-      if (isCanvasTooLarge(canvasData)) {
-        return new Response(
-          JSON.stringify({
-            error: 'Canvas too large',
-            details: 'Canvas data exceeds 10MB limit',
-          } as CanvasErrorResponse),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
+      if (isCanvasTooLarge(canvasData as any)) {
+        return apiErrors.badRequest('Canvas too large', 'Canvas data exceeds 50MB limit');
       }
 
       // Create version if requested
@@ -231,7 +171,7 @@ export const PUT: APIRoute = async (context) => {
         const versionKey = generateCanvasVersionKey(auth.userId, canvasId, canvas.version);
 
         // Save current version
-        const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+        const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key);
         if (currentData) {
           await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, versionKey, currentData);
           await createCanvasVersion(runtime.env.DB, canvasId, canvas.version, versionKey);
@@ -239,7 +179,7 @@ export const PUT: APIRoute = async (context) => {
       }
 
       // Save updated canvas data (compressed)
-      await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
+      await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key, canvasData as any);
     }
 
     // Update thumbnail if provided
@@ -258,45 +198,32 @@ export const PUT: APIRoute = async (context) => {
     });
 
     if (!updatedCanvas) {
-      return new Response(
-        JSON.stringify({
-          error: 'Update failed',
-          details: 'Failed to update canvas metadata',
-        } as CanvasErrorResponse),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.serverError('Update failed', 'Failed to update canvas metadata');
     }
 
     // Load final canvas data
-    const finalCanvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, updatedCanvas.r2_key);
+    const finalCanvasData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, updatedCanvas.r2Key);
 
-    // Build response
+    // Build response (updatedCanvas now has camelCase properties from Drizzle)
     const response: CanvasResponse = {
       id: updatedCanvas.id,
-      userId: updatedCanvas.user_id,
+      userId: updatedCanvas.userId,
       title: updatedCanvas.title,
       description: updatedCanvas.description,
-      thumbnailUrl: updatedCanvas.thumbnail_url,
-      isPublic: updatedCanvas.is_public === 1,
+      thumbnailUrl: updatedCanvas.thumbnailUrl,
+      isPublic: updatedCanvas.isPublic,
       version: updatedCanvas.version,
-      createdAt: updatedCanvas.created_at,
-      updatedAt: updatedCanvas.updated_at,
-      canvasData: finalCanvasData!,
+      createdAt: updatedCanvas.createdAt,
+      updatedAt: updatedCanvas.updatedAt,
+      canvasData: finalCanvasData as any,
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return successResponse(response);
   } catch (error) {
     console.error('Canvas update error:', error);
-
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to update canvas',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      } as CanvasErrorResponse),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return apiErrors.serverError(
+      'Failed to update canvas',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 };
@@ -312,56 +239,38 @@ export const PATCH: APIRoute = async (context) => {
 
     const canvasId = context.params.id;
     if (!canvasId) {
-      return new Response(
-        JSON.stringify({ error: 'Canvas ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.badRequest('Invalid request', 'Canvas ID is required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(
-        JSON.stringify({ error: 'Storage not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     let canvasData: any;
     try {
       canvasData = await context.request.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.invalidJson();
     }
 
     if (!canvasData || !Array.isArray(canvasData.elements)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid canvas data' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.validationError('Invalid canvas data structure');
     }
 
     // Verify ownership
     const canvas = await getCanvasByIdAndUser(runtime.env.DB, canvasId, auth.userId);
     if (!canvas) {
-      return new Response(
-        JSON.stringify({ error: 'Canvas not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.notFound('Canvas');
     }
 
     // Check size
-    if (isCanvasTooLarge(canvasData)) {
-      return new Response(
-        JSON.stringify({ error: 'Canvas data exceeds 10MB limit' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    if (isCanvasTooLarge(canvasData as any)) {
+      return apiErrors.badRequest('Canvas too large', 'Canvas data exceeds 50MB limit');
     }
 
     // Save to R2 (overwrites current data, compressed)
-    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key, canvasData);
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key, canvasData as any);
 
     // Update D1 metadata
     const now = Math.floor(Date.now() / 1000);
@@ -372,19 +281,16 @@ export const PATCH: APIRoute = async (context) => {
       .bind(now, compressedSize, canvasId, auth.userId)
       .run();
 
-    return new Response(
-      JSON.stringify({
-        canvasId,
-        savedAt: new Date().toISOString(),
-        sizeBytes: compressedSize,
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return successResponse({
+      canvasId,
+      savedAt: new Date().toISOString(),
+      sizeBytes: compressedSize,
+    });
   } catch (error) {
     console.error('Canvas auto-save error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Auto-save failed', details: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return apiErrors.serverError(
+      'Auto-save failed',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 };
@@ -404,55 +310,30 @@ export const DELETE: APIRoute = async (context) => {
     const canvasId = context.params.id;
 
     if (!canvasId) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request',
-          details: 'Canvas ID is required',
-        } as CanvasErrorResponse),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.badRequest('Invalid request', 'Canvas ID is required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(
-        JSON.stringify({
-          error: 'Storage not configured',
-          details: 'Database or R2 storage is not available',
-        } as CanvasErrorResponse),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     // Delete from database (also verifies ownership)
     const deleted = await deleteCanvas(runtime.env.DB, canvasId, auth.userId);
 
     if (!deleted) {
-      return new Response(
-        JSON.stringify({
-          error: 'Canvas not found',
-          details: 'Canvas does not exist or you do not have permission to delete it',
-        } as CanvasErrorResponse),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiErrors.notFound('Canvas');
     }
 
     // Delete all R2 files (canvas, versions, thumbnail)
     await deleteAllCanvasFiles(runtime.env.CANVAS_STORAGE, auth.userId, canvasId);
 
-    return new Response(
-      JSON.stringify({ success: true, message: 'Canvas deleted successfully' }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return successResponse({ success: true, message: 'Canvas deleted successfully' });
   } catch (error) {
     console.error('Canvas deletion error:', error);
-
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to delete canvas',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      } as CanvasErrorResponse),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return apiErrors.serverError(
+      'Failed to delete canvas',
+      error instanceof Error ? error.message : 'Unknown error'
     );
   }
 };

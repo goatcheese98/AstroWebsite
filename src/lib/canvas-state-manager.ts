@@ -47,6 +47,7 @@
 
 import type { Message } from "../components/ai-chat/types";
 import type { ImageHistoryItem } from "../components/ai-chat/hooks/useImageGeneration";
+import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from "../context/ExcalidrawContext";
 
 // File format version for compatibility checking
 const STATE_FILE_VERSION = "1.1.0";  // Bumped for compression support
@@ -60,9 +61,9 @@ export interface CanvasState {
     version: string;
     exportedAt: number;
     canvas: {
-        elements: any[];
-        appState: Record<string, any>;
-        files: Record<string, any>;
+        elements: ExcalidrawElement[];
+        appState: Partial<ExcalidrawAppState>;
+        files: Record<string, { mimeType: string; id: string; dataURL?: string }> | null;
     };
     chat: {
         messages: Message[];
@@ -72,13 +73,15 @@ export interface CanvasState {
     images: {
         history: ImageHistoryItem[];
     };
+    // Allow additional properties for markdown files
+    [key: string]: unknown;
 }
 
 /**
  * Current state data collected from various sources
  */
 export interface CurrentStateData {
-    excalidrawAPI: any;
+    excalidrawAPI: ExcalidrawAPI;
     messages: Message[];
     aiProvider: "kimi" | "claude";
     contextMode: "all" | "selected";
@@ -142,7 +145,7 @@ export function collectCanvasState(data: CurrentStateData): CanvasState {
                         ? msg.metadata.timestamp.toISOString() 
                         : msg.metadata.timestamp,
                 },
-            })),
+            })) as unknown as Message[],
             aiProvider,
             contextMode,
         },
@@ -153,7 +156,7 @@ export function collectCanvasState(data: CurrentStateData): CanvasState {
                 timestamp: img.timestamp instanceof Date 
                     ? img.timestamp.toISOString() 
                     : img.timestamp,
-            })),
+            })) as unknown as ImageHistoryItem[],
         },
     };
 }
@@ -317,7 +320,7 @@ export async function saveCanvasStateToFile(
         // Compressed: compact JSON + gzip
         const json = JSON.stringify(stateToSave);
         const compressed = await compressData(json);
-        const blob = new Blob([compressed], { type: "application/gzip" });
+        const blob = new Blob([compressed as unknown as BlobPart], { type: "application/gzip" });
         
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -352,16 +355,28 @@ export async function saveCanvasStateToFile(
 }
 
 /**
+ * Raw Excalidraw file format (from .excalidraw files)
+ */
+interface ExcalidrawFileData {
+    type?: string;
+    version?: number;
+    source?: string;
+    elements?: ExcalidrawElement[];
+    appState?: Partial<ExcalidrawAppState>;
+    files?: Record<string, { mimeType: string; id: string; dataURL?: string }>;
+}
+
+/**
  * Convert .excalidraw file to our CanvasState format
  */
-function convertExcalidrawToCanvasState(excalidrawData: any): CanvasState {
+function convertExcalidrawToCanvasState(excalidrawData: ExcalidrawFileData): CanvasState {
     return {
         version: STATE_FILE_VERSION,
         exportedAt: Date.now(),
         canvas: {
             elements: excalidrawData.elements || [],
             appState: excalidrawData.appState || {},
-            files: excalidrawData.files || {},
+            files: excalidrawData.files || null,
         },
         chat: {
             messages: [],

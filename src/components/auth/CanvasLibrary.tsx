@@ -50,6 +50,10 @@ export function CanvasLibraryPure() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Batch selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
   // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -123,6 +127,72 @@ export function CanvasLibraryPure() {
     }
   }
 
+  // Batch selection handlers
+  function handleToggleSelect(id: string, index: number, shiftKey: boolean) {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+
+      // Handle shift-click for range selection
+      if (shiftKey && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index);
+        const end = Math.max(lastSelectedIndex, index);
+        const idsToSelect = filtered.slice(start, end + 1).map(c => c.id);
+        idsToSelect.forEach(id => newSet.add(id));
+      } else {
+        // Normal toggle
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+      }
+
+      return newSet;
+    });
+
+    setLastSelectedIndex(index);
+  }
+
+  function handleSelectAll() {
+    setSelectedIds(new Set(filtered.map(c => c.id)));
+  }
+
+  function handleDeselectAll() {
+    setSelectedIds(new Set());
+    setLastSelectedIndex(null);
+  }
+
+  async function handleBatchDelete() {
+    const count = selectedIds.size;
+    if (count === 0) return;
+
+    const confirmMsg = count === 1
+      ? 'Delete 1 canvas? This cannot be undone.'
+      : `Delete ${count} canvases? This cannot be undone.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    // Delete all selected canvases in parallel
+    const deletePromises = Array.from(selectedIds).map(id =>
+      fetch(`/api/canvas/${id}`, { method: 'DELETE', credentials: 'include' })
+        .then(res => ({ id, success: res.ok }))
+        .catch(() => ({ id, success: false }))
+    );
+
+    const results = await Promise.all(deletePromises);
+    const successIds = results.filter(r => r.success).map(r => r.id);
+    const failedCount = results.length - successIds.length;
+
+    // Update UI to remove successfully deleted canvases
+    setCanvases(canvases.filter(c => !successIds.includes(c.id)));
+    setSelectedIds(new Set());
+    setLastSelectedIndex(null);
+
+    if (failedCount > 0) {
+      alert(`Deleted ${successIds.length} canvas(es). ${failedCount} failed to delete.`);
+    }
+  }
+
   async function handleToggleFavorite(id: string) {
     try {
       const res = await fetch(`/api/canvas/${id}/favorite`, { method: 'POST', credentials: 'include' });
@@ -175,35 +245,54 @@ export function CanvasLibraryPure() {
     <div className="dashboard-container">
       {/* Toolbar */}
       <div className="toolbar">
-        <div className="search-bar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search your canvases..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <div className="controls">
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as SortOption)}>
-            <option value="recent">Recent</option>
-            <option value="alphabetical">Name (A-Z)</option>
-            <option value="favorites">Favorites</option>
-          </select>
-
-          <div className="view-toggle">
-            <button onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'active' : ''}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-            </button>
-            <button onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'active' : ''}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+        {selectedIds.size > 0 ? (
+          // Batch actions toolbar
+          <div className="batch-actions">
+            <span className="selection-count">{selectedIds.size} selected</span>
+            <button onClick={handleSelectAll} className="btn-secondary">Select All</button>
+            <button onClick={handleDeselectAll} className="btn-secondary">Deselect All</button>
+            <button onClick={handleBatchDelete} className="btn-danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              Delete Selected
             </button>
           </div>
-        </div>
+        ) : (
+          // Normal toolbar
+          <>
+            <div className="search-bar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search your canvases..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="controls">
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as SortOption)}>
+                <option value="recent">Recent</option>
+                <option value="alphabetical">Name (A-Z)</option>
+                <option value="favorites">Favorites</option>
+              </select>
+
+              <div className="view-toggle">
+                <button onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'active' : ''}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+                </button>
+                <button onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'active' : ''}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -221,8 +310,25 @@ export function CanvasLibraryPure() {
         </div>
       ) : (
         <div className={`canvas-grid ${viewMode}`}>
-          {filtered.map(canvas => (
-            <div key={canvas.id} className="canvas-card" onMouseLeave={() => setMenuOpenId(null)}>
+          {filtered.map((canvas, index) => (
+            <div
+              key={canvas.id}
+              className={`canvas-card ${selectedIds.has(canvas.id) ? 'selected' : ''}`}
+              onMouseLeave={() => setMenuOpenId(null)}
+              title={`Created: ${new Date(canvas.createdAt * 1000).toLocaleString()}\nLast Saved: ${new Date(canvas.updatedAt * 1000).toLocaleString()}`}
+            >
+              {/* Selection Checkbox */}
+              <div className="card-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(canvas.id)}
+                  onChange={() => {}} // Controlled by onClick
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleSelect(canvas.id, index, e.shiftKey);
+                  }}
+                />
+              </div>
 
               {/* Thumbnail Area */}
               <a href={`/ai-canvas?canvas=${canvas.id}`} className="card-thumb">
@@ -632,6 +738,81 @@ export function CanvasLibraryPure() {
         }
         .btn-primary:hover { background: #4338ca; }
         .btn-primary.large { padding: 12px 24px; font-size: 16px; }
+
+        /* --- Batch Actions --- */
+        .batch-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          margin-bottom: 24px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .selection-count {
+          font-size: 14px;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .batch-actions .controls {
+          display: flex;
+          gap: 8px;
+        }
+
+        .btn-secondary {
+          background: white;
+          color: #374151;
+          border: 1px solid #d1d5db;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+          background: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        .btn-danger {
+          background: #ef4444;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .btn-danger:hover {
+          background: #dc2626;
+        }
+
+        /* --- Checkbox --- */
+        .card-checkbox {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          z-index: 2;
+          accent-color: #4f46e5;
+        }
+
+        /* Selected Card State */
+        .canvas-card.selected {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+          background: #f5f7ff;
+        }
 
         @media (max-width: 640px) {
           .toolbar { flex-direction: column; align-items: stretch; }

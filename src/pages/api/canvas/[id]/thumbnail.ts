@@ -8,6 +8,7 @@ import type { APIRoute } from 'astro';
 import { requireAuth, optionalAuth } from '@/lib/middleware/auth-middleware';
 import { getCanvasByIdAndUser, getCanvasById } from '@/lib/db';
 import { generateThumbnailKey } from '@/lib/storage/canvas-storage';
+import { successResponse, apiErrors } from '@/lib/utils/api-response';
 
 export const prerender = false;
 
@@ -104,7 +105,7 @@ export const GET: APIRoute = async (context) => {
       return new Response('Not found', { status: 404 });
     }
 
-    const r2Key = generateThumbnailKey(canvas.user_id, canvasId);
+    const r2Key = generateThumbnailKey(canvas.userId, canvasId);
     const object = await runtime.env.CANVAS_STORAGE.get(r2Key);
 
     if (!object) {

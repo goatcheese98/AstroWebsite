@@ -6,79 +6,21 @@
  * ║  🏷️ BADGES: 🟣 UI Component | 🎯 Orchestrator | 🏗️ Architecture Root        ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
- * 👤 WHO AM I?
- * I am the conductor of the AI chat orchestra. I don't play any instruments myself
- * - instead, I coordinate all the specialized musicians (hooks and components) to
- * create a harmonious user experience. I'm thin by design - all the heavy lifting
- * is done by my delegates.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * I bring together all the pieces of the AI chat feature into a cohesive whole.
- * Users get a complete chat experience with:
- * - Message sending and receiving
- * - Canvas context awareness (elements, selected area)
- * - Mobile-responsive layout (full-width panel on small screens)
- * - Resizable sidebar (on desktop)
- * - Keyboard shortcuts (Cmd+Enter to send)
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                     MY ORCHESTRA SECTIONS                        │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   🧠 BRAIN (Hooks)                                               │
- *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
- *      │   │useAIChatState│ │useImageGen   │ │usePanelResize   │         │
- *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
- *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
- *      │   │useMobileDet │ │useCanvasCmds │ │useKeyboardShorts│         │
- *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
- *      │                                                                  │
- *      │   🎨 UI (Components)                                             │
- *      │   ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐         │
- *      │   │ ChatPanel   │ │ ChatHeader   │ │CanvasContextPanel│         │
- *      │   └─────────────┘ └──────────────┘ └─────────────────┘         │
- *      │   ┌─────────────┐ ┌──────────────┐                             │
- *      │   │ MessageList │ │  ChatInput   │                             │
- *      │   └─────────────┘ └──────────────┘                             │
- *      │                                                                  │
- *      │   🎭 MODALS                                                      │
- *      │   ┌─────────────────┐                                            │
- *      │   │ TemplateModal   │                                            │
- *      │   └─────────────────┘                                            │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Chat doesn't open, components not rendering, hooks failing
- * - User Impact: Complete chat feature failure
- * - Quick Fix: Check all imports are correct, verify props passing
- * 
- * 📦 PROPS I ACCEPT:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ isOpen              │ Whether chat panel should be visible                 │
- * │ onClose             │ Callback when user closes the panel                  │
- * │ initialWidth        │ Starting width of the panel (default: 400)           │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted all business logic to custom hooks
- * 2026-02-05: Integrated useMobileDetection for responsive resizing.
- * 2026-02-05: Moved ImageGenerationModal logic to CanvasApp.
- * 2026-02-05: Cleaned up redundant resize state (now using specialized hook).
+ * AI Chat Container - Orchestrates all chat functionality
+ * Now with Zustand store integration for state management
  * 
  * @module AIChatContainer
  */
 
 import React, { useRef, useCallback, useEffect, useState } from "react";
 
+// Store
+import { useCanvasStore } from "../../stores";
+import { useEvent } from "../../lib/events";
+
 // Hooks
 import { useAIChatState } from "./hooks/useAIChatState";
-import { useImageGeneration, type ImageHistoryItem } from "./hooks/useImageGeneration";
-import type { Message } from "./types";
 import { useCanvasCommands } from "./hooks/useCanvasCommands";
-
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useElementSelection } from "./useElementSelection";
 import { useMobileDetection } from "./hooks/useMobileDetection";
@@ -87,7 +29,6 @@ import { useMobileDetection } from "./hooks/useMobileDetection";
 import { ChatPanel } from "./components/ChatPanel";
 import { ChatHeader } from "./components/ChatHeader";
 import { CanvasContextOverlay } from "./components/CanvasContextOverlay";
-
 import { MessageList } from "./components/MessageList";
 import { ChatInput } from "./components/ChatInput";
 
@@ -101,56 +42,152 @@ export interface AIChatContainerProps {
     onClose: () => void;
     /** Initial width of the panel in pixels */
     initialWidth?: number;
-    /** Callback to update parent with current state (for save functionality) */
-    onStateUpdate?: (state: {
-        messages: Message[];
-        aiProvider: "kimi" | "claude";
-        contextMode: "all" | "selected";
-        imageHistory: ImageHistoryItem[];
-    }) => void;
-    /** Pending state to load (from file) */
-    pendingLoadState?: any;
-    /** External image history (from parent useImageGeneration hook) */
-    imageHistory?: ImageHistoryItem[];
-    /** External setter for image history */
-    setImageHistory?: (history: ImageHistoryItem[]) => void;
+}
+
+/**
+ * Minimized Chat Button - Compact button shown when chat is minimized
+ */
+function MinimizedChatButton({
+    onExpand,
+    onClose,
+    aiProvider
+}: {
+    onExpand: () => void;
+    onClose: () => void;
+    aiProvider: "kimi" | "claude"
+}) {
+    return (
+        <div
+            style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 16px",
+                background: "white",
+                border: "1px solid var(--color-border, #e5e7eb)",
+                borderRadius: "24px",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                fontSize: "14px",
+                fontWeight: 500,
+                color: "var(--color-text, #374151)",
+                transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.02)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.2)";
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+            }}
+        >
+            {/* Click to expand */}
+            <button
+                onClick={onExpand}
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    color: "var(--color-text, #374151)",
+                    padding: 0,
+                }}
+            >
+                <span>AI Chat</span>
+                <span
+                    style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        background: aiProvider === 'kimi' ? '#22c55e' : '#22c55e',
+                    }}
+                />
+            </button>
+
+            {/* Close button */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                }}
+                title="Close"
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "20px",
+                    height: "20px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--color-text-secondary, #6b7280)",
+                    borderRadius: "50%",
+                    transition: "all 0.15s",
+                    marginLeft: "4px",
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--color-surface-hover, #f3f4f6)";
+                    e.currentTarget.style.color = "var(--color-text, #374151)";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--color-text-secondary, #6b7280)";
+                }}
+            >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
 }
 
 /**
  * AI Chat Container - Orchestrates all chat functionality
+ * Uses Zustand store for state management - no prop drilling needed
  */
 export default function AIChatContainer({
     isOpen,
     onClose,
     initialWidth = 340,
-    onStateUpdate,
-    pendingLoadState,
-    imageHistory: externalImageHistory,
-    setImageHistory: externalSetImageHistory,
 }: AIChatContainerProps) {
     // === 📱 MOBILE DETECTION ===
     const { isMobile, viewportWidth } = useMobileDetection();
 
+    // === STORE INTEGRATION ===
+    const store = useCanvasStore();
+    const {
+        messages,
+        setMessages,
+        aiProvider,
+        setAIProvider,
+        contextMode,
+        setContextMode,
+        imageHistory,
+        setImageHistory,
+        isChatLoading,
+        setChatLoading,
+        chatError,
+        setChatError,
+        clearChatError,
+        addToast,
+        isChatMinimized,
+        setChatMinimized,
+    } = store;
+
     // === 🧠 REFS ===
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [hasLoadedPendingState, setHasLoadedPendingState] = useState(false);
 
     // Listen for mobile backdrop close request
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleCloseRequest = () => {
-            onClose();
-        };
-
-        window.addEventListener("ai-chat:close-request", handleCloseRequest);
-        return () => {
-            window.removeEventListener("ai-chat:close-request", handleCloseRequest);
-        };
-    }, [isOpen, onClose]);
-
-    // Track if we've loaded the pending state
-    const [hasLoadedPendingState, setHasLoadedPendingState] = useState(false);
+    useEvent('ai-chat:close-request', () => {
+        onClose();
+    });
 
     // === 🧠 HOOKS ===
 
@@ -168,6 +205,7 @@ export default function AIChatContainer({
     const panelWidth = isMobile ? viewportWidth : 360;
     const [panelHeight, setPanelHeight] = useState(600);
     const [isResizingHeight, setIsResizingHeight] = useState(false);
+    const [showTemplates, setShowTemplates] = useState(false);
 
     // Vertical resize handling
     const startResize = useCallback((e: React.MouseEvent) => {
@@ -183,8 +221,7 @@ export default function AIChatContainer({
         if (!isResizingHeight) return;
 
         const handleMouseMove = (e: MouseEvent) => {
-            // Calculate new height from bottom edge
-            const newHeight = window.innerHeight - e.clientY - 20; // 20px from bottom
+            const newHeight = window.innerHeight - e.clientY - 20;
             const clampedHeight = Math.max(300, Math.min(newHeight, window.innerHeight - 100));
             setPanelHeight(clampedHeight);
         };
@@ -204,35 +241,18 @@ export default function AIChatContainer({
         };
     }, [isResizingHeight]);
 
-    // Core chat state
+    // Core chat state (local UI state still in hook)
     const {
-        messages,
-        setMessages,
         input,
         setInput,
-        isLoading,
-        error,
-        clearError,
-        aiProvider,
-        setAiProvider,
-        toggleProvider,
-        contextMode,
-        setContextMode,
         canvasState,
         setCanvasState,
-        showTemplates,
-        setShowTemplates,
         handleSend: handleSendMessage,
     } = useAIChatState({
         isOpen,
         initialWidth,
         onClose,
     });
-
-    // Image generation - use external props if provided, otherwise use internal hook
-    const internalImageGen = useImageGeneration();
-    const imageHistory = externalImageHistory ?? internalImageGen.imageHistory;
-    const setImageHistory = externalSetImageHistory ?? internalImageGen.setImageHistory;
 
     // Canvas commands
     const {
@@ -243,35 +263,58 @@ export default function AIChatContainer({
         onStateUpdate: setCanvasState,
     });
 
-    // Track if user manually selected elements (not via "All" button)
-    const wasManualSelectionRef = useRef(false);
+    // Track selection changes for auto-switching context mode
     const previousSelectionCountRef = useRef(0);
 
-    // Auto-switch to "selected" mode only when user manually selects elements
     useEffect(() => {
         const currentCount = selectedElements.length;
         const previousCount = previousSelectionCountRef.current;
 
-        // If selection increased and we're in "all" mode, check if it's manual
-        if (contextMode === "all" && currentCount > 0 && currentCount < canvasState?.elements?.length) {
-            // Only auto-switch if it's not a full selection (which would be from "All" button)
+        if (contextMode === "all" && currentCount > 0 && currentCount < (canvasState?.elements?.length || 0)) {
             setContextMode("selected");
         }
 
         previousSelectionCountRef.current = currentCount;
     }, [selectedElements.length, contextMode, setContextMode, canvasState?.elements?.length]);
 
+    // Listen for load-state events from store/event bus
+    useEvent('canvas:load-state', (data) => {
+        if (!data.state || hasLoadedPendingState) return;
+
+        const state = data.state as any;
+        if (state.chat) {
+            if (state.chat.messages) {
+                const loadedMessages = state.chat.messages.map((msg: any) => ({
+                    ...msg,
+                    metadata: {
+                        ...msg.metadata,
+                        timestamp: new Date(msg.metadata.timestamp),
+                    },
+                }));
+                setMessages(loadedMessages);
+            }
+            if (state.chat.aiProvider) setAIProvider(state.chat.aiProvider);
+            if (state.chat.contextMode) setContextMode(state.chat.contextMode);
+        }
+
+        if (state.images?.history) {
+            const loadedHistory = state.images.history.map((img: any) => ({
+                ...img,
+                timestamp: new Date(img.timestamp),
+            }));
+            setImageHistory(loadedHistory);
+        }
+
+        setHasLoadedPendingState(true);
+        setTimeout(() => setHasLoadedPendingState(false), 100);
+    }, [hasLoadedPendingState, setMessages, setAIProvider, setContextMode, setImageHistory]);
+
     // === 🚀 ACTIONS ===
 
-    /**
-     * Handle sending a message
-     */
     const handleSend = useCallback(async () => {
-        // Check if we have selected images
         const selectedImageData: string[] = [];
 
         if (contextMode === "selected" && selectedElements.length > 0) {
-            // Extract image data from selected image elements
             elementSnapshots.forEach((snapshot) => {
                 if (snapshot.type === 'image' && snapshot.imageDataURL) {
                     selectedImageData.push(snapshot.imageDataURL);
@@ -279,7 +322,6 @@ export default function AIChatContainer({
             });
         }
 
-        // Use the first selected image as the screenshot data (Claude supports vision)
         const imageForAI = selectedImageData.length > 0 ? selectedImageData[0] : null;
 
         await handleSendMessage({
@@ -287,82 +329,55 @@ export default function AIChatContainer({
             selectedElements,
             getSelectionContext,
         });
-    }, [
-        contextMode,
-        selectedElements,
-        elementSnapshots,
-        handleSendMessage,
-        getSelectionContext,
-    ]);
+    }, [contextMode, selectedElements, elementSnapshots, handleSendMessage, getSelectionContext]);
 
-    // Keyboard shortcuts (must be after handleSend definition)
+    // Keyboard shortcuts
     const { handleKeyDown } = useKeyboardShortcuts({
         onSend: handleSend,
         onClose,
         hasInput: input.trim().length > 0,
-        isLoading: isLoading,
+        isLoading: isChatLoading,
     });
 
-    // Report state changes to parent for save functionality
-    useEffect(() => {
-        onStateUpdate?.({
-            messages,
-            aiProvider,
-            contextMode,
-            imageHistory,
-        });
-    }, [messages, aiProvider, contextMode, imageHistory, onStateUpdate]);
+    // Handle minimize
+    const handleMinimize = useCallback(() => {
+        setChatMinimized(true);
+    }, [setChatMinimized]);
 
-    // Handle loading state from file
-    useEffect(() => {
-        if (pendingLoadState && !hasLoadedPendingState) {
-            console.log("📂 AIChatContainer loading state from file...");
+    // Handle expand from minimized state
+    const handleExpand = useCallback(() => {
+        setChatMinimized(false);
+    }, [setChatMinimized]);
 
-            // Load chat state
-            if (pendingLoadState.chat) {
-                if (pendingLoadState.chat.messages) {
-                    // Replace messages with loaded ones
-                    const loadedMessages = pendingLoadState.chat.messages.map((msg: any) => ({
-                        ...msg,
-                        metadata: {
-                            ...msg.metadata,
-                            timestamp: new Date(msg.metadata.timestamp),
-                        },
-                    }));
-                    setMessages(loadedMessages);
-                }
-                if (pendingLoadState.chat.aiProvider) {
-                    setAiProvider(pendingLoadState.chat.aiProvider);
-                }
-                if (pendingLoadState.chat.contextMode) {
-                    setContextMode(pendingLoadState.chat.contextMode);
-                }
-            }
-
-            // Load image history
-            if (pendingLoadState.images?.history) {
-                const loadedHistory = pendingLoadState.images.history.map((img: any) => ({
-                    ...img,
-                    timestamp: new Date(img.timestamp),
-                }));
-                setImageHistory(loadedHistory);
-            }
-
-            setHasLoadedPendingState(true);
-            console.log("✅ AIChatContainer state loaded");
-        }
-    }, [pendingLoadState, hasLoadedPendingState, setContextMode, setImageHistory, setMessages, setAiProvider]);
-
-    // Reset loaded flag when pending state is cleared
-    useEffect(() => {
-        if (!pendingLoadState && hasLoadedPendingState) {
-            setHasLoadedPendingState(false);
-        }
-    }, [pendingLoadState, hasLoadedPendingState]);
+    // Handle close - also reset minimized state
+    const handleCloseWithReset = useCallback(() => {
+        setChatMinimized(false);
+        onClose();
+    }, [setChatMinimized, onClose]);
 
     // === 🎨 RENDER ===
 
     if (!isOpen) return null;
+
+    // Render minimized button
+    if (isChatMinimized && !isMobile) {
+        return (
+            <ChatPanel
+                isOpen={isOpen}
+                isMinimized={true}
+                width={panelWidth}
+                height={panelHeight}
+                onResizeStart={startResize}
+                isMobile={isMobile}
+            >
+                <MinimizedChatButton
+                    onExpand={handleExpand}
+                    onClose={handleCloseWithReset}
+                    aiProvider={aiProvider}
+                />
+            </ChatPanel>
+        );
+    }
 
     return (
         <>
@@ -378,13 +393,17 @@ export default function AIChatContainer({
 
             <ChatPanel
                 isOpen={isOpen}
+                isMinimized={false}
                 width={panelWidth}
                 height={panelHeight}
                 onResizeStart={startResize}
                 isMobile={isMobile}
             >
-                {/* Header - just close button */}
-                <ChatHeader onClose={onClose} />
+                {/* Header - with minimize and close buttons */}
+                <ChatHeader
+                    onClose={handleCloseWithReset}
+                    onMinimize={handleMinimize}
+                />
 
                 {/* Messages wrapper */}
                 <div style={{
@@ -398,8 +417,8 @@ export default function AIChatContainer({
                     <MessageList
                         ref={messagesEndRef}
                         messages={messages}
-                        isLoading={isLoading}
-                        error={error}
+                        isLoading={isChatLoading}
+                        error={chatError}
                         aiProvider={aiProvider}
                         canvasState={canvasState}
                         hasPreviewPanel={false}
@@ -413,7 +432,7 @@ export default function AIChatContainer({
                     onInputChange={setInput}
                     onSend={handleSend}
                     onOpenTemplates={() => setShowTemplates(true)}
-                    isLoading={isLoading}
+                    isLoading={isChatLoading}
                     selectedElementsCount={selectedElements.length}
                     contextMode={contextMode}
                     onContextModeChange={setContextMode}
@@ -421,7 +440,7 @@ export default function AIChatContainer({
                     onKeyDown={handleKeyDown}
                     isMobile={isMobile}
                     aiProvider={aiProvider}
-                    onToggleProvider={toggleProvider}
+                    onToggleProvider={() => setAIProvider(aiProvider === 'kimi' ? 'claude' : 'kimi')}
                 />
             </ChatPanel>
 
@@ -430,7 +449,6 @@ export default function AIChatContainer({
                 isOpen={showTemplates}
                 onClose={() => setShowTemplates(false)}
                 onSelect={(template) => {
-                    // Handle template selection
                     if (template.variables.length === 0) {
                         setInput(template.template);
                     } else {

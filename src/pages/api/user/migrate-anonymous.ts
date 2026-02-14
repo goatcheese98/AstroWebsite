@@ -11,10 +11,10 @@ import {
   generateCanvasKey,
   saveCanvasToR2,
   saveCanvasToR2Compressed,
-  validateCanvasData,
   getCanvasDataSize,
   isCanvasTooLarge,
 } from '@/lib/storage/canvas-storage';
+import { validateCanvasData } from '@/lib/schemas/canvas.schema';
 
 export const prerender = false;
 

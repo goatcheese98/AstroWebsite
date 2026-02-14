@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { eventBus } from '@/lib/events';
 
 interface Version {
   id: string;
@@ -50,19 +51,17 @@ export default function VersionHistory({ isOpen, onClose, canvasId }: VersionHis
       const data = await res.json();
 
       if (data.canvasData) {
-        // Dispatch event to load into canvas
-        window.dispatchEvent(new CustomEvent('canvas:load-state', {
-          detail: {
-            state: {
-              canvas: data.canvasData,
-              chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
-              images: { history: [] },
-            }
+        // Emit event to load into canvas
+        eventBus.emit('canvas:load-state', {
+          state: {
+            canvas: data.canvasData,
+            chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
+            images: { history: [] },
           }
-        }));
+        });
 
         // Also save as current version via auto-save
-        window.dispatchEvent(new CustomEvent('canvas:data-change'));
+        eventBus.emit('canvas:data-change');
 
         onClose();
       }
@@ -125,7 +124,7 @@ export default function VersionHistory({ isOpen, onClose, canvasId }: VersionHis
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -139,8 +138,8 @@ export default function VersionHistory({ isOpen, onClose, canvasId }: VersionHis
           ) : versions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 16px', color: '#9ca3af' }}>
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 12px' }}>
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
               <p style={{ margin: 0, fontSize: '0.9rem' }}>No saved versions yet</p>
               <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: '#d1d5db' }}>

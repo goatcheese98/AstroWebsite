@@ -710,7 +710,10 @@ export function MessageBubble({ message, canvasState }: MessageBubbleProps) {
                 marginLeft: isUser ? "auto" : "10px",
                 marginRight: isUser ? "10px" : "auto",
             }}>
-                {message.metadata.timestamp.toLocaleTimeString([], {
+                {(message.metadata.timestamp instanceof Date 
+                    ? message.metadata.timestamp 
+                    : new Date(message.metadata.timestamp)
+                ).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit'
                 })}

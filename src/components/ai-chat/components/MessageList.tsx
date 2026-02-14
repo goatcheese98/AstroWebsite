@@ -196,6 +196,11 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         const internalRef = useRef<HTMLDivElement>(null);
         const scrollRef = (forwardedRef as React.RefObject<HTMLDivElement>) || internalRef;
 
+        // Debug logging
+        useEffect(() => {
+            console.log('📝 MessageList: Rendering with', messages.length, 'messages');
+        }, [messages]);
+
         // Auto-scroll to bottom when messages change or loading state changes
         useEffect(() => {
             scrollRef.current?.scrollIntoView({ behavior: "smooth" });

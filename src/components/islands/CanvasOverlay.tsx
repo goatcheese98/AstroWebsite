@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { analyzeCanvasLayout, formatSpatialDescription } from "../../lib/canvas-spatial-analysis";
 import { svgLibrary, categories, type SVGMetadata } from "../../lib/svg-library-config";
+import { eventBus } from "../../lib/events";
 
 interface Message {
     id: string;
@@ -38,16 +39,13 @@ export default function CanvasOverlay() {
 
     // Listen for canvas state updates
     useEffect(() => {
-        const handleCanvasUpdate = (event: any) => {
-            setCanvasState(event.detail);
-        };
+        const unsubscribe = eventBus.on("excalidraw:state-update", (data) => {
+            setCanvasState(data);
+        });
 
-        window.addEventListener("excalidraw:state-update", handleCanvasUpdate);
-        window.dispatchEvent(new CustomEvent("excalidraw:get-state"));
+        eventBus.emit("excalidraw:get-state");
 
-        return () => {
-            window.removeEventListener("excalidraw:state-update", handleCanvasUpdate);
-        };
+        return unsubscribe;
     }, []);
 
     const executeDrawingCommand = (elementsArray: any[]) => {
@@ -55,10 +53,7 @@ export default function CanvasOverlay() {
             if (!Array.isArray(elementsArray)) {
                 return false;
             }
-            const event = new CustomEvent("excalidraw:draw", {
-                detail: { elements: elementsArray },
-            });
-            window.dispatchEvent(event);
+            eventBus.emit("excalidraw:draw", { elements: elementsArray });
             return true;
         } catch (err) {
             console.error("Failed to execute drawing command:", err);
@@ -147,9 +142,7 @@ export default function CanvasOverlay() {
             setMessages((prev) => [...prev, successMsg]);
 
             // Insert the image into the canvas
-            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                detail: { imageData: imageUrl, type: "generated" },
-            }));
+            eventBus.emit("excalidraw:insert-image", { imageData: imageUrl, type: "generated" });
 
         } catch (err) {
             setMessages((prev) => prev.filter((m) => m.id === loadingMsg.id));
@@ -274,9 +267,7 @@ export default function CanvasOverlay() {
     };
 
     const handleSvgClick = (svg: SVGMetadata) => {
-        window.dispatchEvent(new CustomEvent("excalidraw:insert-svg", {
-            detail: { svgPath: svg.path, svgId: svg.id },
-        }));
+        eventBus.emit("excalidraw:insert-svg", { svgPath: svg.path, svgId: svg.id });
     };
 
     const filteredSvgs = svgLibrary.filter((svg) => {

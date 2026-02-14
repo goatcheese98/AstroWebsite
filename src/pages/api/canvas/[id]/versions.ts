@@ -6,7 +6,7 @@
 
 import type { APIRoute } from 'astro';
 import { requireAuth } from '@/lib/middleware/auth-middleware';
-import { getCanvasByIdAndUser, createCanvasVersion, getCanvasVersions } from '@/lib/db';
+import { getCanvasByIdAndUser, createCanvasVersion, getCanvasVersions, updateCanvas } from '@/lib/db';
 import {
   generateCanvasVersionKey,
   loadCanvasFromR2,
@@ -14,6 +14,7 @@ import {
   loadCanvasFromR2Compressed,
   saveCanvasToR2Compressed,
 } from '@/lib/storage/canvas-storage';
+import { successResponse, apiErrors } from '@/lib/utils/api-response';
 
 export const prerender = false;
 
@@ -25,36 +26,29 @@ export const GET: APIRoute = async (context) => {
 
     const canvasId = context.params.id;
     if (!canvasId) {
-      return new Response(JSON.stringify({ error: 'Canvas ID required' }), {
-        status: 400, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.badRequest('Invalid request', 'Canvas ID required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB) {
-      return new Response(JSON.stringify({ error: 'Database not configured' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.databaseError('D1 database is not available');
     }
 
     // Verify ownership
     const canvas = await getCanvasByIdAndUser(runtime.env.DB, canvasId, auth.userId);
     if (!canvas) {
-      return new Response(JSON.stringify({ error: 'Canvas not found' }), {
-        status: 404, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.notFound('Canvas');
     }
 
     const versions = await getCanvasVersions(runtime.env.DB, canvasId);
 
-    return new Response(JSON.stringify({ versions }), {
-      status: 200, headers: { 'Content-Type': 'application/json' },
-    });
+    return successResponse({ versions });
   } catch (error) {
     console.error('Version list error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to list versions' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
-    });
+    return apiErrors.serverError(
+      'Failed to list versions',
+      error instanceof Error ? error.message : 'Unknown error'
+    );
   }
 };
 
@@ -66,32 +60,24 @@ export const POST: APIRoute = async (context) => {
 
     const canvasId = context.params.id;
     if (!canvasId) {
-      return new Response(JSON.stringify({ error: 'Canvas ID required' }), {
-        status: 400, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.badRequest('Invalid request', 'Canvas ID required');
     }
 
     const runtime = context.locals.runtime;
     if (!runtime?.env.DB || !runtime?.env.CANVAS_STORAGE) {
-      return new Response(JSON.stringify({ error: 'Storage not configured' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.storageError('Database or R2 storage is not available');
     }
 
     // Verify ownership
     const canvas = await getCanvasByIdAndUser(runtime.env.DB, canvasId, auth.userId);
     if (!canvas) {
-      return new Response(JSON.stringify({ error: 'Canvas not found' }), {
-        status: 404, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.notFound('Canvas');
     }
 
-    // Load current canvas data (compressed or not)
-    const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+    // Load current canvas data (canvas now has camelCase properties from Drizzle)
+    const currentData = await loadCanvasFromR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key);
     if (!currentData) {
-      return new Response(JSON.stringify({ error: 'Canvas data not found in storage' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' },
-      });
+      return apiErrors.storageError('Canvas data not found in storage');
     }
 
     // Determine next version number
@@ -100,7 +86,6 @@ export const POST: APIRoute = async (context) => {
       ? Math.max(...existingVersions.map(v => v.version)) + 1
       : 1;
 
-    // Save snapshot to R2
     // Save snapshot to R2 (compressed)
     const versionKey = generateCanvasVersionKey(auth.userId, canvasId, nextVersion);
     await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, versionKey, currentData);
@@ -113,22 +98,23 @@ export const POST: APIRoute = async (context) => {
       versionKey
     );
 
-    // Update canvas version counter
-    await runtime.env.DB
-      .prepare('UPDATE canvases SET version = ? WHERE id = ?')
-      .bind(nextVersion, canvasId)
-      .run();
-
-    return new Response(JSON.stringify({
-      version: versionRecord,
-      message: `Version ${nextVersion} created`,
-    }), {
-      status: 201, headers: { 'Content-Type': 'application/json' },
+    // Update canvas version counter using Drizzle
+    await updateCanvas(runtime.env.DB, canvasId, auth.userId, {
+      version: nextVersion,
     });
+
+    return successResponse(
+      {
+        version: versionRecord,
+        message: `Version ${nextVersion} created`,
+      },
+      201
+    );
   } catch (error) {
     console.error('Version create error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to create version' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
-    });
+    return apiErrors.serverError(
+      'Failed to create version',
+      error instanceof Error ? error.message : 'Unknown error'
+    );
   }
 };

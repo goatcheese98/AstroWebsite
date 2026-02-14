@@ -1,11 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, type ComponentType } from "react";
 import { nanoid } from "nanoid";
 import { encode, decode } from "@msgpack/msgpack";
+import type { ExcalidrawElement, ExcalidrawAppState } from "../../context/ExcalidrawContext";
 import { useMobileDetection } from "../ai-chat/hooks/useMobileDetection";
 import { useLongPress } from "../../hooks/useLongPress";
 import { useSmoothCollaboration } from "./useSmoothCollaboration";
 import { useCursorTracking } from "./useCursorTracking";
 import { useCanvasSession } from "../../hooks/useCanvasSession";
+import { useSetExcalidrawAPI } from "../../context";
+import { eventBus, useEvent } from "../../lib/events";
 import CanvasAvatar from "./CanvasAvatar";
 import CollaboratorCursor from "./CollaboratorCursor";
 import SelectionLockOverlay from "./SelectionLockOverlay";
@@ -13,10 +16,26 @@ import ToastNotification, { type Toast } from "./ToastNotification";
 import { useSelectionLocking } from "./useSelectionLocking";
 import "@excalidraw/excalidraw/index.css";
 
+// Types for markdown notes and image history
+interface MarkdownNoteData {
+    id: string;
+    content: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+interface ImageHistoryData {
+    id: string;
+    url: string;
+    timestamp: Date;
+}
+
 // Helper to merge remote elements into local state
-const reconcileElements = (local: any[], remote: any[]) => {
+const reconcileElements = (local: ExcalidrawElement[], remote: ExcalidrawElement[]): ExcalidrawElement[] => {
     // Map existing elements for fast lookup
-    const elementMap = new Map();
+    const elementMap = new Map<string, ExcalidrawElement>();
     local.forEach(el => elementMap.set(el.id, el));
 
     // Process remote elements
@@ -28,8 +47,8 @@ const reconcileElements = (local: any[], remote: any[]) => {
         // 2. Remote version is newer OR
         // 3. Same version but remote nonce is higher (prevent flicker)
         if (!localEl ||
-            (remoteEl.version > (localEl.version || 0)) ||
-            (remoteEl.version === localEl.version && remoteEl.versionNonce > (localEl.versionNonce || 0))) {
+            ((remoteEl.version ?? 0) > (localEl.version ?? 0)) ||
+            ((remoteEl.version ?? 0) === (localEl.version ?? 0) && (remoteEl.versionNonce ?? 0) > (localEl.versionNonce ?? 0))) {
             elementMap.set(remoteEl.id, remoteEl);
         }
     });
@@ -38,8 +57,10 @@ const reconcileElements = (local: any[], remote: any[]) => {
 };
 
 // Dynamically import Excalidraw to avoid SSR issues
-let ExcalidrawModule: any = null;
-let convertToExcalidrawElements: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let ExcalidrawModule: ComponentType<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let convertToExcalidrawElements: ((elements: any[]) => any) | null = null;
 
 const loadExcalidraw = async () => {
     if (!ExcalidrawModule) {
@@ -51,7 +72,8 @@ const loadExcalidraw = async () => {
 };
 
 // Lazy-loaded MarkdownNote
-let MarkdownNote: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let MarkdownNote: ComponentType<any> | null = null;
 
 const loadMarkdownNote = async () => {
     if (!MarkdownNote) {
@@ -62,7 +84,8 @@ const loadMarkdownNote = async () => {
 };
 
 // Lazy-loaded WebEmbed
-let WebEmbed: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let WebEmbed: ComponentType<any> | null = null;
 
 const loadWebEmbed = async () => {
     if (!WebEmbed) {
@@ -73,7 +96,8 @@ const loadWebEmbed = async () => {
 };
 
 // Lazy-loaded LexicalNote
-let LexicalNote: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let LexicalNote: ComponentType<any> | null = null;
 
 const loadLexicalNote = async () => {
     if (!LexicalNote) {
@@ -88,7 +112,7 @@ const STORAGE_VERSION = 2; // Bumped to invalidate old cache
 
 // Helper to sanitize appState before passing to Excalidraw
 // Specifically fixes: TypeError: appState.collaborators.forEach is not a function
-const sanitizeAppState = (appState: any) => {
+const sanitizeAppState = (appState: ExcalidrawAppState | null | undefined): Partial<ExcalidrawAppState> | undefined => {
     if (!appState) return undefined;
     const sanitized = { ...appState };
     // If collaborators is a plain object (serialized), remove it so Excalidraw can re-init as Map
@@ -102,8 +126,8 @@ interface ExcalidrawCanvasProps {
     isSharedMode?: boolean;
     shareRoomId?: string;
     partyKitHost?: string;
-    onMarkdownNotesChange?: (notes: any[]) => void;
-    onImageHistoryChange?: (images: any[]) => void;
+    onMarkdownNotesChange?: (notes: MarkdownNoteData[]) => void;
+    onImageHistoryChange?: (images: ImageHistoryData[]) => void;
     shouldClearOnMount?: boolean;
 }
 
@@ -117,6 +141,7 @@ export default function ExcalidrawCanvas({
 }: ExcalidrawCanvasProps = {}) {
     const { isMobile, isPhone } = useMobileDetection();
     const session = useCanvasSession();
+    const setExcalidrawAPIContext = useSetExcalidrawAPI();
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -129,6 +154,13 @@ export default function ExcalidrawCanvas({
     // Check if we should ignore local storage (e.g. new canvas requested)
     const shouldIgnoreLocalStorage = shouldClearOnMount || (typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('new') === 'true');
+
+    // Clear the flag that prevents loading if this is a fresh canvas
+    useEffect(() => {
+        if (shouldIgnoreLocalStorage && typeof window !== 'undefined') {
+            console.log('🧹 Fresh canvas mode - localStorage will be ignored');
+        }
+    }, [shouldIgnoreLocalStorage]);
 
     // Use refs to avoid triggering re-renders from RAF loop
     const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 }, selectedElementIds: {} });
@@ -251,9 +283,7 @@ export default function ExcalidrawCanvas({
                         }
                         if (data.state.imageHistory) {
                             // Dispatch event to load image history
-                            window.dispatchEvent(new CustomEvent("imagegen:load-history", {
-                                detail: { images: data.state.imageHistory }
-                            }));
+                            eventBus.emit("imagegen:load-history", { images: data.state.imageHistory });
                         }
                         // Load initial cursors
                         if (data.state.cursors) {
@@ -327,12 +357,8 @@ export default function ExcalidrawCanvas({
                     console.log("📝 Applying markdown update from collaborator");
                     // Markdown notes are stored as elements with customData.type === "markdown"
                     // They're already part of the canvas update
-                } else if (data.type === "image-update") {
-                    // Another user generated an image
                     console.log("🖼️ Applying image history update from collaborator");
-                    window.dispatchEvent(new CustomEvent("imagegen:load-history", {
-                        detail: { images: data.imageHistory }
-                    }));
+                    eventBus.emit("imagegen:load-history", { images: data.imageHistory });
                 } else if (data.type === "selection-update") {
                     handleSelectionUpdate(data);
                 } else if (data.type === "user-joined") {
@@ -521,9 +547,7 @@ export default function ExcalidrawCanvas({
                 const currentSelectedIds = Object.keys(appState.selectedElementIds || {}).sort().join(",");
                 if (currentSelectedIds !== lastSelectedIds) {
                     lastSelectedIds = currentSelectedIds;
-                    window.dispatchEvent(new CustomEvent("excalidraw:selection-change", {
-                        detail: { selectedElementIds: appState.selectedElementIds }
-                    }));
+                    eventBus.emit("excalidraw:selection-change", { selectedElementIds: appState.selectedElementIds });
                 }
 
                 const mdElements = elements.filter(
@@ -638,202 +662,177 @@ export default function ExcalidrawCanvas({
         }
     }, [excalidrawAPI]);
 
-    // Listen for drawing commands from the AI chat (supports both old and new event names)
-    useEffect(() => {
-        const handleDrawCommand = async (event: any) => {
-            console.log("🖼️ Canvas received draw command:", event.detail);
+    // Listen for drawing commands from the AI chat (using event bus)
+    const handleDrawCommand = useCallback(async (data: { elements: unknown[]; isModification?: boolean }) => {
+        console.log("🖼️ Canvas received draw command:", data);
 
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
+        if (!excalidrawAPI) {
+            console.warn("⚠️ Excalidraw API not ready yet");
+            return;
+        }
 
-            const { elements, isModification } = event.detail;
-            if (elements && Array.isArray(elements)) {
-                console.log(`📝 Converting ${elements.length} skeleton elements`);
-
-                try {
-                    // Ensure convertToExcalidrawElements is loaded
-                    const { convertToExcalidrawElements: converter } = await loadExcalidraw();
-
-                    let elementsToConvert = elements;
-
-                    // Only center elements if this is NOT a modification (adding to existing elements)
-                    if (!isModification) {
-                        // Get viewport center for positioning - convert to scene coordinates
-                        const appState = excalidrawAPI.getAppState();
-                        const viewportCenterX = appState.width / 2;
-                        const viewportCenterY = appState.height / 2;
-
-                        // Convert viewport center to scene coordinates
-                        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-                        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-                        // Calculate bounding box of elements to center them
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        elements.forEach((el: any) => {
-                            if (el.x < minX) minX = el.x;
-                            if (el.y < minY) minY = el.y;
-                            if (el.x + (el.width || 0) > maxX) maxX = el.x + (el.width || 0);
-                            if (el.y + (el.height || 0) > maxY) maxY = el.y + (el.height || 0);
-                        });
-
-                        // Calculate center of elements
-                        const elementsCenterX = (minX + maxX) / 2;
-                        const elementsCenterY = (minY + maxY) / 2;
-
-                        // Offset elements to center them at viewport center
-                        const offsetX = sceneX - elementsCenterX;
-                        const offsetY = sceneY - elementsCenterY;
-
-                        elementsToConvert = elements.map((el: any) => ({
-                            ...el,
-                            x: el.x + offsetX,
-                            y: el.y + offsetY,
-                        }));
-
-                        console.log("✅ Elements will be centered at viewport center");
-                    } else {
-                        console.log("✅ Modification mode: using original element positions");
-                    }
-
-                    // Convert skeleton elements to full Excalidraw elements
-                    const excalidrawElements = converter(elementsToConvert);
-                    console.log("✅ Converted elements successfully");
-
-                    // Get current scene elements
-                    const currentElements = excalidrawAPI.getSceneElements();
-
-                    // Add new elements to scene
-                    excalidrawAPI.updateScene({
-                        elements: [...currentElements, ...excalidrawElements],
-                    });
-
-                    // Dispatch event with new element IDs for selection
-                    const newElementIds = excalidrawElements.map((el: any) => el.id).filter(Boolean);
-                    if (newElementIds.length > 0) {
-                        window.dispatchEvent(new CustomEvent("excalidraw:elements-added", {
-                            detail: { elementIds: newElementIds },
-                        }));
-                        console.log("📣 Dispatched elements-added event with IDs:", newElementIds);
-                    }
-
-                    console.log("🎨 Scene updated with new elements");
-                } catch (err) {
-                    console.error("❌ Error converting elements:", err);
-                }
-            } else {
-                console.error("❌ Invalid elements data:", elements);
-            }
-        };
-
-        // Support both old and new event names for backward compatibility
-        window.addEventListener("ai-draw-command", handleDrawCommand);
-        window.addEventListener("excalidraw:draw", handleDrawCommand);
-
-        console.log("👂 Canvas listening for draw commands");
-
-        return () => {
-            console.log("👋 Canvas stopped listening for draw commands");
-            window.removeEventListener("ai-draw-command", handleDrawCommand);
-            window.removeEventListener("excalidraw:draw", handleDrawCommand);
-        };
-    }, [excalidrawAPI]);
-
-    // Listen for element update commands from AI chat (modifies existing elements)
-    useEffect(() => {
-        const handleUpdateElements = (event: any) => {
-            console.log("🔄 Canvas received update elements command:", event.detail);
-
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
-
-            const { elements } = event.detail;
-            if (!elements || !Array.isArray(elements) || elements.length === 0) {
-                console.error("❌ Invalid elements data for update:", elements);
-                return;
-            }
+        const { elements, isModification } = data;
+        if (elements && Array.isArray(elements)) {
+            console.log(`📝 Converting ${elements.length} skeleton elements`);
 
             try {
+                // Ensure convertToExcalidrawElements is loaded
+                const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+                if (!converter) {
+                    console.error("❌ Failed to load Excalidraw converter");
+                    return false;
+                }
+
+                let elementsToConvert: Array<Record<string, unknown>> = elements as Array<Record<string, unknown>>;
+
+                // Only center elements if this is NOT a modification (adding to existing elements)
+                if (!isModification) {
+                    // Get viewport center for positioning - convert to scene coordinates
+                    const appState = excalidrawAPI.getAppState();
+                    const viewportCenterX = (appState.width || 800) / 2;
+                    const viewportCenterY = (appState.height || 600) / 2;
+
+                    // Convert viewport center to scene coordinates
+                    const sceneX = (viewportCenterX / (appState.zoom?.value || 1)) - (appState.scrollX || 0);
+                    const sceneY = (viewportCenterY / (appState.zoom?.value || 1)) - (appState.scrollY || 0);
+
+                    // Calculate bounding box of elements to center them
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    elementsToConvert.forEach((el) => {
+                        const x = (el.x as number) || 0;
+                        const y = (el.y as number) || 0;
+                        const width = (el.width as number) || 0;
+                        const height = (el.height as number) || 0;
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x + width > maxX) maxX = x + width;
+                        if (y + height > maxY) maxY = y + height;
+                    });
+
+                    // Calculate center of elements
+                    const elementsCenterX = (minX + maxX) / 2;
+                    const elementsCenterY = (minY + maxY) / 2;
+
+                    // Offset elements to center them at viewport center
+                    const offsetX = sceneX - elementsCenterX;
+                    const offsetY = sceneY - elementsCenterY;
+
+                    elementsToConvert = elementsToConvert.map((el) => ({
+                        ...el,
+                        x: ((el.x as number) || 0) + offsetX,
+                        y: ((el.y as number) || 0) + offsetY,
+                    }));
+
+                    console.log("✅ Elements will be centered at viewport center");
+                } else {
+                    console.log("✅ Modification mode: using original element positions");
+                }
+
+                // Convert skeleton elements to full Excalidraw elements
+                const excalidrawElements = converter(elementsToConvert);
+                console.log("✅ Converted elements successfully");
+
                 // Get current scene elements
                 const currentElements = excalidrawAPI.getSceneElements();
 
-                // Create a map of updated elements by id
-                const updatesById = new Map();
-                elements.forEach((el: any) => {
-                    if (el.id) {
-                        updatesById.set(el.id, el);
-                    }
-                });
-
-                console.log(`📝 Applying updates to ${updatesById.size} elements`);
-
-                // Update existing elements with new properties
-                const updatedElements = currentElements.map((el: any) => {
-                    const update = updatesById.get(el.id);
-                    if (update) {
-                        // Merge update into existing element (preserve id, version, etc.)
-                        return {
-                            ...el,
-                            ...update,
-                            id: el.id, // Preserve original ID
-                            version: (el.version || 0) + 1, // Increment version
-                            versionNonce: Date.now(),
-                            updated: Date.now(),
-                        };
-                    }
-                    return el;
-                });
-
-                // Update scene with modified elements
+                // Add new elements to scene
                 excalidrawAPI.updateScene({
-                    elements: updatedElements,
+                    elements: [...currentElements, ...excalidrawElements],
                 });
 
-                console.log("✅ Elements updated successfully");
+                // Emit event with new element IDs for selection
+                const newElementIds = excalidrawElements.map((el: any) => el.id).filter(Boolean);
+                if (newElementIds.length > 0) {
+                    eventBus.emit('excalidraw:elements-added', { elementIds: newElementIds });
+                    console.log("📣 Emitted elements-added event with IDs:", newElementIds);
+                }
+
+                console.log("🎨 Scene updated with new elements");
             } catch (err) {
-                console.error("❌ Error updating elements:", err);
+                console.error("❌ Error converting elements:", err);
             }
-        };
-
-        window.addEventListener("excalidraw:update-elements", handleUpdateElements);
-
-        console.log("👂 Canvas listening for element update commands");
-
-        return () => {
-            console.log("👋 Canvas stopped listening for element update commands");
-            window.removeEventListener("excalidraw:update-elements", handleUpdateElements);
-        };
+        } else {
+            console.error("❌ Invalid elements data:", elements);
+        }
     }, [excalidrawAPI]);
 
-    // Handle requests for canvas state
-    useEffect(() => {
-        const handleGetState = () => {
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready for state request");
-                return;
-            }
+    // Subscribe to draw commands via event bus
+    useEvent('excalidraw:draw', handleDrawCommand, [handleDrawCommand]);
+    useEvent('ai-draw-command', handleDrawCommand, [handleDrawCommand]); // Legacy support
 
-            const elements = excalidrawAPI.getSceneElements();
-            const appState = excalidrawAPI.getAppState();
+    // Listen for element update commands from AI chat (modifies existing elements) - using event bus
+    useEvent('excalidraw:update-elements', async (data) => {
+        console.log("🔄 Canvas received update elements command:", data);
 
-            window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
-                detail: {
-                    elements,
-                    appState,
-                },
-            }));
+        if (!excalidrawAPI) {
+            console.warn("⚠️ Excalidraw API not ready yet");
+            return;
+        }
 
-            console.log("📤 Broadcasted canvas state");
-        };
+        const { elements } = data;
+        if (!elements || !Array.isArray(elements) || elements.length === 0) {
+            console.error("❌ Invalid elements data for update:", elements);
+            return;
+        }
 
-        window.addEventListener("excalidraw:get-state", handleGetState);
+        try {
+            // Get current scene elements
+            const currentElements = excalidrawAPI.getSceneElements();
 
-        return () => {
-            window.removeEventListener("excalidraw:get-state", handleGetState);
-        };
+            // Create a map of updated elements by id
+            const updatesById = new Map();
+            (elements as any[]).forEach((el: any) => {
+                if (el.id) {
+                    updatesById.set(el.id, el);
+                }
+            });
+
+            console.log(`📝 Applying updates to ${updatesById.size} elements`);
+
+            // Update existing elements with new properties
+            const updatedElements = currentElements.map((el: any) => {
+                const update = updatesById.get(el.id);
+                if (update) {
+                    // Merge update into existing element (preserve id, version, etc.)
+                    return {
+                        ...el,
+                        ...update,
+                        id: el.id, // Preserve original ID
+                        version: (el.version || 0) + 1, // Increment version
+                        versionNonce: Date.now(),
+                        updated: Date.now(),
+                    };
+                }
+                return el;
+            });
+
+            // Update scene with modified elements
+            excalidrawAPI.updateScene({
+                elements: updatedElements,
+            });
+
+            console.log("✅ Elements updated successfully");
+        } catch (err) {
+            console.error("❌ Error updating elements:", err);
+        }
+    }, [excalidrawAPI]);
+
+    // Handle requests for canvas state - using event bus
+    useEvent('excalidraw:get-state', () => {
+        if (!excalidrawAPI) {
+            console.warn("⚠️ Excalidraw API not ready for state request");
+            return;
+        }
+
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+
+        eventBus.emit('excalidraw:state-update', {
+            elements,
+            appState,
+        });
+
+        console.log("📤 Broadcasted canvas state");
     }, [excalidrawAPI]);
 
     // Broadcast canvas state changes periodically
@@ -844,12 +843,10 @@ export default function ExcalidrawCanvas({
             const elements = excalidrawAPI.getSceneElements();
             const appState = excalidrawAPI.getAppState();
 
-            window.dispatchEvent(new CustomEvent("excalidraw:state-update", {
-                detail: {
-                    elements,
-                    appState,
-                },
-            }));
+            eventBus.emit('excalidraw:state-update', {
+                elements,
+                appState,
+            });
         };
 
         // Broadcast state periodically (when canvas changes)
@@ -858,264 +855,239 @@ export default function ExcalidrawCanvas({
         return () => clearInterval(interval);
     }, [excalidrawAPI]);
 
-    // Handle SVG insertion from library
-    useEffect(() => {
-        const handleInsertSVG = async (event: any) => {
-            console.log("📚 Inserting SVG from library:", event.detail);
+    // Handle SVG insertion from library - using event bus
+    useEvent('excalidraw:insert-svg', async (data) => {
+        console.log("📚 Inserting SVG from library:", data);
 
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
+        const api = excalidrawAPIRef.current;
+        if (!api) {
+            console.warn("⚠️ Excalidraw API not ready yet");
+            return;
+        }
+
+        const { svgPath } = data;
+
+        try {
+            // Fetch the SVG content
+            const response = await fetch(svgPath);
+            const svgText = await response.text();
+
+            // Get viewport center for positioning - convert to scene coordinates
+            const appState = api.getAppState();
+            const viewportCenterX = appState.width / 2;
+            const viewportCenterY = appState.height / 2;
+
+            // Convert viewport center to scene coordinates
+            const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+            const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+            // Load converter
+            const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+            if (!converter) {
+                throw new Error("Failed to load Excalidraw converter");
             }
 
-            const { svgPath } = event.detail;
+            // Create Excalidraw image element
+            const imageElement = converter([
+                {
+                    type: "image",
+                    x: sceneX - 50, // Center the 100x100 image in viewport
+                    y: sceneY - 50,
+                    width: 100,
+                    height: 100,
+                    fileId: svgPath, // Use path as unique ID
+                },
+            ]);
 
-            try {
-                // Fetch the SVG content
-                const response = await fetch(svgPath);
-                const svgText = await response.text();
+            // Create blob URL for SVG
+            const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
+            const svgUrl = URL.createObjectURL(svgBlob);
 
-                // Get viewport center for positioning - convert to scene coordinates
-                const appState = excalidrawAPI.getAppState();
-                const viewportCenterX = appState.width / 2;
-                const viewportCenterY = appState.height / 2;
+            // Add the SVG as a file FIRST
+            const newFile = {
+                mimeType: "image/svg+xml",
+                id: svgPath,
+                dataURL: svgUrl,
+                created: Date.now(),
+            };
+            api.addFiles([newFile]);
 
-                // Convert viewport center to scene coordinates
-                const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-                const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-                // Load converter
-                const { convertToExcalidrawElements: converter } = await loadExcalidraw();
-
-                // Create Excalidraw image element
-                const imageElement = converter([
-                    {
-                        type: "image",
-                        x: sceneX - 50, // Center the 100x100 image in viewport
-                        y: sceneY - 50,
-                        width: 100,
-                        height: 100,
-                        fileId: svgPath, // Use path as unique ID
-                    },
-                ]);
-
-                // Add to canvas
-                const currentElements = excalidrawAPI.getSceneElements();
-                const files = excalidrawAPI.getFiles();
-
-                // Create blob URL for SVG
-                const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
-                const svgUrl = URL.createObjectURL(svgBlob);
-
-                // Add the SVG as a file
-                const newFiles = {
-                    ...files,
-                    [svgPath]: {
-                        mimeType: "image/svg+xml",
-                        id: svgPath,
-                        dataURL: svgUrl,
-                        created: Date.now(),
-                    },
-                };
-
-                excalidrawAPI.updateScene({
-                    elements: [...currentElements, ...imageElement],
-                });
-
-                excalidrawAPI.addFiles(Object.values(newFiles));
-
-                console.log("✅ SVG inserted successfully");
-            } catch (err) {
-                console.error("❌ Error inserting SVG:", err);
-            }
-        };
-
-        window.addEventListener("excalidraw:insert-svg", handleInsertSVG);
-
-        return () => {
-            window.removeEventListener("excalidraw:insert-svg", handleInsertSVG);
-        };
-    }, [excalidrawAPI]);
-
-    // Handle image insertion (from AI generation or other sources)
-    useEffect(() => {
-        const handleInsertImage = async (event: any) => {
-            console.log("🖼️ Inserting image into canvas:", event.detail);
-
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
-
-            const { imageData, type = "png", width, height } = event.detail;
-
-            try {
-                // Get viewport center for positioning - convert to scene coordinates
-                const appState = excalidrawAPI.getAppState();
-                const viewportCenterX = appState.width / 2;
-                const viewportCenterY = appState.height / 2;
-
-                // Convert viewport center to scene coordinates
-                const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-                const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-                // Load converter
-                const { convertToExcalidrawElements: converter } = await loadExcalidraw();
-
-                // Create unique file ID
-                const fileId = `generated-${Date.now()}`;
-
-                // Calculate dimensions - use provided or default to natural aspect
-                // Default max width of 400px, maintain aspect ratio
-                const maxWidth = width || 400;
-                const maxHeight = height || 400;
-
-                // Create Excalidraw image element with proper dimensions
-                const imageElement = converter([
-                    {
-                        type: "image",
-                        x: sceneX - (maxWidth / 2), // Center the image in viewport
-                        y: sceneY - (maxHeight / 2),
-                        width: maxWidth,
-                        height: maxHeight,
-                        fileId: fileId,
-                    },
-                ]);
-
-                // Add to canvas
-                const currentElements = excalidrawAPI.getSceneElements();
-
-                // Add the image as a file
-                const newFile = {
-                    mimeType: `image/${type}`,
-                    id: fileId,
-                    dataURL: imageData,
-                    created: Date.now(),
-                };
-
-                excalidrawAPI.updateScene({
-                    elements: [...currentElements, ...imageElement],
-                });
-
-                excalidrawAPI.addFiles([newFile]);
-
-                console.log("✅ Image inserted successfully");
-            } catch (err) {
-                console.error("❌ Error inserting image:", err);
-            }
-        };
-
-        window.addEventListener("excalidraw:insert-image", handleInsertImage);
-
-        return () => {
-            window.removeEventListener("excalidraw:insert-image", handleInsertImage);
-        };
-    }, [excalidrawAPI]);
-
-    // Handle screenshot/capture requests for AI image generation
-    useEffect(() => {
-        const handleCaptureScreenshot = async (event: any) => {
-            const { elementIds, quality = "high", backgroundColor, requestId } = event.detail || {};
-            console.log("📸 Canvas received screenshot request:", {
-                requestId,
-                quality,
-                elementIds: elementIds?.length || 0,
-                backgroundColor
+            // Then add to canvas
+            const currentElements = api.getSceneElements();
+            api.updateScene({
+                elements: [...currentElements, ...imageElement],
             });
 
-            if (!excalidrawAPI) {
-                console.error("⚠️ Excalidraw API not ready yet");
-                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
-                    detail: { error: "Canvas not ready", requestId },
-                }));
+            console.log("✅ SVG inserted successfully");
+        } catch (err) {
+            console.error("❌ Error inserting SVG:", err);
+        }
+    }, []);
+
+    // Handle image insertion (from AI generation or other sources) - using event bus
+    useEvent('excalidraw:insert-image', async (data) => {
+        console.log("🖼️ Inserting image into canvas:", data);
+
+        const api = excalidrawAPIRef.current;
+        if (!api) {
+            console.warn("⚠️ Excalidraw API not ready yet");
+            return;
+        }
+
+        const { imageData, type = "png", width, height } = data;
+
+        try {
+            // Get viewport center for positioning - convert to scene coordinates
+            const appState = api.getAppState();
+            const viewportCenterX = appState.width / 2;
+            const viewportCenterY = appState.height / 2;
+
+            // Convert viewport center to scene coordinates
+            const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+            const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+            // Load converter
+            const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+            if (!converter) {
+                throw new Error("Failed to load Excalidraw converter");
+            }
+
+            // Create unique file ID
+            const fileId = `generated-${Date.now()}`;
+
+            // Calculate dimensions - use provided or default to natural aspect
+            // Default max width of 400px, maintain aspect ratio
+            const maxWidth = width || 400;
+            const maxHeight = height || 400;
+
+            // Create Excalidraw image element with proper dimensions
+            const imageElement = converter([
+                {
+                    type: "image",
+                    x: sceneX - (maxWidth / 2), // Center the image in viewport
+                    y: sceneY - (maxHeight / 2),
+                    width: maxWidth,
+                    height: maxHeight,
+                    fileId: fileId,
+                },
+            ]);
+
+            // Add the image as a file FIRST to ensure it's available when scene updates
+            const newFile = {
+                mimeType: `image/${type}`,
+                id: fileId,
+                dataURL: imageData,
+                created: Date.now(),
+            };
+            api.addFiles([newFile]);
+
+            // Then add to canvas
+            const currentElements = api.getSceneElements();
+            api.updateScene({
+                elements: [...currentElements, ...imageElement],
+            });
+
+            console.log("✅ Image inserted successfully");
+            eventBus.emit('excalidraw:image-inserted');
+        } catch (err) {
+            console.error("❌ Error inserting image:", err);
+        }
+    }, []);
+
+    // Handle screenshot/capture requests for AI image generation (using event bus)
+    useEvent('excalidraw:capture-screenshot', async (data) => {
+        const { elementIds, quality = "high", backgroundColor, requestId } = data;
+        console.log("📸 Canvas received screenshot request:", {
+            requestId,
+            quality,
+            elementIds: elementIds?.length || 0,
+            backgroundColor
+        });
+
+        if (!excalidrawAPI) {
+            console.error("⚠️ Excalidraw API not ready yet");
+            eventBus.emit('excalidraw:screenshot-captured', {
+                error: "Canvas not ready",
+                requestId,
+            });
+            return;
+        }
+
+        try {
+            // Get all elements and filter if specific IDs provided
+            const allElements = excalidrawAPI.getSceneElements();
+            const appState = excalidrawAPI.getAppState();
+
+            console.log("📊 Canvas state:", {
+                totalElements: allElements.length,
+                requestedElements: elementIds?.length || 0,
+            });
+
+            let elementsToCapture = allElements;
+
+            // If specific element IDs provided, filter to just those
+            if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
+                elementsToCapture = allElements.filter((el: any) => elementIds.includes(el.id));
+                console.log("🎯 Filtered to", elementsToCapture.length, "elements");
+            }
+
+            if (elementsToCapture.length === 0) {
+                console.error("⚠️ No elements to capture");
+                eventBus.emit('excalidraw:screenshot-captured', {
+                    error: "No elements to capture",
+                    requestId,
+                });
                 return;
             }
 
-            try {
-                // Get all elements and filter if specific IDs provided
-                const allElements = excalidrawAPI.getSceneElements();
-                const appState = excalidrawAPI.getAppState();
+            console.log("🔄 Starting export to canvas...");
 
-                console.log("📊 Canvas state:", {
-                    totalElements: allElements.length,
-                    requestedElements: elementIds?.length || 0,
-                });
+            // Dynamically import exportToCanvas
+            const { exportToCanvas } = await import("@excalidraw/excalidraw");
 
-                let elementsToCapture = allElements;
+            // Prepare app state with custom background if provided
+            const exportAppState: any = {
+                ...appState,
+                exportBackground: true,
+                exportWithDarkMode: false,
+                exportScale: quality === "high" ? 2 : 1,
+            };
 
-                // If specific element IDs provided, filter to just those
-                if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
-                    elementsToCapture = allElements.filter((el: any) => elementIds.includes(el.id));
-                    console.log("🎯 Filtered to", elementsToCapture.length, "elements");
-                }
-
-                if (elementsToCapture.length === 0) {
-                    console.error("⚠️ No elements to capture");
-                    window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
-                        detail: { error: "No elements to capture", requestId },
-                    }));
-                    return;
-                }
-
-                console.log("🔄 Starting export to canvas...");
-
-                // Dynamically import exportToCanvas
-                const { exportToCanvas } = await import("@excalidraw/excalidraw");
-
-                // Prepare app state with custom background if provided
-                const exportAppState: any = {
-                    ...appState,
-                    exportBackground: true,
-                    exportWithDarkMode: false,
-                    exportScale: quality === "high" ? 2 : 1,
-                };
-
-                // If custom background color provided, use it
-                if (backgroundColor) {
-                    exportAppState.viewBackgroundColor = backgroundColor;
-                }
-
-                // Export to canvas with appropriate quality
-                const canvas = await exportToCanvas({
-                    elements: elementsToCapture,
-                    appState: exportAppState,
-                    files: excalidrawAPI.getFiles(),
-                });
-
-                // Convert to base64
-                const dataURL = canvas.toDataURL("image/png");
-
-                console.log(`✅ Screenshot captured successfully:`, {
-                    requestId,
-                    dataLength: dataURL.length,
-                    elementCount: elementsToCapture.length,
-                });
-
-                // Dispatch event with the screenshot
-                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
-                    detail: {
-                        dataURL,
-                        elementCount: elementsToCapture.length,
-                        elementIds: elementsToCapture.map((el: any) => el.id),
-                        requestId,
-                    },
-                }));
-            } catch (err) {
-                console.error("❌ Error capturing screenshot:", err);
-                window.dispatchEvent(new CustomEvent("excalidraw:screenshot-captured", {
-                    detail: {
-                        error: err instanceof Error ? err.message : "Unknown error",
-                        requestId,
-                    },
-                }));
+            // If custom background color provided, use it
+            if (backgroundColor) {
+                exportAppState.viewBackgroundColor = backgroundColor;
             }
-        };
 
-        window.addEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
+            // Export to canvas with appropriate quality
+            const canvas = await exportToCanvas({
+                elements: elementsToCapture,
+                appState: exportAppState,
+                files: excalidrawAPI.getFiles(),
+            });
 
-        return () => {
-            window.removeEventListener("excalidraw:capture-screenshot", handleCaptureScreenshot);
-        };
+            // Convert to base64
+            const dataURL = canvas.toDataURL("image/png");
+
+            console.log(`✅ Screenshot captured successfully:`, {
+                requestId,
+                dataLength: dataURL.length,
+                elementCount: elementsToCapture.length,
+            });
+
+            // Emit event with the screenshot
+            eventBus.emit('excalidraw:screenshot-captured', {
+                dataURL,
+                elementCount: elementsToCapture.length,
+                elementIds: elementsToCapture.map((el: any) => el.id),
+                requestId,
+            });
+        } catch (err) {
+            console.error("❌ Error capturing screenshot:", err);
+            eventBus.emit('excalidraw:screenshot-captured', {
+                error: err instanceof Error ? err.message : "Unknown error",
+                requestId,
+            });
+        }
     }, [excalidrawAPI]);
 
     // Handle paste events for mobile and clipboard paste
@@ -1163,6 +1135,9 @@ export default function ExcalidrawCanvas({
 
                     // Load converter
                     const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+                    if (!converter) {
+                        throw new Error("Failed to load Excalidraw converter");
+                    }
 
                     // Create image element
                     const imageElement = converter([
@@ -1223,14 +1198,12 @@ export default function ExcalidrawCanvas({
                             const height = width / aspectRatio;
 
                             // Dispatch insert image event
-                            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                                detail: {
-                                    imageData,
-                                    type: blob.type.replace('image/', ''),
-                                    width,
-                                    height,
-                                },
-                            }));
+                            eventBus.emit("excalidraw:insert-image", {
+                                imageData,
+                                type: blob.type.replace('image/', ''),
+                                width,
+                                height,
+                            });
                         };
                         img.src = imageData;
                     };
@@ -1249,119 +1222,110 @@ export default function ExcalidrawCanvas({
         };
     }, [excalidrawAPI]);
 
-    // Handle markdown file loading (both single and bulk)
-    useEffect(() => {
-        const handleLoadMarkdownFiles = async (event: any) => {
-            const { files, dropPosition } = event.detail || {};
-            if (!files || !Array.isArray(files) || files.length === 0) {
-                console.warn("No markdown files provided");
-                return;
+    // Handle markdown file loading (both single and bulk) - using event bus
+    useEvent('canvas:load-markdown-files', async (data) => {
+        const { files, dropPosition } = data;
+        if (!files || !Array.isArray(files) || files.length === 0) {
+            console.warn("No markdown files provided");
+            return;
+        }
+
+        if (!excalidrawAPI) {
+            console.warn("⚠️ Excalidraw API not ready yet");
+            return;
+        }
+
+        console.log(`📝 Creating ${files.length} markdown note(s)`);
+
+        try {
+            const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+            if (!converter) {
+                throw new Error("Failed to load Excalidraw converter");
+            }
+            const appState = excalidrawAPI.getAppState();
+
+            // Grid layout configuration
+            const GRID_COLS = Math.ceil(Math.sqrt(files.length)); // Square-ish grid
+            const NOTE_WIDTH = 500;
+            const NOTE_HEIGHT = 350;
+            const PADDING = 50; // Space between notes
+
+            // Starting position
+            let startX, startY;
+
+            if (dropPosition && files.length === 1) {
+                // If single file with drop position, use drop location
+                startX = (dropPosition.x / appState.zoom.value) - appState.scrollX - NOTE_WIDTH / 2;
+                startY = (dropPosition.y / appState.zoom.value) - appState.scrollY - NOTE_HEIGHT / 2;
+            } else {
+                // Otherwise, use viewport center and grid layout
+                const viewportCenterX = appState.width / 2;
+                const viewportCenterY = appState.height / 2;
+                startX = (viewportCenterX / appState.zoom.value) - appState.scrollX - (GRID_COLS * (NOTE_WIDTH + PADDING)) / 2;
+                startY = (viewportCenterY / appState.zoom.value) - appState.scrollY - 200;
             }
 
-            if (!excalidrawAPI) {
-                console.warn("⚠️ Excalidraw API not ready yet");
-                return;
-            }
+            const newElements = [];
 
-            console.log(`📝 Creating ${files.length} markdown note(s)`);
+            // Read all files and create markdown notes
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const arrayBuffer = await file.arrayBuffer();
+                const decoder = new TextDecoder();
+                const content = decoder.decode(arrayBuffer);
 
-            try {
-                const { convertToExcalidrawElements: converter } = await loadExcalidraw();
-                const appState = excalidrawAPI.getAppState();
+                // Calculate grid position
+                const col = i % GRID_COLS;
+                const row = Math.floor(i / GRID_COLS);
+                const x = startX + col * (NOTE_WIDTH + PADDING);
+                const y = startY + row * (NOTE_HEIGHT + PADDING);
 
-                // Grid layout configuration
-                const GRID_COLS = Math.ceil(Math.sqrt(files.length)); // Square-ish grid
-                const NOTE_WIDTH = 500;
-                const NOTE_HEIGHT = 350;
-                const PADDING = 50; // Space between notes
-
-                // Starting position
-                let startX, startY;
-
-                if (dropPosition && files.length === 1) {
-                    // If single file with drop position, use drop location
-                    startX = (dropPosition.x / appState.zoom.value) - appState.scrollX - NOTE_WIDTH / 2;
-                    startY = (dropPosition.y / appState.zoom.value) - appState.scrollY - NOTE_HEIGHT / 2;
-                } else {
-                    // Otherwise, use viewport center and grid layout
-                    const viewportCenterX = appState.width / 2;
-                    const viewportCenterY = appState.height / 2;
-                    startX = (viewportCenterX / appState.zoom.value) - appState.scrollX - (GRID_COLS * (NOTE_WIDTH + PADDING)) / 2;
-                    startY = (viewportCenterY / appState.zoom.value) - appState.scrollY - 200;
-                }
-
-                const newElements = [];
-
-                // Read all files and create markdown notes
-                for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
-                    const arrayBuffer = await file.arrayBuffer();
-                    const decoder = new TextDecoder();
-                    const content = decoder.decode(arrayBuffer);
-
-                    // Calculate grid position
-                    const col = i % GRID_COLS;
-                    const row = Math.floor(i / GRID_COLS);
-                    const x = startX + col * (NOTE_WIDTH + PADDING);
-                    const y = startY + row * (NOTE_HEIGHT + PADDING);
-
-                    const markdownElement = {
-                        type: "rectangle",
-                        x,
-                        y,
-                        width: NOTE_WIDTH,
-                        height: NOTE_HEIGHT,
-                        backgroundColor: "#ffffff",
-                        strokeColor: "transparent",
-                        strokeWidth: 0,
-                        roughness: 0,
-                        opacity: 100,
-                        fillStyle: "solid",
-                        id: nanoid(),
-                        locked: false,
-                        customData: {
-                            type: "markdown",
-                            content: content,
-                            originalFilename: file.name,
-                        },
-                    };
-
-                    newElements.push(markdownElement);
-                }
-
-                // Convert and add to canvas
-                const converted = converter(newElements);
-                const currentElements = excalidrawAPI.getSceneElements();
-
-                excalidrawAPI.updateScene({
-                    elements: [...currentElements, ...converted],
-                });
-
-                console.log(`✅ Created ${newElements.length} markdown note(s) from files`);
-
-                // Show toast notification
-                window.dispatchEvent(new CustomEvent("canvas:show-toast", {
-                    detail: {
-                        message: `Added ${files.length} markdown note${files.length > 1 ? 's' : ''}`,
-                        type: 'success',
+                const markdownElement = {
+                    type: "rectangle",
+                    x,
+                    y,
+                    width: NOTE_WIDTH,
+                    height: NOTE_HEIGHT,
+                    backgroundColor: "#ffffff",
+                    strokeColor: "transparent",
+                    strokeWidth: 0,
+                    roughness: 0,
+                    opacity: 100,
+                    fillStyle: "solid",
+                    id: nanoid(),
+                    locked: false,
+                    customData: {
+                        type: "markdown",
+                        content: content,
+                        originalFilename: file.name,
                     },
-                }));
-            } catch (err) {
-                console.error("❌ Error creating markdown notes:", err);
-                window.dispatchEvent(new CustomEvent("canvas:show-toast", {
-                    detail: {
-                        message: "Failed to load markdown files",
-                        type: 'info',
-                    },
-                }));
+                };
+
+                newElements.push(markdownElement);
             }
-        };
 
-        window.addEventListener('canvas:load-markdown-files', handleLoadMarkdownFiles);
+            // Convert and add to canvas
+            const converted = converter(newElements);
+            const currentElements = excalidrawAPI.getSceneElements();
 
-        return () => {
-            window.removeEventListener('canvas:load-markdown-files', handleLoadMarkdownFiles);
-        };
+            excalidrawAPI.updateScene({
+                elements: [...currentElements, ...converted],
+            });
+
+            console.log(`✅ Created ${newElements.length} markdown note(s) from files`);
+
+            // Show toast notification via event bus
+            eventBus.emit('canvas:show-toast', {
+                message: `Added ${files.length} markdown note${files.length > 1 ? 's' : ''}`,
+                type: 'success',
+            });
+        } catch (err) {
+            console.error("❌ Error creating markdown notes:", err);
+            eventBus.emit('canvas:show-toast', {
+                message: "Failed to load markdown files",
+                type: 'info',
+            });
+        }
     }, [excalidrawAPI]);
 
     // Handle drag-and-drop for canvas state files, .excalidraw, and .md files
@@ -1405,20 +1369,14 @@ export default function ExcalidrawCanvas({
 
                 if (result.success && result.state) {
                     // Dispatch event to load the state
-                    window.dispatchEvent(new CustomEvent('canvas:load-state', {
-                        detail: { state: result.state },
-                    }));
+                    eventBus.emit('canvas:load-state', { state: result.state });
 
                     // Also dispatch to chat components (if .rj file)
                     if (canvasFile.name.endsWith('.rj')) {
-                        window.dispatchEvent(new CustomEvent('chat:load-messages', {
-                            detail: { messages: result.state.chat.messages },
-                        }));
+                        eventBus.emit('chat:load-messages', { messages: result.state.chat.messages });
 
                         if (result.state.chat.aiProvider) {
-                            window.dispatchEvent(new CustomEvent('chat:set-provider', {
-                                detail: { provider: result.state.chat.aiProvider },
-                            }));
+                            eventBus.emit('chat:set-provider', { provider: result.state.chat.aiProvider });
                         }
                     }
 
@@ -1442,12 +1400,10 @@ export default function ExcalidrawCanvas({
                 };
 
                 // Dispatch event to create markdown notes
-                window.dispatchEvent(new CustomEvent('canvas:load-markdown-files', {
-                    detail: {
-                        files: markdownFiles,
-                        dropPosition: markdownFiles.length === 1 ? dropPosition : undefined,
-                    },
-                }));
+                eventBus.emit('canvas:load-markdown-files', {
+                    files: markdownFiles,
+                    dropPosition: markdownFiles.length === 1 ? dropPosition : undefined,
+                });
             }
         };
 
@@ -1460,47 +1416,39 @@ export default function ExcalidrawCanvas({
         };
     }, []);
 
-    // Handle loading canvas state from file
-    useEffect(() => {
-        const handleLoadState = (event: CustomEvent<{ state: any }>) => {
-            const { state } = event.detail;
-            if (!state?.canvas || !excalidrawAPI) {
-                console.warn("⚠️ Cannot load state: missing canvas data or API");
-                return;
+    // Handle loading canvas state from event bus
+    useEvent('canvas:load-state', (data) => {
+        const { state } = data;
+        const api = excalidrawAPIRef.current;
+        if (!state?.canvas || !api) {
+            console.warn("⚠️ Cannot load state: missing canvas data or API");
+            return;
+        }
+
+        console.log("📂 ExcalidrawCanvas loading state from event bus...");
+
+        try {
+            // Update scene with loaded elements and app state
+            const { elements, appState, files } = state.canvas;
+
+            // Update the scene
+            api.updateScene({
+                elements: elements || [],
+                appState: appState ? sanitizeAppState(appState) : undefined,
+            });
+
+            // Add files if present
+            if (files && Object.keys(files).length > 0) {
+                api.addFiles(Object.values(files));
             }
 
-            console.log("📂 ExcalidrawCanvas loading state from file...");
-
-            try {
-                // Update scene with loaded elements and app state
-                const { elements, appState, files } = state.canvas;
-
-                // Update the scene
-                excalidrawAPI.updateScene({
-                    elements: elements || [],
-                    appState: sanitizeAppState(appState || {}),
-                });
-
-                // Add files if present
-                if (files && Object.keys(files).length > 0) {
-                    excalidrawAPI.addFiles(Object.values(files));
-                }
-
-                console.log("✅ ExcalidrawCanvas state loaded:", {
-                    elements: elements?.length || 0,
-                    files: Object.keys(files || {}).length,
-                });
-            } catch (err) {
-                console.error("❌ Error loading canvas state:", err);
-            }
-        };
-
-        window.addEventListener("canvas:load-state", handleLoadState as EventListener);
-
-        return () => {
-            window.removeEventListener("canvas:load-state", handleLoadState as EventListener);
-        };
-    }, [excalidrawAPI]);
+            console.log("✅ Canvas state loaded successfully");
+            eventBus.emit("canvas:show-toast", { message: "Canvas loaded successfully", type: "success" });
+        } catch (err) {
+            console.error("❌ Error applying loaded state:", err);
+            eventBus.emit("canvas:show-toast", { message: "Failed to load canvas state", type: "error" });
+        }
+    }, []);
 
     // Expose markdown note refs for export functionality
     useEffect(() => {
@@ -1681,6 +1629,9 @@ export default function ExcalidrawCanvas({
         }
 
         const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+        if (!converter) {
+            throw new Error("Failed to load Excalidraw converter");
+        }
 
         // Get viewport center for proper positioning
         const appState = api.getAppState();
@@ -1755,6 +1706,9 @@ export default function ExcalidrawCanvas({
         }
 
         const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+        if (!converter) {
+            throw new Error("Failed to load Excalidraw converter");
+        }
 
         // Get viewport center for proper positioning
         const appState = api.getAppState();
@@ -1877,6 +1831,9 @@ export default function ExcalidrawCanvas({
         }
 
         const { convertToExcalidrawElements: converter } = await loadExcalidraw();
+        if (!converter) {
+            throw new Error("Failed to load Excalidraw converter");
+        }
         const { DEFAULT_NOTE_STATE } = await import("./rich-text");
 
         // Get viewport center for proper positioning
@@ -1896,10 +1853,11 @@ export default function ExcalidrawCanvas({
             height: 1200,
             backgroundColor: "#ffffff",
             strokeColor: "#000000",
-            strokeWidth: 4,
+            strokeWidth: 1,
             roughness: 0,
             opacity: 100,
             fillStyle: "solid",
+            roundness: { type: 3 },
             id: nanoid(),
             locked: false,
             customData: {
@@ -2189,7 +2147,8 @@ export default function ExcalidrawCanvas({
                 theme={theme}
                 excalidrawAPI={(api: any) => {
                     setExcalidrawAPI(api);
-                    // Make API and helper functions globally available
+                    setExcalidrawAPIContext(api); // Set in context for typed access
+                    // Make API and helper functions globally available (legacy support)
                     if (typeof window !== "undefined") {
                         (window as any).excalidrawAPI = api;
                         (window as any).createMarkdownNote = handleCreateMarkdown;
@@ -2218,19 +2177,22 @@ export default function ExcalidrawCanvas({
                     }
 
                     // Restore files from localStorage immediately when API is ready
-                    try {
-                        const saved = localStorage.getItem(STORAGE_KEY);
-                        if (saved) {
-                            const data = JSON.parse(saved);
-                            const files = data.canvasData?.files;
-                            if (files && Object.keys(files).length > 0) {
-                                console.log("📂 Restoring files:", Object.keys(files).length);
-                                api.addFiles(Object.values(files));
-                                console.log("✅ Files restored");
+                    // But only if we are NOT in a new canvas mode
+                    if (!shouldClearOnMount) {
+                        try {
+                            const saved = localStorage.getItem(STORAGE_KEY);
+                            if (saved) {
+                                const data = JSON.parse(saved);
+                                const files = data.canvasData?.files;
+                                if (files && Object.keys(files).length > 0) {
+                                    console.log("📂 Restoring files:", Object.keys(files).length);
+                                    api.addFiles(Object.values(files));
+                                    console.log("✅ Files restored");
+                                }
                             }
+                        } catch (err) {
+                            console.error("❌ Failed to restore files:", err);
                         }
-                    } catch (err) {
-                        console.error("❌ Failed to restore files:", err);
                     }
                 }}
                 initialData={shouldClearOnMount ? {
@@ -2328,9 +2290,7 @@ export default function ExcalidrawCanvas({
                     if (customElement) {
                         if (customElement.customData?.type === 'markdown') {
                             // Dispatch event to trigger markdown edit mode
-                            window.dispatchEvent(new CustomEvent('markdown:edit', {
-                                detail: { elementId: customElement.id }
-                            }));
+                            eventBus.emit('markdown:edit', { elementId: customElement.id });
                         }
                         // Return false to prevent Excalidraw's default text editing
                         return false;
@@ -2399,8 +2359,8 @@ export default function ExcalidrawCanvas({
                             saveToLocalStorage(elements, appState, files);
                         }
 
-                        // Dispatch change event for cloud auto-save
-                        window.dispatchEvent(new CustomEvent("canvas:data-change"));
+                        // Emit change event for cloud auto-save
+                        eventBus.emit("canvas:data-change");
 
                         // Sync to PartyKit in shared mode (but not when applying remote updates or smoothing)
                         if (isSharedMode) {

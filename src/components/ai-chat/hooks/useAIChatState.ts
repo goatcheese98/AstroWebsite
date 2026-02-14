@@ -1,82 +1,13 @@
 /**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                        🧠 useAIChatState.ts                                  ║
- * ║                    "The Conversation Memory Keeper"                          ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🔵 Custom Hook | 🟢 State Manager | 🔴 API Handler               ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the brain of the AI Chat system. I remember every message, track when the AI
- * is thinking, and know which AI provider (Kimi or Claude) we're talking to. I'm
- * the single source of truth for everything conversation-related.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Users want to have fluid conversations with AI about their canvas drawings. I ensure:
- * - Their messages persist during the session (they can scroll back)
- * - They see clear loading states ("Kimi is thinking...")
- * - Errors are captured and displayed humanely
- * - They can switch between AI providers if one is overloaded
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │  ChatInput  │─────▶│      ME      │─────▶│ MessageList │   │
- *      │   │  (sends)    │      │ (useAIChat   │      │  (displays) │   │
- *      │   └─────────────┘      │   State)     │      └─────────────┘   │
- *      │                        └──────┬───────┘                          │
- *      │                               │                                  │
- *      │           ┌───────────────────┼───────────────────┐             │
- *      │           ▼                   ▼                   ▼             │
- *      │    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐      │
- *      │    │ Window Event│    │useCanvasCmds │    │useImageGen  │      │
- *      │    │  (Capture)  │    │              │    │             │      │
- *      │    └─────────────┘    └──────────────┘    └─────────────┘      │
- *      │                                                                  │
- *      │   I TALK TO: /api/chat-kimi, /api/chat (Claude)                 │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Messages don't appear, infinite loading spinners, "undefined" errors
- * - User Impact: Chat becomes completely unusable - messages vanish into void
- * - Quick Fix: Check browser console for API errors, verify network connectivity
- * - Debug: Look at the 'messages' array in React DevTools, check API response format
- * 
- * 📦 STATE I MANAGE:
- * ┌─────────────────┬─────────────────────────────────────────────────────────┐
- * │ messages        │ Array of all conversation messages (user + assistant)   │
- * │ input           │ Current text in the input box                           │
- * │ isLoading       │ Whether AI is currently generating a response           │
- * │ error           │ Any error message to display to user                    │
- * │ contextMode     │ "all" canvas or "selected" elements only                │
- * │ aiProvider      │ "kimi" | "claude" - which AI backend to use              │
- * │ canvasState     │ Snapshot of Excalidraw elements for context             │
- * │ showTemplates   │ Whether template modal is open                          │
- * └─────────────────┴─────────────────────────────────────────────────────────┘
- * 
- * 🎬 MAIN ACTIONS I PROVIDE:
- * - handleSend(): Send message to AI with canvas context
- * - toggleProvider(): Switch between Kimi and Claude
- * - setContextMode(): Toggle between "all" and "selected" context
- * - clearError(): Dismiss error messages
- * - appendMessage(): Add assistant response to history
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted from AIChatContainer.tsx (was 300+ lines of state logic)
- * 2026-02-02: Separated message handling from UI rendering concerns
- * 2026-02-02: Centralized AI provider switching logic
- * 
- * @module useAIChatState
+ * useAIChatState.ts - Store-integrated version
+ * Uses Zustand store for state management
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Message, CanvasContext } from "../types";
 import { nanoid } from "nanoid";
+import { useCanvasStore } from "../../../stores";
+import { eventBus } from "../../../lib/events";
 
 type AIProvider = "kimi" | "claude";
 
@@ -128,89 +59,70 @@ export interface UseAIChatStateReturn {
 }
 
 export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateReturn {
-    const { isOpen, initialWidth = 400, onClose } = options;
+    const { isOpen, onClose } = options;
 
-    // === 📨 Core Message State ===
-    const [messages, setMessages] = useState<Message[]>([]);
+    // === STORE INTEGRATION ===
+    const store = useCanvasStore();
+    const {
+        messages,
+        setMessages,
+        aiProvider,
+        setAIProvider,
+        contextMode,
+        setContextMode,
+        isChatLoading: isLoading,
+        setChatLoading: setIsLoading,
+        chatError: storeError,
+        setChatError: setStoreError,
+        clearChatError,
+        addMessage: addMessageToStore,
+    } = store;
+
+    // === LOCAL UI STATE (not in store) ===
     const [input, setInput] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // === 🖥️ UI State ===
-    const [contextMode, setContextMode] = useState<"all" | "selected">("selected");
-    const [aiProvider, setAiProvider] = useState<AIProvider>("claude");
+    const [canvasState, setCanvasState] = useState<any>(null);
     const [showTemplates, setShowTemplates] = useState(false);
 
-    // === 🎨 Canvas State ===
-    const [canvasState, setCanvasState] = useState<any>(null);
-
-    // === 🔄 Request Tracking ===
+    // === REFS ===
     const chatRequestIdRef = useRef<string | null>(null);
-
-    // === 🌐 Web Embed Content Tracking ===
     const selectedWebEmbedRef = useRef<{ url: string; title: string; elementId: string } | null>(null);
 
-    // Listen for web embed selections
+    // Listen for web embed selections via event bus
     useEffect(() => {
-        const handleWebEmbedSelected = (e: CustomEvent<{ elementId: string; url: string; title: string }>) => {
-            selectedWebEmbedRef.current = e.detail;
-            console.log("🌐 Web embed selected for AI context:", e.detail.url);
-        };
-
-        window.addEventListener("webembed:selected", handleWebEmbedSelected as EventListener);
-        return () => window.removeEventListener("webembed:selected", handleWebEmbedSelected as EventListener);
+        const unsubscribe = eventBus.on('webembed:selected', (data) => {
+            selectedWebEmbedRef.current = data;
+            console.log("🌐 Web embed selected for AI context:", data.url);
+        });
+        return unsubscribe;
     }, []);
 
-    // Cleanup on unmount if still open
-    useEffect(() => {
-        return () => {
-            if (isOpen) {
-                console.warn("useAIChatState unmounting while open - calling onClose");
-                onClose();
-            }
-        };
-    }, [isOpen, onClose]);
+    // Note: We intentionally DON'T call onClose on unmount
+    // The parent component (AIChatContainer) manages the open/close state
+    // Calling onClose here caused issues where the chat would close
+    // unexpectedly during re-renders or state updates
 
     // === 🚀 Actions ===
 
-    /**
-     * Clear any error message
-     */
     const clearError = useCallback(() => {
-        setError(null);
-    }, []);
+        clearChatError();
+    }, [clearChatError]);
 
-    /**
-     * Set AI provider directly
-     */
     const setAiProviderCallback = useCallback((provider: AIProvider) => {
-        setAiProvider(provider);
-    }, []);
+        setAIProvider(provider);
+    }, [setAIProvider]);
 
-    /**
-     * Toggle between Kimi and Claude AI providers
-     */
     const toggleProvider = useCallback(() => {
-        setAiProvider(prev => prev === "kimi" ? "claude" : "kimi");
-    }, []);
+        setAIProvider((prev: AIProvider) => prev === "kimi" ? "claude" : "kimi");
+    }, [setAIProvider]);
 
-    /**
-     * Append a message to the conversation history
-     */
     const appendMessage = useCallback((message: Message) => {
-        setMessages(prev => [...prev, message]);
-    }, []);
+        addMessageToStore(message);
+    }, [addMessageToStore]);
 
-    /**
-     * Clear all messages (reset conversation)
-     */
     const clearMessages = useCallback(() => {
         setMessages([]);
-    }, []);
+    }, [setMessages]);
 
-    /**
-     * Build canvas description from current state
-     */
     const getCanvasDescription = useCallback((): string => {
         if (!canvasState?.elements?.length) {
             return "The canvas is currently empty.";
@@ -231,7 +143,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
         let description = `Canvas has ${canvasState.elements.length} elements: ${desc}`;
 
-        // Add web embed info if selected
         if (selectedWebEmbedRef.current) {
             description += `\n\nSelected Web Embed: ${selectedWebEmbedRef.current.url}`;
             description += `\nThe user has a web page embedded that they may want you to analyze or reference.`;
@@ -240,9 +151,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         return description;
     }, [canvasState]);
 
-    /**
-     * Send a message to the AI with optional canvas context and screenshot
-     */
     const handleSend = useCallback(async (
         sendOptions?: { screenshotData?: string | null; selectedElements?: string[]; getSelectionContext?: () => string }
     ): Promise<void> => {
@@ -251,7 +159,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
         const { screenshotData = null, selectedElements = [], getSelectionContext } = sendOptions || {};
 
-        // Build context based on mode
         let contextMessage = "";
         let elementDataForPrompt = "";
         let isModifyingElements = false;
@@ -260,7 +167,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             const selectionContext = getSelectionContext();
             contextMessage = `\n\n[Working with ${selectedElements.length} selected elements:\n${selectionContext}]`;
 
-            // Include full element data for modification capability
             if (canvasState?.elements) {
                 const selectedElementData = canvasState.elements.filter((el: any) =>
                     selectedElements.includes(el.id)
@@ -276,12 +182,10 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
         const fullContent = userContent + contextMessage + elementDataForPrompt;
 
-        // Build message content array
         const messageContent: Array<{ type: string; text?: string; url?: string }> = [
             { type: "text", text: userContent }
         ];
 
-        // If a screenshot is provided, add it to the message content
         if (screenshotData) {
             messageContent.push({
                 type: "image",
@@ -289,7 +193,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             });
         }
 
-        // Create user message
         const userMessage: Message = {
             id: nanoid(),
             role: "user",
@@ -306,11 +209,11 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             status: "sent",
         };
 
-        // Update UI state
-        setMessages(prev => [...prev, userMessage]);
+        // Update store state
+        addMessageToStore(userMessage);
         setInput("");
         setIsLoading(true);
-        setError(null);
+        setStoreError(null);
 
         try {
             const canvasDescription = getCanvasDescription();
@@ -327,7 +230,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 isModifyingElements,
             };
 
-            // Call appropriate API based on provider
             const endpoint = aiProvider === "kimi" ? "/api/chat-kimi" : "/api/chat";
             const model = aiProvider === "kimi" ?
                 "kimi-k2.5" :
@@ -359,7 +261,6 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
             if (!response.ok) {
                 console.error(`❌ ${aiProvider} API error:`, data);
-
                 const errorMessage = data.details || data.error || `${aiProvider} API failed`;
                 const isOverloaded = errorMessage.toLowerCase().includes('overload') ||
                     errorMessage.toLowerCase().includes('too many requests') ||
@@ -379,23 +280,19 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             let displayMessage = data.message;
             let drawingCommand: any[] | null = null;
             let isMermaidDiagram = false;
-            let sourceCode: string | undefined = undefined; // Store original code for "Show Code" feature
+            let sourceCode: string | undefined = undefined;
 
             // Check for Mermaid diagrams first
             const mermaidMatch = data.message.match(/```mermaid\s*\n([\s\S]*?)\n```/);
             if (mermaidMatch) {
                 try {
-                    // Store original Mermaid code BEFORE conversion
-                    sourceCode = mermaidMatch[0]; // Full code block including ```mermaid
-                    
-                    // Lazy import Mermaid converter
+                    sourceCode = mermaidMatch[0];
                     const { convertMermaidToCanvas } = await import("@/lib/mermaid-converter");
                     const { elements } = await convertMermaidToCanvas(mermaidMatch[1]);
                     
                     if (elements && elements.length > 0) {
                         drawingCommand = elements;
                         isMermaidDiagram = true;
-                        // Replace Mermaid block with success message
                         displayMessage = data.message.replace(
                             mermaidMatch[0],
                             "\n\n✅ **Mermaid diagram converted to editable shapes**\n"
@@ -404,8 +301,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                     }
                 } catch (err) {
                     console.error("Failed to convert Mermaid diagram:", err);
-                    // Keep the original message if conversion fails
-                    sourceCode = undefined; // Don't store code if conversion failed
+                    sourceCode = undefined;
                 }
             }
 
@@ -420,9 +316,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                         const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
                         if (Array.isArray(parsed)) {
                             drawingCommand = parsed;
-                            // Store original JSON code BEFORE replacement
                             sourceCode = jsonMatch[0];
-                            // Replace JSON block with success message
                             displayMessage = data.message.replace(
                                 jsonMatch[0],
                                 "\n\n✅ **Drawing command received**\n"
@@ -434,28 +328,22 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 }
             }
 
-            // Check for web embed command (EMBED: https://example.com)
+            // Check for web embed command
             const embedMatch = data.message.match(/EMBED:\s*(https?:\/\/\S+)/i);
             if (embedMatch) {
                 const url = embedMatch[1];
                 console.log("🌐 Web embed requested:", url);
                 
-                // Dispatch event to create web embed
-                window.dispatchEvent(new CustomEvent("canvas:create-web-embed", {
-                    detail: { url },
-                }));
+                eventBus.emit('canvas:create-web-embed', { url });
                 
-                // Replace EMBED: line with success message
                 displayMessage = displayMessage.replace(
                     embedMatch[0],
                     "\n\n✅ **Web page embedded**\n"
                 );
                 
-                // Store the embed command as source code
                 sourceCode = embedMatch[0];
             }
 
-            // Create assistant message
             const assistantMessage: Message = {
                 id: nanoid(),
                 role: "assistant",
@@ -468,23 +356,23 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                 reactions: [],
                 status: "sent",
                 drawingCommand: drawingCommand || undefined,
-                sourceCode: sourceCode, // Store original code for "Show Code" button
+                sourceCode: sourceCode,
             };
 
-            setMessages(prev => [...prev, assistantMessage]);
+            addMessageToStore(assistantMessage);
 
         } catch (err) {
             console.error("Send message error:", err);
-            setError(err instanceof Error ? err.message : "Something went wrong");
+            setStoreError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
             setIsLoading(false);
         }
-    }, [input, isLoading, messages, aiProvider, contextMode, canvasState, getCanvasDescription]);
+    }, [input, isLoading, messages, aiProvider, contextMode, canvasState, getCanvasDescription, addMessageToStore, setIsLoading, setStoreError]);
 
-    // Listen for load events from file
+    // Listen for load events from file via event bus
     useEffect(() => {
-        const handleLoadMessages = (e: CustomEvent<{ messages: Message[] }>) => {
-            const loadedMessages = e.detail.messages.map(msg => ({
+        const unsubscribeMessages = eventBus.on('chat:load-messages', (data) => {
+            const loadedMessages = data.messages.map((msg: any) => ({
                 ...msg,
                 metadata: {
                     ...msg.metadata,
@@ -493,21 +381,18 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             }));
             setMessages(loadedMessages);
             console.log(`📂 Loaded ${loadedMessages.length} messages`);
-        };
+        });
 
-        const handleSetProvider = (e: CustomEvent<{ provider: AIProvider }>) => {
-            setAiProvider(e.detail.provider);
-            console.log(`📂 Set AI provider to ${e.detail.provider}`);
-        };
-
-        window.addEventListener("chat:load-messages", handleLoadMessages as EventListener);
-        window.addEventListener("chat:set-provider", handleSetProvider as EventListener);
+        const unsubscribeProvider = eventBus.on('chat:set-provider', (data) => {
+            setAIProvider(data.provider);
+            console.log(`📂 Set AI provider to ${data.provider}`);
+        });
 
         return () => {
-            window.removeEventListener("chat:load-messages", handleLoadMessages as EventListener);
-            window.removeEventListener("chat:set-provider", handleSetProvider as EventListener);
+            unsubscribeMessages();
+            unsubscribeProvider();
         };
-    }, []);
+    }, [setMessages, setAIProvider]);
 
     return {
         // Message state
@@ -516,7 +401,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
         input,
         setInput,
         isLoading,
-        error,
+        error: storeError,
         clearError,
 
         // UI state

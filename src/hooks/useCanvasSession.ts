@@ -24,6 +24,7 @@ export interface CanvasSession {
 }
 
 const ANONYMOUS_ID_KEY = 'astroweb-anonymous-id';
+const CANVAS_ID_KEY = 'astroweb-current-canvas-id';
 
 function getOrCreateAnonymousId(): string {
   if (typeof window === 'undefined') return '';
@@ -37,7 +38,16 @@ function getOrCreateAnonymousId(): string {
 
 export function useCanvasSession(): CanvasSession {
   const { user: clerkUser, isSignedIn, isLoaded } = useUser();
-  const [canvasId, setCanvasId] = useState<string | null>(null);
+  const [canvasId, setCanvasId] = useState<string | null>(() => {
+    // Initialize from URL or sessionStorage
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const urlCanvasId = params.get('canvas');
+    if (urlCanvasId) return urlCanvasId;
+
+    // Fall back to sessionStorage
+    return sessionStorage.getItem(CANVAS_ID_KEY);
+  });
   const [anonymousId] = useState(() => getOrCreateAnonymousId());
 
   const user: CanvasSessionUser | null = isSignedIn && clerkUser ? {
@@ -47,14 +57,14 @@ export function useCanvasSession(): CanvasSession {
     avatarUrl: clerkUser.imageUrl,
   } : null;
 
-  // Check for canvas ID in URL
+  // Sync canvasId to sessionStorage whenever it changes
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlCanvasId = params.get('canvas');
-    if (urlCanvasId) {
-      setCanvasId(urlCanvasId);
+    if (canvasId) {
+      sessionStorage.setItem(CANVAS_ID_KEY, canvasId);
+    } else {
+      sessionStorage.removeItem(CANVAS_ID_KEY);
     }
-  }, []);
+  }, [canvasId]);
 
   const updateCanvasId = useCallback((id: string | null) => {
     setCanvasId(id);

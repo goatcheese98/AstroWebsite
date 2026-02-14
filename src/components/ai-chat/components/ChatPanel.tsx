@@ -17,15 +17,19 @@
  * - Floats above the canvas like a popup
  * - Can be easily opened and closed
  * - Has a familiar chat widget appearance
+ * - Is positioned to not cover the right-side toolbar/menu
  * 
  * @module ChatPanel
  */
 
 import React, { forwardRef } from "react";
+import { eventBus } from "../../../lib/events";
 
 export interface ChatPanelProps {
     /** Whether the panel is visible */
     isOpen: boolean;
+    /** Whether the panel is minimized */
+    isMinimized?: boolean;
     /** Current width in pixels */
     width: number;
     /** Current height in pixels */
@@ -40,23 +44,44 @@ export interface ChatPanelProps {
 
 /**
  * Floating chat panel widget
+ * Positioned to the left of the right-side toolbar (88px offset)
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-    function ChatPanel({ isOpen, width, height = 600, onResizeStart, children, isMobile = false }, ref) {
+    function ChatPanel({ isOpen, isMinimized = false, width, height = 600, onResizeStart, children, isMobile = false }, ref) {
         if (!isOpen) return null;
+
+        // Minimized state - show as a compact pill at the bottom right
+        if (isMinimized && !isMobile) {
+            return (
+                <div
+                    ref={ref}
+                    className="ai-chat-container minimized"
+                    style={{
+                        position: "fixed",
+                        right: "88px", // Position to the left of the right toolbar
+                        bottom: "20px",
+                        zIndex: 999,
+                        animation: "popIn 0.2s ease",
+                        pointerEvents: "auto",
+                    }}
+                >
+                    {children}
+                </div>
+            );
+        }
 
         // Dimensions for floating chat
         const chatWidth = isMobile ? "100%" : `${width}px`;
         const chatHeight = isMobile ? "100%" : `${height}px`;
         const maxHeight = isMobile ? "100%" : "calc(100vh - 100px)";
-        
+
         return (
             <>
                 {/* Mobile Backdrop - tap to close */}
                 {isMobile && (
                     <div
                         onClick={() => {
-                            window.dispatchEvent(new CustomEvent("ai-chat:close-request"));
+                            eventBus.emit("ai-chat:close-request");
                         }}
                         style={{
                             position: "fixed",
@@ -67,14 +92,14 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                         }}
                     />
                 )}
-                
+
                 {/* Main Chat Widget */}
                 <div
                     ref={ref}
                     className="ai-chat-container"
                     style={{
                         position: "fixed",
-                        right: isMobile ? 0 : "20px",
+                        right: isMobile ? 0 : "88px", // Position to the left of the right toolbar
                         bottom: isMobile ? 0 : "20px",
                         top: isMobile ? 0 : "auto",
                         width: chatWidth,
@@ -119,39 +144,18 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                                 borderRadius: "2px",
                                 transition: "background 0.15s",
                             }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "var(--color-accent)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "var(--color-border)";
-                            }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "var(--color-accent)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "var(--color-border)";
+                                }}
                             />
                         </div>
                     )}
+
                     {children}
                 </div>
-                
-                {/* Animations */}
-                <style>{`
-                    @keyframes popIn {
-                        from { 
-                            opacity: 0;
-                            transform: scale(0.95) translateY(10px);
-                        }
-                        to { 
-                            opacity: 1;
-                            transform: scale(1) translateY(0);
-                        }
-                    }
-                    @keyframes slideUp {
-                        from { transform: translateY(100%); }
-                        to { transform: translateY(0); }
-                    }
-                    @keyframes fadeIn {
-                        from { opacity: 0; }
-                        to { opacity: 1; }
-                    }
-                `}</style>
             </>
         );
     }

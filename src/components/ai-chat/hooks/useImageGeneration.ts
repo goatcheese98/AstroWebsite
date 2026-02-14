@@ -69,6 +69,7 @@
 
 import { useState, useCallback } from "react";
 import { nanoid } from "nanoid";
+import { eventBus } from "@/lib/events";
 import type { GenerationOptions } from "../ImageGenerationModal";
 
 export interface ImageHistoryItem {
@@ -76,6 +77,7 @@ export interface ImageHistoryItem {
     url: string;
     prompt: string;
     timestamp: Date;
+    aspectRatio?: '1:1' | '16:9' | '4:3' | '9:16';
 }
 
 export interface UseImageGenerationReturn {
@@ -129,10 +131,10 @@ export function useImageGeneration(): UseImageGenerationReturn {
             // Check if we have a reference wireframe
             const hasReference = options.hasReference !== false;
             const bgColor = options.backgroundColor;
-            
+
             // Build comprehensive prompt with strict instructions
             let systemInstructions = "";
-            
+
             if (hasReference) {
                 // Prompt for wireframe-to-design transformation
                 systemInstructions = "You are an expert UI/UX designer tasked with transforming wireframes into photorealistic designs.\n\n";
@@ -140,7 +142,7 @@ export function useImageGeneration(): UseImageGenerationReturn {
                 // Prompt for pure generation from text (no reference)
                 systemInstructions = "You are an expert UI/UX designer creating photorealistic designs from a description.\n\n";
             }
-            
+
             // Add background color instruction FIRST - STRICT ENFORCEMENT
             if (bgColor) {
                 systemInstructions += `BACKGROUND COLOR REQUIREMENTS (ABSOLUTELY MANDATORY - HIGHEST PRIORITY):
@@ -153,7 +155,7 @@ export function useImageGeneration(): UseImageGenerationReturn {
 
 `;
             }
-            
+
             // Add layout instructions based on strict ratio setting and reference availability
             if (hasReference) {
                 if (options.strictRatio) {
@@ -177,10 +179,10 @@ export function useImageGeneration(): UseImageGenerationReturn {
 `;
                 }
             }
-            
+
             // Add the user's creative prompt
             systemInstructions += `DESIGN VISION:\n${options.prompt}\n\n`;
-            
+
             // Add quality and rendering instructions
             if (hasReference) {
                 systemInstructions += `RENDERING REQUIREMENTS:
@@ -214,7 +216,7 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                     : "gemini-2.5-flash-image",
                 mode: hasReference ? "visual" : "text",
             };
-            
+
             if (hasReference) {
                 requestBody.imageData = screenshotData;
             }
@@ -224,9 +226,9 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(requestBody),
             });
-            
+
             const data = await response.json();
-            
+
             if (!response.ok) {
                 // Check for specific error cases
                 if (data.details?.includes('understand') || data.details?.includes('cannot')) {
@@ -234,7 +236,7 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                 }
                 throw new Error(data.details || data.error || "Image generation failed");
             }
-            
+
             // Check if AI responded with confusion
             if (data.message && (
                 data.message.toLowerCase().includes('do not understand') ||
@@ -242,20 +244,18 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
             )) {
                 throw new Error("I do not understand this prompt. Please provide clearer instructions.");
             }
-            
+
             // Success - create image data URL
             const imageDataUrl = `data:${data.mimeType};base64,${data.imageData}`;
-            
+
             // Dispatch to My Assets panel
-            window.dispatchEvent(new CustomEvent("asset:image-generated", {
-                detail: {
-                    imageUrl: imageDataUrl,
-                    prompt: options.prompt,
-                },
-            }));
-            
+            eventBus.emit("asset:image-generated", {
+                imageUrl: imageDataUrl,
+                prompt: options.prompt,
+            });
+
             console.log('✅ Image generated and added to assets');
-            
+
             // Calculate dimensions and insert into canvas
             const img = new Image();
             img.onload = () => {
@@ -263,23 +263,21 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                 const maxWidth = 600;
                 const width = Math.min(img.width, maxWidth);
                 const height = width / aspectRatio;
-                
-                window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                    detail: {
-                        imageData: imageDataUrl,
-                        type: "png",
-                        width,
-                        height,
-                    },
-                }));
-                
+
+                eventBus.emit("excalidraw:insert-image", {
+                    imageData: imageDataUrl,
+                    type: "png",
+                    width,
+                    height,
+                });
+
                 // Dispatch event for toast notification
-                window.dispatchEvent(new CustomEvent("excalidraw:image-inserted"));
-                
+                eventBus.emit("excalidraw:image-inserted");
+
                 callbacks?.onSuccess?.(imageDataUrl);
             };
             img.src = imageDataUrl;
-            
+
         } catch (err) {
             console.error("Image generation error:", err);
             const errorMessage = err instanceof Error ? err.message : "Image generation failed";

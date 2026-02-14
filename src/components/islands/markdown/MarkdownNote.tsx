@@ -57,6 +57,7 @@
  */
 
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
+import { eventBus } from '@/lib/events';
 import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
 import { getMarkdownStyles } from './styles/markdownStyles';
@@ -188,14 +189,13 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         useEffect(() => {
             if (isEditing) return;
 
-            const handleEditCommand = (e: CustomEvent<{ elementId: string }>) => {
-                if (e.detail.elementId === element.id) {
+            const unsubscribe = eventBus.on('markdown:edit', (data) => {
+                if (data.elementId === element.id) {
                     enterEditMode();
                 }
-            };
+            });
 
-            window.addEventListener('markdown:edit', handleEditCommand as EventListener);
-            return () => window.removeEventListener('markdown:edit', handleEditCommand as EventListener);
+            return unsubscribe;
         }, [isEditing, enterEditMode, element.id]);
 
 

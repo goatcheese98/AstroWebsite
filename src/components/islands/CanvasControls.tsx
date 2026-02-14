@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { eventBus } from "../../lib/events";
 
 
 interface CanvasControlsProps {
@@ -161,7 +162,7 @@ export default function CanvasControls({
 
     const handleGenerateImage = () => {
         // Open image generation modal directly without opening AI chat
-        window.dispatchEvent(new CustomEvent("imagegen:open"));
+        eventBus.emit('imagegen:open');
     };
 
     // Note: Controls now always visible for access to Save/Load

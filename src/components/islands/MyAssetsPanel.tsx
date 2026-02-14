@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { eventBus } from "@/lib/events";
 
 interface GeneratedImage {
     id: string;
@@ -27,10 +28,10 @@ const ICON_COLLECTIONS = [
 // Popular icon names to show by default
 const POPULAR_ICONS = [
     "user", "users", "heart", "star", "home", "settings", "search",
-    "mail", "phone", "calendar", "clock", "chart", "folder", "file",
+    "mail", "phone", "calendar", "clock", "folder", "file",
     "image", "video", "music", "download", "upload", "cloud", "database",
-    "check", "x", "plus", "minus", "arrow-right", "arrow-left", "arrow-up",
-    "arrow-down", "edit", "trash", "copy", "link", "external-link", "menu",
+    "check", "x-mark", "plus", "minus", "arrow-right", "arrow-left", "arrow-up",
+    "arrow-down", "pencil", "trash", "copy", "link", "menu",
     "shopping-cart", "credit-card", "gift", "bookmark", "tag", "filter"
 ];
 
@@ -82,14 +83,12 @@ export default function MyAssetsPanel({
 
     // Listen for new generated images
     useEffect(() => {
-        const handleImageGenerated = (event: any) => {
-            const { imageUrl, prompt } = event.detail;
-            if (imageUrl) {
-                addGeneratedImage(imageUrl, prompt);
+        const unsubscribe = eventBus.on("asset:image-generated", (data) => {
+            if (data && data.imageUrl) {
+                addGeneratedImage(data.imageUrl, data.prompt);
             }
-        };
-        window.addEventListener("asset:image-generated", handleImageGenerated);
-        return () => window.removeEventListener("asset:image-generated", handleImageGenerated);
+        });
+        return unsubscribe;
     }, [addGeneratedImage]);
 
     // Search icons using Iconify API
@@ -140,10 +139,13 @@ export default function MyAssetsPanel({
     // Insert icon into canvas
     const handleIconClick = async (iconName: string) => {
         try {
-            // Fetch SVG data from Iconify API
             const response = await fetch(
                 `https://api.iconify.design/${selectedCollection}/${iconName}.svg?height=200`
             );
+
+            if (!response.ok) {
+                throw new Error(`Icon not found: ${selectedCollection}/${iconName}`);
+            }
             const svgText = await response.text();
 
             // Convert SVG to base64 data URL (so it syncs across users)
@@ -151,14 +153,12 @@ export default function MyAssetsPanel({
             const dataUrl = `data:image/svg+xml;base64,${base64}`;
 
             // Dispatch event to insert into canvas
-            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                detail: {
-                    imageData: dataUrl,
-                    type: "svg+xml",
-                    width: 200,
-                    height: 200,
-                },
-            }));
+            eventBus.emit("excalidraw:insert-image", {
+                imageData: dataUrl,
+                type: "svg+xml",
+                width: 200,
+                height: 200,
+            });
 
             console.log(`✅ Inserted icon: ${selectedCollection}:${iconName} (base64 data URL)`);
         } catch (error) {
@@ -175,14 +175,12 @@ export default function MyAssetsPanel({
             const width = Math.min(img.width, maxWidth);
             const height = width / aspectRatio;
 
-            window.dispatchEvent(new CustomEvent("excalidraw:insert-image", {
-                detail: {
-                    imageData: image.url,
-                    type: "png",
-                    width,
-                    height,
-                },
-            }));
+            eventBus.emit("excalidraw:insert-image", {
+                imageData: image.url,
+                type: "png",
+                width,
+                height,
+            });
         };
         img.src = image.url;
     };
@@ -237,8 +235,8 @@ export default function MyAssetsPanel({
                     <h2>My Assets</h2>
                     <button className="close-btn" onClick={onClose} title="Close">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                     </button>
                 </div>
@@ -250,10 +248,10 @@ export default function MyAssetsPanel({
                         onClick={() => setActiveTab("icons")}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                            <line x1="9" y1="9" x2="9.01" y2="9"/>
-                            <line x1="15" y1="9" x2="15.01" y2="9"/>
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                            <line x1="9" y1="9" x2="9.01" y2="9" />
+                            <line x1="15" y1="9" x2="15.01" y2="9" />
                         </svg>
                         Icons
                     </button>
@@ -262,9 +260,9 @@ export default function MyAssetsPanel({
                         onClick={() => setActiveTab("generated")}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                            <circle cx="8.5" cy="8.5" r="1.5"/>
-                            <path d="M21 15l-5-5L5 21"/>
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <path d="M21 15l-5-5L5 21" />
                         </svg>
                         Generated ({generatedImages.length})
                     </button>
@@ -273,8 +271,8 @@ export default function MyAssetsPanel({
                 {/* Search bar */}
                 <div className="search-container">
                     <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
                     </svg>
                     <input
                         type="text"
@@ -286,8 +284,8 @@ export default function MyAssetsPanel({
                     {searchQuery && (
                         <button className="clear-search" onClick={() => setSearchQuery("")}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
                         </button>
                     )}
@@ -323,8 +321,8 @@ export default function MyAssetsPanel({
                             ) : icons.length === 0 ? (
                                 <div className="empty-state">
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                        <circle cx="11" cy="11" r="8"/>
-                                        <path d="m21 21-4.35-4.35"/>
+                                        <circle cx="11" cy="11" r="8" />
+                                        <path d="m21 21-4.35-4.35" />
                                     </svg>
                                     <p>No icons found</p>
                                     <p className="hint">Try a different search term</p>
@@ -355,9 +353,9 @@ export default function MyAssetsPanel({
                             {filteredImages.length === 0 ? (
                                 <div className="empty-state">
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                                        <path d="M21 15l-5-5L5 21"/>
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                        <path d="M21 15l-5-5L5 21" />
                                     </svg>
                                     <p>No generated images yet</p>
                                     <p className="hint">Use "Generate Image" to create AI images</p>
@@ -371,21 +369,36 @@ export default function MyAssetsPanel({
                                                 alt={image.prompt}
                                                 onClick={() => handleImageClick(image)}
                                                 className="image-preview"
+                                                title="Click to place on canvas"
                                             />
                                             <div className="image-info">
                                                 <p className="image-prompt">{image.prompt}</p>
-                                                <button
-                                                    className="delete-btn"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteGeneratedImage(image.id);
-                                                    }}
-                                                    title="Delete"
-                                                >
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                                    </svg>
-                                                </button>
+                                                <div className="image-actions">
+                                                    <button
+                                                        className="place-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleImageClick(image);
+                                                        }}
+                                                        title="Place on canvas"
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                            <path d="M12 5v14M5 12h14" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        className="delete-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteGeneratedImage(image.id);
+                                                        }}
+                                                        title="Delete"
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -755,8 +768,30 @@ export default function MyAssetsPanel({
                     -webkit-box-orient: vertical;
                 }
 
-                .delete-btn {
+                .image-actions {
+                    display: flex;
+                    gap: 0.25rem;
                     flex-shrink: 0;
+                }
+
+                .place-btn {
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    border-radius: 4px;
+                    color: var(--color-text-secondary);
+                    transition: all 0.15s;
+                    display: flex;
+                    align-items: center;
+                }
+
+                .place-btn:hover {
+                    color: #059669;
+                    background: #d1fae5;
+                }
+
+                .delete-btn {
                     background: transparent;
                     border: none;
                     cursor: pointer;

@@ -402,7 +402,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                                     style={{
                                         width: '100%',
                                         minHeight: '100%',
-                                        padding: '40px 60px', // More "workspace" feel
+                                        padding: '12px 60px 40px 60px', // Reduced top padding
                                         outline: 'none',
                                         color: isDark ? '#e5e5e5' : '#1a1a1a',
                                         display: 'block'
@@ -411,7 +411,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                             </div>
                         }
                         placeholder={
-                            <div className="lexical-placeholder" style={{ left: '60px', top: '40px' }}>
+                            <div className="lexical-placeholder" style={{ left: '60px', top: '12px' }}>
                                 Start typing your workspace note...
                             </div>
                         }

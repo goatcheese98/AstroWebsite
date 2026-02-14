@@ -86,6 +86,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { eventBus } from "../../../lib/events";
 
 /** Quality level for screenshot capture */
 export type ScreenshotQuality = "low" | "high" | "preview";
@@ -128,7 +129,7 @@ export interface UseScreenshotCaptureReturn {
     chatScreenshotData: string | null;
     /** Current chat request ID */
     chatRequestId: string | null;
-    
+
     // Actions
     /** Request a screenshot for chat context */
     captureForChat: (elementIds?: string[]) => string;
@@ -144,15 +145,15 @@ export function useScreenshotCapture(
     options: UseScreenshotCaptureOptions = {}
 ): UseScreenshotCaptureReturn {
     const { onChatScreenshot, onGenerationScreenshot } = options;
-    
+
     // === 📸 Chat Capture State ===
     const [isCaptureForChat, setIsCaptureForChat] = useState(false);
     const [chatScreenshotData, setChatScreenshotData] = useState<string | null>(null);
     const chatRequestIdRef = useRef<string | null>(null);
-    
+
     // === 🔄 Active Request Tracking ===
     const activeRequestIdsRef = useRef<Set<string>>(new Set());
-    
+
     /**
      * Request a screenshot for chat context (low quality, fast)
      */
@@ -161,20 +162,18 @@ export function useScreenshotCapture(
         chatRequestIdRef.current = requestId;
         activeRequestIdsRef.current.add(requestId);
         setIsCaptureForChat(true);
-        
+
         console.log("📸 Requesting chat screenshot:", requestId, "elements:", elementIds?.length || "all");
-        
-        window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
-            detail: {
-                elementIds,
-                quality: "low",
-                requestId,
-            } as ScreenshotRequestOptions,
-        }));
-        
+
+        eventBus.emit("excalidraw:capture-screenshot", {
+            elementIds,
+            quality: "low",
+            requestId,
+        });
+
         return requestId;
     }, []);
-    
+
     /**
      * Request a screenshot for image generation (high quality)
      */
@@ -184,21 +183,19 @@ export function useScreenshotCapture(
     ): string => {
         const requestId = `generation-${Date.now()}`;
         activeRequestIdsRef.current.add(requestId);
-        
+
         console.log("📸 Requesting generation screenshot:", requestId, "elements:", elementIds.length);
-        
-        window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
-            detail: {
-                elementIds,
-                quality: "high",
-                backgroundColor,
-                requestId,
-            } as ScreenshotRequestOptions,
-        }));
-        
+
+        eventBus.emit("excalidraw:capture-screenshot", {
+            elementIds,
+            quality: "high",
+            backgroundColor,
+            requestId,
+        });
+
         return requestId;
     }, []);
-    
+
     /**
      * Clear chat screenshot state
      */
@@ -207,7 +204,7 @@ export function useScreenshotCapture(
         setIsCaptureForChat(false);
         chatRequestIdRef.current = null;
     }, []);
-    
+
     /**
      * Reset all capture state
      */
@@ -217,57 +214,53 @@ export function useScreenshotCapture(
         chatRequestIdRef.current = null;
         activeRequestIdsRef.current.clear();
     }, []);
-    
+
     /**
      * Listen for screenshot capture events and route to appropriate handler
      */
     useEffect(() => {
-        const handleScreenshotCaptured = (event: CustomEvent<ScreenshotResult>) => {
-            const detail = event.detail;
-            
+        const unsubscribe = eventBus.on("excalidraw:screenshot-captured", (data) => {
+            const detail = data;
+
             if (!detail?.requestId) {
                 console.warn("⚠️ Received screenshot without requestId");
                 return;
             }
-            
+
             // Check if this is a request we care about
             if (!activeRequestIdsRef.current.has(detail.requestId)) {
                 console.log("⏭️ Ignoring screenshot for unknown requestId:", detail.requestId);
                 return;
             }
-            
+
             // Remove from active requests
             activeRequestIdsRef.current.delete(detail.requestId);
-            
+
             console.log("✅ Screenshot captured:", detail.requestId, "elements:", detail.elementCount);
-            
+
             // Route to appropriate handler based on requestId prefix
             if (detail.requestId.startsWith("chat-")) {
                 setIsCaptureForChat(false);
                 chatRequestIdRef.current = null;
-                
-                if (!detail.error) {
+
+                if (!detail.error && detail.dataURL) {
                     setChatScreenshotData(detail.dataURL);
                 }
-                
-                onChatScreenshot?.(detail);
+
+                onChatScreenshot?.(detail as ScreenshotResult);
             } else if (detail.requestId.startsWith("generation-")) {
-                onGenerationScreenshot?.(detail);
+                onGenerationScreenshot?.(detail as ScreenshotResult);
             }
-        };
-        
-        window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured as EventListener);
-        
-        return () => {
-            window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured as EventListener);
-        };
+        });
+
+        return unsubscribe;
     }, [onChatScreenshot, onGenerationScreenshot]);
-    
+
     return {
         isCaptureForChat,
         chatScreenshotData,
         chatRequestId: chatRequestIdRef.current,
-        
+
         captureForChat,
         captureForGeneration,
         clearChatScreenshot,

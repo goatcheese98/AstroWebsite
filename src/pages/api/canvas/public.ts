@@ -50,14 +50,14 @@ export const GET: APIRoute = async (context) => {
     // Transform to response format
     const canvasesResponse = canvases.map((canvas) => ({
       id: canvas.id,
-      userId: canvas.user_id,
+      userId: canvas.userId,
       title: canvas.title,
       description: canvas.description,
-      thumbnailUrl: canvas.thumbnail_url,
+      thumbnailUrl: canvas.thumbnailUrl,
       isPublic: true,
       version: canvas.version,
-      createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at,
+      createdAt: canvas.createdAt,
+      updatedAt: canvas.updatedAt,
     }));
 
     const response: CanvasListResponse = {

@@ -223,3 +223,19 @@ export function validateListCanvasesQuery(query: unknown) {
     details: firstError.message,
   };
 }
+
+/**
+ * Validate canvas data structure
+ * Use this for runtime validation of canvas data from storage or API
+ */
+export function validateCanvasData(data: unknown): data is CanvasData {
+  return CanvasDataSchema.safeParse(data).success;
+}
+
+/**
+ * Parse and validate canvas data, throwing on error
+ * Use this when you want strict validation with error messages
+ */
+export function parseCanvasData(data: unknown): CanvasData {
+  return CanvasDataSchema.parse(data);
+}

@@ -63,7 +63,7 @@ export const GET: APIRoute = async (context) => {
     }
 
     // Load canvas data from R2
-    const canvasData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, canvas.r2_key);
+    const canvasData = await loadCanvasFromR2(runtime.env.CANVAS_STORAGE, canvas.r2Key);
 
     if (!canvasData) {
       return new Response(
@@ -78,14 +78,14 @@ export const GET: APIRoute = async (context) => {
     // Build response
     const response: CanvasResponse = {
       id: canvas.id,
-      userId: canvas.user_id,
+      userId: canvas.userId,
       title: canvas.title,
       description: canvas.description,
-      thumbnailUrl: canvas.thumbnail_url,
-      isPublic: canvas.is_public === 1,
+      thumbnailUrl: canvas.thumbnailUrl,
+      isPublic: canvas.isPublic === 1,
       version: canvas.version,
-      createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at,
+      createdAt: canvas.createdAt,
+      updatedAt: canvas.updatedAt,
       canvasData,
     };
 

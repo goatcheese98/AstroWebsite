@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useMobileDetection } from "./hooks/useMobileDetection";
+import { eventBus } from "../../lib/events";
 
 // Excalidraw color palette presets
 const EXCALIDRAW_COLORS = [
@@ -54,6 +55,7 @@ export interface GenerationOptions {
     backgroundColor: string; // hex color
     strictRatio: boolean; // true = 1:1, false = lenient
     useProModel: boolean; // false = Flash (Fast), true = Pro (Better quality)
+    aspectRatio?: '1:1' | '16:9' | '4:3' | '9:16';
     hasReference?: boolean; // whether there's a wireframe reference image
 }
 
@@ -75,14 +77,14 @@ export default function ImageGenerationModal({
     const [useProModel, setUseProModel] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-    
+
     const colorPickerRef = useRef<HTMLDivElement>(null);
     const hasCapturedPreview = useRef(false);
     const receivedResponseRef = useRef(false);
 
     // Get effective background color
     const effectiveBackgroundColor = backgroundColor === "custom" ? customColor : backgroundColor;
-    
+
     // Check if we have selected elements for preview
     const hasSelectedElements = selectedElements.length > 0;
 
@@ -97,11 +99,12 @@ export default function ImageGenerationModal({
             const requestId = `preview-${Date.now()}`;
             console.log("🖼️ Requesting preview screenshot with requestId:", requestId, "for elements:", selectedElements);
 
-            const handlePreviewCaptured = (event: any) => {
-                console.log("📸 Received screenshot event:", event.detail?.requestId, "Expected:", requestId);
+            // Set up event bus listener BEFORE emitting the event
+            const unsubscribe = eventBus.on('excalidraw:screenshot-captured', (data) => {
+                console.log("📸 Received screenshot event via eventBus:", data.requestId, "Expected:", requestId);
 
                 // Ignore events that are responses to other requests
-                if (event.detail?.requestId && event.detail.requestId !== requestId) {
+                if (data.requestId && data.requestId !== requestId) {
                     console.log("⏭️ Skipping - different requestId");
                     return;
                 }
@@ -109,45 +112,39 @@ export default function ImageGenerationModal({
                 // Mark that we received a response
                 receivedResponseRef.current = true;
 
-                if (event.detail?.error) {
-                    console.error("❌ Preview capture error:", event.detail.error);
+                if (data.error) {
+                    console.error("❌ Preview capture error:", data.error);
                     setPreviewUrl(null);
-                } else if (event.detail?.dataURL) {
-                    console.log("✅ Preview captured successfully, length:", event.detail.dataURL.length);
-                    setPreviewUrl(event.detail.dataURL);
+                } else if (data.dataURL) {
+                    console.log("✅ Preview captured successfully, length:", data.dataURL.length);
+                    setPreviewUrl(data.dataURL);
                 } else {
-                    console.warn("⚠️ Received event without dataURL or error:", event.detail);
+                    console.warn("⚠️ Received event without dataURL or error:", data);
                 }
                 setIsLoadingPreview(false);
-                // Clean up listener after receiving response
-                window.removeEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
-            };
-
-            // Set up listener BEFORE dispatching the event
-            window.addEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
+                unsubscribe(); // Clean up listener after receiving response
+            });
 
             // Delay to ensure canvas is ready - try multiple times if needed
             const attemptCapture = (attempt = 1) => {
-                console.log(`🚀 Dispatching screenshot request (attempt ${attempt})`);
-                window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
-                    detail: {
-                        elementIds: selectedElements,
-                        quality: "preview",
-                        requestId,
-                    }
-                }));
-                
+                console.log(`🚀 Emitting screenshot request via eventBus (attempt ${attempt})`);
+                eventBus.emit('excalidraw:capture-screenshot', {
+                    elementIds: selectedElements,
+                    quality: "preview",
+                    requestId,
+                });
+
                 // If no response after 2 seconds, retry once
                 if (attempt === 1) {
                     setTimeout(() => {
-                        if (isLoadingPreview) {
+                        if (!receivedResponseRef.current) {
                             console.log("🔄 Retrying screenshot capture...");
                             attemptCapture(2);
                         }
                     }, 2000);
                 }
             };
-            
+
             setTimeout(() => attemptCapture(1), 300);
 
             // Timeout after 10 seconds in case capture fails
@@ -155,7 +152,7 @@ export default function ImageGenerationModal({
                 // Only process timeout if we haven't received a response yet
                 if (!receivedResponseRef.current) {
                     console.error("⏱️ Preview capture timed out after 10 seconds");
-                    window.removeEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
+                    unsubscribe();
                     setIsLoadingPreview(false);
                     setPreviewUrl(null);
                 } else {
@@ -165,7 +162,7 @@ export default function ImageGenerationModal({
 
             return () => {
                 clearTimeout(timeoutId);
-                window.removeEventListener("excalidraw:screenshot-captured", handlePreviewCaptured);
+                unsubscribe();
             };
         }
     }, [isOpen, hasSelectedElements, selectedElements]);
@@ -194,144 +191,100 @@ export default function ImageGenerationModal({
         if (showColorPicker) {
             document.addEventListener('mousedown', handleClickOutside);
         }
-        
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [showColorPicker]);
 
-    // Reset form state when modal opens (but not preview state)
-    useEffect(() => {
-        if (isOpen) {
-            setPrompt("");
-            setBackgroundColor("#ffffff");
-            setCustomColor("#ffffff");
-            setStrictRatio(true);
-            setUseProModel(false);
-            // Don't reset preview here - handled by the close effect
-        }
-    }, [isOpen]);
-
-    // Handle escape key
-    useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && isOpen && !isGenerating) {
-                onClose();
-            }
-        };
-
-        window.addEventListener("keydown", handleEscape);
-        return () => window.removeEventListener("keydown", handleEscape);
-    }, [isOpen, isGenerating, onClose]);
-
+    // Handle generate button click
     const handleGenerate = () => {
-        if (!prompt.trim()) return;
-        
+        if (!prompt.trim() || isGenerating) return;
+
         onGenerate({
             prompt: prompt.trim(),
             backgroundColor: effectiveBackgroundColor,
             strictRatio,
             useProModel,
-            hasReference: hasSelectedElements,
+            aspectRatio: strictRatio ? '1:1' : '4:3',
+            hasReference: hasSelectedElements && previewUrl !== null,
         });
+
+        // Reset prompt after generation starts
+        setPrompt("");
     };
 
-    const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setCustomColor(e.target.value);
-        setBackgroundColor("custom");
+    // Handle close - reset state
+    const handleClose = () => {
+        setPrompt("");
+        onClose();
     };
-
-    // Compute ready state - simple derived value
-    const isReady = prompt.trim().length > 0 && !isGenerating;
 
     if (!isOpen) return null;
 
     return (
-        <>
-            {/* Backdrop */}
-            <div 
-                className="image-gen-modal-backdrop"
-                onClick={!isGenerating ? onClose : undefined}
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.5)",
-                    backdropFilter: "blur(4px)",
-                    zIndex: 2000,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    animation: "fadeIn 0.2s ease",
-                }}
-            />
-
-            {/* Modal */}
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1001,
+                padding: isMobile ? "16px" : "24px",
+            }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) handleClose();
+            }}
+        >
             <div
-                className="image-gen-modal"
                 style={{
-                    position: "fixed",
-                    top: isMobile ? 0 : "50%",
-                    left: isMobile ? 0 : "50%",
-                    transform: isMobile ? "none" : "translate(-50%, -50%)",
-                    width: isMobile ? "100%" : "90%",
-                    height: isMobile ? "100%" : undefined,
-                    maxWidth: isMobile ? "none" : "480px",
-                    maxHeight: isMobile ? "100vh" : "85vh",
-                    background: "var(--color-surface, #ffffff)",
-                    borderRadius: isMobile ? 0 : "16px",
-                    boxShadow: isMobile ? "none" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                    zIndex: 2001,
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                    animation: isMobile ? "slideUp 0.25s ease" : "modalSlideIn 0.25s ease",
+                    background: "white",
+                    borderRadius: "16px",
+                    width: "100%",
+                    maxWidth: "520px",
+                    maxHeight: isMobile ? "calc(100vh - 32px)" : "calc(100vh - 48px)",
+                    overflow: "auto",
+                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                    animation: "modalPop 0.2s ease-out",
                 }}
             >
                 {/* Header */}
-                <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "18px 20px",
-                    borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                    background: "var(--color-bg, #fafafa)",
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "10px",
-                            background: "#6366f1",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h2 style={{
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "20px 24px",
+                        borderBottom: "1px solid #e5e7eb",
+                    }}
+                >
+                    <div>
+                        <h2
+                            style={{
                                 margin: 0,
-                                fontSize: "16px",
+                                fontSize: "18px",
                                 fontWeight: 600,
-                                color: "var(--color-text, #1f2937)",
-                            }}>
-                                Generate Image
-                            </h2>
-                            <p style={{
-                                margin: 0,
-                                fontSize: "12px",
-                                color: "var(--color-text-muted, #6b7280)",
-                            }}>
-                                {selectedElements.length} element{selectedElements.length !== 1 ? 's' : ''} selected
-                            </p>
-                        </div>
+                                color: "#111827",
+                            }}
+                        >
+                            ✨ Generate Image
+                        </h2>
+                        <p
+                            style={{
+                                margin: "4px 0 0",
+                                fontSize: "13px",
+                                color: "#6b7280",
+                            }}
+                        >
+                            {hasSelectedElements
+                                ? "Using selected elements as reference"
+                                : "Create images from text descriptions"}
+                        </p>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         disabled={isGenerating}
                         style={{
                             background: "none",
@@ -339,9 +292,16 @@ export default function ImageGenerationModal({
                             cursor: isGenerating ? "not-allowed" : "pointer",
                             padding: "8px",
                             borderRadius: "8px",
-                            color: "var(--color-text-muted, #6b7280)",
+                            color: "#6b7280",
                             opacity: isGenerating ? 0.5 : 1,
-                            transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!isGenerating) {
+                                e.currentTarget.style.background = "#f3f4f6";
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
                         }}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -351,58 +311,50 @@ export default function ImageGenerationModal({
                 </div>
 
                 {/* Content */}
-                <div style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    padding: "20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "20px",
-                }}>
-                    {/* Preview Section - Only show if elements are selected */}
+                <div style={{ padding: "24px" }}>
+                    {/* Preview Area - Show selected elements preview */}
                     {hasSelectedElements && (
-                        <div>
-                            <label style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "var(--color-text, #1f2937)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "10px",
-                            }}>
-                                Preview
+                        <div style={{ marginBottom: "20px" }}>
+                            <label
+                                style={{
+                                    display: "block",
+                                    fontSize: "13px",
+                                    fontWeight: 500,
+                                    color: "#374151",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                Reference Preview
                             </label>
-                            <div style={{
-                                maxHeight: "180px",
-                                minHeight: "120px",
-                                background: "var(--color-fill-1, #f3f4f6)",
-                                borderRadius: "12px",
-                                border: "2px solid var(--color-stroke-muted, #e5e7eb)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                overflow: "hidden",
-                                position: "relative",
-                                padding: "16px",
-                            }}>
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: "180px",
+                                    background: "#f9fafb",
+                                    borderRadius: "12px",
+                                    border: "2px dashed #e5e7eb",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    overflow: "hidden",
+                                }}
+                            >
                                 {isLoadingPreview ? (
-                                    <div style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        gap: "12px",
-                                        color: "var(--color-text-muted, #6b7280)",
-                                    }}>
-                                        <div style={{
-                                            width: "32px",
-                                            height: "32px",
-                                            border: "3px solid var(--color-stroke-muted, #e5e7eb)",
-                                            borderTopColor: "var(--color-accent, #6366f1)",
-                                            borderRadius: "50%",
-                                            animation: "spin 0.8s linear infinite",
-                                        }} />
-                                        <span style={{ fontSize: "13px" }}>Capturing preview...</span>
+                                    <div style={{ textAlign: "center" }}>
+                                        <div
+                                            style={{
+                                                width: "32px",
+                                                height: "32px",
+                                                border: "3px solid #e5e7eb",
+                                                borderTopColor: "#6366f1",
+                                                borderRadius: "50%",
+                                                animation: "spin 1s linear infinite",
+                                                margin: "0 auto 8px",
+                                            }}
+                                        />
+                                        <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                                            Capturing preview...
+                                        </span>
                                     </div>
                                 ) : previewUrl ? (
                                     <img
@@ -415,16 +367,21 @@ export default function ImageGenerationModal({
                                         }}
                                     />
                                 ) : (
-                                    <div style={{
-                                        textAlign: "center",
-                                        color: "var(--color-text-muted, #6b7280)",
-                                    }}>
-                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "8px", opacity: 0.5 }}>
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <div style={{ textAlign: "center", color: "#9ca3af" }}>
+                                        <svg
+                                            width="32"
+                                            height="32"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            style={{ margin: "0 auto 8px" }}
+                                        >
+                                            <rect x="3" y="3" width="18" height="18" rx="2" />
                                             <circle cx="8.5" cy="8.5" r="1.5" />
-                                            <polyline points="21 15 16 10 5 21" />
+                                            <path d="M21 15l-5-5L5 21" />
                                         </svg>
-                                        <p style={{ margin: 0, fontSize: "13px" }}>No preview available</p>
+                                        <span style={{ fontSize: "12px" }}>Preview unavailable</span>
                                     </div>
                                 )}
                             </div>
@@ -432,501 +389,462 @@ export default function ImageGenerationModal({
                     )}
 
                     {/* Prompt Input */}
-                    <div>
-                        <label style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "var(--color-text, #1f2937)",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "10px",
-                        }}>
-                            <span>Prompt</span>
-                            <span style={{
-                                fontSize: "11px",
-                                fontWeight: 400,
-                                color: "var(--color-text-muted, #6b7280)",
-                                textTransform: "none",
-                            }}>
-                                Describe what you want to create
-                            </span>
+                    <div style={{ marginBottom: "20px" }}>
+                        <label
+                            style={{
+                                display: "block",
+                                fontSize: "13px",
+                                fontWeight: 500,
+                                color: "#374151",
+                                marginBottom: "8px",
+                            }}
+                        >
+                            Describe your image
                         </label>
                         <textarea
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="e.g., Modern SaaS dashboard with blue theme, clean UI, professional look..."
-                            rows={isMobile ? 2 : 3}
+                            placeholder={
+                                hasSelectedElements
+                                    ? "Describe how you want the image based on the selected elements..."
+                                    : "Describe the image you want to generate..."
+                            }
                             disabled={isGenerating}
                             style={{
                                 width: "100%",
-                                padding: isMobile ? "14px 16px" : "12px 14px",
-                                border: "2px solid var(--color-stroke-muted, #e5e7eb)",
+                                minHeight: "80px",
+                                padding: "12px",
                                 borderRadius: "10px",
-                                fontSize: isMobile ? "16px" : "14px", // 16px prevents iOS zoom
+                                border: "1px solid #e5e7eb",
+                                fontSize: "14px",
                                 lineHeight: 1.5,
-                                resize: "none",
+                                resize: "vertical",
                                 fontFamily: "inherit",
-                                background: "var(--color-surface, #ffffff)",
-                                color: "var(--color-text, #1f2937)",
-                                outline: "none",
-                                transition: "border-color 0.15s",
+                                background: isGenerating ? "#f9fafb" : "white",
+                                color: "#111827",
+                                opacity: isGenerating ? 0.7 : 1,
                             }}
-                            onFocus={(e) => e.target.style.borderColor = "var(--color-accent, #6366f1)"}
-                            onBlur={(e) => e.target.style.borderColor = "var(--color-stroke-muted, #e5e7eb)"}
                         />
                     </div>
 
-                    {/* Background Selection */}
-                    <div>
-                        <label style={{
-                            display: "block",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "var(--color-text, #1f2937)",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "10px",
-                        }}>
-                            Background
+                    {/* Options */}
+                    <div style={{ marginBottom: "20px" }}>
+                        <label
+                            style={{
+                                display: "block",
+                                fontSize: "13px",
+                                fontWeight: 500,
+                                color: "#374151",
+                                marginBottom: "12px",
+                            }}
+                        >
+                            Options
                         </label>
-                        
-                        {/* Color Options Row - White, Black, Custom */}
-                        <div style={{
-                            display: "flex",
-                            gap: "10px",
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                        }}>
-                            {/* Preset Colors */}
-                            {PRESET_COLORS.map((preset) => (
+
+                        {/* Background Color */}
+                        <div style={{ marginBottom: "16px" }}>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                Background Color
+                            </div>
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                {/* Canvas option */}
                                 <button
-                                    key={preset.value}
-                                    onClick={() => setBackgroundColor(preset.value)}
-                                    disabled={isGenerating}
+                                    onClick={() => setBackgroundColor("canvas")}
                                     style={{
+                                        width: "32px",
+                                        height: "32px",
+                                        borderRadius: "8px",
+                                        border:
+                                            backgroundColor === "canvas"
+                                                ? "2px solid #6366f1"
+                                                : "2px solid #e5e7eb",
+                                        background: "#f3f4f6",
+                                        cursor: "pointer",
                                         display: "flex",
                                         alignItems: "center",
-                                        gap: "6px",
-                                        padding: "6px 12px",
-                                        borderRadius: "8px",
-                                        border: "2px solid",
-                                        borderColor: backgroundColor === preset.value 
-                                            ? "var(--color-accent, #6366f1)" 
-                                            : "var(--color-stroke-muted, #e5e7eb)",
-                                        background: preset.color,
-                                        cursor: isGenerating ? "not-allowed" : "pointer",
-                                        opacity: isGenerating ? 0.6 : 1,
-                                        transition: "all 0.15s",
-                                    }}
-                                >
-                                    <span style={{
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "4px",
-                                        background: preset.color,
-                                        border: "1px solid rgba(0,0,0,0.1)",
-                                    }} />
-                                    <span style={{
+                                        justifyContent: "center",
                                         fontSize: "12px",
-                                        fontWeight: 500,
-                                        color: preset.value === "#000000" 
-                                            ? "white" 
-                                            : "var(--color-text, #1f2937)",
-                                    }}>
-                                        {preset.name}
-                                    </span>
-                                </button>
-                            ))}
-                            
-                            {/* Custom Color Button with Inline Picker */}
-                            <div style={{ position: "relative" }} ref={colorPickerRef}>
-                                <button
-                                    onClick={() => setShowColorPicker(!showColorPicker)}
-                                    disabled={isGenerating}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        padding: "6px 12px",
-                                        borderRadius: "8px",
-                                        border: "2px solid",
-                                        borderColor: backgroundColor === "custom"
-                                            ? "var(--color-accent, #6366f1)"
-                                            : "var(--color-stroke-muted, #e5e7eb)",
-                                        background: backgroundColor === "custom" ? customColor : "var(--color-surface, #ffffff)",
-                                        cursor: isGenerating ? "not-allowed" : "pointer",
-                                        opacity: isGenerating ? 0.6 : 1,
-                                        transition: "all 0.15s",
                                     }}
+                                    title="Use canvas background"
                                 >
-                                    <span style={{
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "4px",
-                                        background: backgroundColor === "custom" ? customColor : "#e5e7eb",
-                                        border: "1px solid rgba(0,0,0,0.1)",
-                                    }} />
-                                    <span style={{
-                                        fontSize: "12px",
-                                        fontWeight: 500,
-                                        color: backgroundColor === "custom" && customColor === "#000000"
-                                            ? "white"
-                                            : "var(--color-text, #1f2937)",
-                                    }}>
-                                        {backgroundColor === "custom" ? "Custom" : "Custom..."}
-                                    </span>
+                                    🎨
                                 </button>
 
-                                {/* Compact Color Picker Popover */}
-                                {showColorPicker && (
-                                    <div style={{
-                                        position: "absolute",
-                                        top: "calc(100% + 8px)",
-                                        left: 0,
-                                        width: "240px",
-                                        padding: "12px",
-                                        background: "var(--color-surface, #ffffff)",
-                                        border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15)",
-                                        zIndex: 1000,
-                                    }}>
-                                        {/* Hex Input Row */}
-                                        <div style={{
+                                {/* Preset colors */}
+                                {PRESET_COLORS.map((preset) => (
+                                    <button
+                                        key={preset.value}
+                                        onClick={() => setBackgroundColor(preset.value)}
+                                        style={{
+                                            width: "32px",
+                                            height: "32px",
+                                            borderRadius: "8px",
+                                            border:
+                                                backgroundColor === preset.value
+                                                    ? "2px solid #6366f1"
+                                                    : "2px solid #e5e7eb",
+                                            background: preset.color,
+                                            cursor: "pointer",
+                                        }}
+                                        title={preset.name}
+                                    />
+                                ))}
+
+                                {/* Custom color picker */}
+                                <div ref={colorPickerRef} style={{ position: "relative" }}>
+                                    <button
+                                        onClick={() => setShowColorPicker(!showColorPicker)}
+                                        style={{
+                                            width: "32px",
+                                            height: "32px",
+                                            borderRadius: "8px",
+                                            border:
+                                                backgroundColor === "custom"
+                                                    ? "2px solid #6366f1"
+                                                    : "2px solid #e5e7eb",
+                                            background:
+                                                backgroundColor === "custom"
+                                                    ? customColor
+                                                    : "linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4)",
+                                            cursor: "pointer",
                                             display: "flex",
                                             alignItems: "center",
-                                            gap: "8px",
-                                            marginBottom: "12px",
-                                            paddingBottom: "10px",
-                                            borderBottom: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                                        }}>
-                                            <input
-                                                type="color"
-                                                value={customColor}
-                                                onChange={handleColorChange}
-                                                style={{
-                                                    width: "32px",
-                                                    height: "32px",
-                                                    border: "2px solid var(--color-stroke-muted, #e5e7eb)",
-                                                    borderRadius: "6px",
-                                                    cursor: "pointer",
-                                                    padding: "2px",
-                                                    flexShrink: 0,
-                                                }}
-                                            />
-                                            <span style={{ color: "#666", fontSize: "14px" }}>#</span>
-                                            <input
-                                                type="text"
-                                                value={customColor.replace('#', '')}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    if (/^[0-9A-Fa-f]{0,6}$/.test(value)) {
-                                                        setCustomColor('#' + value.toLowerCase());
-                                                        setBackgroundColor("custom");
-                                                    }
-                                                }}
-                                                placeholder="RRGGBB"
-                                                maxLength={6}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: "6px 8px",
-                                                    border: "2px solid var(--color-stroke-muted, #e5e7eb)",
-                                                    borderRadius: "6px",
-                                                    fontSize: "13px",
-                                                    fontFamily: "monospace",
-                                                    textTransform: "uppercase",
-                                                }}
-                                            />
-                                        </div>
+                                            justifyContent: "center",
+                                        }}
+                                        title="Custom color"
+                                    >
+                                        {backgroundColor === "custom" ? (
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke={
+                                                    customColor === "#000000" || customColor === "#343a40"
+                                                        ? "white"
+                                                        : "#374151"
+                                                }
+                                                strokeWidth="2"
+                                            >
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                        ) : (
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="#6b7280"
+                                                strokeWidth="2"
+                                            >
+                                                <circle cx="12" cy="12" r="3" />
+                                                <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.24 4.24l-4.24-4.24M6.34 6.34L2.1 2.1" />
+                                            </svg>
+                                        )}
+                                    </button>
 
-                                        {/* Compact Color Grid */}
-                                        <div style={{
-                                            display: "grid",
-                                            gridTemplateColumns: "repeat(8, 1fr)",
-                                            gap: "4px",
-                                        }}>
-                                            {EXCALIDRAW_COLORS.map((color) => (
-                                                <button
-                                                    key={color}
-                                                    onClick={() => {
-                                                        setCustomColor(color);
-                                                        setBackgroundColor("custom");
+                                    {/* Color picker dropdown */}
+                                    {showColorPicker && (
+                                        <div
+                                            style={{
+                                                position: "absolute",
+                                                top: "40px",
+                                                left: 0,
+                                                background: "white",
+                                                borderRadius: "12px",
+                                                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15)",
+                                                padding: "16px",
+                                                zIndex: 100,
+                                                minWidth: "200px",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: "grid",
+                                                    gridTemplateColumns: "repeat(6, 1fr)",
+                                                    gap: "6px",
+                                                    marginBottom: "12px",
+                                                }}
+                                            >
+                                                {EXCALIDRAW_COLORS.map((color) => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => {
+                                                            setCustomColor(color);
+                                                            setBackgroundColor("custom");
+                                                            setShowColorPicker(false);
+                                                        }}
+                                                        style={{
+                                                            width: "24px",
+                                                            height: "24px",
+                                                            borderRadius: "6px",
+                                                            border:
+                                                                customColor === color
+                                                                    ? "2px solid #6366f1"
+                                                                    : "2px solid transparent",
+                                                            background: color,
+                                                            cursor: "pointer",
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+
+                                            {/* Custom hex input */}
+                                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                                <span style={{ fontSize: "12px", color: "#6b7280" }}>#</span>
+                                                <input
+                                                    type="text"
+                                                    value={customColor.replace("#", "")}
+                                                    onChange={(e) => {
+                                                        const hex = e.target.value.replace(/[^0-9a-fA-F]/g, "");
+                                                        if (hex.length <= 6) {
+                                                            setCustomColor(`#${hex}`);
+                                                            setBackgroundColor("custom");
+                                                        }
                                                     }}
+                                                    placeholder="FFFFFF"
                                                     style={{
-                                                        width: "100%",
-                                                        aspectRatio: "1",
-                                                        borderRadius: "4px",
-                                                        background: color,
-                                                        border: "2px solid",
-                                                        borderColor: customColor === color 
-                                                            ? "var(--color-accent, #6366f1)" 
-                                                            : "transparent",
-                                                        cursor: "pointer",
-                                                        transition: "transform 0.1s",
+                                                        flex: 1,
+                                                        padding: "6px 10px",
+                                                        borderRadius: "6px",
+                                                        border: "1px solid #e5e7eb",
+                                                        fontSize: "13px",
+                                                        textTransform: "uppercase",
                                                     }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
-                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                                                    title={color.toUpperCase()}
                                                 />
-                                            ))}
+                                            </div>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Aspect Ratio */}
+                        <div style={{ marginBottom: "16px" }}>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                Aspect Ratio
+                            </div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                    onClick={() => setStrictRatio(true)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px",
+                                        borderRadius: "8px",
+                                        border: strictRatio ? "2px solid #6366f1" : "2px solid #e5e7eb",
+                                        background: strictRatio ? "#eef2ff" : "white",
+                                        cursor: "pointer",
+                                        fontSize: "13px",
+                                        fontWeight: strictRatio ? 500 : 400,
+                                        color: strictRatio ? "#6366f1" : "#374151",
+                                    }}
+                                >
+                                    <div style={{ fontSize: "16px", marginBottom: "2px" }}>□</div>
+                                    Square (1:1)
+                                </button>
+                                <button
+                                    onClick={() => setStrictRatio(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px",
+                                        borderRadius: "8px",
+                                        border: !strictRatio ? "2px solid #6366f1" : "2px solid #e5e7eb",
+                                        background: !strictRatio ? "#eef2ff" : "white",
+                                        cursor: "pointer",
+                                        fontSize: "13px",
+                                        fontWeight: !strictRatio ? 500 : 400,
+                                        color: !strictRatio ? "#6366f1" : "#374151",
+                                    }}
+                                >
+                                    <div style={{ fontSize: "16px", marginBottom: "2px" }}>▭</div>
+                                    Landscape (4:3)
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Model Selection */}
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                Model
+                            </div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                    onClick={() => setUseProModel(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px",
+                                        borderRadius: "8px",
+                                        border: !useProModel ? "2px solid #6366f1" : "2px solid #e5e7eb",
+                                        background: !useProModel ? "#eef2ff" : "white",
+                                        cursor: "pointer",
+                                        fontSize: "13px",
+                                        fontWeight: !useProModel ? 500 : 400,
+                                        color: !useProModel ? "#6366f1" : "#374151",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <span>⚡</span>
+                                        <span>Flash</span>
                                     </div>
-                                )}
+                                    <div
+                                        style={{
+                                            fontSize: "11px",
+                                            color: "#6b7280",
+                                            marginTop: "2px",
+                                            fontWeight: 400,
+                                        }}
+                                    >
+                                        Fast, great for most images
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setUseProModel(true)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px",
+                                        borderRadius: "8px",
+                                        border: useProModel ? "2px solid #6366f1" : "2px solid #e5e7eb",
+                                        background: useProModel ? "#eef2ff" : "white",
+                                        cursor: "pointer",
+                                        fontSize: "13px",
+                                        fontWeight: useProModel ? 500 : 400,
+                                        color: useProModel ? "#6366f1" : "#374151",
+                                        textAlign: "left",
+                                    }}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <span>✨</span>
+                                        <span>Pro</span>
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: "11px",
+                                            color: "#6b7280",
+                                            marginTop: "2px",
+                                            fontWeight: 400,
+                                        }}
+                                    >
+                                        Best quality, more detail
+                                    </div>
+                                </button>
                             </div>
                         </div>
-
-                        <p style={{
-                            margin: "8px 0 0",
-                            fontSize: "11px",
-                            color: "var(--color-text-muted, #6b7280)",
-                            lineHeight: 1.5,
-                        }}>
-                            💡 Background: {backgroundColor === "custom" ? customColor.toUpperCase() : backgroundColor.toUpperCase()}
-                        </p>
                     </div>
 
-                    {/* Options Row - Layout Ratio and Model on same line */}
-                    <div style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: "12px",
-                    }}>
-                        {/* Layout Ratio Toggle */}
-                        <div style={{
+                    {/* Action Buttons */}
+                    <div
+                        style={{
                             display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 14px",
-                            background: "var(--color-fill-1, #f3f4f6)",
-                            borderRadius: "10px",
-                        }}>
-                            <div>
-                                <div style={{
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                        <path d="M3 9h18M9 21V9" />
+                            gap: "12px",
+                            paddingTop: "20px",
+                            borderTop: "1px solid #e5e7eb",
+                        }}
+                    >
+                        <button
+                            onClick={handleClose}
+                            disabled={isGenerating}
+                            style={{
+                                flex: 1,
+                                padding: "12px",
+                                borderRadius: "10px",
+                                border: "1px solid #e5e7eb",
+                                background: "white",
+                                cursor: isGenerating ? "not-allowed" : "pointer",
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                color: "#374151",
+                                opacity: isGenerating ? 0.5 : 1,
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleGenerate}
+                            disabled={!prompt.trim() || isGenerating}
+                            style={{
+                                flex: 2,
+                                padding: "12px",
+                                borderRadius: "10px",
+                                border: "none",
+                                background: !prompt.trim() || isGenerating ? "#c7c8ff" : "#6366f1",
+                                cursor: !prompt.trim() || isGenerating ? "not-allowed" : "pointer",
+                                fontSize: "14px",
+                                fontWeight: 600,
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                            }}
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <div
+                                        style={{
+                                            width: "16px",
+                                            height: "16px",
+                                            border: "2px solid rgba(255,255,255,0.3)",
+                                            borderTopColor: "white",
+                                            borderRadius: "50%",
+                                            animation: "spin 0.8s linear infinite",
+                                        }}
+                                    />
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M12 5v14M5 12h14" />
                                     </svg>
-                                    1:1 Layout
-                                </div>
-                                <div style={{
-                                    fontSize: "10px",
-                                    color: "var(--color-text-muted, #6b7280)",
-                                    marginTop: "1px",
-                                }}>
-                                    {strictRatio ? "Strict positioning" : "Loose layout"}
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setStrictRatio(!strictRatio)}
-                                disabled={isGenerating}
-                                style={{
-                                    width: "40px",
-                                    height: "22px",
-                                    borderRadius: "11px",
-                                    border: "none",
-                                    background: strictRatio 
-                                        ? "var(--color-accent, #6366f1)" 
-                                        : "var(--color-stroke-muted, #d1d5db)",
-                                    position: "relative",
-                                    cursor: isGenerating ? "not-allowed" : "pointer",
-                                    opacity: isGenerating ? 0.6 : 1,
-                                    transition: "background 0.2s",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <span style={{
-                                    position: "absolute",
-                                    top: "2px",
-                                    left: strictRatio ? "21px" : "2px",
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "50%",
-                                    background: "white",
-                                    transition: "left 0.2s",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                                }} />
-                            </button>
-                        </div>
-
-                        {/* Model Toggle - Improved Language */}
-                        <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 14px",
-                            background: useProModel ? "#f3e8ff" : "var(--color-fill-1, #f3f4f6)",
-                            borderRadius: "10px",
-                            border: useProModel ? "1px solid #d8b4fe" : "1px solid transparent",
-                        }}>
-                            <div>
-                                <div style={{
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "var(--color-text, #1f2937)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                    </svg>
-                                    {useProModel ? "Pro Model" : "Fast Model"}
-                                </div>
-                                <div style={{
-                                    fontSize: "10px",
-                                    color: useProModel ? "#7c3aed" : "var(--color-text-muted, #6b7280)",
-                                    marginTop: "1px",
-                                }}>
-                                    {useProModel ? "Best quality" : "Quick results"}
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setUseProModel(!useProModel)}
-                                disabled={isGenerating}
-                                style={{
-                                    width: "40px",
-                                    height: "22px",
-                                    borderRadius: "11px",
-                                    border: "none",
-                                    background: useProModel 
-                                        ? "#8b5cf6" 
-                                        : "var(--color-stroke-muted, #d1d5db)",
-                                    position: "relative",
-                                    cursor: isGenerating ? "not-allowed" : "pointer",
-                                    opacity: isGenerating ? 0.6 : 1,
-                                    transition: "background 0.2s",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <span style={{
-                                    position: "absolute",
-                                    top: "2px",
-                                    left: useProModel ? "21px" : "2px",
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "50%",
-                                    background: "white",
-                                    transition: "left 0.2s",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                                }} />
-                            </button>
-                        </div>
+                                    Generate Image
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
-
-                {/* Footer */}
-                <div style={{
-                    padding: "16px 20px 20px",
-                    borderTop: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                    background: "var(--color-bg, #fafafa)",
-                    display: "flex",
-                    gap: "12px",
-                }}>
-                    <button
-                        onClick={onClose}
-                        disabled={isGenerating}
-                        style={{
-                            flex: 1,
-                            padding: "12px 20px",
-                            borderRadius: "10px",
-                            border: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                            background: "var(--color-surface, #ffffff)",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "var(--color-text, #1f2937)",
-                            cursor: isGenerating ? "not-allowed" : "pointer",
-                            opacity: isGenerating ? 0.6 : 1,
-                            transition: "all 0.15s",
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleGenerate}
-                        disabled={!isReady}
-                        style={{
-                            flex: 2,
-                            padding: "12px 20px",
-                            borderRadius: "10px",
-                            border: "none",
-                            background: !isReady 
-                                ? "var(--color-fill-2, #e5e7eb)" 
-                                : "#6366f1",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: !isReady ? "var(--color-text-muted, #9ca3af)" : "white",
-                            cursor: !isReady ? "not-allowed" : "pointer",
-                            transition: "opacity 0.15s",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "8px",
-                        }}
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div style={{
-                                    width: "16px",
-                                    height: "16px",
-                                    border: "2px solid rgba(255,255,255,0.3)",
-                                    borderTopColor: "white",
-                                    borderRadius: "50%",
-                                    animation: "spin 0.8s linear infinite",
-                                }} />
-                                Generating...
-                            </>
-                        ) : (
-                            <>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                                Generate Image
-                            </>
-                        )}
-                    </button>
-                </div>
-
-                {/* Animations */}
-                <style>{`
-                    @keyframes fadeIn {
-                        from { opacity: 0; }
-                        to { opacity: 1; }
-                    }
-                    @keyframes modalSlideIn {
-                        from { 
-                            opacity: 0;
-                            transform: translate(-50%, -50%) scale(0.95);
-                        }
-                        to { 
-                            opacity: 1;
-                            transform: translate(-50%, -50%) scale(1);
-                        }
-                    }
-                    @keyframes slideUp {
-                        from {
-                            transform: translateY(100%);
-                        }
-                        to {
-                            transform: translateY(0);
-                        }
-                    }
-                    @keyframes spin {
-                        to { transform: rotate(360deg); }
-                    }
-                `}</style>
             </div>
-        </>
+
+            <style>{`
+                @keyframes modalPop {
+                    from {
+                        opacity: 0;
+                        transform: scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
     );
 }

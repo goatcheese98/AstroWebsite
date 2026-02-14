@@ -1,29 +1,41 @@
 /**
  * Database Utilities
- * Helper functions for interacting with Cloudflare D1
+ * Helper functions for interacting with Cloudflare D1 using Drizzle ORM
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import {
+  canvases,
+  canvasVersions,
+  canvasShares,
+  type Canvas,
+  type NewCanvas,
+  type CanvasVersion,
+  type NewCanvasVersion,
+  type CanvasShare,
+  type NewCanvasShare,
+} from './schema';
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create a Drizzle ORM client from a D1 database
+ */
+export function createDbClient(d1: D1Database) {
+  return drizzle(d1);
+}
 
 // ============================================================================
 // Canvas Queries
 // ============================================================================
 
-export interface Canvas {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  r2_key: string;
-  thumbnail_url: string | null;
-  is_public: number; // SQLite boolean (0 or 1)
-  version: number;
-  created_at: number;
-  updated_at: number;
-  metadata: string | null; // JSON string
-  size_bytes: number | null;
-}
+// Export Canvas type from schema (for backward compatibility with existing code)
+export type { Canvas };
 
 export interface CreateCanvasInput {
   id?: string; // Optional: if not provided, will generate one
@@ -33,33 +45,38 @@ export interface CreateCanvasInput {
   r2Key: string;
   thumbnailUrl?: string;
   isPublic?: boolean;
+  metadata?: string; // JSON string
+  sizeBytes?: number;
+  anonymousId?: string;
 }
 
 export async function createCanvas(
   db: D1Database,
   input: CreateCanvasInput
 ): Promise<Canvas> {
+  const drizzleDb = createDbClient(db);
+
   // Use provided ID or generate a new one
   const id = input.id || nanoid();
   const now = Math.floor(Date.now() / 1000); // Unix timestamp
 
-  await db
-    .prepare(
-      `INSERT INTO canvases (id, user_id, title, description, r2_key, thumbnail_url, is_public, version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
-    )
-    .bind(
-      id,
-      input.userId,
-      input.title,
-      input.description || null,
-      input.r2Key,
-      input.thumbnailUrl || null,
-      input.isPublic ? 1 : 0,
-      now,
-      now
-    )
-    .run();
+  const newCanvas: NewCanvas = {
+    id,
+    userId: input.userId,
+    title: input.title,
+    description: input.description ?? null,
+    r2Key: input.r2Key,
+    thumbnailUrl: input.thumbnailUrl ?? null,
+    isPublic: input.isPublic ?? false,
+    version: 1,
+    metadata: input.metadata ?? null,
+    sizeBytes: input.sizeBytes ?? null,
+    anonymousId: input.anonymousId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await drizzleDb.insert(canvases).values(newCanvas).run();
 
   const canvas = await getCanvasById(db, id);
   if (!canvas) {
@@ -70,12 +87,15 @@ export async function createCanvas(
 }
 
 export async function getCanvasById(db: D1Database, canvasId: string): Promise<Canvas | null> {
-  const result = await db
-    .prepare('SELECT * FROM canvases WHERE id = ?')
-    .bind(canvasId)
-    .first<Canvas>();
+  const drizzleDb = createDbClient(db);
 
-  return result;
+  const result = await drizzleDb
+    .select()
+    .from(canvases)
+    .where(eq(canvases.id, canvasId))
+    .get();
+
+  return result ?? null;
 }
 
 export async function getCanvasByIdAndUser(
@@ -83,12 +103,15 @@ export async function getCanvasByIdAndUser(
   canvasId: string,
   userId: string
 ): Promise<Canvas | null> {
-  const result = await db
-    .prepare('SELECT * FROM canvases WHERE id = ? AND user_id = ?')
-    .bind(canvasId, userId)
-    .first<Canvas>();
+  const drizzleDb = createDbClient(db);
 
-  return result;
+  const result = await drizzleDb
+    .select()
+    .from(canvases)
+    .where(and(eq(canvases.id, canvasId), eq(canvases.userId, userId)))
+    .get();
+
+  return result ?? null;
 }
 
 export async function getUserCanvases(
@@ -97,14 +120,18 @@ export async function getUserCanvases(
   limit: number = 50,
   offset: number = 0
 ): Promise<Canvas[]> {
-  const result = await db
-    .prepare(
-      'SELECT * FROM canvases WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?'
-    )
-    .bind(userId, limit, offset)
-    .all<Canvas>();
+  const drizzleDb = createDbClient(db);
 
-  return result.results || [];
+  const results = await drizzleDb
+    .select()
+    .from(canvases)
+    .where(eq(canvases.userId, userId))
+    .orderBy(desc(canvases.updatedAt))
+    .limit(limit)
+    .offset(offset)
+    .all();
+
+  return results;
 }
 
 export async function getPublicCanvases(
@@ -112,21 +139,29 @@ export async function getPublicCanvases(
   limit: number = 20,
   offset: number = 0
 ): Promise<Canvas[]> {
-  const result = await db
-    .prepare('SELECT * FROM canvases WHERE is_public = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?')
-    .bind(limit, offset)
-    .all<Canvas>();
+  const drizzleDb = createDbClient(db);
 
-  return result.results || [];
+  const results = await drizzleDb
+    .select()
+    .from(canvases)
+    .where(eq(canvases.isPublic, true))
+    .orderBy(desc(canvases.createdAt))
+    .limit(limit)
+    .offset(offset)
+    .all();
+
+  return results;
 }
 
 export interface UpdateCanvasInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   r2Key?: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string | null;
   isPublic?: boolean;
   version?: number;
+  metadata?: string | null;
+  sizeBytes?: number | null;
 }
 
 export async function updateCanvas(
@@ -135,53 +170,22 @@ export async function updateCanvas(
   userId: string,
   input: UpdateCanvasInput
 ): Promise<Canvas | null> {
+  const drizzleDb = createDbClient(db);
   const now = Math.floor(Date.now() / 1000);
 
-  // Build dynamic update query
-  const updates: string[] = [];
-  const values: any[] = [];
-
-  if (input.title !== undefined) {
-    updates.push('title = ?');
-    values.push(input.title);
-  }
-  if (input.description !== undefined) {
-    updates.push('description = ?');
-    values.push(input.description);
-  }
-  if (input.r2Key !== undefined) {
-    updates.push('r2_key = ?');
-    values.push(input.r2Key);
-  }
-  if (input.thumbnailUrl !== undefined) {
-    updates.push('thumbnail_url = ?');
-    values.push(input.thumbnailUrl);
-  }
-  if (input.isPublic !== undefined) {
-    updates.push('is_public = ?');
-    values.push(input.isPublic ? 1 : 0);
-  }
-  if (input.version !== undefined) {
-    updates.push('version = ?');
-    values.push(input.version);
-  }
-
-  if (updates.length === 0) {
+  // If no updates, just return existing canvas
+  if (Object.keys(input).length === 0) {
     return getCanvasById(db, canvasId);
   }
 
-  updates.push('updated_at = ?');
-  values.push(now);
-
-  // Add WHERE clause parameters
-  values.push(canvasId);
-  values.push(userId);
-
-  await db
-    .prepare(
-      `UPDATE canvases SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
-    )
-    .bind(...values)
+  // Drizzle handles dynamic updates automatically
+  await drizzleDb
+    .update(canvases)
+    .set({
+      ...input,
+      updatedAt: now,
+    })
+    .where(and(eq(canvases.id, canvasId), eq(canvases.userId, userId)))
     .run();
 
   return getCanvasById(db, canvasId);
@@ -192,25 +196,22 @@ export async function deleteCanvas(
   canvasId: string,
   userId: string
 ): Promise<boolean> {
-  const result = await db
-    .prepare('DELETE FROM canvases WHERE id = ? AND user_id = ?')
-    .bind(canvasId, userId)
+  const drizzleDb = createDbClient(db);
+
+  const result = await drizzleDb
+    .delete(canvases)
+    .where(and(eq(canvases.id, canvasId), eq(canvases.userId, userId)))
     .run();
 
-  return result.meta.rows_written > 0;
+  return (result.meta?.rows_written ?? 0) > 0;
 }
 
 // ============================================================================
 // Canvas Version Queries
 // ============================================================================
 
-export interface CanvasVersion {
-  id: string;
-  canvas_id: string;
-  version: number;
-  r2_key: string;
-  created_at: number;
-}
+// Export CanvasVersion type from schema (for backward compatibility)
+export type { CanvasVersion };
 
 export async function createCanvasVersion(
   db: D1Database,
@@ -218,20 +219,25 @@ export async function createCanvasVersion(
   version: number,
   r2Key: string
 ): Promise<CanvasVersion> {
+  const drizzleDb = createDbClient(db);
   const id = nanoid();
   const now = Math.floor(Date.now() / 1000);
 
-  await db
-    .prepare(
-      'INSERT INTO canvas_versions (id, canvas_id, version, r2_key, created_at) VALUES (?, ?, ?, ?, ?)'
-    )
-    .bind(id, canvasId, version, r2Key, now)
-    .run();
+  const newVersion: NewCanvasVersion = {
+    id,
+    canvasId,
+    version,
+    r2Key,
+    createdAt: now,
+  };
 
-  const result = await db
-    .prepare('SELECT * FROM canvas_versions WHERE id = ?')
-    .bind(id)
-    .first<CanvasVersion>();
+  await drizzleDb.insert(canvasVersions).values(newVersion).run();
+
+  const result = await drizzleDb
+    .select()
+    .from(canvasVersions)
+    .where(eq(canvasVersions.id, id))
+    .get();
 
   if (!result) {
     throw new Error('Failed to create canvas version');
@@ -244,49 +250,51 @@ export async function getCanvasVersions(
   db: D1Database,
   canvasId: string
 ): Promise<CanvasVersion[]> {
-  const result = await db
-    .prepare('SELECT * FROM canvas_versions WHERE canvas_id = ? ORDER BY version DESC')
-    .bind(canvasId)
-    .all<CanvasVersion>();
+  const drizzleDb = createDbClient(db);
 
-  return result.results || [];
+  const results = await drizzleDb
+    .select()
+    .from(canvasVersions)
+    .where(eq(canvasVersions.canvasId, canvasId))
+    .orderBy(desc(canvasVersions.version))
+    .all();
+
+  return results;
 }
 
 // ============================================================================
 // Canvas Share Queries
 // ============================================================================
 
-export interface CanvasShare {
-  id: string;
-  canvas_id: string;
-  share_token: string;
-  expires_at: number | null;
-  created_at: number;
-}
+// Export CanvasShare type from schema (for backward compatibility)
+export type { CanvasShare };
 
 export async function createCanvasShare(
   db: D1Database,
   canvasId: string,
   expiresInDays?: number
 ): Promise<CanvasShare> {
+  const drizzleDb = createDbClient(db);
   const id = nanoid();
   const shareToken = nanoid(32); // Longer token for shares
   const now = Math.floor(Date.now() / 1000);
-  const expiresAt = expiresInDays
-    ? now + expiresInDays * 24 * 60 * 60
-    : null;
+  const expiresAt = expiresInDays ? now + expiresInDays * 24 * 60 * 60 : null;
 
-  await db
-    .prepare(
-      'INSERT INTO canvas_shares (id, canvas_id, share_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
-    )
-    .bind(id, canvasId, shareToken, expiresAt, now)
-    .run();
+  const newShare: NewCanvasShare = {
+    id,
+    canvasId,
+    shareToken,
+    expiresAt,
+    createdAt: now,
+  };
 
-  const result = await db
-    .prepare('SELECT * FROM canvas_shares WHERE id = ?')
-    .bind(id)
-    .first<CanvasShare>();
+  await drizzleDb.insert(canvasShares).values(newShare).run();
+
+  const result = await drizzleDb
+    .select()
+    .from(canvasShares)
+    .where(eq(canvasShares.id, id))
+    .get();
 
   if (!result) {
     throw new Error('Failed to create canvas share');
@@ -299,15 +307,22 @@ export async function getCanvasShare(
   db: D1Database,
   shareToken: string
 ): Promise<CanvasShare | null> {
-  const result = await db
-    .prepare('SELECT * FROM canvas_shares WHERE share_token = ?')
-    .bind(shareToken)
-    .first<CanvasShare>();
+  const drizzleDb = createDbClient(db);
+
+  const result = await drizzleDb
+    .select()
+    .from(canvasShares)
+    .where(eq(canvasShares.shareToken, shareToken))
+    .get();
+
+  if (!result) {
+    return null;
+  }
 
   // Check if expired
-  if (result && result.expires_at) {
+  if (result.expiresAt) {
     const now = Math.floor(Date.now() / 1000);
-    if (result.expires_at < now) {
+    if (result.expiresAt < now) {
       return null; // Expired
     }
   }
@@ -319,10 +334,12 @@ export async function deleteCanvasShare(
   db: D1Database,
   shareToken: string
 ): Promise<boolean> {
-  const result = await db
-    .prepare('DELETE FROM canvas_shares WHERE share_token = ?')
-    .bind(shareToken)
+  const drizzleDb = createDbClient(db);
+
+  const result = await drizzleDb
+    .delete(canvasShares)
+    .where(eq(canvasShares.shareToken, shareToken))
     .run();
 
-  return result.meta.rows_written > 0;
+  return (result.meta?.rows_written ?? 0) > 0;
 }

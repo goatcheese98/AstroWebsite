@@ -82,6 +82,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
+import { eventBus } from "../../../lib/events";
 
 export interface UseCanvasCommandsOptions {
     /** Whether the chat is currently open (affects event listening) */
@@ -113,10 +114,10 @@ export interface UseCanvasCommandsReturn {
 
 export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasCommandsReturn {
     const { isOpen, onStateUpdate, onElementsAdded } = options;
-    
+
     // === 🎨 Canvas State ===
     const [canvasState, setCanvasState] = useState<any>(null);
-    
+
     /**
      * Execute a drawing command - creates new elements on the canvas
      */
@@ -126,26 +127,22 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
                 console.error("❌ Invalid drawing command: elements must be an array");
                 return false;
             }
-            
+
             if (elements.length === 0) {
                 console.warn("⚠️ Empty drawing command - nothing to draw");
                 return false;
             }
-            
-            const event = new CustomEvent("excalidraw:draw", {
-                detail: { elements, isModification },
-            });
-            
-            window.dispatchEvent(event);
+
+            eventBus.emit("excalidraw:draw", { elements, isModification });
             console.log(`✅ Dispatched draw command: ${elements.length} elements`);
             return true;
-            
+
         } catch (err) {
             console.error("❌ Failed to execute drawing command:", err);
             return false;
         }
     }, []);
-    
+
     /**
      * Execute an update command - modifies existing elements
      */
@@ -155,26 +152,22 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
                 console.error("❌ Invalid update command: elements must be an array");
                 return false;
             }
-            
+
             if (elements.length === 0) {
                 console.warn("⚠️ Empty update command - nothing to update");
                 return false;
             }
-            
-            const event = new CustomEvent("excalidraw:update-elements", {
-                detail: { elements },
-            });
-            
-            window.dispatchEvent(event);
+
+            eventBus.emit("excalidraw:update-elements", { elements });
             console.log(`✅ Dispatched update command: ${elements.length} elements`);
             return true;
-            
+
         } catch (err) {
             console.error("❌ Failed to execute update command:", err);
             return false;
         }
     }, []);
-    
+
     /**
      * Insert an image into the canvas
      */
@@ -185,20 +178,16 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
         type = "png"
     ): boolean => {
         try {
-            const event = new CustomEvent("excalidraw:insert-image", {
-                detail: { imageData, type, width, height },
-            });
-            
-            window.dispatchEvent(event);
+            eventBus.emit("excalidraw:insert-image", { imageData, type, width, height });
             console.log(`✅ Dispatched insert-image: ${width}x${height}`);
             return true;
-            
+
         } catch (err) {
             console.error("❌ Failed to insert image:", err);
             return false;
         }
     }, []);
-    
+
     /**
      * Get a human-readable description of canvas contents
      */
@@ -206,86 +195,80 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
         if (!canvasState?.elements?.length) {
             return "The canvas is currently empty.";
         }
-        
+
         const counts: Record<string, number> = {};
         canvasState.elements.forEach((el: any) => {
             counts[el.type] = (counts[el.type] || 0) + 1;
         });
-        
+
         const desc = Object.entries(counts)
             .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
             .join(', ');
-        
+
         return `Canvas has ${canvasState.elements.length} elements: ${desc}`;
     }, [canvasState]);
-    
+
     /**
      * Request current state from Excalidraw
      */
     const requestCanvasState = useCallback(() => {
-        window.dispatchEvent(new CustomEvent("excalidraw:get-state"));
+        eventBus.emit("excalidraw:get-state");
     }, []);
-    
+
     /**
      * Get currently selected element IDs from Excalidraw API
      */
     const getSelectedElementIds = useCallback((): string[] => {
         const api = (window as any).excalidrawAPI;
         if (!api) return [];
-        
+
         const appState = api.getAppState();
         return Object.entries(appState.selectedElementIds || {})
             .filter(([_, selected]) => selected)
             .map(([id]) => id);
     }, []);
-    
+
     /**
      * Listen for canvas state updates from Excalidraw
      */
     useEffect(() => {
         if (!isOpen) return;
-        
-        const handleCanvasUpdate = (event: CustomEvent<any>) => {
-            if (!event.detail) return;
-            
-            setCanvasState(event.detail);
-            onStateUpdate?.(event.detail);
-        };
-        
-        window.addEventListener("excalidraw:state-update", handleCanvasUpdate as EventListener);
-        
+
+        const unsubscribe = eventBus.on("excalidraw:state-update", (data) => {
+            if (!data) return;
+
+            setCanvasState(data);
+            onStateUpdate?.(data);
+        });
+
         // Request initial state
         const timeout = setTimeout(() => {
             requestCanvasState();
         }, 100);
-        
+
         return () => {
-            window.removeEventListener("excalidraw:state-update", handleCanvasUpdate as EventListener);
+            unsubscribe();
             clearTimeout(timeout);
         };
     }, [isOpen, onStateUpdate, requestCanvasState]);
-    
+
     /**
      * Listen for newly added elements
      */
     useEffect(() => {
         if (!isOpen) return;
-        
-        const handleElementsAdded = (event: CustomEvent<{ elementIds: string[] }>) => {
-            const { elementIds } = event.detail || {};
+
+        const unsubscribe = eventBus.on("excalidraw:elements-added", (data) => {
+            const { elementIds } = data || {};
             if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
                 console.log("📥 New elements added:", elementIds);
                 onElementsAdded?.(elementIds);
             }
-        };
-        
-        window.addEventListener("excalidraw:elements-added", handleElementsAdded as EventListener);
-        
-        return () => {
-            window.removeEventListener("excalidraw:elements-added", handleElementsAdded as EventListener);
-        };
+        });
+
+        return unsubscribe;
     }, [isOpen, onElementsAdded]);
-    
+
     return {
         canvasState,
         setCanvasState,

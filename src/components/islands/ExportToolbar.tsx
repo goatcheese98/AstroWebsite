@@ -123,7 +123,7 @@ export default function ExportToolbar() {
             });
 
             // Convert to blob and download
-            canvas.toBlob((blob) => {
+            canvas.toBlob((blob: Blob | null) => {
                 if (blob) {
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement("a");
@@ -240,7 +240,7 @@ export default function ExportToolbar() {
             });
 
             // Convert to blob and copy
-            canvas.toBlob(async (blob) => {
+            canvas.toBlob(async (blob: Blob | null) => {
                 if (blob) {
                     try {
                         await navigator.clipboard.write([

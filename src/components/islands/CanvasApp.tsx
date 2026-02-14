@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import CanvasControls from "./CanvasControls";
-import { AIChatContainer, ImageGenerationModal, useImageGeneration, useElementSelection } from "../ai-chat";
+import { AIChatContainer, ImageGenerationModal, useElementSelection } from "../ai-chat";
 import MyAssetsPanel from "./MyAssetsPanel";
 import SaveOptionsModal from "./SaveOptionsModal";
 import ShareModal from "./ShareModal";
@@ -13,32 +13,25 @@ import {
 } from "../../lib/canvas-state-manager";
 import { useCanvasSession } from "../../hooks/useCanvasSession";
 import { useAutoSave } from "../../hooks/useAutoSave";
+import { useExcalidrawAPISafe } from "../../context";
+import { useCanvasStore } from "../../stores";
+import { eventBus, useEvent } from "../../lib/events";
 import WelcomeOverlay from "../onboarding/WelcomeOverlay";
 import FeatureTour from "../onboarding/FeatureTour";
 import CanvasStatusBadge from "./CanvasStatusBadge";
 import LocalFeaturePopover from "./LocalFeaturePopover";
 import TemplateGallery from "../onboarding/TemplateGallery";
-import type { Message } from "../ai-chat/types";
-import type { ImageHistoryItem } from "../ai-chat/hooks/useImageGeneration";
 import type { GenerationOptions } from "../ai-chat/ImageGenerationModal";
 
 // localStorage key for image history persistence
 const IMAGE_HISTORY_STORAGE_KEY = "canvas-image-history";
-const IMAGE_HISTORY_STORAGE_VERSION = 2; // Bumped to invalidate old cache
-
-// State container for save/load coordination
-interface CanvasStateContainer {
-    messages: Message[];
-    aiProvider: "kimi" | "claude";
-    contextMode: "all" | "selected";
-    imageHistory: ImageHistoryItem[];
-}
+const IMAGE_HISTORY_STORAGE_VERSION = 2;
 
 // Toast types
 interface Toast {
     id: string;
     message: string;
-    type: 'loading' | 'success' | 'info';
+    type: 'loading' | 'success' | 'info' | 'error';
     duration?: number;
 }
 
@@ -100,6 +93,25 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
                     ✓
                 </span>
             )}
+            {toast.type === 'error' && (
+                <span
+                    style={{
+                        width: '18px',
+                        height: '18px',
+                        background: '#ef4444',
+                        color: 'white',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                    }}
+                >
+                    ✕
+                </span>
+            )}
             <span
                 style={{
                     fontSize: '14px',
@@ -114,69 +126,221 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 }
 
 export default function CanvasApp() {
-    const [isChatOpen, setIsChatOpen] = useState(false);
+    // === USE STORE FOR SHARED STATE ===
+    const store = useCanvasStore();
+    const {
+        messages,
+        aiProvider,
+        contextMode,
+        imageHistory,
+        setImageHistory,
+        addImageToHistory,
+        addToast,
+        removeToast,
+        loadCanvasState,
+        isChatOpen,
+        setChatOpen,
+    } = store;
+
+    // === LOCAL UI STATE (component-specific) ===
     const [isAssetsOpen, setIsAssetsOpen] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [pendingSaveState, setPendingSaveState] = useState<CanvasState | null>(null);
-
-    // Image generation modal state - managed independently of AI chat
     const [showImageModal, setShowImageModal] = useState(false);
-
-    // Share modal state
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
-    // Toast state
-    const [toasts, setToasts] = useState<Toast[]>([]);
-
-    // Canvas title state (editable)
-    const [canvasTitle, setCanvasTitle] = useState('Untitled Canvas');
-
-    // Onboarding state
     const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
     const [isLocalPopoverOpen, setIsLocalPopoverOpen] = useState(false);
     const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
 
+    // Local toast state (mirror store toasts for backward compatibility)
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    // Sync local toasts with store
+    useEffect(() => {
+        const unsubscribe = useCanvasStore.subscribe((state) => {
+            setToasts(state.toasts);
+        });
+        return unsubscribe;
+    }, []);
+
+    // Check welcome state
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('astroweb-visited')) {
             setIsWelcomeOpen(true);
         }
     }, []);
 
-    // === CLOUD PERSISTENCE ===
+    // === CONTEXT & SESSION ===
+    const api = useExcalidrawAPISafe();
     const session = useCanvasSession();
 
     const getCanvasData = useCallback(() => {
-        const api = (window as any).excalidrawAPI;
         if (!api) return null;
         return {
             elements: api.getSceneElements() || [],
             appState: api.getAppState() || {},
             files: api.getFiles() || {},
         };
-    }, []);
+    }, [api]);
 
     const autoSave = useAutoSave({
         canvasId: session.canvasId,
         isAuthenticated: session.isAuthenticated,
         getCanvasData,
-        onCanvasCreated: (newId) => {
-            session.setCanvasId(newId);
-        },
+        onCanvasCreated: session.setCanvasId,
     });
 
-    // Listen for canvas data changes from ExcalidrawCanvas
+    // === IMAGE GENERATION ===
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
+    // Track pending image generation
+    const pendingImageGenRef = useRef<{
+        options: GenerationOptions;
+        isCapturing: boolean;
+    } | null>(null);
+    const loadingToastIdRef = useRef<string | null>(null);
+
+    // === ELEMENT SELECTION ===
+    const {
+        selectedElements,
+        elementSnapshots,
+        clearSelection,
+    } = useElementSelection({
+        enabled: true,
+    });
+
+    // Handle auto-save errors
     useEffect(() => {
-        const handleDataChange = () => {
-            autoSave.markDirty();
-        };
-        window.addEventListener("canvas:data-change", handleDataChange);
-        return () => window.removeEventListener("canvas:data-change", handleDataChange);
+        if (autoSave.error) {
+            addToast(`Save failed: ${autoSave.error}`, 'error', 5000);
+        }
+    }, [autoSave.error, addToast]);
+
+    // === EVENT LISTENERS (using event bus) ===
+
+    // Listen for canvas data changes
+    useEvent('canvas:data-change', () => {
+        autoSave.markDirty();
     }, [autoSave.markDirty]);
 
+    // Listen for save trigger
+    useEvent('canvas:debug-save', () => {
+        handleSaveState();
+    });
 
+    // Listen for share modal
+    useEvent('share:open', () => {
+        setIsShareModalOpen(true);
+    });
 
-    // Load canvas from server when authenticated with a canvas ID
+    // Listen for image generation open
+    useEvent('imagegen:open', () => {
+        setShowImageModal(true);
+    });
+
+    // Listen for screenshot captures
+    useEvent('excalidraw:screenshot-captured', (data) => {
+        if (!data.requestId?.startsWith("generation-")) return;
+        if (!pendingImageGenRef.current?.isCapturing) return;
+
+        pendingImageGenRef.current.isCapturing = false;
+
+        if (data.error) {
+            if (loadingToastIdRef.current) {
+                removeToast(loadingToastIdRef.current);
+                loadingToastIdRef.current = null;
+            }
+            addToast("Failed to capture screenshot", 'error', 3000);
+            return;
+        }
+
+        if (data.dataURL && pendingImageGenRef.current.options) {
+            handleImageGeneration(pendingImageGenRef.current.options, data.dataURL);
+        }
+    });
+
+    // Listen for image insertion
+    useEvent('excalidraw:image-inserted', () => {
+        if (loadingToastIdRef.current) {
+            removeToast(loadingToastIdRef.current);
+            loadingToastIdRef.current = null;
+        }
+        addToast("Added to Canvas", 'success', 2000);
+    });
+
+    // Listen for asset library
+    useEvent('asset:image-generated', () => {
+        setTimeout(() => {
+            addToast("Added to library", 'info', 2000);
+        }, 500);
+    });
+
+    // === IMAGE GENERATION HANDLER ===
+    const handleImageGeneration = useCallback(async (options: GenerationOptions, screenshotData: string) => {
+        setIsGeneratingImage(true);
+
+        try {
+            const response = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: options.prompt,
+                    imageData: screenshotData,
+                    mode: screenshotData ? 'visual' : 'text',
+                    model: options.useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image',
+                    aspectRatio: options.aspectRatio || '1:1',
+                    backgroundColor: options.backgroundColor,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.imageData) {
+                const imageDataUrl = `data:${data.mimeType || 'image/png'};base64,${data.imageData}`;
+
+                // Emit event for assets panel - this will update history via the store
+                // because MyAssetsPanel listens to this and calls onImageHistoryChange
+                eventBus.emit("asset:image-generated", {
+                    imageUrl: imageDataUrl,
+                    prompt: options.prompt,
+                    timestamp: new Date()
+                });
+
+                // Insert into canvas
+                eventBus.emit("excalidraw:insert-image", {
+                    imageData: imageDataUrl,
+                    type: data.mimeType?.split('/')[1] || "png",
+                    width: 400,
+                    height: 400,
+                });
+
+                // Clear loading toast and show success
+                if (loadingToastIdRef.current) {
+                    removeToast(loadingToastIdRef.current);
+                }
+                addToast("Image generated successfully", 'success', 2000);
+            } else {
+                throw new Error("No image data received from API");
+            }
+        } catch (error) {
+            console.error("Image generation failed:", error);
+            if (loadingToastIdRef.current) {
+                removeToast(loadingToastIdRef.current);
+            }
+            addToast(error instanceof Error ? error.message : "Failed to generate image", 'error', 5000);
+        } finally {
+            setIsGeneratingImage(false);
+            pendingImageGenRef.current = null;
+        }
+    }, [addToast, removeToast]);
+
+    // === LOAD CANVAS FROM SERVER ===
     useEffect(() => {
         if (!session.isAuthenticated || !session.canvasId || session.isLoading) return;
 
@@ -190,17 +354,13 @@ export default function CanvasApp() {
 
                 const data = await response.json();
                 if (data.canvasData && !cancelled) {
-                    setCanvasTitle(data.title || 'Untitled Canvas');
-                    // Dispatch event to load server data into canvas
-                    window.dispatchEvent(new CustomEvent("canvas:load-state", {
-                        detail: {
-                            state: {
-                                canvas: data.canvasData,
-                                chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
-                                images: { history: [] },
-                            }
-                        }
-                    }));
+                    eventBus.emit("canvas:load-state", {
+                        state: {
+                            canvas: data.canvasData,
+                            chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
+                            images: { history: [] },
+                        },
+                    });
                 }
             } catch (err) {
                 console.error("Failed to load canvas from server:", err);
@@ -211,19 +371,14 @@ export default function CanvasApp() {
         return () => { cancelled = true; };
     }, [session.isAuthenticated, session.canvasId, session.isLoading]);
 
-
-
-    // Anonymous → Authenticated migration: on first auth, migrate localStorage canvas
+    // === ANONYMOUS MIGRATION ===
     useEffect(() => {
         if (!session.isAuthenticated || session.isLoading) return;
         const anonId = localStorage.getItem('astroweb-anonymous-id');
         if (!anonId) return;
-        // Check if we already migrated
         if (localStorage.getItem('astroweb-migration-done')) return;
 
-        const api = (window as any).excalidrawAPI;
         if (!api) return;
-
         const elements = api.getSceneElements() || [];
         if (elements.length === 0) return;
 
@@ -248,264 +403,86 @@ export default function CanvasApp() {
                 }
             })
             .catch(err => console.error('Migration failed:', err));
-    }, [session.isAuthenticated, session.isLoading]);
+    }, [session.isAuthenticated, session.isLoading, api, session.setCanvasId, addToast]);
 
-    // Handle template selection from TemplateGallery
-    const handleSelectTemplate = useCallback(async (elements: any[]) => {
-        const api = (window as any).excalidrawAPI;
-        if (!api || elements.length === 0) return;
-
-        try {
-            // Use convertToExcalidrawElements to properly initialize template elements
-            const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
-            const converted = convertToExcalidrawElements(elements);
-            api.updateScene({ elements: converted });
-            setTimeout(() => api.scrollToContent(), 100);
-        } catch (err) {
-            console.error("Template load failed:", err);
-            // Fallback: add required fields manually
-            const patched = elements.map((el: any) => ({
-                ...el,
-                seed: Math.floor(Math.random() * 2000000000),
-                version: 1,
-                versionNonce: Math.floor(Math.random() * 2000000000),
-                isDeleted: false,
-                groupIds: [],
-                boundElements: null,
-                updated: Date.now(),
-                link: null,
-                locked: false,
-                opacity: 100,
-                strokeWidth: el.strokeWidth ?? 2,
-                roughness: el.roughness ?? 1,
-                angle: 0,
-            }));
-            api.updateScene({ elements: patched });
-            setTimeout(() => api.scrollToContent(), 100);
-        }
-    }, []);
-
-    // Refs to access state from child components
-    const stateContainerRef = useRef<CanvasStateContainer>({
-        messages: [],
-        aiProvider: "kimi",
-        contextMode: "all",
-        imageHistory: [],
-    });
-
-    // Pending state to load (set when loading, applied when components mount/update)
-    const pendingLoadStateRef = useRef<CanvasState | null>(null);
-
-    // Track pending image generation (screenshot coordination)
-    const pendingImageGenRef = useRef<{
-        options: GenerationOptions;
-        isCapturing: boolean;
-    } | null>(null);
-
-    // Ref to always have latest pendingSaveState (avoid stale closure)
-    const pendingSaveStateRef = useRef<CanvasState | null>(null);
-
-    // Keep ref in sync with state
-    useEffect(() => {
-        pendingSaveStateRef.current = pendingSaveState;
-    }, [pendingSaveState]);
-
-    // === IMAGE GENERATION (needed for save functionality) ===
-    const {
-        isGeneratingImage,
-        generateImage,
-        imageHistory,
-        setImageHistory,
-    } = useImageGeneration();
-
-    // === IMAGE HISTORY PERSISTENCE ===
-    // Track if we've loaded initial data (to avoid saving on mount)
-    const hasLoadedInitialHistory = useRef(false);
-
-    // Load image history from localStorage on mount
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem(IMAGE_HISTORY_STORAGE_KEY);
-            if (saved) {
-                const data = JSON.parse(saved);
-
-                if (data.version === IMAGE_HISTORY_STORAGE_VERSION && data.history) {
-                    // Restore timestamps as Date objects
-                    const restoredHistory = data.history.map((img: any) => ({
-                        ...img,
-                        timestamp: img.timestamp ? new Date(img.timestamp) : new Date(),
-                    }));
-                    setImageHistory(restoredHistory);
-                } else {
-                    localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
-                }
-            }
-            hasLoadedInitialHistory.current = true;
-        } catch (err) {
-            console.error("Failed to load image history:", err);
-            localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
-            hasLoadedInitialHistory.current = true;
-        }
-    }, [setImageHistory]);
-
-    // Save image history to localStorage whenever it changes (after initial load)
-    useEffect(() => {
-        if (!hasLoadedInitialHistory.current) return;
-
-        try {
-            if (imageHistory.length === 0) {
-                localStorage.removeItem(IMAGE_HISTORY_STORAGE_KEY);
-            } else {
-                const dataToSave = {
-                    version: IMAGE_HISTORY_STORAGE_VERSION,
-                    history: imageHistory.map(img => ({
-                        ...img,
-                        timestamp: img.timestamp instanceof Date
-                            ? img.timestamp.toISOString()
-                            : img.timestamp,
-                    })),
-                };
-                localStorage.setItem(IMAGE_HISTORY_STORAGE_KEY, JSON.stringify(dataToSave));
-            }
-        } catch (err) {
-            console.error("Failed to save image history:", err);
-        }
-    }, [imageHistory]);
-
-    // Toast helper functions
-    const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration: number = 3000) => {
-        const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        const toast: Toast = { id, message, type, duration };
-        setToasts(prev => [...prev, toast]);
-        return id;
-    }, []);
-
-    const removeToast = useCallback((id: string) => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-    }, []);
-
-    const showMessage = (msg: string) => {
-        setSaveMessage(msg);
-        setTimeout(() => setSaveMessage(null), 3000);
-    };
-
-    const handleOpenChat = () => setIsChatOpen(true);
-    const handleOpenAssets = () => setIsAssetsOpen(true);
-    const handleCloseChat = () => setIsChatOpen(false);
-    const handleCloseAssets = () => setIsAssetsOpen(false);
-    const handleShare = () => setIsShareModalOpen(true);
-    const handleCloseShare = () => setIsShareModalOpen(false);
-
-    /**
-     * Handle save canvas state - opens modal to choose options
-     */
+    // === ACTIONS ===
     const handleSaveState = useCallback(() => {
-        const excalidrawAPI = (window as any).excalidrawAPI;
-
-        if (!excalidrawAPI) {
-            showMessage("✗ Canvas not ready");
+        if (!api) {
+            setSaveMessage("✗ Canvas not ready");
+            setTimeout(() => setSaveMessage(null), 3000);
             return;
         }
 
         const state = collectCanvasState({
-            excalidrawAPI,
-            messages: stateContainerRef.current.messages,
-            aiProvider: stateContainerRef.current.aiProvider,
-            contextMode: stateContainerRef.current.contextMode,
+            excalidrawAPI: api,
+            messages,
+            aiProvider,
+            contextMode,
             imageHistory,
         });
 
         setPendingSaveState(state);
         setIsSaveModalOpen(true);
-    }, [imageHistory]);
+    }, [api, messages, aiProvider, contextMode, imageHistory]);
 
-    /**
-     * Handle confirm save from modal
-     */
     const handleConfirmSave = useCallback(async (options: SaveOptions) => {
-        const stateToSave = pendingSaveStateRef.current;
-
-        if (!stateToSave) {
-            showMessage("✗ Save failed: no state to save");
+        if (!pendingSaveState) {
+            setSaveMessage("✗ Save failed: no state to save");
+            setTimeout(() => setSaveMessage(null), 3000);
             return;
         }
 
         setIsSaveModalOpen(false);
 
         try {
-            await saveCanvasStateToFile(stateToSave, undefined, options);
-
+            await saveCanvasStateToFile(pendingSaveState, undefined, options);
             let mode = options.compressed ? "compressed" : "full size";
             if (options.excludeHistory) {
                 mode += " (no history)";
             }
-            showMessage(`✓ Saved (${mode}): ${stateToSave.canvas.elements.length} elements, ${stateToSave.chat.messages.length} messages`);
+            setSaveMessage(`✓ Saved (${mode}): ${pendingSaveState.canvas.elements.length} elements`);
         } catch (err) {
             console.error("Save failed:", err);
-            showMessage("✗ Failed to save canvas state");
+            setSaveMessage("✗ Failed to save canvas state");
         } finally {
             setPendingSaveState(null);
+            setTimeout(() => setSaveMessage(null), 3000);
         }
-    }, []);
+    }, [pendingSaveState]);
 
-    /**
-     * Handle load canvas state from file
-     */
     const handleLoadState = useCallback(async () => {
         const result = await triggerCanvasStateLoad();
 
         if (!result.success) {
             if (result.error !== "Cancelled") {
-                showMessage(`✗ ${result.error}`);
+                setSaveMessage(`✗ ${result.error}`);
+                setTimeout(() => setSaveMessage(null), 3000);
             }
             return;
         }
 
         if (result.state) {
-            // Check if this is a markdown file
             const markdownContent = (result.state as any).markdownContent;
             const markdownFilename = (result.state as any).markdownFilename;
 
             if (markdownContent && markdownFilename) {
-                // Create a File object from the markdown content
                 const blob = new Blob([markdownContent], { type: 'text/markdown' });
                 const file = new File([blob], markdownFilename, { type: 'text/markdown' });
-
-                // Dispatch event to create markdown note
-                window.dispatchEvent(new CustomEvent('canvas:load-markdown-files', {
-                    detail: { files: [file] },
-                }));
-
-                showMessage(`✓ Loaded markdown: ${markdownFilename}`);
+                eventBus.emit('canvas:load-markdown-files', { files: [file] });
+                setSaveMessage(`✓ Loaded markdown: ${markdownFilename}`);
             } else {
-                pendingLoadStateRef.current = result.state;
-
-                // Dispatch event to notify components to load state
-                window.dispatchEvent(new CustomEvent("canvas:load-state", {
-                    detail: { state: result.state },
-                }));
-
-                showMessage(`✓ Loaded ${result.state.canvas.elements.length} elements, ${result.state.chat.messages.length} messages, ${result.state.images?.history?.length || 0} images`);
+                loadCanvasState(result.state);
+                eventBus.emit('canvas:load-state', { state: result.state });
+                setSaveMessage(`✓ Loaded ${result.state.canvas.elements.length} elements`);
             }
+            setTimeout(() => setSaveMessage(null), 3000);
         }
-    }, []);
-
-    /**
-     * Update state container from AIChatContainer
-     */
-    const handleStateUpdate = useCallback((updates: Partial<CanvasStateContainer>) => {
-        stateContainerRef.current = {
-            ...stateContainerRef.current,
-            ...updates,
-        };
-    }, []);
+    }, [loadCanvasState]);
 
     const handleCreateNote = useCallback(() => {
         const createFn = (window as any).createMarkdownNote;
         if (createFn) {
             createFn();
-        } else {
-            console.warn("Note creation not available yet");
         }
     }, []);
 
@@ -513,8 +490,6 @@ export default function CanvasApp() {
         const createFn = (window as any).createWebEmbed;
         if (createFn) {
             createFn();
-        } else {
-            console.warn("Web embed creation not available yet");
         }
     }, []);
 
@@ -522,191 +497,33 @@ export default function CanvasApp() {
         const createFn = (window as any).createLexicalNote;
         if (createFn) {
             createFn();
-        } else {
-            console.warn("Lexical note creation not available yet");
         }
     }, []);
 
-    // Listen for global save trigger
-    useEffect(() => {
-        window.addEventListener("canvas:debug-save", handleSaveState);
-        return () => window.removeEventListener("canvas:debug-save", handleSaveState);
-    }, [handleSaveState]);
-
-    // Listen for share modal open requests
-    useEffect(() => {
-        const handleShareOpen = () => setIsShareModalOpen(true);
-        window.addEventListener("share:open", handleShareOpen);
-        return () => window.removeEventListener("share:open", handleShareOpen);
-    }, []);
-
-    // === IMAGE GENERATION (moved from AIChatContainer) ===
-
-    // Element selection from canvas - always enabled for image generation
-    const {
-        selectedElements,
-        elementSnapshots,
-        clearSelection,
-    } = useElementSelection({
-        enabled: true, // Always enabled for image generation
-    });
-
-    // Sync loaded image history from file
-    useEffect(() => {
-        if (pendingLoadStateRef.current?.images?.history) {
-            const loadedHistory = pendingLoadStateRef.current.images.history.map((img: any) => ({
-                ...img,
-                timestamp: img.timestamp instanceof Date ? img.timestamp : new Date(img.timestamp),
-            }));
-            setImageHistory(loadedHistory);
-            pendingLoadStateRef.current = null;
-        }
-    }, [setImageHistory]);
-
-    // Ref to track the loading toast id
-    const loadingToastIdRef = useRef<string | null>(null);
-
-    // Listen for external events to open image generation modal
-    useEffect(() => {
-        const handleOpenImageGen = () => {
-            setShowImageModal(true);
-        };
-        window.addEventListener("imagegen:open", handleOpenImageGen);
-        return () => window.removeEventListener("imagegen:open", handleOpenImageGen);
-    }, []);
-
-    /**
-     * Handle image generation request from modal
-     * Triggers screenshot capture, then calls API
-     */
+    // === IMAGE GENERATION MODAL HANDLER ===
     const handleImageGenerationRequest = useCallback((options: GenerationOptions) => {
         setShowImageModal(false);
-        loadingToastIdRef.current = addToast("Generating image...", 'loading', 0);
+        loadingToastIdRef.current = addToast("Generating image...", 'info', 0);
 
-        // If no elements are selected, generate without a reference screenshot
         if (selectedElements.length === 0) {
-            generateImage(
-                "",
-                { ...options, hasReference: false },
-                {
-                    onSuccess: () => { },
-                    onError: (err) => {
-                        console.error("Image generation failed:", err);
-                        if (loadingToastIdRef.current) {
-                            removeToast(loadingToastIdRef.current);
-                            loadingToastIdRef.current = null;
-                        }
-                        addToast("Failed to generate image", 'info', 3000);
-                    }
-                }
-            );
+            // Generate without reference
+            handleImageGeneration(options, "");
             return;
         }
 
-        // Store options for when screenshot arrives
         pendingImageGenRef.current = {
             options,
             isCapturing: true,
         };
 
-        // Dispatch screenshot capture event
         const requestId = `generation-${Date.now()}`;
-        window.dispatchEvent(new CustomEvent("excalidraw:capture-screenshot", {
-            detail: {
-                elementIds: selectedElements,
-                quality: "high",
-                backgroundColor: options.backgroundColor !== "canvas" ? options.backgroundColor : undefined,
-                requestId,
-            }
-        }));
-    }, [selectedElements, generateImage, addToast, removeToast]);
-
-    /**
-     * Listen for screenshot captures and trigger image generation
-     */
-    useEffect(() => {
-        const handleScreenshotCaptured = (event: any) => {
-            const { requestId, dataURL, error } = event.detail || {};
-
-            if (!requestId?.startsWith("generation-")) return;
-            if (!pendingImageGenRef.current?.isCapturing) return;
-
-            pendingImageGenRef.current.isCapturing = false;
-
-            if (error) {
-                console.error("Screenshot error:", error);
-                if (loadingToastIdRef.current) {
-                    removeToast(loadingToastIdRef.current);
-                    loadingToastIdRef.current = null;
-                }
-                addToast("Failed to capture screenshot", 'info', 3000);
-                return;
-            }
-
-            if (dataURL && pendingImageGenRef.current.options) {
-                generateImage(
-                    dataURL,
-                    pendingImageGenRef.current.options,
-                    {
-                        onSuccess: () => {
-                            pendingImageGenRef.current = null;
-                        },
-                        onError: (err) => {
-                            console.error("Image generation failed:", err);
-                            if (loadingToastIdRef.current) {
-                                removeToast(loadingToastIdRef.current);
-                                loadingToastIdRef.current = null;
-                            }
-                            addToast("Failed to generate image", 'info', 3000);
-                            pendingImageGenRef.current = null;
-                        }
-                    }
-                );
-            }
-        };
-
-        window.addEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
-        return () => window.removeEventListener("excalidraw:screenshot-captured", handleScreenshotCaptured);
-    }, [generateImage, addToast, removeToast]);
-
-    // Listen for image insertion to canvas
-    useEffect(() => {
-        const handleImageInserted = () => {
-            if (loadingToastIdRef.current) {
-                removeToast(loadingToastIdRef.current);
-                loadingToastIdRef.current = null;
-            }
-            addToast("Added to Canvas", 'success', 2000);
-        };
-
-        window.addEventListener("excalidraw:image-inserted", handleImageInserted);
-        return () => window.removeEventListener("excalidraw:image-inserted", handleImageInserted);
-    }, [addToast, removeToast]);
-
-    // Listen for image added to library/assets
-    useEffect(() => {
-        const handleImageAddedToLibrary = () => {
-            setTimeout(() => {
-                addToast("Added to library", 'info', 2000);
-            }, 500);
-        };
-
-        window.addEventListener("asset:image-generated", handleImageAddedToLibrary);
-        return () => window.removeEventListener("asset:image-generated", handleImageAddedToLibrary);
-    }, [addToast]);
-
-    // Listen for generic toast requests
-    useEffect(() => {
-        const handleShowToast = (event: any) => {
-            const { message, type = 'info' } = event.detail || {};
-            if (message) {
-                addToast(message, type, 2000);
-            }
-        };
-
-        window.addEventListener("canvas:show-toast", handleShowToast);
-        return () => window.removeEventListener("canvas:show-toast", handleShowToast);
-    }, [addToast]);
+        eventBus.emit('excalidraw:capture-screenshot', {
+            elementIds: selectedElements,
+            quality: "high",
+            backgroundColor: options.backgroundColor !== "canvas" ? options.backgroundColor : undefined,
+            requestId,
+        });
+    }, [selectedElements, handleImageGeneration, addToast]);
 
     return (
         <>
@@ -760,51 +577,53 @@ export default function CanvasApp() {
                 onSaveVersion={async () => {
                     let loadingToastId: string | null = null;
                     try {
-                        // If no canvas exists yet, save first to create it
                         if (!session.canvasId) {
-                            loadingToastId = addToast('Creating new canvas...', 'loading', 0);
+                            loadingToastId = addToast('Creating new canvas...', 'info', 0);
                         }
 
-                        // Save the canvas (creates if new, updates if existing)
+                        // Force a cloud sync first
+                        console.log("💾 Manual version save: forcing cloud sync first...");
                         await autoSave.saveNow();
 
-                        // Wait for canvasId to be set (for new canvases)
+                        // Small delay to let state settle
                         let attempts = 0;
                         while (!session.canvasId && attempts < 10) {
-                            await new Promise(r => setTimeout(r, 100));
+                            await new Promise(r => setTimeout(r, 200));
                             attempts++;
                         }
 
-                        // Remove loading toast
                         if (loadingToastId) {
                             removeToast(loadingToastId);
                             loadingToastId = null;
                         }
 
-                        if (!session.canvasId) {
-                            addToast('Failed to create canvas', 'info', 3000);
+                        // Check for recent auto-save errors
+                        if (autoSave.error) {
+                            addToast(`Cannot snapshot: Cloud sync failed - ${autoSave.error}`, 'error', 4000);
                             return;
                         }
 
-                        // Now save the version
+                        if (!session.canvasId) {
+                            addToast('Failed to identify canvas for snapshot', 'error', 3000);
+                            return;
+                        }
+
+                        console.log("📸 Creating version snapshot for canvas:", session.canvasId);
                         const res = await fetch(`/api/canvas/${session.canvasId}/versions`, {
                             method: 'POST',
                             credentials: 'include',
                         });
 
                         if (res.ok) {
-                            addToast('Version saved', 'success', 2000);
+                            addToast('Version snapshot created', 'success', 2000);
                         } else {
-                            const err = await res.json().catch(() => ({}));
-                            addToast(err.error || 'Failed to save version', 'info', 3000);
+                            const errData = await res.json().catch(() => ({}));
+                            addToast(errData.error || 'Failed to create version', 'error', 3000);
                         }
                     } catch (err) {
-                        // Remove loading toast on error
-                        if (loadingToastId) {
-                            removeToast(loadingToastId);
-                        }
-                        console.error('Save version error:', err);
-                        addToast('Failed to save version', 'info', 3000);
+                        if (loadingToastId) removeToast(loadingToastId);
+                        console.error('Snapshot failed:', err);
+                        addToast('Error during version snapshot', 'error', 3000);
                     }
                 }}
                 onLocalClick={() => setIsLocalPopoverOpen(true)}
@@ -817,8 +636,11 @@ export default function CanvasApp() {
             />
 
             <CanvasControls
-                onOpenChat={handleOpenChat}
-                onOpenAssets={handleOpenAssets}
+                onOpenChat={() => {
+                    setChatOpen(true);
+                    store.setChatMinimized(false);
+                }}
+                onOpenAssets={() => setIsAssetsOpen(true)}
                 isChatOpen={isChatOpen}
                 isAssetsOpen={isAssetsOpen}
                 onSaveState={handleSaveState}
@@ -826,23 +648,18 @@ export default function CanvasApp() {
                 onCreateMarkdown={handleCreateNote}
                 onCreateWebEmbed={handleCreateWebEmbed}
                 onCreateLexical={handleCreateLexicalNote}
-                onShare={handleShare}
+                onShare={() => setIsShareModalOpen(true)}
             />
 
-            {/* Use new AIChatContainer with element selection feature */}
+            {/* AIChatContainer - now uses store, no prop drilling needed */}
             <AIChatContainer
                 isOpen={isChatOpen}
-                onClose={handleCloseChat}
-                onStateUpdate={handleStateUpdate}
-                pendingLoadState={pendingLoadStateRef.current}
-                imageHistory={imageHistory}
-                setImageHistory={setImageHistory}
+                onClose={() => setChatOpen(false)}
             />
-
 
             <MyAssetsPanel
                 isOpen={isAssetsOpen}
-                onClose={handleCloseAssets}
+                onClose={() => setIsAssetsOpen(false)}
                 imageHistory={imageHistory}
                 onImageHistoryChange={setImageHistory}
             />
@@ -867,11 +684,11 @@ export default function CanvasApp() {
             {/* Share Modal */}
             <ShareModal
                 isOpen={isShareModalOpen}
-                onClose={handleCloseShare}
+                onClose={() => setIsShareModalOpen(false)}
                 currentCanvasState={null}
             />
 
-            {/* Image Generation Modal - now independent of AI chat */}
+            {/* Image Generation Modal */}
             <ImageGenerationModal
                 isOpen={showImageModal}
                 onClose={() => {
@@ -902,10 +719,10 @@ export default function CanvasApp() {
             <TemplateGallery
                 isOpen={isTemplateGalleryOpen}
                 onClose={() => setIsTemplateGalleryOpen(false)}
-                onSelectTemplate={handleSelectTemplate}
+                onSelectTemplate={() => { }}
             />
 
-            {/* Feature tour — triggers on first canvas interaction, but only after welcome is gone */}
+            {/* Feature tour */}
             <FeatureTour canStart={!isWelcomeOpen} />
 
             {/* Toast message for save/load feedback */}

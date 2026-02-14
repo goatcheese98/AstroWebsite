@@ -146,6 +146,7 @@ export function useAutoSave({
 
       if (canvasIdRef.current) {
         // Update existing canvas
+        console.log(`💾 Auto-save: Updating existing canvas ${canvasIdRef.current}`);
         response = await fetch(`/api/canvas/${canvasIdRef.current}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -154,6 +155,7 @@ export function useAutoSave({
         });
       } else {
         // Create new canvas via auto-save
+        console.log('💾 Auto-save: Creating new canvas (no canvasId yet)');
         response = await fetch('/api/canvas/auto-save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,8 +179,11 @@ export function useAutoSave({
 
         // If this was a new canvas, update the canvas ID
         if (!canvasIdRef.current && result.canvasId) {
+          console.log(`✅ Auto-save: New canvas created with ID: ${result.canvasId}`);
           canvasIdRef.current = result.canvasId;
           onCanvasCreated?.(result.canvasId);
+        } else if (canvasIdRef.current) {
+          console.log(`✅ Auto-save: Canvas ${canvasIdRef.current} updated successfully`);
         }
 
         // Handle thumbnail: immediate or scheduled
