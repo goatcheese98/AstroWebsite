@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import CanvasRoot from "../components/islands/CanvasRoot";
+import { CanvasContainer } from "../components/canvas";
 ---
 
 <BaseLayout
@@ -9,7 +9,7 @@ import CanvasRoot from "../components/islands/CanvasRoot";
 >
   <div class="canvas-layout">
     <div class="canvas-container">
-      <CanvasRoot client:only="react" />
+      <CanvasContainer client:only="react" />
     </div>
   </div>
 </BaseLayout>

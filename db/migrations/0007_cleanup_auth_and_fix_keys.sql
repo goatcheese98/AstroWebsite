@@ -6,8 +6,6 @@
 
 PRAGMA foreign_keys=OFF;
 
-BEGIN TRANSACTION;
-
 -- 1. Create new canvases table without foreign key and with all columns
 CREATE TABLE new_canvases (
   id TEXT PRIMARY KEY NOT NULL,
@@ -21,19 +19,19 @@ CREATE TABLE new_canvases (
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   metadata TEXT DEFAULT '{}',
-  size_bytes INTEGER DEFAULT 0,
+  size_bytes INTEGER,
   anonymous_id TEXT
 );
 
 -- 2. Copy data from old table
--- Note: Order must match the CREATE TABLE definition or use explicit columns
+-- Note: Excluding size_bytes as it does not exist in the source table
 INSERT INTO new_canvases (
   id, user_id, title, description, r2_key, thumbnail_url, is_public, version, 
-  created_at, updated_at, metadata, size_bytes, anonymous_id
+  created_at, updated_at, metadata, anonymous_id
 )
 SELECT 
   id, user_id, title, description, r2_key, thumbnail_url, is_public, version, 
-  created_at, updated_at, metadata, size_bytes, anonymous_id 
+  created_at, updated_at, metadata, anonymous_id 
 FROM canvases;
 
 -- 3. Drop old tables
@@ -51,7 +49,5 @@ CREATE INDEX IF NOT EXISTS idx_canvases_user_id ON canvases(user_id);
 CREATE INDEX IF NOT EXISTS idx_canvases_is_public ON canvases(is_public);
 CREATE INDEX IF NOT EXISTS idx_canvases_created_at ON canvases(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_canvases_anonymous_id ON canvases(anonymous_id);
-
-COMMIT;
 
 PRAGMA foreign_keys=ON;

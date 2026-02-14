@@ -1,7 +1,6 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import ExcalidrawCanvas from "@/components/islands/ExcalidrawCanvas";
-import CanvasApp from "@/components/islands/CanvasApp";
+import { CanvasContainer } from "@/components/canvas";
 
 const { roomId } = Astro.params;
 
@@ -13,12 +12,11 @@ if (!roomId) {
 <BaseLayout title={`Shared Canvas - ${roomId}`}>
   <div class="canvas-layout">
     <div class="canvas-container">
-      <ExcalidrawCanvas
+      <CanvasContainer
         client:only="react"
         isSharedMode={true}
         shareRoomId={roomId}
       />
-      <CanvasApp client:only="react" />
     </div>
   </div>
 </BaseLayout>

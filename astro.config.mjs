@@ -106,10 +106,25 @@ export default defineConfig({
     ],
     build: {
         assets: 'assets',
+        // Faster builds: don't inline small assets
+        assetsInlineLimit: 4096,
     },
     vite: {
         build: {
             minify: 'esbuild',
+            rollupOptions: {
+                output: {
+                    // Manual chunking for faster builds & better caching
+                    manualChunks: {
+                        'excalidraw-vendor': ['@excalidraw/excalidraw', '@excalidraw/mermaid-to-excalidraw'],
+                        'lexical-vendor': ['lexical'],
+                        'graph-vendor': ['cytoscape', 'cytoscape-cose-bilkent'],
+                        'react-vendor': ['react', 'react-dom', 'zustand'],
+                    },
+                },
+            },
+            // Enable parallel processing
+            target: 'esnext',
         },
         esbuild: {
             // This removes all console.log and debugger statements from the production build
@@ -119,11 +134,20 @@ export default defineConfig({
         optimizeDeps: {
             include: [
                 '@excalidraw/excalidraw',
+                '@excalidraw/mermaid-to-excalidraw',
                 'nanoid',
                 'react',
                 'react-dom',
+                'cytoscape',
+                'cytoscape-cose-bilkent',
+                'lexical',
+                'zustand',
+                'zod',
+                'html2canvas',
+                'katex',
             ],
             exclude: [],
+            force: false, // Don't force re-optimization
         },
         ssr: {
             noExternal: ['@excalidraw/excalidraw'],

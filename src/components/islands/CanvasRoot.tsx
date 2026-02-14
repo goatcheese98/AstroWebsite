@@ -1,23 +1,23 @@
-import { useState, useEffect } from "react";
-import { ClerkProvider } from '@clerk/clerk-react';
-import { ExcalidrawProvider } from '../../context';
-import ExcalidrawCanvas from './ExcalidrawCanvas';
-import CanvasApp from './CanvasApp';
-
-// Load key from environment (Vite automatically replaces import.meta.env)
-const PUBLISHABLE_KEY = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-if (!PUBLISHABLE_KEY) {
-    throw new Error("Missing Publishable Key");
-}
-
 /**
- * CanvasRoot: Wrapper for the entire canvas application
- * Ensures shared React context and Clerk provider if needed
+ * CanvasRoot - Backward Compatibility Wrapper
+ * 
+ * @deprecated Use CanvasContainer from '@/components/canvas' directly instead.
+ * This component is kept for gradual migration only.
+ * 
+ * Before:
+ *   import CanvasRoot from './CanvasRoot';
+ *   <CanvasRoot />
+ * 
+ * After:
+ *   import { CanvasContainer } from '@/components/canvas';
+ *   <CanvasContainer />
  */
+
+import { useState, useEffect } from "react";
+import { CanvasContainer } from '../canvas';
+
 export default function CanvasRoot() {
-    const [key, setKey] = useState(0); // Force remount key
-    const [isReady, setIsReady] = useState(true);
+    const [shouldClearOnMount, setShouldClearOnMount] = useState(false);
 
     // Listen for URL changes to detect new canvas request
     useEffect(() => {
@@ -46,19 +46,14 @@ export default function CanvasRoot() {
             // Clean up URL (keep canvas clean without ?new=true)
             window.history.replaceState({}, '', '/ai-canvas');
 
-            // Force ExcalidrawCanvas to remount with fresh state
-            setKey(prev => prev + 1);
+            // Signal that we should clear on mount
+            setShouldClearOnMount(true);
         }
-    }, []); // Run only once on mount
+    }, []);
 
     return (
-        <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-            <ExcalidrawProvider>
-                <div className="canvas-container" style={{ width: '100%', height: '100%', position: 'relative', background: '#ffffff' }}>
-                    {isReady && <ExcalidrawCanvas key={key} />}
-                    <CanvasApp key={`app-${key}`} />
-                </div>
-            </ExcalidrawProvider>
-        </ClerkProvider>
+        <div style={{ width: '100%', height: '100%', position: 'relative', background: '#ffffff' }}>
+            <CanvasContainer shouldClearOnMount={shouldClearOnMount} />
+        </div>
     );
 }
