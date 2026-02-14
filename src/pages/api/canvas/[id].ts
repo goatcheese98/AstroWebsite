@@ -159,6 +159,8 @@ export const PUT: APIRoute = async (context) => {
     let newR2Key = canvas.r2Key;
     let newVersion = canvas.version;
 
+    let currentSizeBytes = canvas.sizeBytes;
+
     if (canvasData) {
       // Check canvas size
       if (isCanvasTooLarge(canvasData as any)) {
@@ -179,7 +181,7 @@ export const PUT: APIRoute = async (context) => {
       }
 
       // Save updated canvas data (compressed)
-      await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key, canvasData as any);
+      currentSizeBytes = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, canvas.r2Key, canvasData as any);
     }
 
     // Update thumbnail if provided
@@ -195,6 +197,7 @@ export const PUT: APIRoute = async (context) => {
       description,
       isPublic,
       version: createVersion ? newVersion : undefined,
+      sizeBytes: currentSizeBytes,
     });
 
     if (!updatedCanvas) {

@@ -19,7 +19,7 @@ const canvasRouting = defineMiddleware(async (context, next) => {
     }
 
     // Allowed routes for canvas-only mode
-    const allowedRoutes = ['/', '/login', '/signup', '/api/', '/_image'];
+    const allowedRoutes = ['/', '/login', '/signup', '/dashboard', '/api/', '/_image'];
     const isAllowed = allowedRoutes.some(route =>
       url.pathname === route || url.pathname.startsWith(route + '/')
     );

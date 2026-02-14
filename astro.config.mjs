@@ -19,7 +19,7 @@ function filterPages() {
     if (DEPLOY_TARGET === 'full') return;
 
     const pagesDir = path.resolve('./src/pages');
-    const canvasOnlyPages = ['index.astro', 'ai-canvas.astro', '404.astro', 'login.astro', 'signup.astro'];
+    const canvasOnlyPages = ['index.astro', 'ai-canvas.astro', '404.astro', 'login.astro', 'signup.astro', 'dashboard.astro'];
 
     // Get all .astro files
     const allPages = fs.readdirSync(pagesDir)

@@ -4,17 +4,24 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
+    "dev:bun": "bunx --bun astro dev",
     "dev:canvas": "astro dev",
-    "dev:preview": "npx astro build && wrangler pages dev dist --port=4321",
-    "dev:party": "npx partykit dev",
+    "dev:preview": "astro build && wrangler pages dev dist --port=4321",
+    "dev:preview:bun": "bun run build && wrangler pages dev dist --port=4321",
+    "dev:party": "partykit dev",
+    "dev:party:bun": "bunx partykit dev",
     "build": "astro build",
+    "build:bun": "bunx --bun astro build",
     "build:canvas": "node scripts/build-canvas.js prepare && DEPLOY_TARGET=canvas astro build && node scripts/build-canvas.js restore",
+    "build:canvas:bun": "bun run scripts/build-canvas.js prepare && DEPLOY_TARGET=canvas bunx --bun astro build && bun run scripts/build-canvas.js restore",
     "preview": "astro preview",
     "preview:canvas": "DEPLOY_TARGET=canvas astro preview",
     "deploy": "astro build && wrangler pages deploy dist --project-name=astroweb",
+    "deploy:bun": "bun run build && wrangler pages deploy dist --project-name=astroweb",
     "deploy:canvas": "bash scripts/deploy-canvas.sh",
     "astro": "astro",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:bun": "bun test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -72,5 +79,10 @@
     "dotenv": "^17.3.1",
     "tailwindcss": "^4.1.18",
     "vitest": "^4.0.18"
-  }
+  },
+  "trustedDependencies": [
+    "@clerk/shared",
+    "browser-tabs-lock",
+    "core-js"
+  ]
 }

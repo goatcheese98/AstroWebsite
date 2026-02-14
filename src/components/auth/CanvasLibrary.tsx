@@ -322,7 +322,7 @@ export function CanvasLibraryPure() {
                 <input
                   type="checkbox"
                   checked={selectedIds.has(canvas.id)}
-                  onChange={() => {}} // Controlled by onClick
+                  onChange={() => { }} // Controlled by onClick
                   onClick={(e) => {
                     e.stopPropagation();
                     handleToggleSelect(canvas.id, index, e.shiftKey);
@@ -825,9 +825,10 @@ export function CanvasLibraryPure() {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B';
+  if (bytes === 0) return '0 B';
   const k = 1024;
-  const sizes = ['KB', 'MB', 'GB'];
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  const val = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+  return val + ' ' + sizes[i];
 }
