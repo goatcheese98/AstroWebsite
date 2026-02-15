@@ -8,9 +8,8 @@
 
 import { useCallback } from 'react';
 import { nanoid } from 'nanoid';
-import { useCanvasStore } from '@/stores';
-import { useExcalidrawAPISafe } from '@/context';
-import { eventBus } from '@/lib/events';
+import { useUnifiedCanvasStore, useExcalidrawAPISafe } from '@/stores';
+import { canvasEvents } from '@/lib/events';
 
 export interface GenerationOptions {
   prompt: string;
@@ -27,7 +26,7 @@ export interface ImageGenerationCallbacks {
 
 export function useImageGeneration() {
   const api = useExcalidrawAPISafe();
-  const store = useCanvasStore();
+  const store = useUnifiedCanvasStore();
 
   const {
     imageHistory,
@@ -146,8 +145,8 @@ export function useImageGeneration() {
       elements: [...elements, ...converted],
     });
 
-    // Emit event for listeners
-    eventBus.emit('excalidraw:image-inserted');
+    // Notify that image was inserted (for any listeners)
+    canvasEvents.emit('excalidraw:image-inserted');
     addToast('Added to canvas', 'success', 2000);
   }, [imageHistory, api, addToast]);
 
@@ -160,8 +159,8 @@ export function useImageGeneration() {
       throw new Error('Image not found');
     }
 
-    // Emit event for asset library to handle
-    eventBus.emit('asset:image-generated', {
+    // Notify asset library about new image
+    canvasEvents.emit('asset:image-generated', {
       imageUrl: image.url,
       prompt: image.prompt,
       timestamp: image.timestamp

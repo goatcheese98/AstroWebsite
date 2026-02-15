@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { eventBus } from "@/lib/events";
+import { useUnifiedCanvasStore } from '@/stores';
 
 interface GeneratedImage {
     id: string;
@@ -56,6 +56,9 @@ export default function MyAssetsPanel({
     const [localGeneratedImages, setLocalGeneratedImages] = useState<GeneratedImage[]>([]);
     const generatedImages = isExternalHistory ? imageHistory : localGeneratedImages;
 
+    // Subscribe to unified store imageHistory for new generated images
+    const storeImageHistory = useUnifiedCanvasStore(state => state.imageHistory);
+
     // Helper to add a new image to history
     const addGeneratedImage = useCallback((imageUrl: string, prompt?: string) => {
         const newImage: GeneratedImage = {
@@ -81,15 +84,18 @@ export default function MyAssetsPanel({
         }
     }, [isExternalHistory, onImageHistoryChange, generatedImages]);
 
-    // Listen for new generated images
+    // Listen for new generated images from unified store
     useEffect(() => {
-        const unsubscribe = eventBus.on("asset:image-generated", (data) => {
-            if (data && data.imageUrl) {
-                addGeneratedImage(data.imageUrl, data.prompt);
+        if (storeImageHistory.length > 0) {
+            // Get the most recent image from the store
+            const latestImage = storeImageHistory[0];
+            // Check if this image is already in our local history
+            const exists = generatedImages.some(img => img.url === latestImage.url);
+            if (!exists && latestImage.url) {
+                addGeneratedImage(latestImage.url, latestImage.prompt);
             }
-        });
-        return unsubscribe;
-    }, [addGeneratedImage]);
+        }
+    }, [storeImageHistory, addGeneratedImage, generatedImages]);
 
     // Search icons using Iconify API
     const searchIcons = useCallback(async (query: string, collection: string) => {
@@ -152,8 +158,8 @@ export default function MyAssetsPanel({
             const base64 = btoa(unescape(encodeURIComponent(svgText)));
             const dataUrl = `data:image/svg+xml;base64,${base64}`;
 
-            // Dispatch event to insert into canvas
-            eventBus.emit("excalidraw:insert-image", {
+            // Dispatch command to insert into canvas via unified store
+            useUnifiedCanvasStore.getState().dispatchCommand('insertImage', {
                 imageData: dataUrl,
                 type: "svg+xml",
                 width: 200,
@@ -175,7 +181,7 @@ export default function MyAssetsPanel({
             const width = Math.min(img.width, maxWidth);
             const height = width / aspectRatio;
 
-            eventBus.emit("excalidraw:insert-image", {
+            useUnifiedCanvasStore.getState().dispatchCommand('insertImage', {
                 imageData: image.url,
                 type: "png",
                 width,

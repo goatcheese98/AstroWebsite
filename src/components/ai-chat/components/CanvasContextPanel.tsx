@@ -1,90 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                    🎯 CanvasContextPanel.tsx                                 ║
- * ║                    "The Context Selector"                                    ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🟣 UI Component | 🎛️ Control Panel | 📊 Info Display            ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the control panel that lets users choose what canvas context to send to the AI.
- * I provide a toggle between "All Elements" (entire canvas) and "Selected" (specific
- * items). When in "Selected" mode, I show preview chips of what's selected and tips
- * for multi-selection.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Users often want to ask the AI about specific parts of their drawing, not the
- * entire canvas. I provide that control:
- * - "All" mode: AI sees everything (good for overall feedback)
- * - "Selected" mode: AI sees only chosen elements (good for targeted questions)
- * - Visual preview: Users confirm what's being sent to AI
- * - Multi-selection tips: Users learn Shift+click to select multiple items
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │  Excalidraw │─────▶│      ME      │◀─────│   User      │   │
- *      │   │ (selection  │      │(CanvasContext│      │  (toggles)  │   │
- *      │   │   changes)  │      │   Panel)     │      │             │   │
- *      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
- *      │                               │                                │
- *      │           ┌───────────────────┼───────────────────┐            │
- *      │           ▼                   ▼                   ▼            │
- *      │   ┌─────────────┐    ┌──────────────┐    ┌─────────────┐       │
- *      │   │setContextMode│   │clearSelection│    │ Element     │       │
- *      │   │  ("all"/    │    │ (when switch │    │ Snapshots   │       │
- *      │   │"selected")  │    │  to "all")   │    │  (preview)  │       │
- *      │   └─────────────┘    └──────────────┘    └─────────────┘       │
- *      │                                                                  │
- *      │   I DISPLAY: Selected element count, element type icons          │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Toggle doesn't switch modes, preview chips missing, wrong counts
- * - User Impact: AI gets wrong context, confusing user experience
- * - Quick Fix: Check contextMode prop values are exactly "all" | "selected"
- * - Debug: Verify selectedElements array is being passed correctly
- * - Common Issue: Snapshots Map not updating - check elementSnapshots prop
- * 
- * 📦 PROPS I ACCEPT:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ contextMode         │ Current mode ("all" | "selected")                    │
- * │ onContextModeChange │ Callback when user toggles mode                    │
- * │ selectedElements    │ Array of selected element IDs                        │
- * │ elementSnapshots    │ Map of element ID → snapshot data                    │
- * │ canvasElementCount  │ Total number of elements on canvas                   │
- * │ onClearSelection    │ Callback to clear selection (when switching to all)  │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- * 
- * 🎨 VISUAL FEATURES:
- * - Mode toggle: Two buttons side by side
- * - "All" button: Green when active
- * - "Selected" button: Shows count, green when active
- * - Element chips: Show type icon + text preview
- * - Selection tip: Shift+click hint when in selected mode
- * 
- * 🔣 TYPE ICONS:
- * - Rectangle: ▭
- * - Diamond: ◇
- * - Ellipse: ○
- * - Text: T
- * - Arrow: →
- * - Line: /
- * - Other: ◆
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted from AIChatContainer.tsx (was ~150 lines of context UI)
- * 2026-02-02: Separated context selection from message list
- * 2026-02-02: Added proper TypeScript types for element snapshots
- * 
- * @module CanvasContextPanel
- */
-
 import React from "react";
 import type { CanvasElementSnapshot } from "../types";
 
@@ -133,7 +46,7 @@ export function CanvasContextPanel({
     const isSelectedMode = contextMode === "selected";
     const hasSelected = selectedElements.length > 0;
     const hasSnapshots = elementSnapshots.size > 0;
-    
+
     // Calculate element type counts for "All" mode summary
     const elementCounts = React.useMemo(() => {
         if (!elementSnapshots.size) return {};
@@ -143,7 +56,7 @@ export function CanvasContextPanel({
         });
         return counts;
     }, [elementSnapshots]);
-    
+
     return (
         <div style={{
             padding: "14px 18px",
@@ -176,7 +89,7 @@ export function CanvasContextPanel({
                     </span>
                 )}
             </div>
-            
+
             {/* Mode Toggle */}
             <div style={{
                 display: "flex",
@@ -206,7 +119,7 @@ export function CanvasContextPanel({
                 >
                     All Elements
                 </button>
-                
+
                 {/* Selected Elements Button */}
                 <button
                     onClick={() => onContextModeChange("selected")}
@@ -226,7 +139,7 @@ export function CanvasContextPanel({
                     Selected ({selectedElements.length})
                 </button>
             </div>
-            
+
             {/* Selection Tip */}
             {isSelectedMode && (
                 <div style={{
@@ -244,15 +157,15 @@ export function CanvasContextPanel({
                         gap: "6px",
                     }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                            <path d="M2 17l10 5 10-5"/>
-                            <path d="M2 12l10 5 10-5"/>
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                            <path d="M2 17l10 5 10-5" />
+                            <path d="M2 12l10 5 10-5" />
                         </svg>
                         💡 Hold <strong>Shift</strong> to multi-select items on canvas
                     </div>
                 </div>
             )}
-            
+
             {/* Selected Elements Preview */}
             {isSelectedMode && hasSelected && hasSnapshots && (
                 <div style={{
@@ -298,7 +211,7 @@ export function CanvasContextPanel({
                     </div>
                 </div>
             )}
-            
+
             {/* All Elements Summary */}
             {isAllMode && canvasElementCount > 0 && Object.keys(elementCounts).length > 0 && (
                 <div style={{

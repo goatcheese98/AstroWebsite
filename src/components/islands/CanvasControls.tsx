@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { eventBus } from "../../lib/events";
 
 
 interface CanvasControlsProps {
@@ -13,6 +12,7 @@ interface CanvasControlsProps {
     onCreateWebEmbed?: () => void;
     onCreateLexical?: () => void;
     onShare?: () => void;
+    onGenerateImage?: () => void;
 }
 
 export default function CanvasControls({
@@ -25,7 +25,8 @@ export default function CanvasControls({
     onCreateMarkdown,
     onCreateWebEmbed,
     onCreateLexical,
-    onShare
+    onShare,
+    onGenerateImage
 }: CanvasControlsProps) {
     const [message, setMessage] = useState<string | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -62,7 +63,8 @@ export default function CanvasControls({
     const handleExportPNG = async () => {
         setIsExporting(true);
         try {
-            const api = (window as any).excalidrawAPI;
+            const { useUnifiedCanvasStore } = await import("@/stores");
+            const api = useUnifiedCanvasStore.getState().excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
                 return;
@@ -89,7 +91,8 @@ export default function CanvasControls({
     const handleExportSVG = async () => {
         setIsExporting(true);
         try {
-            const api = (window as any).excalidrawAPI;
+            const { useUnifiedCanvasStore } = await import("@/stores");
+            const api = useUnifiedCanvasStore.getState().excalidrawAPI;
             if (!api) {
                 showMessage("Canvas not ready");
                 return;
@@ -161,8 +164,9 @@ export default function CanvasControls({
     };
 
     const handleGenerateImage = () => {
-        // Open image generation modal directly without opening AI chat
-        eventBus.emit('imagegen:open');
+        if (onGenerateImage) {
+            onGenerateImage();
+        }
     };
 
     // Note: Controls now always visible for access to Save/Load

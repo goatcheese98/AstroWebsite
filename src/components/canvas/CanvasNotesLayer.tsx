@@ -1,96 +1,260 @@
 /**
- * CanvasNotesLayer
- * Renders markdown notes, web embeds, and rich text notes on top of canvas
+ * CanvasNotesLayer - Restored from original ExcalidrawCanvas
  * 
- * These are "overlay" components positioned on the canvas
+ * Renders markdown notes, web embeds, and rich text notes on top of canvas
+ * Uses RAF loop with direct ref manipulation for 60fps smooth sync
  */
 
-import { useEffect, useState } from 'react';
-import type { ExcalidrawAPI, ExcalidrawElement } from '@/stores/unifiedCanvasStore';
+import { useEffect, useState, useRef, useCallback, type ComponentType } from 'react';
+import { useUnifiedCanvasStore, type ExcalidrawAPI, type ExcalidrawElement, type ExcalidrawAppState } from '@/stores';
+
+// Note: These components are loaded dynamically to avoid SSR issues
+let MarkdownNoteComp: ComponentType<any> | null = null;
+let WebEmbedComp: ComponentType<any> | null = null;
+let LexicalNoteComp: ComponentType<any> | null = null;
+
+const loadComponents = async () => {
+  if (!MarkdownNoteComp) {
+    const mod = await import('@/components/islands/markdown');
+    MarkdownNoteComp = mod.MarkdownNote;
+  }
+  if (!WebEmbedComp) {
+    const mod = await import('@/components/islands/web-embed');
+    WebEmbedComp = mod.WebEmbed;
+  }
+  if (!LexicalNoteComp) {
+    const mod = await import('@/components/islands/rich-text');
+    LexicalNoteComp = mod.LexicalNote;
+  }
+  return { MarkdownNoteComp, WebEmbedComp, LexicalNoteComp };
+};
 
 interface CanvasNotesLayerProps {
   api: ExcalidrawAPI | null;
 }
 
-interface NoteElement {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  content: string;
-  type: 'markdown' | 'embed' | 'rich-text';
-}
-
 export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
-  const [notes, setNotes] = useState<NoteElement[]>([]);
+  const [componentsLoaded, setComponentsLoaded] = useState(false);
+  const [markdownElements, setMarkdownElements] = useState<ExcalidrawElement[]>([]);
+  const [webEmbedElements, setWebEmbedElements] = useState<ExcalidrawElement[]>([]);
+  const [lexicalElements, setLexicalElements] = useState<ExcalidrawElement[]>([]);
   
-  // Watch for custom data elements in Excalidraw
+  // Refs for direct transform updates (bypass React for 60fps)
+  const markdownRefs = useRef<Map<string, any>>(new Map());
+  const webEmbedRefs = useRef<Map<string, any>>(new Map());
+  const lexicalRefs = useRef<Map<string, any>>(new Map());
+  const viewStateRef = useRef({ scrollX: 0, scrollY: 0, zoom: { value: 1 } });
+  
+  // Load components on mount
   useEffect(() => {
-    if (!api) return;
+    let mounted = true;
+    loadComponents().then(() => {
+      if (mounted) setComponentsLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+  
+  // RAF polling loop - unified clock for zero-lag overlay sync
+  useEffect(() => {
+    if (!api || !componentsLoaded) return;
     
-    const interval = setInterval(() => {
-      const elements = api.getSceneElements();
-      const noteElements = elements
-        .filter((el: ExcalidrawElement) => 
-          el.customData?.type === 'markdown' ||
-          el.customData?.type === 'embed' ||
-          el.customData?.type === 'rich-text'
-        )
-        .map((el: ExcalidrawElement) => ({
-          id: el.id,
-          x: el.x,
-          y: el.y,
-          width: el.width || 200,
-          height: el.height || 200,
-          content: el.customData?.content || '',
-          type: el.customData?.type as NoteElement['type'],
-        }));
+    let rafId: number;
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL = 16; // React state updates at ~60fps
+    
+    const pollState = (timestamp: number) => {
+      try {
+        const elements = api.getSceneElements();
+        const appState = api.getAppState();
+        
+        // Update view state ref
+        viewStateRef.current = {
+          scrollX: appState.scrollX,
+          scrollY: appState.scrollY,
+          zoom: appState.zoom,
+        };
+        
+        // Filter elements by type
+        const md = elements.filter((el: ExcalidrawElement) => 
+          el.customData?.type === 'markdown' && !el.isDeleted
+        );
+        const embeds = elements.filter((el: ExcalidrawElement) => 
+          el.customData?.type === 'web-embed' && !el.isDeleted
+        );
+        const lex = elements.filter((el: ExcalidrawElement) => 
+          el.customData?.type === 'lexical' && !el.isDeleted
+        );
+        
+        // UNIFIED CLOCK: Update transforms directly on refs (every frame, no React)
+        md.forEach((el: ExcalidrawElement) => {
+          const ref = markdownRefs.current.get(el.id);
+          if (ref?.updateTransform) {
+            ref.updateTransform(
+              el.x, el.y, el.width, el.height, el.angle || 0,
+              appState.zoom.value, appState.scrollX, appState.scrollY
+            );
+          }
+        });
+        
+        embeds.forEach((el: ExcalidrawElement) => {
+          const ref = webEmbedRefs.current.get(el.id);
+          if (ref?.updateTransform) {
+            ref.updateTransform(
+              el.x, el.y, el.width, el.height, el.angle || 0,
+              appState.zoom.value, appState.scrollX, appState.scrollY
+            );
+          }
+        });
+        
+        lex.forEach((el: ExcalidrawElement) => {
+          const ref = lexicalRefs.current.get(el.id);
+          if (ref?.updateTransform) {
+            ref.updateTransform(
+              el.x, el.y, el.width, el.height, el.angle || 0,
+              appState.zoom.value, appState.scrollX, appState.scrollY
+            );
+          }
+        });
+        
+        // React state updates ONLY for mounting/unmounting
+        if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
+          setMarkdownElements(md);
+          setWebEmbedElements(embeds);
+          setLexicalElements(lex);
+          lastUpdateTime = timestamp;
+        }
+      } catch (err) {
+        console.error('[CanvasNotesLayer] Error polling:', err);
+      }
       
-      setNotes(noteElements);
-    }, 100);
+      rafId = requestAnimationFrame(pollState);
+    };
     
-    return () => clearInterval(interval);
+    rafId = requestAnimationFrame(pollState);
+    return () => cancelAnimationFrame(rafId);
+  }, [api, componentsLoaded]);
+  
+  // Handle markdown content update
+  const handleMarkdownUpdate = useCallback((elementId: string, content: string) => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const updated = elements.map((el: ExcalidrawElement) => {
+      if (el.id === elementId) {
+        return {
+          ...el,
+          customData: { ...el.customData, content },
+          version: (el.version || 0) + 1,
+          versionNonce: Date.now(),
+        };
+      }
+      return el;
+    });
+    api.updateScene({ elements: updated });
   }, [api]);
   
-  if (notes.length === 0) return null;
+  // Handle web embed update
+  const handleWebEmbedUpdate = useCallback((elementId: string, updates: any) => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const updated = elements.map((el: ExcalidrawElement) => {
+      if (el.id === elementId) {
+        return {
+          ...el,
+          customData: { ...el.customData, ...updates },
+          version: (el.version || 0) + 1,
+          versionNonce: Date.now(),
+        };
+      }
+      return el;
+    });
+    api.updateScene({ elements: updated });
+  }, [api]);
+  
+  // Handle lexical update
+  const handleLexicalUpdate = useCallback((elementId: string, updates: any) => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const updated = elements.map((el: ExcalidrawElement) => {
+      if (el.id === elementId) {
+        const newCustomData = { ...el.customData };
+        if (updates.lexicalState !== undefined) newCustomData.lexicalState = updates.lexicalState;
+        if (updates.backgroundOpacity !== undefined) newCustomData.backgroundOpacity = updates.backgroundOpacity;
+        if (updates.blurAmount !== undefined) newCustomData.blurAmount = updates.blurAmount;
+        return {
+          ...el,
+          customData: newCustomData,
+          version: (el.version || 0) + 1,
+          versionNonce: Date.now(),
+        };
+      }
+      return el;
+    });
+    api.updateScene({ elements: updated });
+  }, [api]);
+  
+  // Deselect all elements
+  const handleDeselect = useCallback(() => {
+    if (!api) return;
+    api.updateScene({ appState: { selectedElementIds: {} } });
+  }, [api]);
+  
+  // Register/unregister refs
+  const registerMarkdownRef = (id: string, ref: any) => {
+    if (ref) markdownRefs.current.set(id, ref);
+    else markdownRefs.current.delete(id);
+  };
+  const registerWebEmbedRef = (id: string, ref: any) => {
+    if (ref) webEmbedRefs.current.set(id, ref);
+    else webEmbedRefs.current.delete(id);
+  };
+  const registerLexicalRef = (id: string, ref: any) => {
+    if (ref) lexicalRefs.current.set(id, ref);
+    else lexicalRefs.current.delete(id);
+  };
+  
+  if (!componentsLoaded || !MarkdownNoteComp || !WebEmbedComp || !LexicalNoteComp) {
+    return null;
+  }
+  
+  const MarkdownNote = MarkdownNoteComp;
+  const WebEmbed = WebEmbedComp;
+  const LexicalNote = LexicalNoteComp;
   
   return (
-    <div 
-      style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        width: '100%', 
-        height: '100%', 
-        pointerEvents: 'none',
-        zIndex: 50,
-      }}
-    >
-      {notes.map((note) => (
-        <div
-          key={note.id}
-          style={{
-            position: 'absolute',
-            left: note.x,
-            top: note.y,
-            width: note.width,
-            height: note.height,
-            pointerEvents: 'auto',
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            padding: 12,
-            overflow: 'auto',
-          }}
-        >
-          {/* TODO: Render actual note content based on type */}
-          <div style={{ fontSize: 12, color: '#666' }}>
-            {note.type}: {note.content.slice(0, 50)}...
-          </div>
-        </div>
+    <>
+      {/* Markdown Notes */}
+      {markdownElements.map((element) => (
+        <MarkdownNote
+          key={element.id}
+          element={element}
+          appState={viewStateRef.current}
+          onChange={handleMarkdownUpdate}
+          ref={(ref: any) => registerMarkdownRef(element.id, ref)}
+        />
       ))}
-    </div>
+      
+      {/* Web Embeds */}
+      {webEmbedElements.map((element) => (
+        <WebEmbed
+          key={element.id}
+          element={element}
+          appState={viewStateRef.current}
+          onChange={handleWebEmbedUpdate}
+          ref={(ref: any) => registerWebEmbedRef(element.id, ref)}
+        />
+      ))}
+      
+      {/* Lexical Rich Text Notes */}
+      {lexicalElements.map((element) => (
+        <LexicalNote
+          key={element.id}
+          element={element}
+          appState={viewStateRef.current}
+          onChange={handleLexicalUpdate}
+          onDeselect={handleDeselect}
+          ref={(ref: any) => registerLexicalRef(element.id, ref)}
+        />
+      ))}
+    </>
   );
 }

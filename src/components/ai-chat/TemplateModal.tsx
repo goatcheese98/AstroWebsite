@@ -224,16 +224,9 @@ export default function TemplateModal({
         <>
             {/* Backdrop */}
             <div
-                className="template-modal-backdrop"
+                className="modal-overlay"
                 onClick={onClose}
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.5)",
-                    backdropFilter: "blur(4px)",
-                    zIndex: 2000,
-                    animation: "fadeIn 0.2s ease",
-                }}
+                style={{ zIndex: 2000, animation: "fadeIn 0.2s ease" }}
             />
 
             {/* Modal */}
@@ -258,13 +251,9 @@ export default function TemplateModal({
                 }}
             >
                 {/* Header */}
-                <div style={{
-                    padding: "20px 24px",
-                    borderBottom: "1px solid var(--color-border)",
-                    background: "var(--color-surface-hover)",
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div className="bg-surface-hover" style={{ padding: "20px 24px", borderBottom: "1px solid var(--color-border)" }}>
+                    <div className="flex items-center justify-between" style={{ marginBottom: "16px" }}>
+                        <div className="flex items-center gap-2">
                             <div style={{
                                 width: "40px",
                                 height: "40px",
@@ -277,37 +266,17 @@ export default function TemplateModal({
                                 <span style={{ fontSize: "20px" }}>⚡</span>
                             </div>
                             <div>
-                                <h2 style={{
-                                    margin: 0,
-                                    fontSize: "18px",
-                                    fontWeight: 600,
-                                    color: "var(--color-text)",
-                                }}>
+                                <h2 className="text-text" style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
                                     Template Library
                                 </h2>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: "12px",
-                                    color: "var(--color-text-secondary)",
-                                }}>
+                                <p className="text-text-secondary" style={{ margin: 0, fontSize: "12px" }}>
                                     {selectedElementsCount > 0
                                         ? `${selectedElementsCount} element${selectedElementsCount !== 1 ? 's' : ''} selected`
                                         : "Choose a template to get started"}
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={onClose}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                padding: "8px",
-                                borderRadius: "8px",
-                                color: "var(--color-text-secondary)",
-                                transition: "all 0.15s",
-                            }}
-                        >
+                        <button onClick={onClose} className="btn-close">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M18 6L6 18M6 6l12 12" />
                             </svg>
@@ -315,23 +284,17 @@ export default function TemplateModal({
                     </div>
 
                     {/* Search Bar */}
-                    <div style={{ position: "relative" }}>
+                    <div className="relative">
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search templates..."
+                            className="input-field"
                             style={{
                                 width: "100%",
-                                padding: "10px 14px 10px 40px",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: "10px",
-                                fontSize: "14px",
-                                outline: "none",
-                                transition: "border-color 0.15s",
+                                paddingLeft: "40px",
                             }}
-                            onFocus={(e) => e.target.style.borderColor = "var(--color-accent)"}
-                            onBlur={(e) => e.target.style.borderColor = "var(--color-border)"}
                         />
                         <svg
                             width="18"
@@ -353,20 +316,21 @@ export default function TemplateModal({
                     </div>
                 </div>
 
-                <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+                <div className="flex overflow-hidden" style={{ flex: 1 }}>
                     {/* Sidebar - Categories */}
                     {!searchQuery && !isMobile && (
-                        <div style={{
-                            width: "200px",
-                            borderRight: "1px solid var(--color-stroke-muted, #e5e7eb)",
-                            padding: "16px",
-                            overflowY: "auto",
-                            background: "var(--color-fill-1, #f9fafb)",
-                        }}>
-                            <div style={{
+                        <div
+                            className="overflow-y-auto"
+                            style={{
+                                width: "200px",
+                                borderRight: "1px solid var(--color-stroke-muted, #e5e7eb)",
+                                padding: "16px",
+                                background: "var(--color-fill-1, #f9fafb)",
+                            }}
+                        >
+                            <div className="text-text-secondary" style={{
                                 fontSize: "11px",
                                 fontWeight: 600,
-                                color: "var(--color-text-secondary)",
                                 textTransform: "uppercase",
                                 letterSpacing: "0.5px",
                                 marginBottom: "12px",
@@ -377,23 +341,15 @@ export default function TemplateModal({
                                 <button
                                     key={category}
                                     onClick={() => setSelectedCategory(category)}
+                                    className={selectedCategory === category ? "btn-primary" : "btn-secondary"}
                                     style={{
                                         width: "100%",
                                         textAlign: "left",
-                                        padding: "10px 12px",
                                         marginBottom: "4px",
-                                        border: "none",
-                                        borderRadius: "8px",
-                                        background: selectedCategory === category
-                                            ? "var(--color-accent)"
-                                            : "transparent",
-                                        color: selectedCategory === category
-                                            ? "white"
-                                            : "var(--color-text)",
                                         fontSize: "13px",
                                         fontWeight: selectedCategory === category ? 600 : 400,
-                                        cursor: "pointer",
-                                        transition: "all 0.15s",
+                                        justifyContent: "flex-start",
+                                        padding: "10px 12px",
                                     }}
                                 >
                                     {category}
@@ -403,35 +359,29 @@ export default function TemplateModal({
                     )}
 
                     {/* Content - Templates */}
-                    <div style={{
-                        flex: 1,
-                        padding: "20px",
-                        overflowY: "auto",
-                    }}>
+                    <div className="overflow-y-auto" style={{ flex: 1, padding: "20px" }}>
                         {/* Recent Templates */}
                         {!searchQuery && recentTemplateObjects.length > 0 && (
                             <div style={{ marginBottom: "24px" }}>
-                                <h3 style={{
+                                <h3 className="flex items-center gap-2 text-text" style={{
                                     fontSize: "13px",
                                     fontWeight: 600,
-                                    color: "var(--color-text)",
                                     marginBottom: "12px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
                                 }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     Recently Used
                                 </h3>
-                                <div style={{
-                                    display: "grid",
-                                    gridTemplateColumns: isMobile 
-                                        ? "repeat(auto-fill, minmax(140px, 1fr))" 
-                                        : "repeat(auto-fill, minmax(160px, 1fr))",
-                                    gap: isMobile ? "10px" : "12px",
-                                }}>
+                                <div
+                                    className="card-grid"
+                                    style={{
+                                        gridTemplateColumns: isMobile
+                                            ? "repeat(auto-fill, minmax(140px, 1fr))"
+                                            : "repeat(auto-fill, minmax(160px, 1fr))",
+                                        gap: isMobile ? "10px" : "12px",
+                                    }}
+                                >
                                     {recentTemplateObjects.map(template => (
                                         <TemplateCard
                                             key={template.id}
@@ -446,21 +396,22 @@ export default function TemplateModal({
                         {/* Template Grid */}
                         {Object.entries(filteredTemplates).map(([category, templates]) => (
                             <div key={category} style={{ marginBottom: "24px" }}>
-                                <h3 style={{
+                                <h3 className="text-text" style={{
                                     fontSize: "13px",
                                     fontWeight: 600,
-                                    color: "var(--color-text)",
                                     marginBottom: "12px",
                                 }}>
                                     {category}
                                 </h3>
-                                <div style={{
-                                    display: "grid",
-                                    gridTemplateColumns: isMobile 
-                                        ? "repeat(auto-fill, minmax(140px, 1fr))" 
-                                        : "repeat(auto-fill, minmax(160px, 1fr))",
-                                    gap: isMobile ? "10px" : "12px",
-                                }}>
+                                <div
+                                    className="card-grid"
+                                    style={{
+                                        gridTemplateColumns: isMobile
+                                            ? "repeat(auto-fill, minmax(140px, 1fr))"
+                                            : "repeat(auto-fill, minmax(160px, 1fr))",
+                                        gap: isMobile ? "10px" : "12px",
+                                    }}
+                                >
                                     {templates.map(template => (
                                         <TemplateCard
                                             key={template.id}
@@ -473,12 +424,8 @@ export default function TemplateModal({
                         ))}
 
                         {Object.keys(filteredTemplates).length === 0 && (
-                            <div style={{
-                                textAlign: "center",
-                                padding: "40px 20px",
-                                color: "var(--color-text-secondary)",
-                            }}>
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "12px", opacity: 0.5, margin: "0 auto" }}>
+                            <div className="placeholder-content" style={{ padding: "40px 20px" }}>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "12px", opacity: 0.5 }}>
                                     <circle cx="11" cy="11" r="8" />
                                     <path d="m21 21-4.35-4.35" />
                                 </svg>
@@ -523,18 +470,14 @@ function TemplateCard({ template, onSelect }: { template: PromptTemplate; onSele
     return (
         <button
             onClick={() => onSelect(template)}
+            className="template-card"
             style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "flex-start",
-                gap: "8px",
+                textAlign: "left",
                 padding: "14px",
                 background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "12px",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                textAlign: "left",
             }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "var(--color-accent, #6366f1)";
@@ -547,21 +490,12 @@ function TemplateCard({ template, onSelect }: { template: PromptTemplate; onSele
                 e.currentTarget.style.boxShadow = "none";
             }}
         >
-            <span style={{ fontSize: "28px" }}>{template.icon}</span>
+            <span className="template-card__icon">{template.icon}</span>
             <div>
-                <div style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--color-text)",
-                    marginBottom: "2px",
-                }}>
+                <div className="template-card__title" style={{ marginBottom: "2px" }}>
                     {template.title}
                 </div>
-                <div style={{
-                    fontSize: "11px",
-                    color: "var(--color-text-secondary)",
-                    lineHeight: 1.4,
-                }}>
+                <div className="template-card__desc">
                     {template.description}
                 </div>
             </div>

@@ -1,14 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                    📝 RichTextEditor.tsx                                     ║
- * ║                    "The Full-Featured Lexical Editor"                        ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  👤 I am a complete rich text editor powered by Meta's Lexical framework.   ║
- * ║     I provide the full editing experience with formatting toolbar.          ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * @module rich-text/RichTextEditor
- */
-
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';

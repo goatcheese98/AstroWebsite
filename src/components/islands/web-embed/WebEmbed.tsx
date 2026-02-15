@@ -1,16 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                    🌐 WebEmbed.tsx                                           ║
- * ║                    "The Interactive Web Viewer"                              ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- *
- * Simple web embed with:
- * - Click-through when not selected (scroll passes to canvas)
- * - Interaction only when selected
- * - Simple URL display (no navigation history - CORS blocks it)
- * - Red X to close
- */
-
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useState, useRef, useEffect } from 'react';
 import { enhanceUrl, isKnownEmbeddable, RELIABLE_EMBED_SITES } from '@/lib/web-embed-utils';
 
@@ -70,6 +57,26 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                 setCurrentUrl(processedUrl);
             }
         }, [processedUrl]);
+
+        // Reset loading state when URL changes and set timeout for sites that block embedding
+        useEffect(() => {
+            if (!displayUrl) {
+                setIsLoading(false);
+                return;
+            }
+            
+            setIsLoading(true);
+            setHasError(false);
+            setShowFallback(false);
+            
+            // Timeout for sites that block embedding via X-Frame-Options
+            // If iframe doesn't load within 8 seconds, show content anyway
+            const timeout = setTimeout(() => {
+                setIsLoading(false);
+            }, 8000);
+            
+            return () => clearTimeout(timeout);
+        }, [displayUrl]);
 
         // Calculate screen position
         const zoom = appState.zoom.value;
@@ -300,12 +307,22 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             }
         }, [isSelected, currentUrl, processedUrl, rawUrl, element.id]);
 
+        // Global double-click handler to enter edit mode
+        const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (!isEditing) {
+                setIsEditing(true);
+                setUrlInput(rawUrl);
+            }
+        }, [isEditing, rawUrl]);
+
         return (
             <div
                 ref={containerRef}
                 style={containerStyle}
                 className="web-embed-container"
                 data-embed-id={element.id}
+                onDoubleClick={handleDoubleClick}
             >
                 <div style={contentStyle}>
                     {/* Header bar - draggable */}

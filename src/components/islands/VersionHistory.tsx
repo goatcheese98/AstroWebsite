@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { eventBus } from '@/lib/events';
+import { useUnifiedCanvasStore } from '@/stores';
 
 interface Version {
   id: string;
@@ -23,6 +23,7 @@ export default function VersionHistory({ isOpen, onClose, canvasId }: VersionHis
   const [versions, setVersions] = useState<Version[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState<number | null>(null);
+  const { loadCanvasState, setDirty } = useUnifiedCanvasStore();
 
   useEffect(() => {
     if (!isOpen || !canvasId) return;
@@ -51,17 +52,15 @@ export default function VersionHistory({ isOpen, onClose, canvasId }: VersionHis
       const data = await res.json();
 
       if (data.canvasData) {
-        // Emit event to load into canvas
-        eventBus.emit('canvas:load-state', {
-          state: {
-            canvas: data.canvasData,
-            chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
-            images: { history: [] },
-          }
+        // Load into canvas via store
+        loadCanvasState({
+          canvas: data.canvasData,
+          chat: { messages: [], aiProvider: 'kimi', contextMode: 'all' },
+          images: { history: [] },
         });
 
-        // Also save as current version via auto-save
-        eventBus.emit('canvas:data-change');
+        // Mark as dirty to trigger auto-save
+        setDirty(true);
 
         onClose();
       }

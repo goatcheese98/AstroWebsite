@@ -1,29 +1,4 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                        🖥️ ChatPanel.tsx                                      ║
- * ║                    "The Floating Chat Widget"                                ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🟣 UI Component | 📐 Layout Container | 🖱️ Interaction Zone      ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am a floating chat widget that appears at the bottom right of the screen,
- * similar to customer support chat windows. I have a fixed height and width,
- * rounded corners, and a shadow to appear floating above the canvas.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Users need a compact AI chat that:
- * - Doesn't take up the entire side of the screen
- * - Floats above the canvas like a popup
- * - Can be easily opened and closed
- * - Has a familiar chat widget appearance
- * - Is positioned to not cover the right-side toolbar/menu
- * 
- * @module ChatPanel
- */
-
 import React, { forwardRef } from "react";
-import { eventBus } from "../../../lib/events";
 
 export interface ChatPanelProps {
     /** Whether the panel is visible */
@@ -36,6 +11,8 @@ export interface ChatPanelProps {
     height?: number;
     /** Callback when user starts dragging resize handle */
     onResizeStart: (e: React.MouseEvent) => void;
+    /** Callback when panel should close (backdrop clicked) */
+    onClose?: () => void;
     /** All child components */
     children: React.ReactNode;
     /** Whether we're on mobile - if true, panel takes full screen */
@@ -81,7 +58,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                 {isMobile && (
                     <div
                         onClick={() => {
-                            eventBus.emit("ai-chat:close-request");
+                            onClose?.();
                         }}
                         style={{
                             position: "fixed",

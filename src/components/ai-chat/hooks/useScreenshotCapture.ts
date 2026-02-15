@@ -86,7 +86,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { eventBus } from "../../../lib/events";
+import { canvasEvents } from "@/lib/events/eventEmitter";
 
 /** Quality level for screenshot capture */
 export type ScreenshotQuality = "low" | "high" | "preview";
@@ -165,7 +165,7 @@ export function useScreenshotCapture(
 
         console.log("📸 Requesting chat screenshot:", requestId, "elements:", elementIds?.length || "all");
 
-        eventBus.emit("excalidraw:capture-screenshot", {
+        canvasEvents.emit("excalidraw:capture-screenshot", {
             elementIds,
             quality: "low",
             requestId,
@@ -186,7 +186,7 @@ export function useScreenshotCapture(
 
         console.log("📸 Requesting generation screenshot:", requestId, "elements:", elementIds.length);
 
-        eventBus.emit("excalidraw:capture-screenshot", {
+        canvasEvents.emit("excalidraw:capture-screenshot", {
             elementIds,
             quality: "high",
             backgroundColor,
@@ -219,7 +219,7 @@ export function useScreenshotCapture(
      * Listen for screenshot capture events and route to appropriate handler
      */
     useEffect(() => {
-        const unsubscribe = eventBus.on("excalidraw:screenshot-captured", (data) => {
+        const unsubscribe = canvasEvents.on("excalidraw:screenshot-captured", (data) => {
             const detail = data;
 
             if (!detail?.requestId) {

@@ -1,65 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                     📦 ai-chat/index.ts                                      ║
- * ║                    "The AI Chat Module Export Hub"                           ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: ⚪ Barrel Export | 📚 Module Entry Point | 🏗️ Public API         ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the public face of the AI Chat module. I decide what the outside world
- * can see and use from this module. I'm a "barrel" file - I re-export everything
- * that should be publicly accessible, creating a clean API surface for consumers.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Developers importing from this module shouldn't need to know the internal
- * file structure. I provide:
- * - Single import point for all chat functionality
- * - Clean, organized exports by category
- * - Type definitions for TypeScript users
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   Inside the module:        Outside consumers:                   │
- *      │   ┌─────────────┐          ┌──────────────┐                     │
- *      │   │ All hooks   │◀─────────│ Other parts  │                     │
- *      │   │ All comps   │          │ of the app   │                     │
- *      │   │ All types   │          └──────────────┘                     │
- *      │   └──────┬──────┘                                              │
- *      │          │                                                     │
- *      │          ▼                                                     │
- *      │   ┌─────────────┐                                              │
- *      │   │      ME     │                                              │
- *      │   │  (index.ts) │                                              │
- *      │   └─────────────┘                                              │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Import errors, missing exports, TypeScript compilation fails
- * - User Impact: Can't use the AI Chat module
- * - Quick Fix: Check all exports match actual file names
- * - Debug: Verify file paths are correct
- * 
- * 📦 EXPORTS:
- * ┌────────────────────────────────────────────────────────────────────────────┐
- * │ Components: AIChatContainer, PathfinderBotAvatar, ImageGenerationModal,   │
- * │             TemplateModal                                                   │
- * │ Hooks:      useElementSelection                                            │
- * │ Types:      Message, MessageContent, MessageMetadata, CanvasContext, etc. │
- * └────────────────────────────────────────────────────────────────────────────┘
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Added exports for new hooks and components
- * 2026-02-02: Organized exports by category (components, hooks, types)
- * 
- * @module ai-chat
- */
-
 // Components
 export { default as AIChatContainer } from "./AIChatContainer";
 export { default as PathfinderBotAvatar } from "./PathfinderBotAvatar";
@@ -73,7 +11,7 @@ export { CanvasContextPanel } from "./components/CanvasContextPanel";
 export { CanvasContextOverlay } from "./components/CanvasContextOverlay";
 export { ImageGallery } from "./components/ImageGallery";
 export { MessageList } from "./components/MessageList";
-export { MessageBubble } from "./components/MessageBubble";
+export { MessageBubble } from "./components/message"; // Barrel export from message/ folder
 export { ChatInput } from "./components/ChatInput";
 
 // Hooks

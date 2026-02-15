@@ -1,6 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { CanvasContainer } from "../components/canvas";
+
+const auth = Astro.locals.auth();
+const user = await Astro.locals.currentUser();
+const isSignedIn = !!auth.userId;
 ---
 
 <BaseLayout
@@ -9,7 +13,13 @@ import { CanvasContainer } from "../components/canvas";
 >
   <div class="canvas-layout">
     <div class="canvas-container">
-      <CanvasContainer client:only="react" />
+      <CanvasContainer
+        client:only="react"
+        isSignedIn={isSignedIn}
+        userId={auth.userId}
+        userName={user?.fullName || user?.username}
+        avatarUrl={user?.imageUrl}
+      />
     </div>
   </div>
 </BaseLayout>
@@ -55,8 +65,8 @@ import { CanvasContainer } from "../components/canvas";
     height: 100% !important;
   }
 
-  /* Hide Excalidraw's default theme toggle since we sync with site theme */
-  :global(.excalidraw .layer-ui__wrapper__top-right) {
-    display: none;
+  /* Hide Excalidraw's default theme toggle - but keep our custom avatar */
+  :global(.excalidraw .layer-ui__wrapper__top-right .custom-avatar) {
+    display: flex;
   }
 </style>

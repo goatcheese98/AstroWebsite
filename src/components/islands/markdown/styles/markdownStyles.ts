@@ -1,18 +1,4 @@
 /**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║  🟡 markdownStyles.ts           "The Stylist"                                ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  👤 I define the CSS styles for markdown notes. I provide scoped styles     ║
- * ║     that don't leak to the rest of the app.                                 ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 🎬 MAIN CONTENT I PROVIDE:
- * - getMarkdownStyles(): Returns the CSS string for markdown notes
- * 
- * @module markdown/styles/markdownStyles
- */
-
-/**
  * CSS styles for markdown preview and note containers
  */
 export const getMarkdownStyles = (): string => `

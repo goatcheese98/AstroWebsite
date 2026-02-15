@@ -3,14 +3,15 @@ import { useEffect, useState } from 'react';
 export interface Toast {
     id: string;
     message: string;
-    type: 'info' | 'warning' | 'error';
+    type: 'info' | 'success' | 'error' | 'warning' | 'loading';
 }
 
 interface ToastNotificationProps {
     toast: Toast | null;
+    onRemove?: (id: string) => void;
 }
 
-export default function ToastNotification({ toast }: ToastNotificationProps) {
+export default function ToastNotification({ toast, onRemove }: ToastNotificationProps) {
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
@@ -18,20 +19,23 @@ export default function ToastNotification({ toast }: ToastNotificationProps) {
             setVisible(true);
             const timer = setTimeout(() => {
                 setVisible(false);
+                onRemove?.(toast.id);
             }, 3000);
             return () => clearTimeout(timer);
         }
-    }, [toast]);
+    }, [toast, onRemove]);
 
     if (!toast || !visible) return null;
 
-    const colors = {
+    const colors: Record<Toast['type'], { bg: string; icon: string }> = {
         info: { bg: '#3b82f6', icon: 'ℹ️' },
+        success: { bg: '#22c55e', icon: '✅' },
         warning: { bg: '#f59e0b', icon: '⚠️' },
         error: { bg: '#ef4444', icon: '❌' },
+        loading: { bg: '#6366f1', icon: '⏳' },
     };
 
-    const style = colors[toast.type];
+    const style = colors[toast.type] ?? colors.info;
 
     return (
         <>

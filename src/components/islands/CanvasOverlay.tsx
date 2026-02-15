@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { analyzeCanvasLayout, formatSpatialDescription } from "../../lib/canvas-spatial-analysis";
 import { svgLibrary, categories, type SVGMetadata } from "../../lib/svg-library-config";
-import { eventBus } from "../../lib/events";
+import { useUnifiedCanvasStore } from '@/stores';
 
 interface Message {
     id: string;
@@ -37,23 +37,19 @@ export default function CanvasOverlay() {
         scrollToBottom();
     }, [messages]);
 
-    // Listen for canvas state updates
+    // Subscribe to canvas state from unified store
+    const canvasData = useUnifiedCanvasStore((state) => state.canvasData);
+    
     useEffect(() => {
-        const unsubscribe = eventBus.on("excalidraw:state-update", (data) => {
-            setCanvasState(data);
-        });
-
-        eventBus.emit("excalidraw:get-state");
-
-        return unsubscribe;
-    }, []);
+        setCanvasState(canvasData);
+    }, [canvasData]);
 
     const executeDrawingCommand = (elementsArray: any[]) => {
         try {
             if (!Array.isArray(elementsArray)) {
                 return false;
             }
-            eventBus.emit("excalidraw:draw", { elements: elementsArray });
+            useUnifiedCanvasStore.getState().dispatchCommand('drawElements', { elements: elementsArray });
             return true;
         } catch (err) {
             console.error("Failed to execute drawing command:", err);
@@ -142,7 +138,7 @@ export default function CanvasOverlay() {
             setMessages((prev) => [...prev, successMsg]);
 
             // Insert the image into the canvas
-            eventBus.emit("excalidraw:insert-image", { imageData: imageUrl, type: "generated" });
+            useUnifiedCanvasStore.getState().dispatchCommand('insertImage', { imageData: imageUrl, type: "generated" });
 
         } catch (err) {
             setMessages((prev) => prev.filter((m) => m.id === loadingMsg.id));
@@ -267,7 +263,7 @@ export default function CanvasOverlay() {
     };
 
     const handleSvgClick = (svg: SVGMetadata) => {
-        eventBus.emit("excalidraw:insert-svg", { svgPath: svg.path, svgId: svg.id });
+        useUnifiedCanvasStore.getState().dispatchCommand('insertSvg', { svgPath: svg.path, svgId: svg.id });
     };
 
     const filteredSvgs = svgLibrary.filter((svg) => {

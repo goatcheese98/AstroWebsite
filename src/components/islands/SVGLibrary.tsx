@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { svgLibrary, categories, type SVGMetadata } from "../../lib/svg-library-config";
-import { eventBus } from "../../lib/events";
+import { useUnifiedCanvasStore } from "../../stores";
 
 export default function SVGLibrary() {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,8 +16,8 @@ export default function SVGLibrary() {
     });
 
     const handleSvgClick = (svg: SVGMetadata) => {
-        // Dispatch event to insert SVG into canvas
-        eventBus.emit("excalidraw:insert-svg", { svgPath: svg.path, svgId: svg.id });
+        // Dispatch command to insert SVG into canvas
+        useUnifiedCanvasStore.getState().dispatchCommand('insertSvg', { svgPath: svg.path, svgId: svg.id });
     };
 
     if (!isOpen) {

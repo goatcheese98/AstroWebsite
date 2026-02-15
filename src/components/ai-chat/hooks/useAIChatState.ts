@@ -6,8 +6,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Message, CanvasContext } from "../types";
 import { nanoid } from "nanoid";
-import { useCanvasStore } from "../../../stores";
-import { eventBus } from "../../../lib/events";
+import { useUnifiedCanvasStore } from "@/stores";
+import { canvasEvents } from "@/lib/events/eventEmitter";
 
 type AIProvider = "kimi" | "claude";
 
@@ -62,7 +62,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const { isOpen, onClose } = options;
 
     // === STORE INTEGRATION ===
-    const store = useCanvasStore();
+    const store = useUnifiedCanvasStore();
     const {
         messages,
         setMessages,
@@ -87,12 +87,20 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
     const chatRequestIdRef = useRef<string | null>(null);
     const selectedWebEmbedRef = useRef<{ url: string; title: string; elementId: string } | null>(null);
 
-    // Listen for web embed selections via event bus
+    // Listen for web embed selections via store
     useEffect(() => {
-        const unsubscribe = eventBus.on('webembed:selected', (data) => {
-            selectedWebEmbedRef.current = data;
-            console.log("🌐 Web embed selected for AI context:", data.url);
-        });
+        let lastCommandId: string | null = null;
+        const unsubscribe = useUnifiedCanvasStore.subscribe(
+            (state) => state.pendingCommand,
+            (command) => {
+                // Prevent duplicate handling by tracking command ID or timestamp
+                if (command?.type === 'webembed:selected' && command?.timestamp !== lastCommandId) {
+                    lastCommandId = command?.timestamp;
+                    selectedWebEmbedRef.current = command.payload;
+                    console.log("🌐 Web embed selected for AI context:", command.payload?.url);
+                }
+            }
+        );
         return unsubscribe;
     }, []);
 
@@ -289,7 +297,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
                     sourceCode = mermaidMatch[0];
                     const { convertMermaidToCanvas } = await import("@/lib/mermaid-converter");
                     const { elements } = await convertMermaidToCanvas(mermaidMatch[1]);
-                    
+
                     if (elements && elements.length > 0) {
                         drawingCommand = elements;
                         isMermaidDiagram = true;
@@ -333,14 +341,14 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             if (embedMatch) {
                 const url = embedMatch[1];
                 console.log("🌐 Web embed requested:", url);
-                
-                eventBus.emit('canvas:create-web-embed', { url });
-                
+
+                canvasEvents.emit('canvas:create-web-embed', { url });
+
                 displayMessage = displayMessage.replace(
                     embedMatch[0],
                     "\n\n✅ **Web page embedded**\n"
                 );
-                
+
                 sourceCode = embedMatch[0];
             }
 
@@ -371,7 +379,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
     // Listen for load events from file via event bus
     useEffect(() => {
-        const unsubscribeMessages = eventBus.on('chat:load-messages', (data) => {
+        const unsubscribeMessages = canvasEvents.on('chat:load-messages', (data) => {
             const loadedMessages = data.messages.map((msg: any) => ({
                 ...msg,
                 metadata: {
@@ -383,7 +391,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
             console.log(`📂 Loaded ${loadedMessages.length} messages`);
         });
 
-        const unsubscribeProvider = eventBus.on('chat:set-provider', (data) => {
+        const unsubscribeProvider = canvasEvents.on('chat:set-provider', (data) => {
             setAIProvider(data.provider);
             console.log(`📂 Set AI provider to ${data.provider}`);
         });

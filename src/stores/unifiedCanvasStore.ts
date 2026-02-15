@@ -15,6 +15,7 @@
  * - useSetExcalidrawAPI() → useUnifiedCanvasStore.getState().setExcalidrawAPI()
  */
 
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage, devtools } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
@@ -73,8 +74,8 @@ export interface ExcalidrawAPI {
   getSceneElements: () => ExcalidrawElement[];
   getAppState: () => ExcalidrawAppState;
   getFiles: () => Record<string, { mimeType: string; id: string; dataURL?: string }>;
-  updateScene: (scene: { 
-    elements?: ExcalidrawElement[]; 
+  updateScene: (scene: {
+    elements?: ExcalidrawElement[];
     appState?: Partial<ExcalidrawAppState>;
     collaborators?: unknown[];
   }) => void;
@@ -97,7 +98,7 @@ export interface CanvasCommand {
 
 // === Store Interface ===
 
-interface UnifiedCanvasStore {
+export interface UnifiedCanvasStore {
   // === Chat State ===
   messages: Message[];
   aiProvider: AIProvider;
@@ -178,7 +179,7 @@ interface UnifiedCanvasStore {
   // Excalidraw API (from ExcalidrawContext)
   setExcalidrawAPI: (api: ExcalidrawAPI | null) => void;
   setSelectedElementIds: (ids: Record<string, boolean>) => void;
-  
+
   // Safe getters for Excalidraw API
   getExcalidrawAPI: () => ExcalidrawAPI | null;
   isReady: () => boolean;
@@ -186,7 +187,7 @@ interface UnifiedCanvasStore {
   // Commands (replaces eventBus.emit)
   dispatchCommand: (type: CanvasCommand['type'], payload?: any) => string;
   clearCommand: () => void;
-  
+
   // Legacy compatibility with eventBus patterns
   emit: (event: string, data?: any) => void;
 }
@@ -344,9 +345,9 @@ export const useUnifiedCanvasStore = create<UnifiedCanvasStore>()(
         openShareModal: () => set({ isShareModalOpen: true }),
 
         // === Excalidraw API Actions ===
-        setExcalidrawAPI: (api) => set({ 
-          excalidrawAPI: api, 
-          isExcalidrawReady: api !== null 
+        setExcalidrawAPI: (api) => set({
+          excalidrawAPI: api,
+          isExcalidrawReady: api !== null
         }),
 
         setSelectedElementIds: (selectedElementIds) => set({ selectedElementIds }),
@@ -359,9 +360,9 @@ export const useUnifiedCanvasStore = create<UnifiedCanvasStore>()(
         dispatchCommand: (type, payload = {}) => {
           const id = nanoid();
           const command: CanvasCommand = { type, payload, id };
-          set({ 
+          set({
             pendingCommand: command,
-            lastCommandId: id 
+            lastCommandId: id
           });
           return id;
         },
@@ -432,15 +433,14 @@ export function useCanvasCommand(
   callback: (command: CanvasCommand) => void
 ) {
   const { pendingCommand, clearCommand } = useUnifiedCanvasStore();
-  
+
   // Use useEffect to respond to command changes
-  const React = require('react');
-  React.useEffect(() => {
+  useEffect(() => {
     if (pendingCommand) {
       callback(pendingCommand);
       clearCommand();
     }
-  }, [pendingCommand?.id]);
+  }, [pendingCommand, clearCommand, callback]);
 }
 
 // === Re-export types for backward compatibility ===

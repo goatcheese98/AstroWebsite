@@ -1,75 +1,6 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                      🎨 useImageGeneration.ts                                ║
- * ║                    "The Digital Artist"                                      ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🔵 Custom Hook | 🔴 API Handler | 🟢 State Manager               ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the artist that transforms wireframes into photorealistic images. When
- * users provide a screenshot of their canvas and creative instructions, I talk
- * to the Gemini API to generate a polished design. I also maintain a gallery
- * of previously generated images.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Users sketch rough wireframes but need presentation-ready visuals. I:
- * - Send the screenshot + creative prompt to Gemini
- * - Handle the API response and extract the generated image
- * - Calculate dimensions and insert the result into the canvas
- * - Keep a history of generated images for reuse
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │   Parent    │─────▶│      ME      │─────▶│  /api/gen   │   │
- *      │   │(AIChatCont) │      │(useImageGen) │      │   -image    │   │
- *      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
- *      │                               │                                │
- *      │                               ▼                                │
- *      │                  ┌─────────────────────┐                       │
- *      │                  │  excalidraw:insert  │                       │
- *      │                  │      -image         │                       │
- *      │                  └─────────────────────┘                       │
- *      │                                                                  │
- *      │   I RECEIVE: screenshot (base64), generation options             │
- *      │   I SEND TO: Excalidraw (insert-image event)                     │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: "Generating..." forever, no image appears, API errors
- * - User Impact: Can't transform wireframes to photorealistic images
- * - Quick Fix: Check /api/generate-image endpoint is working
- * - Debug: Look for "🎨" logs, check Network tab for API response
- * - Common Issue: Screenshot data too large, or API key expired
- * 
- * 📦 STATE I MANAGE:
- * ┌──────────────────────┬─────────────────────────────────────────────────────┐
- * │ isGeneratingImage    │ Whether we're waiting for Gemini API                │
- * │ imageHistory         │ Array of previously generated images                │
- * └──────────────────────┴─────────────────────────────────────────────────────┘
- * 
- * 🎬 MAIN ACTIONS I PROVIDE:
- * - generateImage(): Main function - send screenshot to API, get image back
- * - copyImageToClipboard(): Copy any image to clipboard
- * - clearHistory(): Remove all generated images
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted from AIChatContainer.tsx
- * 2026-02-02: Simplified - removed screenshot coordination (parent handles it)
- * 2026-02-02: Now receives screenshot directly via generateImage() params
- * 
- * @module useImageGeneration
- */
-
 import { useState, useCallback } from "react";
 import { nanoid } from "nanoid";
-import { eventBus } from "@/lib/events";
+import { canvasEvents } from "@/lib/events/eventEmitter";
 import type { GenerationOptions } from "../ImageGenerationModal";
 
 export interface ImageHistoryItem {
@@ -249,7 +180,7 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
             const imageDataUrl = `data:${data.mimeType};base64,${data.imageData}`;
 
             // Dispatch to My Assets panel
-            eventBus.emit("asset:image-generated", {
+            canvasEvents.emit("asset:image-generated", {
                 imageUrl: imageDataUrl,
                 prompt: options.prompt,
             });
@@ -264,7 +195,7 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                 const width = Math.min(img.width, maxWidth);
                 const height = width / aspectRatio;
 
-                eventBus.emit("excalidraw:insert-image", {
+                canvasEvents.emit("excalidraw:insert-image", {
                     imageData: imageDataUrl,
                     type: "png",
                     width,
@@ -272,7 +203,7 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
                 });
 
                 // Dispatch event for toast notification
-                eventBus.emit("excalidraw:image-inserted");
+                canvasEvents.emit("excalidraw:image-inserted");
 
                 callbacks?.onSuccess?.(imageDataUrl);
             };

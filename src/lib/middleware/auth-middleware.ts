@@ -1,21 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                      🛡️ auth-middleware.ts                                   ║
- * ║                    "The Session Sentry"                                      ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🔴 API Handler | 🔐 Security Layer | 🛰️ Request Interceptor      ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the sentry standing guard at the entrance of our API routes. I check 
- * every incoming request for a valid session token using Clerk.
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-13: Migrated to Clerk authentication.
- * 
- * @module middleware/auth-middleware
- */
-
 import type { APIContext } from 'astro';
 
 export interface AuthenticatedContext extends APIContext {

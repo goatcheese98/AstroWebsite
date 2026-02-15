@@ -1,63 +1,5 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                        🟣 MarkdownNote.tsx                                   ║
- * ║                    "The Spatial Note Overlay"                                ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🟣 UI Component | 📐 Spatial Sync | ✨ Interactive Layer        ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am an interactive overlay that lives on top of the Excalidraw canvas. I sync 
- * my position and rotation with a "ghost" rectangle element in Excalidraw, giving
- * the illusion that Markdown notes are part of the drawing.
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Excalidraw's native text is limited to plain string labels. I bring:
- * - Full Markdown rendering (headers, bold, lists, links)
- * - Syntax highlighting for code snippets
- * - Interactive checklists
- * - A beautiful glassmorphism aesthetic (blur + translucency)
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │ Excalidraw  │◀─────│      ME      │─────▶│  Markdown   │   │
- *      │   │ (Canvas)    │      │(MarkdownNote)│      │  Preview    │   │
- *      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
- *      │                               │                                │
- *      │                               ▼                                │
- *      │                        [MarkdownEditor]                        │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: Note is offset from its rectangle; double-click doesn't work; scroll
- *   affects the canvas instead of the note content; "Shield layer" artifacts.
- * - User Impact: Users can't read or edit their spatial notes.
- * - Quick Fix: Verify appState.scrollX/Y and appState.zoom are being used correctly.
- * - Debug: Check the pointer-events logic (auto in center, none at edges).
- * 
- * 📦 PROPS I ACCEPT:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ element             │ The Excalidraw rectangle element I am tracking       │
- * │ appState            │ Global canvas state (zoom, scroll, selection)       │
- * │ onChange            │ Callback to update the element's customData         │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-05: Standardized personified header.
- * 2026-02-05: Fixed theme synchronization (passing isDark to Preview).
- * 2026-02-05: Removed outdated "Shield layer" references.
- * 
- * @module markdown/MarkdownNote
- */
-
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
-import { eventBus } from '@/lib/events';
+import { useCanvasEvent } from '@/lib/events';
 import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
 import { getMarkdownStyles } from './styles/markdownStyles';
@@ -186,17 +128,11 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         }, [exitEditMode]);
 
         // Listen for edit command from ExcalidrawCanvas
-        useEffect(() => {
-            if (isEditing) return;
-
-            const unsubscribe = eventBus.on('markdown:edit', (data) => {
-                if (data.elementId === element.id) {
-                    enterEditMode();
-                }
-            });
-
-            return unsubscribe;
-        }, [isEditing, enterEditMode, element.id]);
+        useCanvasEvent('markdown:edit', (data) => {
+            if (!isEditing && data.elementId === element.id) {
+                enterEditMode();
+            }
+        }, [isEditing, element.id, enterEditMode]);
 
 
         // Hit test helper

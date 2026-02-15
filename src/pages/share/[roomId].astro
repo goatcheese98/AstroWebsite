@@ -3,6 +3,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import { CanvasContainer } from "@/components/canvas";
 
 const { roomId } = Astro.params;
+const user = await Astro.locals.currentUser();
 
 if (!roomId) {
   return Astro.redirect("/");
@@ -16,6 +17,10 @@ if (!roomId) {
         client:only="react"
         isSharedMode={true}
         shareRoomId={roomId}
+        isSignedIn={!!user}
+        userId={user?.id}
+        userName={user?.fullName || user?.username}
+        avatarUrl={user?.imageUrl}
       />
     </div>
   </div>
@@ -62,8 +67,8 @@ if (!roomId) {
     height: 100% !important;
   }
 
-  /* Hide Excalidraw's default theme toggle since we sync with site theme */
-  :global(.excalidraw .layer-ui__wrapper__top-right) {
-    display: none;
+  /* Hide Excalidraw's default theme toggle - but keep our custom avatar */
+  :global(.excalidraw .layer-ui__wrapper__top-right .custom-avatar) {
+    display: flex;
   }
 </style>

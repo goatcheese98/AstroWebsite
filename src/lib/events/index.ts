@@ -1,41 +1,22 @@
 /**
- * Event Bus - REMOVED
+ * Events Module
  * 
- * This module has been removed. Use the unified canvas store instead:
+ * Provides a typed event emitter for cross-component communication
+ * that doesn't fit the Zustand store model (one-time commands, notifications).
  * 
- * Before:
- *   import { eventBus, useEvent } from '@/lib/events';
- *   eventBus.emit('imagegen:open');
+ * For persistent state, use useUnifiedCanvasStore instead.
  * 
- * After:
- *   import { useUnifiedCanvasStore } from '@/stores';
- *   const store = useUnifiedCanvasStore();
- *   store.openImageGen();
+ * @example
+ *   import { canvasEvents, useCanvasEvent } from '@/lib/events';
+ *   
+ *   // Emit an event
+ *   canvasEvents.emit('excalidraw:screenshot-captured', { dataUrl: '...' });
+ *   
+ *   // Listen in a component
+ *   useCanvasEvent('excalidraw:screenshot-captured', (data) => {
+ *     console.log(data.dataUrl);
+ *   });
  */
 
-// Re-export from unified store
-export { useUnifiedCanvasStore, useCanvasCommand } from '@/stores/unifiedCanvasStore';
-
-// Legacy compatibility stub - logs warning
-export const eventBus = {
-  emit: (event: string, data?: any) => {
-    console.warn(`[DEPRECATED] eventBus.emit('${event}') is deprecated. Use useUnifiedCanvasStore instead.`);
-    const { useUnifiedCanvasStore } = require('@/stores/unifiedCanvasStore');
-    useUnifiedCanvasStore.getState().emit(event, data);
-  },
-  on: () => {
-    console.warn('[DEPRECATED] eventBus.on() is deprecated. Use useUnifiedCanvasStore.subscribe() instead.');
-    return () => {};
-  },
-  off: () => {},
-  once: () => {
-    console.warn('[DEPRECATED] eventBus.once() is deprecated.');
-    return () => {};
-  },
-};
-
-export const useEvent = () => {
-  console.warn('[DEPRECATED] useEvent() is deprecated. Use useUnifiedCanvasStore.subscribe() instead.');
-};
-
-export type CanvasEvents = never;
+export { canvasEvents, useCanvasEvent } from './eventEmitter';
+export type { CanvasEventMap, CanvasEventType, EventCallback } from './eventEmitter';

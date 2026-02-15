@@ -1,88 +1,5 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                      🎨 useCanvasCommands.ts                                 ║
- * ║                    "The Canvas Action Director"                              ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🔵 Custom Hook | ⚡ Event Dispatcher | 🛡️ Safety Wrapper         ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * 
- * 👤 WHO AM I?
- * I am the director that tells Excalidraw what to draw. When the AI responds with
- * drawing instructions (JSON arrays of elements), I'm the one who validates those
- * instructions and dispatches them to the canvas. I also handle updating existing
- * elements (like when AI modifies selected shapes).
- * 
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * AI responses need to become actual drawings on the canvas. I ensure:
- * - Drawing commands are valid before attempting execution
- * - New elements are added at appropriate positions
- * - Existing elements can be modified (preserving their IDs)
- * - Errors don't crash the app - they're logged gracefully
- * 
- * 💬 WHO IS IN MY SOCIAL CIRCLE?
- * 
- *      ┌─────────────────────────────────────────────────────────────────┐
- *      │                        MY NEIGHBORS                              │
- *      ├─────────────────────────────────────────────────────────────────┤
- *      │                                                                  │
- *      │   ┌─────────────┐      ┌──────────────┐      ┌─────────────┐   │
- *      │   │   AIChat    │─────▶│      ME      │─────▶│ Excalidraw  │   │
- *      │   │   State     │      │(useCanvas    │      │   Canvas    │   │
- *      │   │(AI response)│      │  Commands)   │      │             │   │
- *      │   └─────────────┘      └──────┬───────┘      └─────────────┘   │
- *      │                               │                                │
- *      │           ┌───────────────────┴───────────────────┐            │
- *      │           ▼                   ▼                   ▼            │
- *      │   excalidraw:draw    excalidraw:update    excalidraw:insert   │
- *      │        -elements        -elements           -image             │
- *      │                                                                  │
- *      │   I SEND EVENTS:                                                  │
- *      │   - excalidraw:draw (new elements)                               │
- *      │   - excalidraw:update-elements (modify existing)                 │
- *      │   - excalidraw:insert-image (generated images)                   │
- *      │   - excalidraw:get-state (request current state)                 │
- *      │                                                                  │
- *      │   I LISTEN TO:                                                    │
- *      │   - excalidraw:state-update (canvas changes)                     │
- *      │   - excalidraw:elements-added (track new elements)               │
- *      │                                                                  │
- *      └─────────────────────────────────────────────────────────────────┘
- * 
- * 🚨 IF I BREAK:
- * - Symptoms: AI says "✅ Drawing added!" but nothing appears on canvas
- * - User Impact: AI responses don't become drawings - broken core feature
- * - Quick Fix: Check browser console for "Failed to execute drawing command"
- * - Debug: Verify elements array structure - must be valid Excalidraw elements
- * - Common Issue: Element IDs missing or malformed - I validate before dispatching
- * 
- * 📦 STATE I MANAGE:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ canvasState         │ Cached snapshot of current canvas elements           │
- * │ selectedElements    │ Currently selected element IDs                       │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- * 
- * 🎬 MAIN ACTIONS I PROVIDE:
- * - drawElements(): Add new elements to canvas
- * - updateElements(): Modify existing elements (preserve IDs)
- * - insertImage(): Add a generated image to canvas
- * - getCanvasDescription(): Human-readable summary of canvas contents
- * - requestCanvasState(): Ask Excalidraw for current state
- * 
- * 🛡️ SAFETY FEATURES:
- * - Validates elements is an array before dispatching
- * - Wraps all dispatches in try-catch
- * - Returns success boolean for UI feedback
- * 
- * 📝 REFACTOR JOURNAL:
- * 2026-02-02: Extracted from AIChatContainer.tsx (was ~80 lines of command logic)
- * 2026-02-02: Separated drawing from updating concerns
- * 2026-02-02: Added proper error handling and return types
- * 
- * @module useCanvasCommands
- */
-
 import { useState, useCallback, useEffect } from "react";
-import { eventBus } from "../../../lib/events";
+import { useUnifiedCanvasStore, useCanvasCommand } from '@/stores';
 
 export interface UseCanvasCommandsOptions {
     /** Whether the chat is currently open (affects event listening) */
@@ -133,7 +50,7 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
                 return false;
             }
 
-            eventBus.emit("excalidraw:draw", { elements, isModification });
+            useUnifiedCanvasStore.getState().dispatchCommand('drawElements', { elements, isModification });
             console.log(`✅ Dispatched draw command: ${elements.length} elements`);
             return true;
 
@@ -158,7 +75,7 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
                 return false;
             }
 
-            eventBus.emit("excalidraw:update-elements", { elements });
+            useUnifiedCanvasStore.getState().dispatchCommand('updateElements', { elements });
             console.log(`✅ Dispatched update command: ${elements.length} elements`);
             return true;
 
@@ -178,7 +95,7 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
         type = "png"
     ): boolean => {
         try {
-            eventBus.emit("excalidraw:insert-image", { imageData, type, width, height });
+            useUnifiedCanvasStore.getState().dispatchCommand('insertImage', { imageData, type, width, height });
             console.log(`✅ Dispatched insert-image: ${width}x${height}`);
             return true;
 
@@ -212,14 +129,21 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
      * Request current state from Excalidraw
      */
     const requestCanvasState = useCallback(() => {
-        eventBus.emit("excalidraw:get-state");
+        // Use the store's getExcalidrawAPI to get current state directly
+        const api = useUnifiedCanvasStore.getState().getExcalidrawAPI();
+        if (api) {
+            const elements = api.getSceneElements();
+            const appState = api.getAppState();
+            const state = { elements, appState };
+            setCanvasState(state);
+        }
     }, []);
 
     /**
      * Get currently selected element IDs from Excalidraw API
      */
     const getSelectedElementIds = useCallback((): string[] => {
-        const api = (window as any).excalidrawAPI;
+        const api = useUnifiedCanvasStore.getState().getExcalidrawAPI();
         if (!api) return [];
 
         const appState = api.getAppState();
@@ -229,17 +153,10 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
     }, []);
 
     /**
-     * Listen for canvas state updates from Excalidraw
+     * Listen for canvas state updates from Excalidraw using command hook
      */
     useEffect(() => {
         if (!isOpen) return;
-
-        const unsubscribe = eventBus.on("excalidraw:state-update", (data) => {
-            if (!data) return;
-
-            setCanvasState(data);
-            onStateUpdate?.(data);
-        });
 
         // Request initial state
         const timeout = setTimeout(() => {
@@ -247,27 +164,52 @@ export function useCanvasCommands(options: UseCanvasCommandsOptions): UseCanvasC
         }, 100);
 
         return () => {
-            unsubscribe();
             clearTimeout(timeout);
         };
-    }, [isOpen, onStateUpdate, requestCanvasState]);
+    }, [isOpen, requestCanvasState]);
 
     /**
-     * Listen for newly added elements
+     * Use canvas command hook to listen for commands
+     */
+    useCanvasCommand((command) => {
+        if (!isOpen) return;
+
+        switch (command.type) {
+            case 'drawElements':
+                // After draw elements, update the canvas state
+                requestCanvasState();
+                // Call the callback if provided
+                const elementIds = command.payload?.elements?.map((el: any) => el.id).filter(Boolean);
+                if (elementIds && elementIds.length > 0) {
+                    onElementsAdded?.(elementIds);
+                }
+                break;
+            case 'updateElements':
+                // After update, refresh state
+                requestCanvasState();
+                break;
+            case 'insertImage':
+                // After insert, refresh state
+                requestCanvasState();
+                break;
+        }
+    });
+
+    /**
+     * Subscribe to canvas data changes from the store
      */
     useEffect(() => {
         if (!isOpen) return;
 
-        const unsubscribe = eventBus.on("excalidraw:elements-added", (data) => {
-            const { elementIds } = data || {};
-            if (elementIds && Array.isArray(elementIds) && elementIds.length > 0) {
-                console.log("📥 New elements added:", elementIds);
-                onElementsAdded?.(elementIds);
+        const unsubscribe = useUnifiedCanvasStore.subscribe((state) => {
+            if (state.canvasData) {
+                setCanvasState(state.canvasData);
+                onStateUpdate?.(state.canvasData);
             }
         });
 
         return unsubscribe;
-    }, [isOpen, onElementsAdded]);
+    }, [isOpen, onStateUpdate]);
 
     return {
         canvasState,

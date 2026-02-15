@@ -16,7 +16,8 @@
  */
 
 // === Unified Store (Single Source of Truth) ===
-export { 
+// === Unified Store (Single Source of Truth) ===
+import {
   useUnifiedCanvasStore,
   useExcalidrawAPI,
   useExcalidrawAPISafe,
@@ -25,7 +26,16 @@ export {
   useCanvasCommand,
 } from './unifiedCanvasStore';
 
-export type { 
+export {
+  useUnifiedCanvasStore,
+  useExcalidrawAPI,
+  useExcalidrawAPISafe,
+  useExcalidrawReady,
+  useSetExcalidrawAPI,
+  useCanvasCommand,
+};
+
+export type {
   UnifiedCanvasStore,
   AIProvider,
   ContextMode,

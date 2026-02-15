@@ -1,17 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                    🎯 CanvasContextOverlay.tsx                               ║
- * ║                 "The Selected Items Preview Panel"                           ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🟣 UI Component | 📊 Info Panel | 🎠 Carousel                    ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- *
- * 👤 WHO AM I?
- * I am a SEPARATE panel that shows previews of selected canvas elements,
- * positioned to the LEFT of the AI chat panel as an independent container.
- *
- * @module CanvasContextOverlay
- */
 
 import React, { useState } from "react";
 import type { CanvasElementSnapshot } from "../types";

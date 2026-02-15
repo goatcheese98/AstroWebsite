@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useMobileDetection } from "./hooks/useMobileDetection";
-import { eventBus } from "../../lib/events";
+import { canvasEvents } from "@/lib/events/eventEmitter";
 
 // Excalidraw color palette presets
 const EXCALIDRAW_COLORS = [
@@ -100,7 +100,7 @@ export default function ImageGenerationModal({
             console.log("🖼️ Requesting preview screenshot with requestId:", requestId, "for elements:", selectedElements);
 
             // Set up event bus listener BEFORE emitting the event
-            const unsubscribe = eventBus.on('excalidraw:screenshot-captured', (data) => {
+            const unsubscribe = canvasEvents.on('excalidraw:screenshot-captured', (data) => {
                 console.log("📸 Received screenshot event via eventBus:", data.requestId, "Expected:", requestId);
 
                 // Ignore events that are responses to other requests
@@ -127,8 +127,8 @@ export default function ImageGenerationModal({
 
             // Delay to ensure canvas is ready - try multiple times if needed
             const attemptCapture = (attempt = 1) => {
-                console.log(`🚀 Emitting screenshot request via eventBus (attempt ${attempt})`);
-                eventBus.emit('excalidraw:capture-screenshot', {
+                console.log(`🚀 Emitting screenshot request via canvasEvents (attempt ${attempt})`);
+                canvasEvents.emit('excalidraw:capture-screenshot', {
                     elementIds: selectedElements,
                     quality: "preview",
                     requestId,
@@ -224,60 +224,26 @@ export default function ImageGenerationModal({
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0, 0, 0, 0.5)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 1001,
-                padding: isMobile ? "16px" : "24px",
-            }}
+            className={`modal-overlay ${isMobile ? 'p-4' : 'p-6'}`}
+            style={{ zIndex: 1001 }}
             onClick={(e) => {
                 if (e.target === e.currentTarget) handleClose();
             }}
         >
             <div
+                className="modal-content"
                 style={{
-                    background: "white",
-                    borderRadius: "16px",
-                    width: "100%",
-                    maxWidth: "520px",
-                    maxHeight: isMobile ? "calc(100vh - 32px)" : "calc(100vh - 48px)",
-                    overflow: "auto",
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                    animation: "modalPop 0.2s ease-out",
+                    maxHeight: isMobile ? 'calc(100vh - 32px)' : 'calc(100vh - 48px)',
+                    animation: 'modalPop 0.2s ease-out',
                 }}
             >
                 {/* Header */}
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "20px 24px",
-                        borderBottom: "1px solid #e5e7eb",
-                    }}
-                >
+                <div className="modal-header">
                     <div>
-                        <h2
-                            style={{
-                                margin: 0,
-                                fontSize: "18px",
-                                fontWeight: 600,
-                                color: "#111827",
-                            }}
-                        >
+                        <h2 className="modal-title">
                             ✨ Generate Image
                         </h2>
-                        <p
-                            style={{
-                                margin: "4px 0 0",
-                                fontSize: "13px",
-                                color: "#6b7280",
-                            }}
-                        >
+                        <p className="text-sm text-text-secondary mt-1">
                             {hasSelectedElements
                                 ? "Using selected elements as reference"
                                 : "Create images from text descriptions"}
@@ -286,23 +252,7 @@ export default function ImageGenerationModal({
                     <button
                         onClick={handleClose}
                         disabled={isGenerating}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: isGenerating ? "not-allowed" : "pointer",
-                            padding: "8px",
-                            borderRadius: "8px",
-                            color: "#6b7280",
-                            opacity: isGenerating ? 0.5 : 1,
-                        }}
-                        onMouseEnter={(e) => {
-                            if (!isGenerating) {
-                                e.currentTarget.style.background = "#f3f4f6";
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "transparent";
-                        }}
+                        className={`btn-close ${isGenerating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M18 6L6 18M6 6l12 12" />
@@ -311,48 +261,21 @@ export default function ImageGenerationModal({
                 </div>
 
                 {/* Content */}
-                <div style={{ padding: "24px" }}>
+                <div className="modal-body">
                     {/* Preview Area - Show selected elements preview */}
                     {hasSelectedElements && (
-                        <div style={{ marginBottom: "20px" }}>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    color: "#374151",
-                                    marginBottom: "8px",
-                                }}
-                            >
+                        <div className="form-group">
+                            <label className="form-label">
                                 Reference Preview
                             </label>
                             <div
-                                style={{
-                                    width: "100%",
-                                    height: "180px",
-                                    background: "#f9fafb",
-                                    borderRadius: "12px",
-                                    border: "2px dashed #e5e7eb",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    overflow: "hidden",
-                                }}
+                                className="preview-box"
+                                style={{ width: '100%', height: '180px' }}
                             >
                                 {isLoadingPreview ? (
-                                    <div style={{ textAlign: "center" }}>
-                                        <div
-                                            style={{
-                                                width: "32px",
-                                                height: "32px",
-                                                border: "3px solid #e5e7eb",
-                                                borderTopColor: "#6366f1",
-                                                borderRadius: "50%",
-                                                animation: "spin 1s linear infinite",
-                                                margin: "0 auto 8px",
-                                            }}
-                                        />
-                                        <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                                    <div className="text-center">
+                                        <div className="animate-spin mb-2 mx-auto" style={{ width: '32px', height: '32px', border: '3px solid #e5e7eb', borderTopColor: '#6366f1', borderRadius: '50%' }} />
+                                        <span className="text-xs text-text-secondary">
                                             Capturing preview...
                                         </span>
                                     </div>
@@ -360,14 +283,10 @@ export default function ImageGenerationModal({
                                     <img
                                         src={previewUrl}
                                         alt="Selected elements preview"
-                                        style={{
-                                            maxWidth: "100%",
-                                            maxHeight: "100%",
-                                            objectFit: "contain",
-                                        }}
+                                        className="max-w-full max-h-full object-contain"
                                     />
                                 ) : (
-                                    <div style={{ textAlign: "center", color: "#9ca3af" }}>
+                                    <div className="placeholder-content">
                                         <svg
                                             width="32"
                                             height="32"
@@ -375,13 +294,12 @@ export default function ImageGenerationModal({
                                             fill="none"
                                             stroke="currentColor"
                                             strokeWidth="1.5"
-                                            style={{ margin: "0 auto 8px" }}
                                         >
                                             <rect x="3" y="3" width="18" height="18" rx="2" />
                                             <circle cx="8.5" cy="8.5" r="1.5" />
                                             <path d="M21 15l-5-5L5 21" />
                                         </svg>
-                                        <span style={{ fontSize: "12px" }}>Preview unavailable</span>
+                                        <span className="placeholder-content__text">Preview unavailable</span>
                                     </div>
                                 )}
                             </div>
@@ -389,16 +307,8 @@ export default function ImageGenerationModal({
                     )}
 
                     {/* Prompt Input */}
-                    <div style={{ marginBottom: "20px" }}>
-                        <label
-                            style={{
-                                display: "block",
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                color: "#374151",
-                                marginBottom: "8px",
-                            }}
-                        >
+                    <div className="form-group">
+                        <label className="form-label">
                             Describe your image
                         </label>
                         <textarea
@@ -410,66 +320,33 @@ export default function ImageGenerationModal({
                                     : "Describe the image you want to generate..."
                             }
                             disabled={isGenerating}
+                            className="textarea"
                             style={{
-                                width: "100%",
-                                minHeight: "80px",
-                                padding: "12px",
-                                borderRadius: "10px",
-                                border: "1px solid #e5e7eb",
-                                fontSize: "14px",
-                                lineHeight: 1.5,
-                                resize: "vertical",
-                                fontFamily: "inherit",
-                                background: isGenerating ? "#f9fafb" : "white",
-                                color: "#111827",
+                                background: isGenerating ? '#f9fafb' : undefined,
                                 opacity: isGenerating ? 0.7 : 1,
                             }}
                         />
                     </div>
 
                     {/* Options */}
-                    <div style={{ marginBottom: "20px" }}>
-                        <label
-                            style={{
-                                display: "block",
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                color: "#374151",
-                                marginBottom: "12px",
-                            }}
-                        >
+                    <div className="form-group">
+                        <label className="form-label">
                             Options
                         </label>
 
                         {/* Background Color */}
-                        <div style={{ marginBottom: "16px" }}>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    marginBottom: "8px",
-                                }}
-                            >
+                        <div className="mb-4">
+                            <div className="form-label--small mb-2">
                                 Background Color
                             </div>
-                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            <div className="flex gap-2 flex-wrap">
                                 {/* Canvas option */}
                                 <button
                                     onClick={() => setBackgroundColor("canvas")}
+                                    className="color-swatch flex items-center justify-center text-xs"
                                     style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        borderRadius: "8px",
-                                        border:
-                                            backgroundColor === "canvas"
-                                                ? "2px solid #6366f1"
-                                                : "2px solid #e5e7eb",
-                                        background: "#f3f4f6",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "12px",
+                                        background: '#f3f4f6',
+                                        borderColor: backgroundColor === "canvas" ? '#6366f1' : '#e5e7eb',
                                     }}
                                     title="Use canvas background"
                                 >
@@ -481,41 +358,25 @@ export default function ImageGenerationModal({
                                     <button
                                         key={preset.value}
                                         onClick={() => setBackgroundColor(preset.value)}
+                                        className="color-swatch"
                                         style={{
-                                            width: "32px",
-                                            height: "32px",
-                                            borderRadius: "8px",
-                                            border:
-                                                backgroundColor === preset.value
-                                                    ? "2px solid #6366f1"
-                                                    : "2px solid #e5e7eb",
                                             background: preset.color,
-                                            cursor: "pointer",
+                                            borderColor: backgroundColor === preset.value ? '#6366f1' : '#e5e7eb',
                                         }}
                                         title={preset.name}
                                     />
                                 ))}
 
                                 {/* Custom color picker */}
-                                <div ref={colorPickerRef} style={{ position: "relative" }}>
+                                <div ref={colorPickerRef} className="relative">
                                     <button
                                         onClick={() => setShowColorPicker(!showColorPicker)}
+                                        className="color-swatch flex items-center justify-center"
                                         style={{
-                                            width: "32px",
-                                            height: "32px",
-                                            borderRadius: "8px",
-                                            border:
-                                                backgroundColor === "custom"
-                                                    ? "2px solid #6366f1"
-                                                    : "2px solid #e5e7eb",
-                                            background:
-                                                backgroundColor === "custom"
-                                                    ? customColor
-                                                    : "linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4)",
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
+                                            borderColor: backgroundColor === "custom" ? '#6366f1' : '#e5e7eb',
+                                            background: backgroundColor === "custom"
+                                                ? customColor
+                                                : 'linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4)',
                                         }}
                                         title="Custom color"
                                     >
@@ -552,25 +413,17 @@ export default function ImageGenerationModal({
                                     {/* Color picker dropdown */}
                                     {showColorPicker && (
                                         <div
+                                            className="bg-surface rounded-xl shadow-lg p-4 z-10"
                                             style={{
-                                                position: "absolute",
-                                                top: "40px",
+                                                position: 'absolute',
+                                                top: '40px',
                                                 left: 0,
-                                                background: "white",
-                                                borderRadius: "12px",
-                                                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15)",
-                                                padding: "16px",
-                                                zIndex: 100,
-                                                minWidth: "200px",
+                                                minWidth: '200px',
                                             }}
                                         >
                                             <div
-                                                style={{
-                                                    display: "grid",
-                                                    gridTemplateColumns: "repeat(6, 1fr)",
-                                                    gap: "6px",
-                                                    marginBottom: "12px",
-                                                }}
+                                                className="grid gap-1 mb-3"
+                                                style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}
                                             >
                                                 {EXCALIDRAW_COLORS.map((color) => (
                                                     <button
@@ -580,24 +433,21 @@ export default function ImageGenerationModal({
                                                             setBackgroundColor("custom");
                                                             setShowColorPicker(false);
                                                         }}
+                                                        className="color-swatch"
                                                         style={{
-                                                            width: "24px",
-                                                            height: "24px",
-                                                            borderRadius: "6px",
-                                                            border:
-                                                                customColor === color
-                                                                    ? "2px solid #6366f1"
-                                                                    : "2px solid transparent",
+                                                            width: '24px',
+                                                            height: '24px',
+                                                            borderRadius: '6px',
                                                             background: color,
-                                                            cursor: "pointer",
+                                                            borderColor: customColor === color ? '#6366f1' : 'transparent',
                                                         }}
                                                     />
                                                 ))}
                                             </div>
 
                                             {/* Custom hex input */}
-                                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                                                <span style={{ fontSize: "12px", color: "#6b7280" }}>#</span>
+                                            <div className="flex gap-2 items-center">
+                                                <span className="text-xs text-text-secondary">#</span>
                                                 <input
                                                     type="text"
                                                     value={customColor.replace("#", "")}
@@ -609,14 +459,8 @@ export default function ImageGenerationModal({
                                                         }
                                                     }}
                                                     placeholder="FFFFFF"
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: "6px 10px",
-                                                        borderRadius: "6px",
-                                                        border: "1px solid #e5e7eb",
-                                                        fontSize: "13px",
-                                                        textTransform: "uppercase",
-                                                    }}
+                                                    className="flex-1 px-2 py-1 rounded border border-border text-sm"
+                                                    style={{ textTransform: 'uppercase' }}
                                                 />
                                             </div>
                                         </div>
@@ -626,49 +470,35 @@ export default function ImageGenerationModal({
                         </div>
 
                         {/* Aspect Ratio */}
-                        <div style={{ marginBottom: "16px" }}>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    marginBottom: "8px",
-                                }}
-                            >
+                        <div className="mb-4">
+                            <div className="form-label--small mb-2">
                                 Aspect Ratio
                             </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
+                            <div className="flex gap-2">
                                 <button
                                     onClick={() => setStrictRatio(true)}
+                                    className="flex-1 p-2 rounded-lg border-2 cursor-pointer text-sm"
                                     style={{
-                                        flex: 1,
-                                        padding: "10px",
-                                        borderRadius: "8px",
-                                        border: strictRatio ? "2px solid #6366f1" : "2px solid #e5e7eb",
-                                        background: strictRatio ? "#eef2ff" : "white",
-                                        cursor: "pointer",
-                                        fontSize: "13px",
+                                        borderColor: strictRatio ? '#6366f1' : '#e5e7eb',
+                                        background: strictRatio ? '#eef2ff' : 'white',
                                         fontWeight: strictRatio ? 500 : 400,
-                                        color: strictRatio ? "#6366f1" : "#374151",
+                                        color: strictRatio ? '#6366f1' : '#374151',
                                     }}
                                 >
-                                    <div style={{ fontSize: "16px", marginBottom: "2px" }}>□</div>
+                                    <div className="text-lg mb-1">□</div>
                                     Square (1:1)
                                 </button>
                                 <button
                                     onClick={() => setStrictRatio(false)}
+                                    className="flex-1 p-2 rounded-lg border-2 cursor-pointer text-sm"
                                     style={{
-                                        flex: 1,
-                                        padding: "10px",
-                                        borderRadius: "8px",
-                                        border: !strictRatio ? "2px solid #6366f1" : "2px solid #e5e7eb",
-                                        background: !strictRatio ? "#eef2ff" : "white",
-                                        cursor: "pointer",
-                                        fontSize: "13px",
+                                        borderColor: !strictRatio ? '#6366f1' : '#e5e7eb',
+                                        background: !strictRatio ? '#eef2ff' : 'white',
                                         fontWeight: !strictRatio ? 500 : 400,
-                                        color: !strictRatio ? "#6366f1" : "#374151",
+                                        color: !strictRatio ? '#6366f1' : '#374151',
                                     }}
                                 >
-                                    <div style={{ fontSize: "16px", marginBottom: "2px" }}>▭</div>
+                                    <div className="text-lg mb-1">▭</div>
                                     Landscape (4:3)
                                 </button>
                             </div>
@@ -676,73 +506,43 @@ export default function ImageGenerationModal({
 
                         {/* Model Selection */}
                         <div>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    marginBottom: "8px",
-                                }}
-                            >
+                            <div className="form-label--small mb-2">
                                 Model
                             </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
+                            <div className="flex gap-2">
                                 <button
                                     onClick={() => setUseProModel(false)}
+                                    className="flex-1 p-2 rounded-lg border-2 cursor-pointer text-sm text-left"
                                     style={{
-                                        flex: 1,
-                                        padding: "10px",
-                                        borderRadius: "8px",
-                                        border: !useProModel ? "2px solid #6366f1" : "2px solid #e5e7eb",
-                                        background: !useProModel ? "#eef2ff" : "white",
-                                        cursor: "pointer",
-                                        fontSize: "13px",
+                                        borderColor: !useProModel ? '#6366f1' : '#e5e7eb',
+                                        background: !useProModel ? '#eef2ff' : 'white',
                                         fontWeight: !useProModel ? 500 : 400,
-                                        color: !useProModel ? "#6366f1" : "#374151",
-                                        textAlign: "left",
+                                        color: !useProModel ? '#6366f1' : '#374151',
                                     }}
                                 >
-                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <div className="flex items-center gap-1">
                                         <span>⚡</span>
                                         <span>Flash</span>
                                     </div>
-                                    <div
-                                        style={{
-                                            fontSize: "11px",
-                                            color: "#6b7280",
-                                            marginTop: "2px",
-                                            fontWeight: 400,
-                                        }}
-                                    >
+                                    <div className="text-xs text-text-secondary mt-1 font-normal">
                                         Fast, great for most images
                                     </div>
                                 </button>
                                 <button
                                     onClick={() => setUseProModel(true)}
+                                    className="flex-1 p-2 rounded-lg border-2 cursor-pointer text-sm text-left"
                                     style={{
-                                        flex: 1,
-                                        padding: "10px",
-                                        borderRadius: "8px",
-                                        border: useProModel ? "2px solid #6366f1" : "2px solid #e5e7eb",
-                                        background: useProModel ? "#eef2ff" : "white",
-                                        cursor: "pointer",
-                                        fontSize: "13px",
+                                        borderColor: useProModel ? '#6366f1' : '#e5e7eb',
+                                        background: useProModel ? '#eef2ff' : 'white',
                                         fontWeight: useProModel ? 500 : 400,
-                                        color: useProModel ? "#6366f1" : "#374151",
-                                        textAlign: "left",
+                                        color: useProModel ? '#6366f1' : '#374151',
                                     }}
                                 >
-                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <div className="flex items-center gap-1">
                                         <span>✨</span>
                                         <span>Pro</span>
                                     </div>
-                                    <div
-                                        style={{
-                                            fontSize: "11px",
-                                            color: "#6b7280",
-                                            marginTop: "2px",
-                                            fontWeight: 400,
-                                        }}
-                                    >
+                                    <div className="text-xs text-text-secondary mt-1 font-normal">
                                         Best quality, more detail
                                     </div>
                                 </button>
@@ -751,61 +551,34 @@ export default function ImageGenerationModal({
                     </div>
 
                     {/* Action Buttons */}
-                    <div
-                        style={{
-                            display: "flex",
-                            gap: "12px",
-                            paddingTop: "20px",
-                            borderTop: "1px solid #e5e7eb",
-                        }}
-                    >
+                    <div className="modal-footer" style={{ padding: '20px 0 0 0', borderTop: '1px solid var(--color-border)' }}>
                         <button
                             onClick={handleClose}
                             disabled={isGenerating}
-                            style={{
-                                flex: 1,
-                                padding: "12px",
-                                borderRadius: "10px",
-                                border: "1px solid #e5e7eb",
-                                background: "white",
-                                cursor: isGenerating ? "not-allowed" : "pointer",
-                                fontSize: "14px",
-                                fontWeight: 500,
-                                color: "#374151",
-                                opacity: isGenerating ? 0.5 : 1,
-                            }}
+                            className={`flex-1 py-3 px-4 rounded-lg border font-medium text-sm ${isGenerating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer bg-surface'}`}
+                            style={{ borderColor: '#e5e7eb', color: '#374151' }}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleGenerate}
                             disabled={!prompt.trim() || isGenerating}
+                            className="btn-primary flex-[2]"
                             style={{
-                                flex: 2,
-                                padding: "12px",
-                                borderRadius: "10px",
-                                border: "none",
-                                background: !prompt.trim() || isGenerating ? "#c7c8ff" : "#6366f1",
-                                cursor: !prompt.trim() || isGenerating ? "not-allowed" : "pointer",
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                color: "white",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "8px",
+                                background: !prompt.trim() || isGenerating ? '#c7c8ff' : '#6366f1',
+                                cursor: !prompt.trim() || isGenerating ? 'not-allowed' : 'pointer',
                             }}
                         >
                             {isGenerating ? (
                                 <>
                                     <div
+                                        className="animate-spin"
                                         style={{
-                                            width: "16px",
-                                            height: "16px",
-                                            border: "2px solid rgba(255,255,255,0.3)",
-                                            borderTopColor: "white",
-                                            borderRadius: "50%",
-                                            animation: "spin 0.8s linear infinite",
+                                            width: '16px',
+                                            height: '16px',
+                                            border: '2px solid rgba(255,255,255,0.3)',
+                                            borderTopColor: 'white',
+                                            borderRadius: '50%',
                                         }}
                                     />
                                     Generating...
@@ -840,9 +613,6 @@ export default function ImageGenerationModal({
                         opacity: 1;
                         transform: scale(1);
                     }
-                }
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
                 }
             `}</style>
         </div>

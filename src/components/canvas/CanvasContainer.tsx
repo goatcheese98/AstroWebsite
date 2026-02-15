@@ -14,10 +14,8 @@
  * - Extracted hooks for testability
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useRef, useCallback, useMemo } from 'react';
 import { useUnifiedCanvasStore, useExcalidrawAPISafe, useSetExcalidrawAPI } from '@/stores';
-import { useExcalidrawLoader } from './hooks/useExcalidrawLoader';
 import { useCanvasPersistence } from './hooks/useCanvasPersistence';
 import { useCanvasCollaboration } from './hooks/useCanvasCollaboration';
 
@@ -26,6 +24,7 @@ import CanvasCore from './CanvasCore';
 import CanvasUI from './CanvasUI';
 import CanvasCollaborationLayer from './CanvasCollaborationLayer';
 import CanvasNotesLayer from './CanvasNotesLayer';
+import CanvasAvatar from '../islands/CanvasAvatar';
 
 import "@excalidraw/excalidraw/index.css";
 
@@ -38,6 +37,12 @@ interface CanvasContainerProps {
   partyKitHost?: string;
   /** Force clear canvas on mount (new canvas mode) */
   shouldClearOnMount?: boolean;
+
+  // Auth props passed from Astro
+  isSignedIn?: boolean;
+  userId?: string | null;
+  userName?: string | null;
+  avatarUrl?: string | null;
 }
 
 export default function CanvasContainer({
@@ -45,30 +50,30 @@ export default function CanvasContainer({
   shareRoomId,
   partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev",
   shouldClearOnMount = false,
+  isSignedIn = false,
+  userId = null,
+  userName = null,
+  avatarUrl = null,
 }: CanvasContainerProps) {
-  const { isSignedIn } = useUser();
+  // const { isSignedIn } = useUser(); // Removed
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // === STORE CONNECTION ===
   const store = useUnifiedCanvasStore();
-  const { 
-    canvasId, 
+  const {
+    canvasId,
     setCanvasId,
     addToast,
   } = store;
-  
-  // === EXCALIDRAW LOADING ===
-  const { modules, isLoading: isLoadingExcalidraw, error: loadError } = useExcalidrawLoader();
-  const ExcalidrawComponent = modules?.Excalidraw || null;
-  
+
   // === API MANAGEMENT ===
   const api = useExcalidrawAPISafe();
   const setApi = useSetExcalidrawAPI();
-  
+
   const handleApiReady = useCallback((excalidrawApi: any) => {
     setApi(excalidrawApi);
   }, [setApi]);
-  
+
   // === PERSISTENCE ===
   useCanvasPersistence({
     api,
@@ -82,7 +87,7 @@ export default function CanvasContainer({
       addToast(`Save failed: ${err.message}`, 'error');
     },
   });
-  
+
   // === COLLABORATION ===
   const { isConnected, activeUsers, cursors } = useCanvasCollaboration({
     isSharedMode,
@@ -93,52 +98,53 @@ export default function CanvasContainer({
     onDisconnect: () => addToast('Disconnected from room', 'info'),
     onError: (err) => addToast(`Connection error: ${err.message}`, 'error'),
   });
-  
-  // === ERROR HANDLING ===
-  if (loadError) {
-    return (
-      <div style={{ padding: 20, textAlign: 'center' }}>
-        <h2>Failed to load canvas</h2>
-        <p>{loadError.message}</p>
-      </div>
-    );
-  }
-  
+
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="canvas-container" 
-      style={{ 
-        width: '100%', 
-        height: '100%', 
-        position: 'relative', 
+      className="canvas-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
         background: '#ffffff',
         overflow: 'hidden',
       }}
     >
       {/* Core Excalidraw Canvas */}
       <CanvasCore
-        ExcalidrawComponent={ExcalidrawComponent}
-        isLoading={isLoadingExcalidraw}
         onApiReady={handleApiReady}
         isSharedMode={isSharedMode}
+        renderTopRightUI={useMemo(() => () => (
+          <CanvasAvatar
+            user={isSignedIn && userId ? {
+              id: userId,
+              name: userName || undefined,
+              email: undefined,
+              avatarUrl: avatarUrl || undefined,
+            } : null}
+            isAuthenticated={!!isSignedIn}
+            isLoading={false}
+          />
+        ), [isSignedIn, userId, userName, avatarUrl])}
       />
-      
+
       {/* Collaboration Layer (cursors, locks) */}
       {isSharedMode && isConnected && (
-        <CanvasCollaborationLayer 
+        <CanvasCollaborationLayer
           cursors={cursors}
           activeUsers={activeUsers}
         />
       )}
-      
+
       {/* Notes Layer (markdown, embeds) */}
       <CanvasNotesLayer api={api} />
-      
+
       {/* UI Layer (controls, modals, chat) */}
-      <CanvasUI 
-        api={api}
+      <CanvasUI
         isSignedIn={isSignedIn}
+        userId={userId}
+        userName={userName}
         isSharedMode={isSharedMode}
         isConnected={isConnected}
         activeUsers={activeUsers}

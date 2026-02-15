@@ -1,22 +1,14 @@
 /**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                     🤖 AIChatContainer.tsx                                   ║
- * ║                    "The Chat Orchestra Conductor"                            ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🟣 UI Component | 🎯 Orchestrator | 🏗️ Architecture Root        ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
+ * AIChatContainer - Chat Interface for AI Canvas
+ * Uses unified Zustand store for state management
  * 
- * AI Chat Container - Orchestrates all chat functionality
- * Now with Zustand store integration for state management
- * 
- * @module AIChatContainer
+ * Added minimize functionality - shows compact button when minimized
  */
 
 import React, { useRef, useCallback, useEffect, useState } from "react";
 
-// Store
-import { useCanvasStore } from "../../stores";
-import { useEvent } from "../../lib/events";
+// Unified Store
+import { useUnifiedCanvasStore } from "@/stores";
 
 // Hooks
 import { useAIChatState } from "./hooks/useAIChatState";
@@ -45,70 +37,61 @@ export interface AIChatContainerProps {
 }
 
 /**
- * Minimized Chat Button - Compact button shown when chat is minimized
+ * Minimized Chat Button - Compact pill button shown when chat is minimized
+ * Matches the design in the screenshot: pill shape, green dot, positioned at bottom
  */
 function MinimizedChatButton({
     onExpand,
     onClose,
-    aiProvider
+    aiProvider,
 }: {
     onExpand: () => void;
     onClose: () => void;
-    aiProvider: "kimi" | "claude"
+    aiProvider: "kimi" | "claude";
 }) {
     return (
         <div
             style={{
+                position: "fixed",
+                bottom: "20px",
+                right: "80px", // Positioned left of the help button
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "10px",
                 padding: "10px 16px",
                 background: "white",
-                border: "1px solid var(--color-border, #e5e7eb)",
-                borderRadius: "24px",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                border: "1px solid #e5e7eb",
+                borderRadius: "9999px", // Full pill shape
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                 fontSize: "14px",
                 fontWeight: 500,
-                color: "var(--color-text, #374151)",
-                transition: "all 0.15s ease",
+                color: "#374151",
+                transition: "all 0.2s ease",
+                cursor: "pointer",
+                zIndex: 100,
             }}
+            onClick={onExpand}
             onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.02)";
-                e.currentTarget.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.2)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.12)";
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
             }}
         >
-            {/* Click to expand */}
-            <button
-                onClick={onExpand}
+            <span>AI Chat</span>
+            
+            {/* Green status dot */}
+            <span
                 style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--color-text, #374151)",
-                    padding: 0,
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: aiProvider === 'kimi' ? '#22c55e' : '#f97316',
+                    flexShrink: 0,
                 }}
-            >
-                <span>AI Chat</span>
-                <span
-                    style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        background: aiProvider === 'kimi' ? '#22c55e' : '#22c55e',
-                    }}
-                />
-            </button>
+            />
 
-            {/* Close button */}
+            {/* Close button - separate from expand click area */}
             <button
                 onClick={(e) => {
                     e.stopPropagation();
@@ -121,21 +104,22 @@ function MinimizedChatButton({
                     justifyContent: "center",
                     width: "20px",
                     height: "20px",
-                    background: "none",
+                    background: "transparent",
                     border: "none",
                     cursor: "pointer",
-                    color: "var(--color-text-secondary, #6b7280)",
+                    color: "#9ca3af",
                     borderRadius: "50%",
                     transition: "all 0.15s",
                     marginLeft: "4px",
+                    padding: 0,
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--color-surface-hover, #f3f4f6)";
-                    e.currentTarget.style.color = "var(--color-text, #374151)";
+                    e.currentTarget.style.background = "#f3f4f6";
+                    e.currentTarget.style.color = "#374151";
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--color-text-secondary, #6b7280)";
+                    e.currentTarget.style.color = "#9ca3af";
                 }}
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -147,8 +131,8 @@ function MinimizedChatButton({
 }
 
 /**
- * AI Chat Container - Orchestrates all chat functionality
- * Uses Zustand store for state management - no prop drilling needed
+ * AI Chat Container - Chat Interface for AI Canvas
+ * Uses unified Zustand store for state management
  */
 export default function AIChatContainer({
     isOpen,
@@ -159,7 +143,7 @@ export default function AIChatContainer({
     const { isMobile, viewportWidth } = useMobileDetection();
 
     // === STORE INTEGRATION ===
-    const store = useCanvasStore();
+    const store = useUnifiedCanvasStore();
     const {
         messages,
         setMessages,
@@ -184,10 +168,10 @@ export default function AIChatContainer({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [hasLoadedPendingState, setHasLoadedPendingState] = useState(false);
 
-    // Listen for mobile backdrop close request
-    useEvent('ai-chat:close-request', () => {
+    // Close handler - can be extended for mobile backdrop
+    const handleCloseRequest = useCallback(() => {
         onClose();
-    });
+    }, [onClose]);
 
     // === 🧠 HOOKS ===
 
@@ -198,7 +182,7 @@ export default function AIChatContainer({
         clearSelection,
         getSelectionContext,
     } = useElementSelection({
-        enabled: isOpen,
+        enabled: isOpen && !isChatMinimized,
     });
 
     // Panel dimensions - vertical resize enabled
@@ -249,7 +233,7 @@ export default function AIChatContainer({
         setCanvasState,
         handleSend: handleSendMessage,
     } = useAIChatState({
-        isOpen,
+        isOpen: isOpen && !isChatMinimized,
         initialWidth,
         onClose,
     });
@@ -259,7 +243,7 @@ export default function AIChatContainer({
         drawElements,
         updateElements,
     } = useCanvasCommands({
-        isOpen,
+        isOpen: isOpen && !isChatMinimized,
         onStateUpdate: setCanvasState,
     });
 
@@ -276,38 +260,6 @@ export default function AIChatContainer({
 
         previousSelectionCountRef.current = currentCount;
     }, [selectedElements.length, contextMode, setContextMode, canvasState?.elements?.length]);
-
-    // Listen for load-state events from store/event bus
-    useEvent('canvas:load-state', (data) => {
-        if (!data.state || hasLoadedPendingState) return;
-
-        const state = data.state as any;
-        if (state.chat) {
-            if (state.chat.messages) {
-                const loadedMessages = state.chat.messages.map((msg: any) => ({
-                    ...msg,
-                    metadata: {
-                        ...msg.metadata,
-                        timestamp: new Date(msg.metadata.timestamp),
-                    },
-                }));
-                setMessages(loadedMessages);
-            }
-            if (state.chat.aiProvider) setAIProvider(state.chat.aiProvider);
-            if (state.chat.contextMode) setContextMode(state.chat.contextMode);
-        }
-
-        if (state.images?.history) {
-            const loadedHistory = state.images.history.map((img: any) => ({
-                ...img,
-                timestamp: new Date(img.timestamp),
-            }));
-            setImageHistory(loadedHistory);
-        }
-
-        setHasLoadedPendingState(true);
-        setTimeout(() => setHasLoadedPendingState(false), 100);
-    }, [hasLoadedPendingState, setMessages, setAIProvider, setContextMode, setImageHistory]);
 
     // === 🚀 ACTIONS ===
 
@@ -339,43 +291,18 @@ export default function AIChatContainer({
         isLoading: isChatLoading,
     });
 
-    // Handle minimize
-    const handleMinimize = useCallback(() => {
-        setChatMinimized(true);
-    }, [setChatMinimized]);
-
-    // Handle expand from minimized state
-    const handleExpand = useCallback(() => {
-        setChatMinimized(false);
-    }, [setChatMinimized]);
-
-    // Handle close - also reset minimized state
-    const handleCloseWithReset = useCallback(() => {
-        setChatMinimized(false);
-        onClose();
-    }, [setChatMinimized, onClose]);
-
     // === 🎨 RENDER ===
 
     if (!isOpen) return null;
 
-    // Render minimized button
-    if (isChatMinimized && !isMobile) {
+    // Show minimized button when minimized
+    if (isChatMinimized) {
         return (
-            <ChatPanel
-                isOpen={isOpen}
-                isMinimized={true}
-                width={panelWidth}
-                height={panelHeight}
-                onResizeStart={startResize}
-                isMobile={isMobile}
-            >
-                <MinimizedChatButton
-                    onExpand={handleExpand}
-                    onClose={handleCloseWithReset}
-                    aiProvider={aiProvider}
-                />
-            </ChatPanel>
+            <MinimizedChatButton
+                onExpand={() => setChatMinimized(false)}
+                onClose={onClose}
+                aiProvider={aiProvider}
+            />
         );
     }
 
@@ -393,16 +320,16 @@ export default function AIChatContainer({
 
             <ChatPanel
                 isOpen={isOpen}
-                isMinimized={false}
                 width={panelWidth}
                 height={panelHeight}
                 onResizeStart={startResize}
+                onClose={onClose}
                 isMobile={isMobile}
             >
-                {/* Header - with minimize and close buttons */}
-                <ChatHeader
-                    onClose={handleCloseWithReset}
-                    onMinimize={handleMinimize}
+                {/* Header with minimize button */}
+                <ChatHeader 
+                    onClose={onClose}
+                    onMinimize={!isMobile ? () => setChatMinimized(true) : undefined}
                 />
 
                 {/* Messages wrapper */}

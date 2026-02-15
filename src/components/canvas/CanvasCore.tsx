@@ -1,47 +1,65 @@
 /**
  * CanvasCore - The Core Excalidraw Instance
- * 
- * Responsibilities:
- * - Render the Excalidraw component
- * - Handle API initialization
- * - Manage initial data loading
- * - Handle theme
  */
 
-import { useState, useCallback, useEffect, type ComponentType } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
 import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from '@/stores/unifiedCanvasStore';
 
+// Import Excalidraw - the client:only directive in parent handles SSR
+import { Excalidraw } from "@excalidraw/excalidraw";
+
 interface CanvasCoreProps {
-  ExcalidrawComponent: ComponentType<any> | null;
-  isLoading: boolean;
+  isLoading?: boolean;
   onApiReady: (api: ExcalidrawAPI) => void;
   isSharedMode?: boolean;
+  renderTopRightUI?: () => React.ReactNode;
 }
 
-// Helper to sanitize appState (fixes Map serialization issues)
-const sanitizeAppState = (appState: ExcalidrawAppState | null | undefined): Partial<ExcalidrawAppState> | undefined => {
-  if (!appState) return undefined;
-  const sanitized = { ...appState };
-  if (sanitized.collaborators && !(sanitized.collaborators instanceof Map)) {
-    delete sanitized.collaborators;
+// Deep sanitize initial data to fix collaborators and other serialization issues
+const sanitizeInitialData = (data: any): any => {
+  if (!data) return null;
+  
+  const sanitized = { ...data };
+  
+  // Remove collaborators if not a Map (causes forEach error)
+  if (sanitized.appState) {
+    sanitized.appState = { ...sanitized.appState };
+    if (sanitized.appState.collaborators && !(sanitized.appState.collaborators instanceof Map)) {
+      delete sanitized.appState.collaborators;
+    }
   }
+  
+  // Ensure elements is an array
+  if (!sanitized.elements || !Array.isArray(sanitized.elements)) {
+    sanitized.elements = [];
+  }
+  
+  // Ensure files is an object
+  if (!sanitized.files || typeof sanitized.files !== 'object') {
+    sanitized.files = {};
+  }
+  
   return sanitized;
 };
 
 export default function CanvasCore({
-  ExcalidrawComponent,
-  isLoading,
+  isLoading: propIsLoading,
   onApiReady,
   isSharedMode,
+  renderTopRightUI,
 }: CanvasCoreProps) {
   const [initialData, setInitialData] = useState<any>(null);
+  const [isReady, setIsReady] = useState(false);
   const { canvasData, setCanvasData, setDirty } = useUnifiedCanvasStore();
+  const apiRef = useRef<ExcalidrawAPI | null>(null);
   
-  // Load initial data from store or localStorage
+  // Load initial data
   useEffect(() => {
+    let dataToLoad = null;
+    
     if (canvasData) {
-      setInitialData(canvasData);
+      dataToLoad = canvasData;
     } else {
       // Try loading from localStorage
       try {
@@ -49,13 +67,17 @@ export default function CanvasCore({
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.version === 2 && parsed.canvasData) {
-            setInitialData(parsed.canvasData);
+            dataToLoad = parsed.canvasData;
           }
         }
       } catch (err) {
         console.error('Failed to load initial canvas data:', err);
       }
     }
+    
+    // Sanitize before setting
+    setInitialData(sanitizeInitialData(dataToLoad));
+    setIsReady(true);
   }, [canvasData]);
   
   const handleChange = useCallback((
@@ -63,7 +85,6 @@ export default function CanvasCore({
     appState: ExcalidrawAppState,
     files: BinaryFileData
   ) => {
-    // Update store
     setCanvasData({
       elements: [...elements],
       appState: { ...appState },
@@ -72,13 +93,15 @@ export default function CanvasCore({
     setDirty(true);
   }, [setCanvasData, setDirty]);
   
-  const handleExcalidrawRef = useCallback((api: any) => {
-    if (api) {
+  // Handle API ready - Excalidraw passes API via excalidrawAPI prop callback
+  const handleApiChange = useCallback((api: ExcalidrawAPI) => {
+    if (api && api !== apiRef.current) {
+      apiRef.current = api;
       onApiReady(api);
     }
   }, [onApiReady]);
   
-  if (isLoading || !ExcalidrawComponent) {
+  if (propIsLoading || !isReady) {
     return (
       <div style={{ 
         width: '100%', 
@@ -96,7 +119,7 @@ export default function CanvasCore({
   const UIOptions = {
     canvasActions: {
       changeViewBackgroundColor: true,
-      clearCanvas: !isSharedMode, // Disable clear in shared mode
+      clearCanvas: !isSharedMode,
       export: { saveFileToDisk: true },
       loadScene: !isSharedMode,
       saveToActiveFile: !isSharedMode,
@@ -107,19 +130,19 @@ export default function CanvasCore({
   
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <ExcalidrawComponent
-        ref={handleExcalidrawRef}
+      <Excalidraw
+        excalidrawAPI={handleApiChange}
         initialData={initialData}
         onChange={handleChange}
         theme="light"
         UIOptions={UIOptions}
         name="Untitled Canvas"
+        renderTopRightUI={renderTopRightUI}
       />
     </div>
   );
 }
 
-// Type for binary file data
 interface BinaryFileData {
   mimeType: string;
   id: string;

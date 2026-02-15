@@ -1,35 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                       📱 useMobileDetection.ts                               ║
- * ║                    "The Mobile Device Detector"                              ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  🏷️ BADGES: 🔵 Custom Hook | 📱 Mobile | 🎯 Responsive                        ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- *
- * 👤 WHO AM I?
- * I detect if the user is on a mobile device by checking:
- * - Viewport width (screen size)
- * - Touch capability
- * - User agent string (for device type detection)
- *
- * 🎯 WHAT USER PROBLEM DO I SOLVE?
- * Mobile devices need different UI/UX:
- * - Smaller touch targets
- * - Simplified interfaces
- * - Different interaction patterns
- * - Performance optimizations
- *
- * 📦 STATE I PROVIDE:
- * ┌─────────────────────┬──────────────────────────────────────────────────────┐
- * │ isMobile            │ Boolean - is viewport <= 768px OR touch device       │
- * │ isPhone             │ Boolean - is viewport <= 480px (small phone)         │
- * │ isTablet            │ Boolean - is viewport 481px-768px (tablet)           │
- * │ hasTouch            │ Boolean - does device support touch                  │
- * └─────────────────────┴──────────────────────────────────────────────────────┘
- *
- * @module useMobileDetection
- */
-
 import { useState, useEffect, useCallback } from "react";
 
 export interface MobileDetectionState {

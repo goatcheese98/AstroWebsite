@@ -1,14 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════╗
- * ║                    🛠️ Toolbar.tsx                                            ║
- * ║                    "The Formatting Command Center"                           ║
- * ╠══════════════════════════════════════════════════════════════════════════════╣
- * ║  👤 I provide all the formatting controls for the Lexical editor. I handle  ║
- * ║     text styling, lists, headings, links, tables, and more.                 ║
- * ╚══════════════════════════════════════════════════════════════════════════════╝
- * @module rich-text/components
- */
-
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {

@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useClerk } from '@clerk/clerk-react';
 
 interface User {
   id: string;
@@ -19,12 +18,19 @@ interface CanvasAvatarProps {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  signOut?: (callback?: () => void) => void;
+  openUserProfile?: () => void;
 }
 
-export default function CanvasAvatar({ user, isAuthenticated, isLoading }: CanvasAvatarProps) {
+export default function CanvasAvatar({ 
+  user, 
+  isAuthenticated, 
+  isLoading,
+  signOut,
+  openUserProfile,
+}: CanvasAvatarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { signOut, openUserProfile } = useClerk();
 
   // Click-away dismissal
   useEffect(() => {
@@ -51,9 +57,14 @@ export default function CanvasAvatar({ user, isAuthenticated, isLoading }: Canva
   if (isLoading) return null;
 
   const handleSignOut = () => {
-    signOut(() => {
+    if (signOut) {
+      signOut(() => {
+        window.location.href = '/';
+      });
+    } else {
+      // Fallback: just redirect to home which will trigger sign out
       window.location.href = '/';
-    });
+    }
   };
 
   const initials = user?.name
@@ -225,7 +236,7 @@ export default function CanvasAvatar({ user, isAuthenticated, isLoading }: Canva
                     Dashboard
                   </a>
                   <button
-                    onClick={() => openUserProfile()}
+                    onClick={() => openUserProfile?.()}
                     style={{
                       display: 'block',
                       width: '100%',
