@@ -1418,3 +1418,107 @@ img[loading] {
   background-color: #22c55e;
   color: white;
 }
+
+/* ============================================================================
+   SECTION HEADER PATTERN
+   Used by: Skills, Experience, Projects
+   Component: SectionHeader.astro
+   ============================================================================ */
+
+.section-header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.section-header__title {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-sm);
+}
+
+.section-header__subtitle {
+  font-family: var(--font-hand);
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.section-header__line {
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--color-accent),
+    var(--color-gradient-end)
+  );
+  border-radius: 2px;
+  filter: url(#sketch-filter);
+}
+
+/* Mobile: Disable filter for performance */
+@media (hover: none) and (pointer: coarse) {
+  .section-header__line {
+    filter: none;
+    border-radius: 3px 1px 3px 1px;
+  }
+}
+
+/* ============================================================================
+   SKETCH CARD PATTERN
+   Used by: Skills, Experience timeline, Projects
+   Component: SketchCard.astro
+   ============================================================================ */
+
+.sketch-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 2px solid var(--color-stroke);
+  border-radius: var(--radius-md);
+  filter: url(#sketch-filter);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.sketch-card__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--hover-accent, var(--color-accent));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sketch-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-md);
+}
+
+.sketch-card:hover .sketch-card__accent {
+  opacity: 1;
+}
+
+.sketch-card__content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Mobile: Simplify hover effects */
+@media (max-width: 640px) {
+  .sketch-card:hover {
+    transform: none;
+  }
+}
+
+/* Touch devices: Disable filter */
+@media (hover: none) and (pointer: coarse) {
+  .sketch-card {
+    filter: none;
+    border-radius: 10px 8px 12px 9px;
+  }
+}

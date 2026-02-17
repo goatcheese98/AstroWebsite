@@ -32,6 +32,7 @@ export const PROJECTS: Project[] = [
     codeUrl: 'https://github.com/rohanjasani/algs-dashboard',
     featured: true,
     fillColor: 'var(--color-fill-1)',
+    accentColor: '#3b82f6',
   },
   {
     title: 'AI-Powered SVG Generation Tool',
@@ -39,6 +40,7 @@ export const PROJECTS: Project[] = [
     tags: ['Vue.js', 'Tailwind CSS', 'AI/ML', 'Full-Stack'],
     codeUrl: 'https://github.com/rohanjasani/svg-generator',
     fillColor: 'var(--color-fill-2)',
+    accentColor: '#10b981',
   },
   {
     title: 'AstroWeb Portfolio',
@@ -46,6 +48,7 @@ export const PROJECTS: Project[] = [
     tags: ['Astro', 'TypeScript', 'rough.js', 'CSS'],
     codeUrl: 'https://github.com/rohanjasani/AstroWeb',
     fillColor: 'var(--color-fill-3)',
+    accentColor: '#f59e0b',
   },
 ];
 
@@ -60,6 +63,8 @@ export const EXPERIENCES: Experience[] = [
       'Developing expertise in predictive modeling, data visualization, and business intelligence',
     ],
     current: true,
+    accentColor: '#1e3a5f',
+    logo: 'ubc',
   },
   {
     company: 'Goldman Sachs',
@@ -70,6 +75,8 @@ export const EXPERIENCES: Experience[] = [
       'Maintained SEC-compliant client documentation and flagged data inconsistencies',
       'Served as liaison between Consumer Wealth and Private Wealth Management teams',
     ],
+    accentColor: '#7399C6',
+    logo: 'goldman',
   },
   {
     company: 'Megaplex Theatres',
@@ -80,6 +87,8 @@ export const EXPERIENCES: Experience[] = [
       'Built Python web scraper to collect trailer data via YouTube API',
       'Delivered insights that informed strategic marketing decisions',
     ],
+    accentColor: '#6B2C91',
+    logo: 'megaplex',
   },
 ];
 

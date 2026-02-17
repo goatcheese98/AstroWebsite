@@ -1,0 +1,59 @@
+---
+interface Props {
+  title: string;
+  subtitle?: string;
+  highlight?: boolean;
+}
+
+const { title, subtitle, highlight = true } = Astro.props;
+---
+
+<div class="section-header">
+  <h2 class="section-header__title">
+    {highlight ? <span class="gradient-text">{title}</span> : title}
+  </h2>
+  {subtitle && <p class="section-header__subtitle">{subtitle}</p>}
+  <div class="section-header__line" aria-hidden="true"></div>
+</div>
+
+<style>
+  .section-header {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .section-header__title {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-sm);
+  }
+
+  .section-header__subtitle {
+    font-family: var(--font-hand);
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-md);
+  }
+
+  .section-header__line {
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--color-accent),
+      var(--color-gradient-end)
+    );
+    border-radius: 2px;
+    filter: url(#sketch-filter);
+  }
+
+  /* Mobile: Disable filter for performance */
+  @media (hover: none) and (pointer: coarse) {
+    .section-header__line {
+      filter: none;
+      border-radius: 3px 1px 3px 1px;
+    }
+  }
+</style>

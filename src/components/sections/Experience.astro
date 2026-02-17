@@ -1,17 +1,18 @@
 ---
+import SectionHeader from "../ui/SectionHeader.astro";
 import SketchHighlight from "../sketch/SketchHighlight.astro";
 import { EXPERIENCES } from "../../lib/constants";
+
+const LOGO_FILES: Record<string, string> = {
+  ubc: '/logos/UBC.png',
+  goldman: '/logos/Goldman.jpeg',
+  megaplex: '/logos/megaplex.jpeg',
+};
 ---
 
 <section class="experience section-gap" id="experience" aria-label="Experience">
   <div class="container">
-    <div class="experience__header">
-      <h2 class="experience__heading">
-        <span class="gradient-text">Experience</span>
-      </h2>
-      <p class="experience__subhead">Where I've worked.</p>
-      <div class="experience__header-line" aria-hidden="true"></div>
-    </div>
+    <SectionHeader title="Experience" subtitle="Where I've worked." />
 
     <div class="timeline">
       {
@@ -23,12 +24,17 @@ import { EXPERIENCES } from "../../lib/constants";
                   "timeline__dot",
                   { "timeline__dot--active": exp.current },
                 ]}
+                style={exp.accentColor ? `--dot-color: ${exp.accentColor}` : ''}
               >
-                {exp.current && <span class="timeline__pulse" />}
+                {exp.current && <span class="timeline__pulse" style={exp.accentColor ? `--pulse-color: ${exp.accentColor}` : ''} />}
               </div>
               <div class="timeline__line" />
             </div>
-            <div class="timeline__card">
+            <div 
+              class="sketch-card timeline__card" 
+              style={`--hover-accent: ${exp.accentColor || 'var(--color-accent)'}`}
+            >
+              <div class="sketch-card__accent" aria-hidden="true"></div>
               <div class="timeline__content">
                 <div class="timeline__header">
                   <div class="timeline__title-group">
@@ -39,18 +45,23 @@ import { EXPERIENCES } from "../../lib/constants";
                         exp.role
                       )}
                     </h3>
-                    <p class="timeline__company">{exp.company}</p>
+                    <div class="timeline__company-row">
+                      {exp.logo && (
+                        <span class="timeline__logo-wrapper">
+                          <img 
+                            src={LOGO_FILES[exp.logo]}
+                            alt=""
+                            class="timeline__logo"
+                            width="20"
+                            height="20"
+                          />
+                        </span>
+                      )}
+                      <p class="timeline__company">{exp.company}</p>
+                    </div>
                   </div>
                   <span class="timeline__period">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                       <line x1="16" y1="2" x2="16" y2="6" />
                       <line x1="8" y1="2" x2="8" y2="6" />
@@ -78,39 +89,6 @@ import { EXPERIENCES } from "../../lib/constants";
 </section>
 
 <style>
-  /* Header - Centered */
-  .experience__header {
-    text-align: center;
-    margin-bottom: var(--space-xl);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .experience__heading {
-    font-size: var(--text-2xl);
-    margin-bottom: var(--space-sm);
-  }
-
-  .experience__subhead {
-    font-family: var(--font-hand);
-    font-size: var(--text-lg);
-    color: var(--color-text-muted);
-    margin-bottom: var(--space-md);
-  }
-
-  .experience__header-line {
-    width: 60px;
-    height: 4px;
-    background: linear-gradient(
-      90deg,
-      var(--color-accent),
-      var(--color-gradient-end)
-    );
-    border-radius: 2px;
-    filter: url(#sketch-filter);
-  }
-
   .timeline {
     position: relative;
     max-width: 800px;
@@ -151,85 +129,39 @@ import { EXPERIENCES } from "../../lib/constants";
     filter: url(#sketch-filter);
     position: relative;
     z-index: 2;
-    transition:
-      border-color 0.3s ease,
-      background 0.3s ease;
+    transition: border-color 0.3s ease, background 0.3s ease;
   }
 
   .timeline__dot--active {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 4px var(--color-accent-glow);
+    background: var(--dot-color, var(--color-accent));
+    border-color: var(--dot-color, var(--color-accent));
+    box-shadow: 0 0 0 4px var(--pulse-color, var(--color-accent-glow));
   }
 
   .timeline__pulse {
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    border: 2px solid var(--color-accent);
+    border: 2px solid var(--pulse-color, var(--color-accent));
     animation: pulse-ring 2s ease-out infinite;
   }
 
   @keyframes pulse-ring {
-    0% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(1.8);
-      opacity: 0;
-    }
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.8); opacity: 0; }
   }
 
   .timeline__line {
     width: 2px;
     flex: 1;
-    background: linear-gradient(
-      to bottom,
-      var(--color-stroke-muted),
-      transparent
-    );
+    background: linear-gradient(to bottom, var(--color-stroke-muted), transparent);
     margin-top: var(--space-sm);
     min-height: 40px;
   }
 
   .timeline__card {
     flex: 1;
-    background: var(--color-surface);
-    border: 2px solid var(--color-stroke);
-    border-radius: var(--radius-md);
     padding: var(--space-lg);
-    filter: url(#sketch-filter);
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .timeline__card::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(
-      to bottom,
-      var(--color-accent),
-      var(--color-gradient-end)
-    );
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-
-  .timeline__card:hover {
-    transform: translateX(4px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .timeline__card:hover::before {
-    opacity: 1;
   }
 
   .timeline__content {
@@ -248,6 +180,7 @@ import { EXPERIENCES } from "../../lib/constants";
 
   .timeline__title-group {
     flex: 1;
+    min-width: 0;
   }
 
   .timeline__role {
@@ -257,11 +190,38 @@ import { EXPERIENCES } from "../../lib/constants";
     line-height: 1.3;
   }
 
+  .timeline__company-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .timeline__logo-wrapper {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    flex-grow: 0;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--color-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .timeline__logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    display: block;
+  }
+
   .timeline__company {
     font-family: var(--font-hand);
     font-size: var(--text-base);
-    color: var(--color-accent);
+    color: var(--hover-accent, var(--color-accent));
     font-weight: 600;
+    transition: color 0.3s ease;
   }
 
   .timeline__period {
@@ -276,6 +236,7 @@ import { EXPERIENCES } from "../../lib/constants";
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-stroke-muted);
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .timeline__desc {
@@ -297,25 +258,31 @@ import { EXPERIENCES } from "../../lib/constants";
     padding-left: 1.5em;
     position: relative;
     line-height: 1.6;
+    transition: all 0.15s ease;
+    padding: var(--space-xs) var(--space-xs) var(--space-xs) 1.5em;
+    border-radius: var(--radius-sm);
+    margin-left: -0.5em;
+  }
+
+  .timeline__highlight:hover {
+    background: var(--color-bg);
+    color: var(--hover-accent, var(--color-accent));
   }
 
   .highlight__bullet {
     position: absolute;
-    left: 0;
-    top: 0.5em;
+    left: 0.25em;
+    top: 0.65em;
     width: 8px;
     height: 8px;
-    background: var(--color-accent);
+    background: var(--hover-accent, var(--color-accent));
     border-radius: 50%;
     filter: url(#sketch-filter);
+    transition: transform 0.15s ease;
   }
 
-  /* Footer with resume button */
-  .experience__footer {
-    display: flex;
-    justify-content: center;
-    margin-top: var(--space-xl);
-    padding-top: var(--space-lg);
+  .timeline__highlight:hover .highlight__bullet {
+    transform: scale(1.2);
   }
 
   @media (max-width: 640px) {
@@ -340,8 +307,13 @@ import { EXPERIENCES } from "../../lib/constants";
       padding: var(--space-md);
     }
 
-    .timeline__card:hover {
-      transform: none;
+    .timeline__highlight {
+      margin-left: 0;
+      padding-left: 1.5em;
+    }
+
+    .highlight__bullet {
+      left: 0.25em;
     }
   }
 </style>

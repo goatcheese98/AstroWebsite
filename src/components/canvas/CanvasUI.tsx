@@ -198,46 +198,83 @@ export default function CanvasUI({
       }
       const { elements, isModification } = payload;
       
-      const appState = api.getAppState();
-      let elementsToAdd = elements;
-      
-      if (!isModification) {
-        // Center elements on viewport
-        const viewportCenterX = (appState.width || 800) / 2;
-        const viewportCenterY = (appState.height || 600) / 2;
-        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-        // Calculate bounding box
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        elements.forEach((el: any) => {
-          const x = el.x || 0;
-          const y = el.y || 0;
-          const w = el.width || 100;
-          const h = el.height || 100;
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x + w);
-          maxY = Math.max(maxY, y + h);
-        });
-
-        const elementsCenterX = (minX + maxX) / 2;
-        const elementsCenterY = (minY + maxY) / 2;
-        const offsetX = sceneX - elementsCenterX;
-        const offsetY = sceneY - elementsCenterY;
-
-        elementsToAdd = elements.map((el: any) => ({
-          ...el,
+      try {
+        // Ensure all elements have required Excalidraw properties
+        let elementsToAdd = elements.map((el: any) => ({
+          type: el.type || 'rectangle',
+          x: el.x ?? 0,
+          y: el.y ?? 0,
+          width: el.width ?? 100,
+          height: el.height ?? 100,
           id: el.id || nanoid(),
-          x: (el.x || 0) + offsetX,
-          y: (el.y || 0) + offsetY,
-          version: 1,
-          versionNonce: Date.now(),
+          // Required Excalidraw properties
+          angle: el.angle ?? 0,
+          strokeColor: el.strokeColor ?? '#000000',
+          backgroundColor: el.backgroundColor ?? 'transparent',
+          fillStyle: el.fillStyle ?? 'hachure',
+          strokeWidth: el.strokeWidth ?? 1,
+          strokeStyle: el.strokeStyle ?? 'solid',
+          roughness: el.roughness ?? 1,
+          opacity: el.opacity ?? 100,
+          roundness: el.roundness ?? null,
+          seed: el.seed ?? Math.floor(Math.random() * 100000),
+          version: el.version ?? 1,
+          versionNonce: el.versionNonce ?? Date.now(),
+          isDeleted: el.isDeleted ?? false,
+          groupIds: el.groupIds ?? [],
+          frameId: el.frameId ?? null,
+          boundElements: el.boundElements ?? null,
+          updated: el.updated ?? Date.now(),
+          link: el.link ?? null,
+          locked: el.locked ?? false,
+          // Type-specific properties
+          ...(el.text !== undefined && { text: el.text }),
+          ...(el.fontSize !== undefined && { fontSize: el.fontSize }),
+          ...(el.fontFamily !== undefined && { fontFamily: el.fontFamily }),
+          ...(el.points !== undefined && { points: el.points }),
         }));
-      }
+        
+        if (!isModification) {
+          // Center elements on viewport
+          const appState = api.getAppState();
+          const viewportCenterX = (appState.width || 800) / 2;
+          const viewportCenterY = (appState.height || 600) / 2;
+          const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+          const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
 
-      const currentElements = api.getSceneElements();
-      api.updateScene({ elements: [...currentElements, ...elementsToAdd] });
+          // Calculate bounding box
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          elementsToAdd.forEach((el: any) => {
+            const x = el.x || 0;
+            const y = el.y || 0;
+            const w = el.width || 100;
+            const h = el.height || 100;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+          });
+
+          const elementsCenterX = (minX + maxX) / 2;
+          const elementsCenterY = (minY + maxY) / 2;
+          const offsetX = sceneX - elementsCenterX;
+          const offsetY = sceneY - elementsCenterY;
+
+          elementsToAdd = elementsToAdd.map((el: any) => ({
+            ...el,
+            x: el.x + offsetX,
+            y: el.y + offsetY,
+          }));
+        }
+
+        const currentElements = api.getSceneElements();
+        api.updateScene({ elements: [...currentElements, ...elementsToAdd] });
+        
+        addToast('Elements added to canvas', 'success');
+      } catch (err) {
+        console.error('[CanvasUI] Failed to draw elements:', err);
+        addToast('Failed to add elements to canvas', 'error');
+      }
     },
   });
 
@@ -468,9 +505,7 @@ export default function CanvasUI({
 
     setIsGeneratingImage(true);
     try {
-      // TODO: Connect to image generation system
-      // This was previously using eventBus but had no listener
-      // Should call image generation API directly or use the store
+      // TODO: Connect to image generation system via store
       console.log('Image generation requested:', options);
       addToast('Image generation not yet implemented', 'info');
     } catch (err) {

@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
-import type { ExcalidrawAPI } from '@/stores/unifiedCanvasStore';
+import type { ExcalidrawAPI } from '@/stores';
 import { 
   CanvasPersistenceCoordinator,
   type PersistenceState 

@@ -11,7 +11,7 @@
  * Event-driven architecture for React integration
  */
 
-import type { ExcalidrawAPI } from "@/stores/unifiedCanvasStore";
+import type { ExcalidrawAPI } from "@/stores";
 
 export interface CanvasData {
   elements: any[];

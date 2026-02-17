@@ -7,317 +7,318 @@
   interface SkillCategory {
     id: string;
     name: string;
-    icon: string;
     description: string;
     skills: Skill[];
-    color: string;
+    accentColor: string;
   }
 
   const categories: SkillCategory[] = [
     {
       id: 'data',
       name: 'Data & Analytics',
-      icon: '📊',
-      description: 'Core analytical capabilities',
-      color: 'var(--color-fill-1)',
+      description: 'Transforming raw data into actionable insights through statistical modeling and analytical rigor',
+      accentColor: '#3b82f6',
       skills: [
         { id: 'python', name: 'Python' },
         { id: 'sql', name: 'SQL' },
         { id: 'r', name: 'R' },
-        { id: 'data-stats', name: 'Statistical Modeling' },
-        { id: 'data-ab', name: 'A/B Testing' },
-        { id: 'data-mining', name: 'Data Mining' },
+        { id: 'stats', name: 'Statistical Modeling' },
+        { id: 'ab', name: 'A/B Testing' },
+        { id: 'mining', name: 'Data Mining' },
       ],
     },
     {
       id: 'viz',
       name: 'Visualization',
-      icon: '📈',
-      description: 'Bringing data to life',
-      color: 'var(--color-fill-2)',
+      description: 'Crafting compelling visual narratives that make complex data accessible',
+      accentColor: '#10b981',
       skills: [
         { id: 'tableau', name: 'Tableau' },
         { id: 'looker', name: 'Looker Studio' },
         { id: 'd3', name: 'D3.js' },
-        { id: 'viz-powerbi', name: 'Power BI' },
-        { id: 'viz-matplotlib', name: 'Matplotlib' },
-        { id: 'viz-seaborn', name: 'Seaborn' },
+        { id: 'powerbi', name: 'Power BI' },
+        { id: 'matplotlib', name: 'Matplotlib' },
       ],
     },
     {
       id: 'web',
       name: 'Web Development',
-      icon: '💻',
-      description: 'Building interactive solutions',
-      color: 'var(--color-fill-3)',
+      description: 'Building interactive, performant web applications',
+      accentColor: '#f59e0b',
       skills: [
-        { id: 'js', name: 'JavaScript' },
         { id: 'ts', name: 'TypeScript' },
         { id: 'react', name: 'React' },
-        { id: 'web-vue', name: 'Vue' },
-        { id: 'web-svelte', name: 'Svelte' },
-        { id: 'web-astro', name: 'Astro' },
-        { id: 'web-htmlcss', name: 'HTML/CSS' },
+        { id: 'svelte', name: 'Svelte' },
+        { id: 'astro', name: 'Astro' },
+        { id: 'nodejs', name: 'Node.js' },
       ],
     },
     {
       id: 'cloud',
       name: 'Databases & Cloud',
-      icon: '☁️',
-      description: 'Data infrastructure',
-      color: 'var(--color-fill-4)',
+      description: 'Designing scalable data infrastructure',
+      accentColor: '#8b5cf6',
       skills: [
         { id: 'postgres', name: 'PostgreSQL' },
         { id: 'mongo', name: 'MongoDB' },
         { id: 'bigquery', name: 'BigQuery' },
-        { id: 'cloud-aws', name: 'AWS' },
-        { id: 'cloud-snowflake', name: 'Snowflake' },
-        { id: 'cloud-etl', name: 'ETL Pipelines' },
+        { id: 'aws', name: 'AWS' },
+        { id: 'snowflake', name: 'Snowflake' },
       ],
     },
     {
       id: 'product',
       name: 'Product & Strategy',
-      icon: '🎯',
-      description: 'Driving business impact',
-      color: 'var(--color-fill-5)',
+      description: 'Driving business impact through data-informed product decisions',
+      accentColor: '#ec4899',
       skills: [
         { id: 'product-analytics', name: 'Product Analytics' },
         { id: 'research', name: 'User Research' },
         { id: 'market', name: 'Market Analysis' },
-        { id: 'product-kpi', name: 'KPI Design' },
-        { id: 'product-agile', name: 'Agile' },
-        { id: 'product-stakeholder', name: 'Stakeholder Mgmt' },
+        { id: 'kpi', name: 'KPI Design' },
+        { id: 'agile', name: 'Agile' },
+        { id: 'stakeholder', name: 'Stakeholder Mgmt' },
       ],
     },
     {
       id: 'tools',
-      name: 'Tools & Methods',
-      icon: '🛠️',
-      description: 'Workflow & productivity',
-      color: 'var(--color-fill-1)',
+      name: 'Tools & Workflow',
+      description: 'Productivity stack for efficient collaboration',
+      accentColor: '#06b6d4',
       skills: [
         { id: 'git', name: 'Git' },
         { id: 'jupyter', name: 'Jupyter' },
-        { id: 'excel', name: 'Excel/GSheets' },
-        { id: 'tools-figma', name: 'Figma' },
-        { id: 'tools-notion', name: 'Notion' },
-        { id: 'tools-jira', name: 'JIRA' },
-        { id: 'tools-confluence', name: 'Confluence' },
+        { id: 'figma', name: 'Figma' },
+        { id: 'notion', name: 'Notion' },
       ],
     },
   ];
 
-  let expandedId = $state<string | null>(null);
+  let mounted = $state(false);
 
-  function toggleExpand(id: string) {
-    expandedId = expandedId === id ? null : id;
-  }
+  $effect(() => {
+    mounted = true;
+  });
 </script>
 
-<div class="bento-skills">
-  <div class="bento-grid">
-    {#each categories as category (category.id)}
+<div class="skills-container" class:mounted>
+  <div class="skills-grid">
+    {#each categories as category, i (category.id)}
       <div
-        class="bento-card"
-        class:expanded={expandedId === category.id}
-        style:--category-color={category.color}
-        onclick={() => toggleExpand(category.id)}
-        role="button"
-        tabindex="0"
-        onkeydown={(e) => e.key === 'Enter' && toggleExpand(category.id)}
-        aria-expanded={expandedId === category.id}
+        class="skill-card sketch-card"
+        style="--hover-accent: {category.accentColor}; --delay: {i * 80}ms"
+        role="region"
+        aria-label="{category.name} skills"
       >
-        <div class="bento-card__inner">
-          <div class="bento-card__header">
-            <span class="bento-card__icon">{category.icon}</span>
-            <div class="bento-card__title-group">
-              <h3 class="bento-card__name">{category.name}</h3>
-              <p class="bento-card__desc">{category.description}</p>
+        <div class="sketch-card__accent" aria-hidden="true"></div>
+        <div class="skill-card__content">
+          <div class="skill-card__header">
+            <div class="skill-card__icon-wrapper" style="--accent: {category.accentColor}">
+              {#if category.id === 'data'}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M3 3v18h18" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {:else if category.id === 'viz'}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M3 3v16a2 2 0 002 2h16" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="7" y="13" width="3" height="5" rx="0.5"/>
+                  <rect x="12" y="9" width="3" height="9" rx="0.5"/>
+                  <rect x="17" y="5" width="3" height="13" rx="0.5"/>
+                </svg>
+              {:else if category.id === 'web'}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="3" width="20" height="14" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 21h8M12 17v4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M2 7h20" stroke-linecap="round"/>
+                </svg>
+              {:else if category.id === 'cloud'}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <ellipse cx="12" cy="5" rx="8" ry="4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M4 5v6c0 2.2 3.6 4 8 4s8-1.8 8-4V5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M4 11v6c0 2.2 3.6 4 8 4s8-1.8 8-4v-6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {:else if category.id === 'product'}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="6" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                </svg>
+              {:else}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {/if}
             </div>
-            <span class="bento-card__expand-hint">
-              {expandedId === category.id ? '−' : '+'}
-            </span>
+            <div class="skill-card__title-group">
+              <h3 class="skill-card__name">{category.name}</h3>
+              <p class="skill-card__desc">{category.description}</p>
+            </div>
           </div>
           
-          <div class="bento-card__skills" class:expanded={expandedId === category.id}>
-            {#each (expandedId === category.id ? category.skills : category.skills.slice(0, 3)) as skill (skill.id)}
-              <span class="skill-tag">
-                {skill.name}
-              </span>
+          <div class="skill-card__skills">
+            {#each category.skills as skill (skill.id)}
+              <span class="skill-chip">{skill.name}</span>
             {/each}
           </div>
         </div>
       </div>
     {/each}
   </div>
-  
-  <p class="skills__note">
-    <em>Click cards to expand</em>
-  </p>
 </div>
 
 <style>
-  .bento-skills {
+  .skills-container {
     width: 100%;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
   }
 
-  .bento-grid {
+  .skills-container.mounted {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .skills-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-    grid-auto-flow: dense;
-    align-items: start;
+    grid-template-columns: repeat(1, 1fr);
+    gap: var(--space-lg);
   }
 
-  @media (min-width: 768px) {
-    .bento-grid {
+  @media (min-width: 640px) {
+    .skills-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .skills-grid {
       grid-template-columns: repeat(3, 1fr);
     }
   }
 
-  .bento-card {
-    background: var(--color-surface);
-    border: 2px solid var(--color-stroke);
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    overflow: hidden;
-    filter: url(#sketch-filter);
-    height: fit-content;
+  .skill-card {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: card-enter 0.6s ease forwards;
+    animation-delay: var(--delay);
   }
 
-  /* Mobile/Touch: Disable expensive filter and use organic border-radius instead */
-  @media (hover: none) and (pointer: coarse) {
-    .bento-card {
-      filter: none;
-      border-radius: 16px 12px 20px 14px;
+  @keyframes card-enter {
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
-  .bento-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background: var(--category-color);
-    opacity: 0.7;
+  .skill-card__content {
+    padding: var(--space-lg);
   }
 
-  .bento-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .bento-card.expanded {
-    grid-column: span 2;
-    z-index: 10;
-  }
-
-  @media (max-width: 767px) {
-    .bento-card.expanded {
-      grid-column: span 1;
-    }
-  }
-
-  .bento-card__inner {
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .bento-card__header {
+  .skill-card__header {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
   }
 
-  .bento-card__icon {
-    font-size: 1.75rem;
-    line-height: 1;
+  .skill-card__icon-wrapper {
     flex-shrink: 0;
-  }
-
-  .bento-card__title-group {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .bento-card__name {
-    font-family: var(--font-hand);
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0 0 0.25rem 0;
-    line-height: 1.3;
-  }
-
-  .bento-card__desc {
-    font-size: 0.8125rem;
-    color: var(--color-text-muted);
-    margin: 0;
-    line-height: 1.4;
-  }
-
-  .bento-card__expand-hint {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
     background: var(--color-bg);
     border: 1px solid var(--color-stroke-muted);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
+    color: var(--accent);
     transition: all 0.2s ease;
-    flex-shrink: 0;
   }
 
-  .bento-card:hover .bento-card__expand-hint {
-    background: var(--category-color);
+  .skill-card:hover .skill-card__icon-wrapper {
+    background: var(--hover-accent);
+    border-color: var(--hover-accent);
+    color: white;
+  }
+
+  .skill-card__icon-wrapper :global(svg) {
+    width: 22px;
+    height: 22px;
+  }
+
+  .skill-card__title-group {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .skill-card__name {
+    font-family: var(--font-hand);
+    font-size: var(--text-xl);
+    margin: 0 0 var(--space-xs) 0;
+    line-height: 1.3;
     color: var(--color-text);
-    border-color: var(--color-stroke);
   }
 
-  .bento-card__skills {
+  .skill-card__desc {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .skill-card__skills {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
+    gap: var(--space-xs);
   }
 
-  .bento-card__skills.expanded {
-    gap: 0.625rem;
-  }
-
-  .skill-tag {
+  .skill-chip {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    padding: 0.375rem 0.75rem;
+    font-size: var(--text-xs);
+    padding: var(--space-xs) var(--space-sm);
     background: var(--color-bg);
     border: 1px solid var(--color-stroke-muted);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--color-text);
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
   }
 
-  .skill-tag:hover {
-    transform: translateY(-2px);
-    box-shadow: 2px 2px 0 var(--color-stroke-muted);
+  .skill-chip:hover {
+    border-color: var(--hover-accent);
+    color: var(--hover-accent);
+    transform: translateY(-1px);
   }
 
-  .skills__note {
-    text-align: center;
-    font-family: var(--font-hand);
-    font-size: 0.9375rem;
-    color: var(--color-text-muted);
-    font-style: italic;
-    margin-top: 2rem;
+  /* Mobile */
+  @media (max-width: 640px) {
+    .skill-card {
+      animation-duration: 0.4s;
+    }
+
+    .skill-card__content {
+      padding: var(--space-md);
+    }
+
+    .skill-card__icon-wrapper {
+      width: 40px;
+      height: 40px;
+    }
+
+    .skill-card__icon-wrapper :global(svg) {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .skill-card {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
   }
 </style>

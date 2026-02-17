@@ -3,6 +3,7 @@
 export { MessageBubble } from "./MessageBubble";
 export { MessageActions } from "./MessageActions";
 export { DrawingActions } from "./DrawingActions";
+export { DrawingPreview } from "./DrawingPreview";
 export { MessageContent } from "./MessageContent";
 
 // Re-export types

@@ -1,7 +1,8 @@
 /**
  * useCommandSubscriber Hook
  * 
- * This hook is used by components that execute canvas commands
+ * This hook is used by components that execute canvas commands.
+ * Only ONE subscriber will execute each command (first-come-first-served).
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -34,43 +35,51 @@ const COMMAND_TO_HANDLER: Record<CommandType, keyof UseCommandSubscriberOptions>
   'markdown:edit': 'onMarkdownEdit',
 };
 
+// Global claim tracker to ensure only one subscriber handles each command
+const globalClaimedCommands = new Set<string>();
+
 /**
  * Hook to subscribe to and execute canvas commands
+ * 
+ * IMPORTANT: Only the first subscriber to claim a command will execute it.
+ * This prevents multiple components from handling the same command.
  */
 export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): void {
   const pendingCommand = useStore((state) => state.pendingCommand);
-  const processedCommandId = useStore((state) => (state as any).processedCommandId);
   const resolveCommand = useStore((state) => state.resolveCommand);
   const rejectCommand = useStore((state) => state.rejectCommand);
   
   // Store handlers in a ref to avoid re-subscribing on every render
   const handlersRef = useRef(handlers);
-  const localProcessedRef = useRef<string | null>(null);
   
-  // Update ref when handlers change
   useEffect(() => {
     handlersRef.current = handlers;
   });
 
   // Process pending commands
   useEffect(() => {
-    if (!pendingCommand) {
-      localProcessedRef.current = null;
-      return;
-    }
+    if (!pendingCommand) return;
 
-    // Prevent processing the same command twice (locally or globally)
     const commandKey = `${pendingCommand.type}-${pendingCommand.timestamp}`;
-    if (localProcessedRef.current === commandKey || processedCommandId === commandKey) {
-      console.log('[useCommandSubscriber] Command already processed:', commandKey);
+    
+    // Try to claim this command atomically
+    if (globalClaimedCommands.has(commandKey)) {
+      // Command already claimed by another subscriber
       return;
     }
-    localProcessedRef.current = commandKey;
+    
+    // Claim the command
+    globalClaimedCommands.add(commandKey);
+    
+    // Clean up claim after command is processed
+    const cleanup = () => {
+      globalClaimedCommands.delete(commandKey);
+    };
 
     const { type, payload } = pendingCommand;
     const currentHandlers = handlersRef.current;
 
-    console.log('[useCommandSubscriber] Processing command:', type, payload);
+    console.log('[useCommandSubscriber] Claimed command:', type);
 
     // Notify general command handler
     currentHandlers.onCommand?.(type, payload);
@@ -83,6 +92,7 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
       console.error('[useCommandSubscriber]', error);
       rejectCommand(error);
       currentHandlers.onError?.(type, error);
+      cleanup();
       return;
     }
 
@@ -90,15 +100,15 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
     const handler = currentHandlers[handlerName];
 
     if (!handler || typeof handler !== 'function') {
-      const error = new Error(`No handler registered for command: ${type} (expected ${handlerName})`);
-      console.error('[useCommandSubscriber]', error);
-      console.error('[useCommandSubscriber] Available handlers:', Object.keys(currentHandlers).filter(k => k.startsWith('on')));
+      // No handler for this command - reject and let other subscribers try
+      const error = new Error(`No handler for command: ${type}`);
+      console.warn('[useCommandSubscriber] No handler, releasing claim:', type);
+      globalClaimedCommands.delete(commandKey);
       rejectCommand(error);
       currentHandlers.onError?.(type, error);
+      cleanup();
       return;
     }
-
-    console.log('[useCommandSubscriber] Executing handler:', handlerName);
 
     // Execute handler
     Promise.resolve()
@@ -113,8 +123,9 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
         const err = error instanceof Error ? error : new Error(String(error));
         rejectCommand(err);
         currentHandlers.onError?.(type, err);
-      });
-  }, [pendingCommand, processedCommandId, resolveCommand, rejectCommand]);
+      })
+      .finally(cleanup);
+  }, [pendingCommand, resolveCommand, rejectCommand]);
 }
 
 /**

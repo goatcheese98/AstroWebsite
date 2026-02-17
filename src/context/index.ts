@@ -27,13 +27,13 @@ export {
   useExcalidrawAPISafe,
   useExcalidrawReady,
   useSetExcalidrawAPI,
-} from '@/stores/unifiedCanvasStore';
+} from '@/stores';
 
 export type { 
   ExcalidrawAPI, 
   ExcalidrawElement, 
   ExcalidrawAppState 
-} from '@/stores/unifiedCanvasStore';
+} from '@/stores';
 
 // Stub for backward compatibility - no longer needed but won't break
 export const ExcalidrawProvider = ({ children }: { children: React.ReactNode }) => children;

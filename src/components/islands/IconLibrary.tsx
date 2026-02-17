@@ -23,38 +23,30 @@ const STYLE_OPTIONS: StyleOption[] = [
   { id: 'micro', label: 'Micro', suffix: '-16-solid' },
 ];
 
-// Core icon set - base names without suffixes
 const CORE_ICONS = [
   'home', 'user', 'users', 'cog', 'magnifying-glass', 'bell', 'heart', 'star', 
   'calendar', 'clock', 'folder', 'folder-open', 'document', 'document-text', 
   'photo', 'envelope', 'paper-airplane', 'inbox', 'trash', 'archive-box',
-  
   'check', 'x-mark', 'plus', 'minus', 'arrow-right', 'arrow-left', 
   'arrow-up', 'arrow-down', 'arrow-up-right', 'arrow-down-right',
   'chevron-right', 'chevron-left', 'chevron-up', 'chevron-down',
   'pencil', 'pencil-square', 'link', 'clipboard', 'clipboard-document',
   'bookmark', 'bookmark-slash', 'adjustments-horizontal', 'adjustments-vertical',
-  
   'phone', 'chat-bubble-left', 'chat-bubble-left-right', 'chat-bubble-bottom-center-text',
   'megaphone', 'share', 'paper-clip', 'envelope-open',
-  
   'bars-3', 'bars-4', 'squares-2x2', 'squares-plus', 'list-bullet', 'table-cells',
   'window', 'computer-desktop', 'device-tablet', 'device-phone-mobile',
-  
   'play', 'pause', 'play-pause', 'stop', 'backward', 'forward',
   'speaker-wave', 'speaker-x-mark', 'microphone', 'video-camera',
   'camera', 'sun', 'moon', 'cloud', 'cloud-arrow-down', 'cloud-arrow-up',
-  
   'shopping-cart', 'credit-card', 'banknotes', 'receipt-percent', 'receipt-refund',
   'tag', 'key', 'lock-closed', 'lock-open', 'shield-check', 'shield-exclamation',
   'wrench', 'scissors', 'briefcase', 'building-office', 'building-office-2',
   'map', 'map-pin', 'flag', 'fire', 'bolt', 'eye', 'eye-slash', 'finger-print',
   'wallet', 'gift', 'cake', 'beaker', 'bug-ant', 'code-bracket', 'command-line',
   'cube', 'database', 'server', 'wifi',
-  
   'arrow-path', 'arrow-uturn-left', 'arrow-uturn-right', 'arrow-top-right-on-square',
   'arrows-pointing-in', 'arrows-pointing-out', 'arrows-up-down',
-  
   'check-circle', 'x-circle', 'exclamation-circle', 'exclamation-triangle',
   'information-circle', 'question-mark-circle', 'minus-circle', 'plus-circle',
 ];
@@ -71,18 +63,16 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [svgCache, setSvgCache] = useState<Record<string, string | null>>({});
-  const svgCacheRef = useRef<Record<string, string | null>>({});
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
-
+  const [isInserting, setIsInserting] = useState(false);
   
+  const svgCacheRef = useRef<Record<string, string | null>>({});
   const searchTimeoutRef = useRef<number | null>(null);
   const api = useExcalidrawAPISafe();
   const addToast = useStore((state) => state.addToast);
-  const [isInserting, setIsInserting] = useState(false);
 
   const currentSuffix = STYLE_OPTIONS.find(s => s.id === iconStyle)?.suffix || '';
 
-  // Get full icon name with suffix
   const getFullIconName = useCallback((baseName: string) => {
     return baseName + currentSuffix;
   }, [currentSuffix]);
@@ -93,9 +83,8 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
     
     const loadIcons = async () => {
       const suffix = STYLE_OPTIONS.find(s => s.id === iconStyle)?.suffix || '';
-      
-      // Load icons in batches to avoid overwhelming the API
       const batchSize = 16;
+      
       for (let i = 0; i < icons.length; i += batchSize) {
         const batch = icons.slice(i, i + batchSize);
         
@@ -104,10 +93,7 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
             const fullName = baseName + suffix;
             const cacheKey = `${iconStyle}:${baseName}`;
             
-            // Skip if already cached
-            if (cacheKey in svgCacheRef.current) {
-              return;
-            }
+            if (cacheKey in svgCacheRef.current) return;
             
             try {
               const response = await fetch(`https://api.iconify.design/heroicons/${fullName}.svg`);
@@ -128,7 +114,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
           })
         );
         
-        // Small delay between batches to keep UI responsive
         if (i + batchSize < icons.length) {
           await new Promise(r => setTimeout(r, 50));
         }
@@ -144,7 +129,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
       setSearchQuery('');
       setIcons(CORE_ICONS);
       setError(null);
-      // Don't clear cache, just sync ref
       svgCacheRef.current = { ...svgCache };
     }
   }, [isOpen, svgCache]);
@@ -168,7 +152,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
       setError(null);
       
       try {
-        // Search for icons that match the query
         const response = await fetch(
           `https://api.iconify.design/search?query=${encodeURIComponent(searchQuery)}&limit=32&prefix=heroicons`
         );
@@ -178,24 +161,22 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         const data = await response.json();
         
         if (data.icons && data.icons.length > 0) {
-          // Extract base names (remove suffixes)
           const baseNames = data.icons
             .map((fullName: string) => {
               const parts = fullName.split(':');
               const name = parts.length > 1 ? parts[1] : fullName;
-              // Remove suffixes to get base name
               return name
                 .replace(/-16-solid$/, '')
                 .replace(/-20-solid$/, '')
                 .replace(/-solid$/, '');
             })
-            .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index); // dedupe
+            .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index);
           
           setIcons(baseNames.slice(0, 32));
         } else {
           setIcons([]);
         }
-      } catch (err) {
+      } catch {
         setError('Failed to search icons');
         setIcons([]);
       } finally {
@@ -292,7 +273,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
     }
   }, [api, addToast, getFullIconName]);
 
-  // Switch style handler
   const handleStyleChange = useCallback((newStyle: IconStyle) => {
     setIconStyle(newStyle);
     setSearchQuery('');
@@ -319,7 +299,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         border: '1px solid rgba(0,0,0,0.06)',
       }}
     >
-      {/* Header */}
       <div style={{ padding: '16px 16px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827' }}>Icons</h3>
@@ -349,7 +328,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
           </button>
         </div>
 
-        {/* Style Selector */}
         <div style={{ 
           display: 'flex', 
           gap: 4, 
@@ -381,7 +359,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
           ))}
         </div>
 
-        {/* Search Input */}
         <div style={{ position: 'relative' }}>
           <svg 
             style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }}
@@ -417,7 +394,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         </div>
       </div>
 
-      {/* Icon Grid */}
       <div style={{ 
         flex: 1, 
         overflow: 'auto', 
@@ -531,7 +507,6 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         )}
       </div>
 
-      {/* Footer */}
       <div style={{ 
         padding: '10px 16px', 
         borderTop: '1px solid #f3f4f6',

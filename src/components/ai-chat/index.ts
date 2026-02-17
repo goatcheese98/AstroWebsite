@@ -4,21 +4,20 @@ export { default as PathfinderBotAvatar } from "./PathfinderBotAvatar";
 export { default as ImageGenerationModal } from "./ImageGenerationModal";
 export { default as TemplateModal } from "./TemplateModal";
 
-// Sub-components (for advanced use cases)
+// Sub-components
 export { ChatPanel } from "./components/ChatPanel";
 export { ChatHeader } from "./components/ChatHeader";
 export { CanvasContextPanel } from "./components/CanvasContextPanel";
 export { CanvasContextOverlay } from "./components/CanvasContextOverlay";
 export { ImageGallery } from "./components/ImageGallery";
 export { MessageList } from "./components/MessageList";
-export { MessageBubble } from "./components/message"; // Barrel export from message/ folder
+export { MessageBubble } from "./components/message";
 export { ChatInput } from "./components/ChatInput";
 
 // Hooks
 export { useElementSelection } from "./useElementSelection";
 export { useAIChatState } from "./hooks/useAIChatState";
 export { useImageGeneration } from "./hooks/useImageGeneration";
-export { useScreenshotCapture } from "./hooks/useScreenshotCapture";
 export { useCanvasCommands } from "./hooks/useCanvasCommands";
 export { usePanelResize } from "./hooks/usePanelResize";
 export { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -51,13 +50,6 @@ export type {
     UseImageGenerationReturn,
     ImageHistoryItem 
 } from "./hooks/useImageGeneration";
-export type { 
-    UseScreenshotCaptureOptions,
-    UseScreenshotCaptureReturn,
-    ScreenshotQuality,
-    ScreenshotRequestOptions,
-    ScreenshotResult 
-} from "./hooks/useScreenshotCapture";
 export type { 
     UseCanvasCommandsOptions,
     UseCanvasCommandsReturn 

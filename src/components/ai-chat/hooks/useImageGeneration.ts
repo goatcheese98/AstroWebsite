@@ -1,11 +1,11 @@
 /**
- * useImageGeneration.ts - Thin React wrapper around ImageGenerationCoordinator
+ * useImageGeneration.ts - Image Generation Hook
  * 
- * All business logic has been moved to lib/ai-chat/ImageGenerationCoordinator.ts
+ * Uses dispatchCommand from store for canvas operations.
  */
 
 import { useState, useCallback, useRef } from "react";
-import { canvasEvents } from "@/lib/events/eventEmitter";
+import { useStore } from "@/stores";
 import type { GenerationOptions } from "../ImageGenerationModal";
 import {
   generateImage,
@@ -25,13 +25,9 @@ export interface ImageHistoryItem {
 }
 
 export interface UseImageGenerationReturn {
-  /** Whether image generation is in progress */
   isGeneratingImage: boolean;
-  /** History of generated images */
   imageHistory: ImageHistoryItem[];
-  /** Set image history directly (for loading saved state) */
   setImageHistory: (history: ImageHistoryItem[]) => void;
-  /** Generate an image from screenshot and options */
   generateImage: (
     screenshotData: string,
     options: GenerationOptions,
@@ -40,26 +36,19 @@ export interface UseImageGenerationReturn {
       onError?: (error: string) => void;
     }
   ) => Promise<void>;
-  /** Copy an image to clipboard */
   copyImageToClipboard: (imageUrl: string) => Promise<void>;
-  /** Clear image history */
   clearHistory: () => void;
 }
 
-/**
- * React hook for image generation
- * Thin wrapper around ImageGenerationCoordinator
- */
 export function useImageGeneration(): UseImageGenerationReturn {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
+  const dispatchCommand = useStore((state) => state.dispatchCommand);
+  const addToast = useStore((state) => state.addToast);
+  const addGeneratedImage = useStore((state) => state.addGeneratedImage);
 
-  // Use ref to track generation state for callbacks
   const isGeneratingRef = useRef(false);
 
-  /**
-   * Generate an image using Gemini API
-   */
   const generateImageCallback = useCallback(
     async (
       screenshotData: string,
@@ -73,27 +62,36 @@ export function useImageGeneration(): UseImageGenerationReturn {
       setIsGeneratingImage(true);
 
       const coordinatorCallbacks: ImageGenerationCallbacks = {
-        onSuccess: (result: ImageGenerationResult) => {
-          // Dispatch to My Assets panel
-          canvasEvents.emit("asset:image-generated", {
-            imageUrl: result.imageUrl,
+        onSuccess: async (result: ImageGenerationResult) => {
+          // Add to image history in store
+          addGeneratedImage({
+            id: `generated-${Date.now()}`,
+            url: result.imageUrl,
             prompt: options.prompt,
-          });
-
-          // Dispatch insert command
-          canvasEvents.emit("excalidraw:insert-image", {
-            imageData: result.imageUrl,
-            type: "png",
+            timestamp: new Date(),
             width: result.width,
             height: result.height,
           });
 
-          // Dispatch toast notification
-          canvasEvents.emit("excalidraw:image-inserted");
+          // Insert image into canvas via command
+          try {
+            await dispatchCommand("insertImage", {
+              imageData: result.imageUrl,
+              type: "png",
+              width: result.width,
+              height: result.height,
+            });
+
+            addToast("Image added to canvas", "success");
+          } catch (err) {
+            console.error("Failed to insert image:", err);
+            addToast("Failed to add image to canvas", "error");
+          }
 
           callbacks?.onSuccess?.(result.imageUrl);
         },
         onError: (err) => {
+          addToast(`Image generation failed: ${err.message}`, "error");
           callbacks?.onError?.(err.message);
         },
       };
@@ -103,26 +101,17 @@ export function useImageGeneration(): UseImageGenerationReturn {
       isGeneratingRef.current = false;
       setIsGeneratingImage(false);
     },
-    []
+    [dispatchCommand, addToast, addGeneratedImage]
   );
 
-  /**
-   * Copy an image to clipboard
-   */
   const copyImageToClipboard = useCallback(async (imageUrl: string) => {
     await copyImage(imageUrl);
   }, []);
 
-  /**
-   * Clear all generated images from history
-   */
   const clearHistory = useCallback(() => {
     setImageHistory([]);
   }, []);
 
-  /**
-   * Set image history directly (used for loading saved state)
-   */
   const setImageHistoryCallback = useCallback(
     (history: ImageHistoryItem[]) => {
       setImageHistory(history);

@@ -12,7 +12,7 @@
  */
 
 import { encode, decode } from "@msgpack/msgpack";
-import type { ExcalidrawAPI, ExcalidrawElement } from "@/stores/unifiedCanvasStore";
+import type { ExcalidrawAPI, ExcalidrawElement } from "@/stores";
 
 export interface Cursor {
   id: string;

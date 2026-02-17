@@ -4,6 +4,7 @@ import Hero from "../components/sections/Hero.astro";
 import Projects from "../components/sections/Projects.astro";
 import Experience from "../components/sections/Experience.astro";
 import BentoSkills from "../components/islands/BentoSkills.svelte";
+import SectionHeader from "../components/ui/SectionHeader.astro";
 import SketchDivider from "../components/sketch/SketchDivider.astro";
 ---
 
@@ -18,16 +19,10 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
 
   <section class="skills section-gap" id="skills" aria-label="Skills">
     <div class="container">
-      <div class="skills__header">
-        <h2 class="skills__heading">
-          <span class="gradient-text">Skills & Expertise</span>
-        </h2>
-        <p class="skills__subhead">
-          A generalist's toolkit spanning data, technology, and strategy
-        </p>
-        <div class="skills__header-line" aria-hidden="true"></div>
-      </div>
-
+      <SectionHeader 
+        title="Skills & Expertise" 
+        subtitle="A generalist's toolkit spanning data, technology, and strategy" 
+      />
       <BentoSkills client:load />
     </div>
   </section>

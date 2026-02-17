@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
-import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from '@/stores/unifiedCanvasStore';
+import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from '@/stores';
 
 // Import Excalidraw - the client:only directive in parent handles SSR
 import { Excalidraw } from "@excalidraw/excalidraw";

@@ -6,6 +6,7 @@ export interface Project {
   codeUrl?: string;
   featured?: boolean;
   fillColor?: string;
+  accentColor?: string;
 }
 
 export interface Experience {
@@ -15,6 +16,8 @@ export interface Experience {
   description: string;
   highlights: string[];
   current?: boolean;
+  accentColor?: string;
+  logo?: 'ubc' | 'goldman' | 'megaplex';
 }
 
 export interface Skill {
