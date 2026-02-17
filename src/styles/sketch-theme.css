@@ -1,10 +1,9 @@
 :root {
-  /* Typography - System fonts for clean Excalidraw-like aesthetic */
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  /* Deprecated: --font-hand kept for backward compatibility during transition */
-  --font-hand: var(--font-ui);
+  /* Typography - defaults that can be overridden by JS */
+  --font-ui: "Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif;
+  --font-mono: "Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif;
+  --font-body: "Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif;
+  --font-hand: "Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif;
 
   /* Fluid sizing - enhanced scale */
   --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);

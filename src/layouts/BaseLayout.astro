@@ -129,6 +129,25 @@ const canonicalURL = new URL(
     </style>
   </head>
   <body>
+    <!-- Global SVG sketch filter with adjustable parameters -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+      <defs>
+        <filter id="sketch-filter" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence 
+            type="turbulence" 
+            id="sketch-turbulence"
+            baseFrequency="0.01" 
+            numOctaves="3" 
+            seed="2" 
+          />
+          <feDisplacementMap 
+            id="sketch-displacement"
+            in="SourceGraphic" 
+            scale="0.5" 
+          />
+        </filter>
+      </defs>
+    </svg>
     <slot />
 
     <!-- Scroll reveal animation script -->

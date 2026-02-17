@@ -3,6 +3,7 @@ import BaseLayout from "./BaseLayout.astro";
 import Header from "../components/core/Header.astro";
 import Footer from "../components/core/Footer.astro";
 import SkipLink from "../components/core/SkipLink.astro";
+import SketchControls from "../components/islands/SketchControls.svelte";
 
 interface Props {
   title: string;
@@ -11,6 +12,10 @@ interface Props {
 }
 
 const { title, description, ogImage } = Astro.props;
+
+// Check if current page is canvas or dashboard
+const pathname = Astro.url.pathname;
+const isCanvasPage = pathname === "/ai-canvas" || pathname.startsWith("/canvas") || pathname.startsWith("/dashboard");
 ---
 
 <BaseLayout title={title} description={description} ogImage={ogImage}>
@@ -20,6 +25,7 @@ const { title, description, ogImage } = Astro.props;
     <slot />
   </main>
   <Footer />
+  {!isCanvasPage && <SketchControls client:load />}
 </BaseLayout>
 
 <style>
