@@ -237,11 +237,11 @@ export default function CanvasControls({
                         </button>
                     )}
 
-                    <button onClick={onOpenAssets} className="control-btn assets-btn" title="Browse My Assets">
+                    <button onClick={onOpenAssets} className="control-btn assets-btn" title="Icon Library">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                         </svg>
-                        <span className="label">My Assets</span>
+                        <span className="label">Icons</span>
                     </button>
 
                     {onShare && (

@@ -6,13 +6,13 @@
  */
 
 import { useCallback, useState, useEffect } from 'react';
-import { useUnifiedCanvasStore, useExcalidrawAPISafe } from '@/stores';
+import { useUnifiedCanvasStore, useExcalidrawAPISafe, useCommandSubscriber } from '@/stores';
 import { nanoid } from 'nanoid';
 
 // Import sub-components
 import CanvasControls from '../islands/CanvasControls';
 import { AIChatContainer } from '../ai-chat';
-import MyAssetsPanel from '../islands/MyAssetsPanel';
+import IconLibrary from '../islands/IconLibrary';
 import SaveOptionsModal from '../islands/SaveOptionsModal';
 import ShareModal from '../islands/ShareModal';
 import CanvasStatusBadge from '../islands/CanvasStatusBadge';
@@ -143,6 +143,103 @@ export default function CanvasUI({
     window.addEventListener('excalidraw:draw', handleDrawCommand as EventListener);
     return () => window.removeEventListener('excalidraw:draw', handleDrawCommand as EventListener);
   }, [api]);
+
+  // Handle commands from the store (image insertion, etc.)
+  useCommandSubscriber({
+    onInsertImage: async (payload) => {
+      if (!api) {
+        console.warn('[CanvasUI] Cannot insert image - API not ready');
+        return;
+      }
+      const { imageData, width, height } = payload;
+      
+      console.log('[CanvasUI] Inserting image:', width, height);
+      
+      // Create a new image element
+      const appState = api.getAppState();
+      const viewportCenterX = (appState.width || 800) / 2;
+      const viewportCenterY = (appState.height || 600) / 2;
+      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+      const newElement = {
+        type: 'image',
+        x: sceneX - (width || 400) / 2,
+        y: sceneY - (height || 300) / 2,
+        width: width || 400,
+        height: height || 300,
+        fileId: nanoid(),
+        status: 'pending',
+        id: nanoid(),
+        version: 1,
+        versionNonce: Date.now(),
+      };
+
+      // Add the image file
+      const file = {
+        id: newElement.fileId,
+        mimeType: 'image/png',
+        dataURL: imageData,
+        created: Date.now(),
+      };
+
+      const currentElements = api.getSceneElements();
+      api.updateScene({ 
+        elements: [...currentElements, newElement],
+        files: { ...api.getFiles(), [file.id]: file },
+      });
+      
+      addToast('Image inserted', 'success');
+    },
+    onDrawElements: async (payload) => {
+      if (!api) {
+        console.warn('[CanvasUI] Cannot draw elements - API not ready');
+        return;
+      }
+      const { elements, isModification } = payload;
+      
+      const appState = api.getAppState();
+      let elementsToAdd = elements;
+      
+      if (!isModification) {
+        // Center elements on viewport
+        const viewportCenterX = (appState.width || 800) / 2;
+        const viewportCenterY = (appState.height || 600) / 2;
+        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+        // Calculate bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        elements.forEach((el: any) => {
+          const x = el.x || 0;
+          const y = el.y || 0;
+          const w = el.width || 100;
+          const h = el.height || 100;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + w);
+          maxY = Math.max(maxY, y + h);
+        });
+
+        const elementsCenterX = (minX + maxX) / 2;
+        const elementsCenterY = (minY + maxY) / 2;
+        const offsetX = sceneX - elementsCenterX;
+        const offsetY = sceneY - elementsCenterY;
+
+        elementsToAdd = elements.map((el: any) => ({
+          ...el,
+          id: el.id || nanoid(),
+          x: (el.x || 0) + offsetX,
+          y: (el.y || 0) + offsetY,
+          version: 1,
+          versionNonce: Date.now(),
+        }));
+      }
+
+      const currentElements = api.getSceneElements();
+      api.updateScene({ elements: [...currentElements, ...elementsToAdd] });
+    },
+  });
 
   const handleSave = useCallback(async () => {
     if (!api) return;
@@ -424,8 +521,8 @@ export default function CanvasUI({
         />
       )}
 
-      {/* Assets Panel */}
-      <MyAssetsPanel
+      {/* Icon Library Panel */}
+      <IconLibrary
         isOpen={isAssetsOpen}
         onClose={() => setAssetsOpen(false)}
       />

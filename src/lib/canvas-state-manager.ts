@@ -1,6 +1,6 @@
 import type { Message } from "../components/ai-chat/types";
 import type { ImageHistoryItem } from "../components/ai-chat/hooks/useImageGeneration";
-import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from "../context/ExcalidrawContext";
+import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from "@/stores/unifiedCanvasStore";
 
 // File format version for compatibility checking
 const STATE_FILE_VERSION = "1.1.0";  // Bumped for compression support

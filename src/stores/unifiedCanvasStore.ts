@@ -444,4 +444,4 @@ export function useCanvasCommand(
 }
 
 // === Re-export types for backward compatibility ===
-export type { CanvasStore as LegacyCanvasStore } from './canvasStore';
+// Note: Legacy CanvasStore type removed - use UnifiedCanvasStore instead

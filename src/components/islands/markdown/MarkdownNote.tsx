@@ -1,5 +1,5 @@
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
-import { useCanvasEvent } from '@/lib/events';
+import { useCommandSubscriber } from '@/stores';
 import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
 import { getMarkdownStyles } from './styles/markdownStyles';
@@ -127,12 +127,14 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             }
         }, [exitEditMode]);
 
-        // Listen for edit command from ExcalidrawCanvas
-        useCanvasEvent('markdown:edit', (data) => {
-            if (!isEditing && data.elementId === element.id) {
-                enterEditMode();
-            }
-        }, [isEditing, element.id, enterEditMode]);
+        // Listen for edit command from store
+        useCommandSubscriber({
+            'markdown:edit': (data) => {
+                if (!isEditing && data.elementId === element.id) {
+                    enterEditMode(data.mode);
+                }
+            },
+        });
 
 
         // Hit test helper

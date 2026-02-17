@@ -1,52 +1,116 @@
 /**
- * Stores Index - Unified State Management
+ * Stores Index - New Architecture
  * 
- * All canvas state is now managed through the unified store.
+ * This is the new unified store architecture that replaces:
+ * - unifiedCanvasStore.ts (old monolithic store)
+ * - eventBus/eventEmitter (replaced with commands and async functions)
+ * - ExcalidrawContext (replaced with store slices)
  * 
- * Usage:
- *   import { useUnifiedCanvasStore, useExcalidrawAPI } from '@/stores';
- *   
- *   const store = useUnifiedCanvasStore();
- *   const api = useExcalidrawAPI();
+ * Migration Guide:
+ *   Before: import { useUnifiedCanvasStore } from '@/stores';
+ *   After:  import { useStore, useCanvas, usePanels } from '@/stores';
  * 
- * The unified store replaces:
- *   - canvasStore.ts (consolidated)
- *   - eventBus.ts (replaced with direct actions)
- *   - ExcalidrawContext.tsx (API now in store)
+ *   Before: canvasEvents.emit('excalidraw:insert-image', data);
+ *   After:  const { insertImage } = useCanvasCommands();
+ *           await insertImage(data.imageData, data.width, data.height);
+ * 
+ *   Before: canvasEvents.on('excalidraw:screenshot-captured', cb);
+ *   After:  const { capture } = useScreenshotCapture();
+ *           const result = await capture({ quality: 'high' });
  */
 
-// === Unified Store (Single Source of Truth) ===
-// === Unified Store (Single Source of Truth) ===
-import {
-  useUnifiedCanvasStore,
-  useExcalidrawAPI,
-  useExcalidrawAPISafe,
-  useExcalidrawReady,
-  useSetExcalidrawAPI,
-  useCanvasCommand,
-} from './unifiedCanvasStore';
+// ============================================================================
+// Main Store
+// ============================================================================
+
+export { useStore } from './store';
+
+// ============================================================================
+// Selector Hooks
+// ============================================================================
 
 export {
-  useUnifiedCanvasStore,
   useExcalidrawAPI,
-  useExcalidrawAPISafe,
   useExcalidrawReady,
   useSetExcalidrawAPI,
+  useExcalidrawAPISafe,
+  useCanvasData,
+  useCanvasDirty,
   useCanvasCommand,
-};
+  useToasts,
+  useChat,
+  usePanels,
+  useAsyncOperation,
+} from './store';
+
+// ============================================================================
+// Custom Hooks
+// ============================================================================
+
+export { 
+  useScreenshotCapture, 
+  useCanvasCommands,
+  useCommandSubscriber,
+  useCommandExecutor,
+} from './hooks';
+
+// ============================================================================
+// Async Helpers
+// ============================================================================
+
+export {
+  captureScreenshot,
+  captureForChat,
+  captureForGeneration,
+  captureForPreview,
+} from './async/screenshot';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export type {
-  UnifiedCanvasStore,
+  StoreState,
+  CanvasSlice,
+  UISlice,
+  ChatSlice,
+  CommandSlice,
+  AsyncSlice,
+  // Base types
   AIProvider,
   ContextMode,
   Toast,
-  CanvasData,
-  ExcalidrawAPI,
+  // Canvas types
   ExcalidrawElement,
   ExcalidrawAppState,
-  CanvasCommand,
-} from './unifiedCanvasStore';
+  ExcalidrawAPI,
+  CanvasData,
+  // Chat types
+  Message,
+  MessageContent,
+  // Command types
+  CommandType,
+  CommandPayload,
+  PendingCommand,
+  // Async types
+  AsyncOperation,
+  AsyncOperationStatus,
+} from './types';
 
-// === Backward Compatibility Aliases ===
-/** @deprecated Use useUnifiedCanvasStore instead */
-export const useCanvasStore = useUnifiedCanvasStore;
+// ============================================================================
+// Backward Compatibility (deprecated)
+// ============================================================================
+
+import { useStore } from './store';
+
+/**
+ * @deprecated Use useStore or specific selector hooks instead
+ * This is kept for backward compatibility during migration
+ */
+export const useUnifiedCanvasStore = useStore;
+
+/**
+ * @deprecated Use useStore instead
+ * Alias for backward compatibility
+ */
+export const useCanvasStore = useStore;

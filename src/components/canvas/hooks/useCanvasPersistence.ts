@@ -1,13 +1,17 @@
 /**
  * useCanvasPersistence
- * Handles saving/loading canvas data to localStorage and server
+ * Thin React wrapper around CanvasPersistenceCoordinator
  * 
- * Extracted from ExcalidrawCanvas to simplify the main component
+ * Handles auto-saving canvas to localStorage
  */
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
 import type { ExcalidrawAPI } from '@/stores/unifiedCanvasStore';
+import { 
+  CanvasPersistenceCoordinator,
+  type PersistenceState 
+} from '@/lib/persistence/CanvasPersistenceCoordinator';
 
 interface UseCanvasPersistenceOptions {
   api: ExcalidrawAPI | null;
@@ -17,10 +21,6 @@ interface UseCanvasPersistenceOptions {
   onError?: (error: Error) => void;
 }
 
-const STORAGE_KEY = 'excalidraw-canvas-data';
-const STORAGE_VERSION = 2;
-const SAVE_DEBOUNCE_MS = 1000;
-
 export function useCanvasPersistence({
   api,
   canvasId,
@@ -29,91 +29,82 @@ export function useCanvasPersistence({
   onError,
 }: UseCanvasPersistenceOptions) {
   const { canvasData, setCanvasData, setDirty, setLastSaved } = useUnifiedCanvasStore();
-  const saveTimeoutRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
+  const coordinatorRef = useRef<CanvasPersistenceCoordinator | null>(null);
   
-  // Load on mount
+  // Create coordinator and load on mount
   useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
+    const coordinator = new CanvasPersistenceCoordinator();
+    coordinatorRef.current = coordinator;
     
-    if (shouldClearOnMount) {
-      console.log('🧹 Fresh canvas mode - skipping load');
-      return;
-    }
+    // Subscribe to events
+    const handleSaved = (e: Event) => {
+      const customEvent = e as CustomEvent<{ to: "localStorage" | "server" }>;
+      if (customEvent.detail.to === "localStorage") {
+        setLastSaved(new Date());
+        setDirty(false);
+      }
+    };
     
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        if (data.version === STORAGE_VERSION && data.canvasData) {
-          setCanvasData(data.canvasData);
-          console.log('📂 Loaded canvas from localStorage');
-        } else {
-          console.warn('⚠️ Canvas version mismatch, clearing');
-          localStorage.removeItem(STORAGE_KEY);
+    const handleError = (e: Event) => {
+      const customEvent = e as CustomEvent<Error>;
+      onError?.(customEvent.detail);
+    };
+    
+    coordinator.addEventListener('saved', handleSaved);
+    coordinator.addEventListener('error', handleError);
+    
+    // Load on mount
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      
+      if (shouldClearOnMount) {
+        console.log('🧹 Fresh canvas mode - skipping load');
+      } else {
+        const savedData = coordinator.loadFromStorage();
+        if (savedData) {
+          setCanvasData(savedData);
         }
       }
-    } catch (err) {
-      console.error('❌ Failed to load canvas:', err);
-      localStorage.removeItem(STORAGE_KEY);
     }
-  }, [shouldClearOnMount, setCanvasData]);
+    
+    return () => {
+      coordinator.removeEventListener('saved', handleSaved);
+      coordinator.removeEventListener('error', handleError);
+      coordinator.dispose();
+      coordinatorRef.current = null;
+    };
+  }, [shouldClearOnMount, setCanvasData, setLastSaved, setDirty, onError]);
   
   // Auto-save when canvasData changes
   useEffect(() => {
-    if (!canvasData || !api) return;
+    const coordinator = coordinatorRef.current;
+    if (!coordinator || !canvasData) return;
     
-    // Debounced save to localStorage
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = window.setTimeout(() => {
-      try {
-        const dataToSave = {
-          version: STORAGE_VERSION,
-          canvasData,
-          savedAt: Date.now(),
-          canvasId,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-        setLastSaved(new Date());
-        setDirty(false);
-      } catch (err) {
-        console.error('❌ Failed to save canvas:', err);
-        onError?.(err instanceof Error ? err : new Error('Save failed'));
-      }
-    }, SAVE_DEBOUNCE_MS);
+    coordinator.scheduleSave(canvasData, canvasId);
     
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      coordinator.cancelPendingSave();
     };
-  }, [canvasData, api, canvasId, setLastSaved, setDirty, onError]);
+  }, [canvasData, canvasId]);
   
-  // Manual save function
+  // Manual save to server
   const saveToServer = useCallback(async () => {
     if (!api) return;
     
+    const coordinator = coordinatorRef.current;
+    if (!coordinator) return;
+    
     try {
-      const data = {
-        elements: api.getSceneElements(),
-        appState: api.getAppState(),
-        files: api.getFiles(),
-      };
-      
-      // TODO: Implement server save
-      console.log('💾 Saving to server:', data);
-      
-      setLastSaved(new Date());
-      setDirty(false);
-      onSave?.(canvasId || 'local');
+      const result = await coordinator.saveToServer(api, canvasId);
+      onSave?.(result.id);
     } catch (err) {
-      onError?.(err instanceof Error ? err : new Error('Server save failed'));
+      // Error already emitted by coordinator
     }
-  }, [api, canvasId, setLastSaved, setDirty, onSave, onError]);
+  }, [api, canvasId, onSave]);
   
   return { saveToServer };
 }
+
+// Re-export types
+export type { PersistenceState };

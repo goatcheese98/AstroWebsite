@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useState, useRef, useCallback, type ComponentType } from 'react';
-import { useUnifiedCanvasStore, type ExcalidrawAPI, type ExcalidrawElement, type ExcalidrawAppState } from '@/stores';
+import { useUnifiedCanvasStore, useCommandSubscriber, type ExcalidrawAPI, type ExcalidrawElement, type ExcalidrawAppState } from '@/stores';
+import { nanoid } from 'nanoid';
 
 // Note: These components are loaded dynamically to avoid SSR issues
 let MarkdownNoteComp: ComponentType<any> | null = null;
@@ -197,6 +198,117 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
     if (!api) return;
     api.updateScene({ appState: { selectedElementIds: {} } });
   }, [api]);
+
+  // Handle commands from the store
+  useCommandSubscriber({
+    onInsertImage: async (payload) => {
+      if (!api) return;
+      const { imageData, width, height } = payload;
+      
+      // Create a new image element
+      const appState = api.getAppState();
+      const viewportCenterX = (appState.width || 800) / 2;
+      const viewportCenterY = (appState.height || 600) / 2;
+      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+      const newElement = {
+        type: 'image',
+        x: sceneX - (width || 400) / 2,
+        y: sceneY - (height || 300) / 2,
+        width: width || 400,
+        height: height || 300,
+        fileId: nanoid(),
+        status: 'pending',
+        id: nanoid(),
+        version: 1,
+        versionNonce: Date.now(),
+      };
+
+      // Add the image file
+      const file = {
+        id: newElement.fileId,
+        mimeType: 'image/png',
+        dataURL: imageData,
+        created: Date.now(),
+      };
+
+      const currentElements = api.getSceneElements();
+      api.updateScene({ 
+        elements: [...currentElements, newElement],
+        files: { ...api.getFiles(), [file.id]: file },
+      });
+    },
+
+    onDrawElements: async (payload) => {
+      if (!api) return;
+      const { elements, isModification } = payload;
+      
+      // Convert elements to Excalidraw format if needed
+      const appState = api.getAppState();
+      let elementsToAdd = elements;
+      
+      if (!isModification) {
+        // Center elements on viewport
+        const viewportCenterX = (appState.width || 800) / 2;
+        const viewportCenterY = (appState.height || 600) / 2;
+        const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+        const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+        // Calculate bounding box of new elements
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        elements.forEach((el: any) => {
+          const x = el.x || 0;
+          const y = el.y || 0;
+          const w = el.width || 100;
+          const h = el.height || 100;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + w);
+          maxY = Math.max(maxY, y + h);
+        });
+
+        const elementsCenterX = (minX + maxX) / 2;
+        const elementsCenterY = (minY + maxY) / 2;
+        const offsetX = sceneX - elementsCenterX;
+        const offsetY = sceneY - elementsCenterY;
+
+        elementsToAdd = elements.map((el: any) => ({
+          ...el,
+          id: el.id || nanoid(),
+          x: (el.x || 0) + offsetX,
+          y: (el.y || 0) + offsetY,
+          version: 1,
+          versionNonce: Date.now(),
+        }));
+      }
+
+      const currentElements = api.getSceneElements();
+      api.updateScene({ elements: [...currentElements, ...elementsToAdd] });
+    },
+
+    onUpdateElements: async (payload) => {
+      if (!api) return;
+      const { elements } = payload;
+      
+      const currentElements = api.getSceneElements();
+      const elementMap = new Map(elements.map((el: any) => [el.id, el]));
+      
+      const updatedElements = currentElements.map((el: ExcalidrawElement) => {
+        if (elementMap.has(el.id)) {
+          return {
+            ...el,
+            ...elementMap.get(el.id),
+            version: (el.version || 0) + 1,
+            versionNonce: Date.now(),
+          };
+        }
+        return el;
+      });
+      
+      api.updateScene({ elements: updatedElements });
+    },
+  });
   
   // Register/unregister refs
   const registerMarkdownRef = (id: string, ref: any) => {
