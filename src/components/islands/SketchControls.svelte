@@ -79,8 +79,9 @@
 
 <div class="sketch-controls" class:expanded={isExpanded}>
   <button 
+    type="button"
     class="sketch-controls__toggle" 
-    onclick={() => isExpanded = !isExpanded}
+    on:click={() => isExpanded = !isExpanded}
     aria-label={isExpanded ? "Close sketch controls" : "Open sketch controls"}
     aria-expanded={isExpanded}
   >
@@ -94,7 +95,7 @@
     <div class="sketch-controls__panel">
       <div class="sketch-controls__header">
         <h3>Style Settings</h3>
-        <button class="sketch-controls__reset" onclick={reset} title="Reset to defaults">
+        <button type="button" class="sketch-controls__reset" on:click={reset} title="Reset to defaults">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/>
             <path d="M3 3v9h9"/>
@@ -109,7 +110,7 @@
             <button 
               class="sketch-controls__font-option"
               class:active={selectedFont === font.id}
-              onclick={() => selectedFont = font.id}
+              on:click={() => selectedFont = font.id}
             >
               {font.name}
             </button>
