@@ -146,21 +146,26 @@ export function useCanvasCommands(
   /**
    * Use canvas command hook to listen for commands
    */
-  useCanvasCommand((command) => {
+  const command = useCanvasCommand();
+  useEffect(() => {
+    if (!command) return;
     if (!isOpen) return;
 
     switch (command.type) {
       case "drawElements":
+        {
+        const drawPayload = command.payload as { elements?: any[] };
         // After draw elements, update the canvas state
         requestCanvasState();
         // Call the callback if provided
-        const elementIds = command.payload?.elements
-          ?.map((el: any) => el.id)
-          .filter(Boolean);
-        if (elementIds?.length > 0) {
+        const elementIds = (drawPayload.elements || [])
+          .map((el: any) => el.id)
+          .filter(Boolean) as string[];
+        if (elementIds.length > 0) {
           onElementsAdded?.(elementIds);
         }
         break;
+        }
       case "updateElements":
         requestCanvasState();
         break;
@@ -168,7 +173,7 @@ export function useCanvasCommands(
         requestCanvasState();
         break;
     }
-  });
+  }, [command, isOpen, onElementsAdded, requestCanvasState]);
 
   /**
    * Subscribe to canvas data changes from the store
@@ -178,7 +183,7 @@ export function useCanvasCommands(
 
     const unsubscribe = useUnifiedCanvasStore.subscribe((state) => {
       if (state.canvasData) {
-        processorRef.current?.setState(state.canvasData);
+        processorRef.current?.setState(state.canvasData as any);
       }
     });
 

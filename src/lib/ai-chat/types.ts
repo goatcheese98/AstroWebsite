@@ -3,41 +3,13 @@
  * Pure TypeScript types - no React dependencies
  */
 
+import type { Message } from "@/components/ai-chat/types";
+
 export type AIProvider = "kimi" | "claude";
 
 export type ContextMode = "all" | "selected";
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: Array<
-    | { type: "text"; text: string }
-    | { type: "image"; url: string }
-    | { type: "code"; code: string; language: string }
-  >;
-  metadata: {
-    timestamp: Date;
-    model?: string;
-    provider?: AIProvider;
-    canvasContext?: {
-      elementCount: number;
-      selectedElementIds: string[];
-      viewport: {
-        scrollX: number;
-        scrollY: number;
-        zoom: number;
-      };
-    };
-  };
-  reactions: Array<{
-    emoji: string;
-    userId: string;
-    timestamp: Date;
-  }>;
-  status: "sending" | "sent" | "error" | "editing";
-  drawingCommand?: any[];
-  sourceCode?: string;
-}
+export type ChatMessage = Message;
 
 export interface CanvasState {
   elements: any[];

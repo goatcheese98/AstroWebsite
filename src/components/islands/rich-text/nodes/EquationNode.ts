@@ -31,7 +31,7 @@ export type SerializedEquationNode = Spread<
     SerializedLexicalNode
 >;
 
-export class EquationNode extends DecoratorNode<JSX.Element> {
+export class EquationNode extends DecoratorNode<React.JSX.Element> {
     __equation: string;
     __inline: boolean;
 
@@ -112,7 +112,7 @@ export class EquationNode extends DecoratorNode<JSX.Element> {
         return this.__inline;
     }
 
-    decorate(): JSX.Element {
+    decorate(): React.JSX.Element {
         return React.createElement(EquationComponent, {
             equation: this.__equation,
             inline: this.__inline,
@@ -149,7 +149,7 @@ interface EquationComponentProps {
     nodeKey: NodeKey;
 }
 
-function EquationComponent({ equation, inline }: EquationComponentProps): JSX.Element {
+function EquationComponent({ equation, inline }: EquationComponentProps): React.JSX.Element {
     const containerRef = useRef<HTMLSpanElement | HTMLDivElement>(null);
 
     useEffect(() => {

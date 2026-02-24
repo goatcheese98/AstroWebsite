@@ -23,8 +23,18 @@ export interface UseCommandSubscriberOptions {
   onError?: (type: CommandType, error: Error) => void;
 }
 
+type CommandHandlerName =
+  | 'onInsertImage'
+  | 'onInsertSvg'
+  | 'onDrawElements'
+  | 'onUpdateElements'
+  | 'onCaptureScreenshot'
+  | 'onLoadMarkdownFiles'
+  | 'onWebembedSelected'
+  | 'onMarkdownEdit';
+
 // Map from command type to handler name
-const COMMAND_TO_HANDLER: Record<CommandType, keyof UseCommandSubscriberOptions> = {
+const COMMAND_TO_HANDLER: Record<CommandType, CommandHandlerName> = {
   insertImage: 'onInsertImage',
   insertSvg: 'onInsertSvg',
   drawElements: 'onDrawElements',
@@ -112,7 +122,7 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
 
     // Execute handler
     Promise.resolve()
-      .then(() => handler(payload))
+      .then(() => handler(payload as never))
       .then((result) => {
         console.log('[useCommandSubscriber] Handler succeeded:', type);
         resolveCommand(result);

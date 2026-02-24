@@ -3,10 +3,10 @@
  * Replaces `any[]` and `any` usage throughout the codebase
  */
 import type {
-  ExcalidrawElement,
   AppState,
   BinaryFiles,
 } from '@excalidraw/excalidraw/types';
+import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 
 // Re-export core Excalidraw types for convenience
 export type { ExcalidrawElement, AppState, BinaryFiles };
@@ -19,20 +19,20 @@ export type CustomElementType = 'markdown' | 'web-embed' | 'lexical';
 /**
  * Extended Excalidraw element with our custom data
  */
-export interface CustomExcalidrawElement extends ExcalidrawElement {
+export type CustomExcalidrawElement = ExcalidrawElement & {
   customData?: {
     type?: CustomElementType;
     content?: string;
     url?: string;
     [key: string]: unknown;
   };
-}
+};
 
 /**
  * Core canvas data structure as stored in R2
  */
 export interface CanvasData {
-  elements: readonly ExcalidrawElement[];
+  elements: ExcalidrawElement[];
   appState: Partial<AppState>;
   files: BinaryFiles | null;
 }

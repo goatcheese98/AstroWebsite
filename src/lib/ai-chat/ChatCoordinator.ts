@@ -168,6 +168,12 @@ export class ChatCoordinator {
       messageContent.push({ type: "image", url: screenshotData });
     }
 
+    const appState = (canvasState?.appState || {}) as any;
+    const zoom =
+      typeof appState.zoom === "number"
+        ? appState.zoom
+        : appState.zoom?.value ?? 1;
+
     return {
       id: nanoid(),
       role: "user",
@@ -177,7 +183,11 @@ export class ChatCoordinator {
         canvasContext: {
           elementCount: canvasState?.elements?.length || 0,
           selectedElementIds: selectedElements,
-          viewport: canvasState?.appState || { scrollX: 0, scrollY: 0, zoom: 1 },
+          viewport: {
+            scrollX: appState.scrollX ?? 0,
+            scrollY: appState.scrollY ?? 0,
+            zoom,
+          },
         },
       },
       reactions: [],

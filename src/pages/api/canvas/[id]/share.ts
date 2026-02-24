@@ -74,12 +74,12 @@ export const POST: APIRoute = async (context) => {
 
     // Build share URL
     const baseUrl = context.url.origin;
-    const shareUrl = `${baseUrl}/canvas/shared/${share.share_token}`;
+    const shareUrl = `${baseUrl}/canvas/shared/${share.shareToken}`;
 
     const response: ShareLinkResponse = {
-      shareToken: share.share_token,
+      shareToken: share.shareToken,
       shareUrl,
-      expiresAt: share.expires_at,
+      expiresAt: share.expiresAt,
     };
 
     return new Response(JSON.stringify(response), {

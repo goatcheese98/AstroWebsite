@@ -31,7 +31,9 @@ export function useExcalidrawSelection({
             setIsSelected(selectedId === elementId);
         };
         listeners.add(listener);
-        return () => listeners.delete(listener);
+        return () => {
+            listeners.delete(listener);
+        };
     }, [elementId]);
 
     /**

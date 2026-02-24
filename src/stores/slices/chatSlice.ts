@@ -83,6 +83,10 @@ export const createChatSlice: StateCreator<
   },
 
   // === Image History Actions ===
+  setImageHistory: (history: GeneratedImage[]) => {
+    set({ imageHistory: history });
+  },
+
   addGeneratedImage: (image: GeneratedImage) => {
     set((state) => ({
       imageHistory: [image, ...state.imageHistory],

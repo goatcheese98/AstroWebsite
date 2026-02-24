@@ -3,6 +3,8 @@
  * Handles generation of unique "Untitled Canvas" names
  */
 
+import type { D1Database } from '@cloudflare/workers-types';
+
 /**
  * Generates a unique canvas name based on existing canvases
  * Handles "Untitled Canvas", "Untitled Canvas 2", etc.

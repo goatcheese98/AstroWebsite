@@ -6,18 +6,13 @@
  */
 
 import type { StateCreator } from 'zustand';
-import type { CommandSlice, CommandType, CommandPayload, PendingCommand } from '../types';
-
-interface CommandState {
-  pendingCommand: PendingCommand | null;
-  processedCommandId: string | null;
-}
+import type { CommandSlice, CommandType, CommandPayload, PendingCommand, StoreState } from '../types';
 
 export const createCommandSlice: StateCreator<
-  CommandSlice & CommandState,
+  StoreState,
   [],
   [],
-  CommandSlice & CommandState
+  CommandSlice
 > = (set, get) => ({
   // === State ===
   pendingCommand: null,

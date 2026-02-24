@@ -17,12 +17,11 @@
 import { useRef, useCallback, useMemo } from 'react';
 import { useUnifiedCanvasStore, useExcalidrawAPISafe, useSetExcalidrawAPI } from '@/stores';
 import { useCanvasPersistence } from './hooks/useCanvasPersistence';
-import { useCanvasCollaboration } from './hooks/useCanvasCollaboration';
+import { useExcalidrawCollaboration } from './hooks/useExcalidrawCollaboration';
 
 // Sub-components
 import CanvasCore from './CanvasCore';
 import CanvasUI from './CanvasUI';
-import CanvasCollaborationLayer from './CanvasCollaborationLayer';
 import CanvasNotesLayer from './CanvasNotesLayer';
 import CanvasAvatar from '../islands/CanvasAvatar';
 
@@ -72,6 +71,7 @@ export default function CanvasContainer({
 
   const handleApiReady = useCallback((excalidrawApi: any) => {
     setApi(excalidrawApi);
+    (window as any).excalidrawAPI = excalidrawApi;
   }, [setApi]);
 
   // === PERSISTENCE ===
@@ -88,12 +88,17 @@ export default function CanvasContainer({
     },
   });
 
-  // === COLLABORATION ===
-  const { isConnected, activeUsers, cursors } = useCanvasCollaboration({
-    isSharedMode,
-    shareRoomId,
+  // === NATIVE EXCALIDRAW COLLABORATION ===
+  const { isConnected, activeUsers, onPointerUpdate, onSceneChange } = useExcalidrawCollaboration({
+    enabled: isSharedMode,
+    roomId: shareRoomId,
     partyKitHost,
     api,
+    user: {
+      id: userId,
+      name: userName,
+      avatarUrl,
+    },
     onConnect: () => addToast('Connected to collaboration room', 'success'),
     onDisconnect: () => addToast('Disconnected from room', 'info'),
     onError: (err) => addToast(`Connection error: ${err.message}`, 'error'),
@@ -115,7 +120,10 @@ export default function CanvasContainer({
       <CanvasCore
         onApiReady={handleApiReady}
         isSharedMode={isSharedMode}
-        renderTopRightUI={useMemo(() => () => (
+        isCollaborating={isSharedMode}
+        onPointerUpdate={onPointerUpdate}
+        onSceneChange={onSceneChange}
+        renderTopRightUI={useMemo(() => (_isMobile: boolean, _appState: any) => (
           <CanvasAvatar
             user={isSignedIn && userId ? {
               id: userId,
@@ -128,14 +136,6 @@ export default function CanvasContainer({
           />
         ), [isSignedIn, userId, userName, avatarUrl])}
       />
-
-      {/* Collaboration Layer (cursors, locks) */}
-      {isSharedMode && isConnected && (
-        <CanvasCollaborationLayer
-          cursors={cursors}
-          activeUsers={activeUsers}
-        />
-      )}
 
       {/* Notes Layer (markdown, embeds) */}
       <CanvasNotesLayer api={api} />

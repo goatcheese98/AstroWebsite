@@ -98,15 +98,13 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
 
   useEffect(() => {
     let lastCommandId: string | null = null;
-    const unsubscribe = useUnifiedCanvasStore.subscribe(
-      (state) => state.pendingCommand,
-      (command) => {
-        if (command?.type === 'webembed:selected' && command?.timestamp !== lastCommandId) {
-          lastCommandId = command?.timestamp;
-          selectedWebEmbedRef.current = command.payload;
-        }
+    const unsubscribe = useUnifiedCanvasStore.subscribe((state) => {
+      const command = state.pendingCommand;
+      if (command?.type === 'webembed:selected' && command?.timestamp !== lastCommandId) {
+        lastCommandId = command.timestamp;
+        selectedWebEmbedRef.current = command.payload as { url: string; title: string; elementId: string };
       }
-    );
+    });
     return unsubscribe;
   }, []);
 

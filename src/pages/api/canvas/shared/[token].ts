@@ -50,7 +50,7 @@ export const GET: APIRoute = async (context) => {
     }
 
     // Get canvas
-    const canvas = await getCanvasById(runtime.env.DB, share.canvas_id);
+    const canvas = await getCanvasById(runtime.env.DB, share.canvasId);
 
     if (!canvas) {
       return new Response(
@@ -82,11 +82,11 @@ export const GET: APIRoute = async (context) => {
       title: canvas.title,
       description: canvas.description,
       thumbnailUrl: canvas.thumbnailUrl,
-      isPublic: canvas.isPublic === 1,
+      isPublic: canvas.isPublic,
       version: canvas.version,
       createdAt: canvas.createdAt,
       updatedAt: canvas.updatedAt,
-      canvasData,
+      canvasData: canvasData as any,
     };
 
     return new Response(JSON.stringify(response), {

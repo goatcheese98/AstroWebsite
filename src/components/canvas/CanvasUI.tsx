@@ -91,8 +91,9 @@ export default function CanvasUI({
   useEffect(() => {
     if (!api) return;
 
-    const handleDrawCommand = async (event: CustomEvent) => {
-      const { elements, isModification } = event.detail || {};
+    const handleDrawCommand = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { elements, isModification } = (customEvent.detail as any) || {};
       if (!elements || !Array.isArray(elements)) return;
 
       try {
@@ -140,8 +141,8 @@ export default function CanvasUI({
       }
     };
 
-    window.addEventListener('excalidraw:draw', handleDrawCommand as EventListener);
-    return () => window.removeEventListener('excalidraw:draw', handleDrawCommand as EventListener);
+    window.addEventListener('excalidraw:draw', handleDrawCommand);
+    return () => window.removeEventListener('excalidraw:draw', handleDrawCommand);
   }, [api]);
 
   // Handle commands from the store (image insertion, etc.)
@@ -603,5 +604,4 @@ export default function CanvasUI({
     </>
   );
 }
-
 

@@ -20,6 +20,7 @@ import { generateUniqueCanvasName } from '@/lib/utils/canvas-naming';
 import { successResponse, apiErrors } from '@/lib/utils/api-response';
 import { withErrorHandling, StorageError } from '@/lib/utils/error-handling';
 import { nanoid } from 'nanoid';
+import type { CanvasData as StoredCanvasData } from '@/lib/types/excalidraw';
 
 export const prerender = false;
 
@@ -50,6 +51,11 @@ export const POST: APIRoute = async (context) => {
     }
 
     const { title, description, canvasData, isPublic, thumbnailData } = validation.data;
+    const normalizedCanvasData: StoredCanvasData = {
+      elements: canvasData.elements as StoredCanvasData['elements'],
+      appState: (canvasData.appState || {}) as StoredCanvasData['appState'],
+      files: (canvasData.files || null) as StoredCanvasData['files'],
+    };
 
     // Generate unique title using utility function
     const finalTitle = await generateUniqueCanvasName(
@@ -59,7 +65,7 @@ export const POST: APIRoute = async (context) => {
     );
 
     // Check canvas size (max 10MB)
-    if (isCanvasTooLarge(canvasData)) {
+    if (isCanvasTooLarge(normalizedCanvasData)) {
       return apiErrors.badRequest(
         'Canvas too large',
         'Canvas data exceeds 10MB limit'
@@ -72,7 +78,7 @@ export const POST: APIRoute = async (context) => {
     const thumbnailKey = thumbnailData ? generateThumbnailKey(auth.userId, canvasId) : null;
 
     // Save canvas data to R2 (compressed)
-    await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, normalizedCanvasData);
 
     // Save thumbnail if provided
     if (thumbnailData && thumbnailKey) {
@@ -103,7 +109,7 @@ export const POST: APIRoute = async (context) => {
       version: canvas.version,
       createdAt: canvas.createdAt,
       updatedAt: canvas.updatedAt,
-      canvasData,
+      canvasData: normalizedCanvasData,
     };
 
     return successResponse(response, 201);

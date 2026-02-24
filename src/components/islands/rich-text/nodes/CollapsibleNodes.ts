@@ -7,6 +7,7 @@ import type {
     LexicalEditor,
     LexicalNode,
     NodeKey,
+    RangeSelection,
     SerializedElementNode,
     Spread,
 } from 'lexical';
@@ -111,7 +112,7 @@ export class CollapsibleContainerNode extends ElementNode {
         return this.__open;
     }
 
-    insertNewAfter(_: LexicalEditor, restoreSelection?: boolean): ElementNode {
+    insertNewAfter(_selection: RangeSelection, restoreSelection?: boolean): ElementNode {
         const newBlock = $createParagraphNode();
         const direction = this.getDirection();
         newBlock.setDirection(direction);
@@ -119,8 +120,8 @@ export class CollapsibleContainerNode extends ElementNode {
         return newBlock;
     }
 
-    collapseAtStart(_: LexicalEditor): true {
-        this.insertNewAfter(_, false);
+    collapseAtStart(selection: RangeSelection): true {
+        this.insertNewAfter(selection, false);
         return true;
     }
 }
@@ -181,7 +182,7 @@ export class CollapsibleTitleNode extends ElementNode {
         return { element };
     }
 
-    insertNewAfter(_: LexicalEditor, restoreSelection?: boolean): ElementNode {
+    insertNewAfter(_selection: RangeSelection, restoreSelection?: boolean): ElementNode {
         const containerNode = this.getParentOrThrow();
         if (!$isCollapsibleContainerNode(containerNode)) {
             throw new Error('CollapsibleTitleNode expects to be child of CollapsibleContainerNode');
@@ -206,8 +207,8 @@ export class CollapsibleTitleNode extends ElementNode {
         return paragraphNode;
     }
 
-    collapseAtStart(_: LexicalEditor): true {
-        this.getParentOrThrow().insertNewAfter(_, false);
+    collapseAtStart(selection: RangeSelection): true {
+        this.getParentOrThrow().insertNewAfter(selection, false);
         return true;
     }
 }
@@ -269,7 +270,7 @@ export class CollapsibleContentNode extends ElementNode {
 // Helper functions
 
 function $convertCollapsibleContainerElement(domNode: HTMLElement): DOMConversionOutput | null {
-    const isOpen = domNode.open ?? true;
+    const isOpen = (domNode as HTMLDetailsElement).open ?? true;
     const node = $createCollapsibleContainerNode(isOpen);
     return { node };
 }
@@ -304,5 +305,8 @@ export function $isCollapsibleContentNode(node: LexicalNode | null | undefined):
 }
 
 export function $findCollapsibleContainerNode(node: LexicalNode | null): CollapsibleContainerNode | null {
+    if (!node) {
+        return null;
+    }
     return $findMatchingParent(node, $isCollapsibleContainerNode) as CollapsibleContainerNode | null;
 }

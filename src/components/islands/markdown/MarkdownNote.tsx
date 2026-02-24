@@ -129,7 +129,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         // Listen for edit command from store
         useCommandSubscriber({
-            'markdown:edit': (data) => {
+            onMarkdownEdit: (data) => {
                 if (!isEditing && data.elementId === element.id) {
                     enterEditMode(data.mode);
                 }

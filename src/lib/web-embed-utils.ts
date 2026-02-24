@@ -65,7 +65,7 @@ export function convertToEmbedUrl(url: string): string | null {
     for (const { pattern, convert } of EMBED_PATTERNS) {
         const match = url.match(pattern);
         if (match) {
-            const result = convert(...match.slice(1));
+            const result = (convert as (...args: string[]) => string | null)(...match.slice(1));
             // If convert returns null, continue to next pattern
             if (result === null) continue;
             return result;
@@ -190,7 +190,7 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
         const isDev = import.meta.env.DEV;
         const host = isDev
             ? "localhost:1999"
-            : (import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.goatcheese98.partykit.dev");
+            : (import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev");
         const protocol = isDev ? "http" : "https";
 
         // Construct proxy URL

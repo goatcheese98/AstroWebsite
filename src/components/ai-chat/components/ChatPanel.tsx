@@ -24,7 +24,7 @@ export interface ChatPanelProps {
  * Positioned to the left of the right-side toolbar (88px offset)
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-    function ChatPanel({ isOpen, isMinimized = false, width, height = 600, onResizeStart, children, isMobile = false }, ref) {
+    function ChatPanel({ isOpen, isMinimized = false, width, height = 600, onResizeStart, onClose, children, isMobile = false }, ref) {
         if (!isOpen) return null;
 
         // Minimized state - show as a compact pill at the bottom right

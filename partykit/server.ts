@@ -1,38 +1,46 @@
 import type * as Party from "partykit/server";
 import { encode, decode } from "@msgpack/msgpack";
 
-interface CursorPosition {
-  userId: string;
-  userName: string;
+interface CollaboratorColor {
+  background: string;
+  stroke: string;
+}
+
+interface CollaboratorPointer {
   x: number;
   y: number;
-  color: string;
+  tool: "pointer" | "laser";
+  renderCursor?: boolean;
+}
+
+interface CollaboratorPresence {
+  id: string;
+  username?: string;
+  avatarUrl?: string;
+  color?: CollaboratorColor;
+  pointer?: CollaboratorPointer;
+  button?: "up" | "down";
+  selectedElementIds?: Record<string, boolean>;
   lastUpdate: number;
 }
 
 interface CanvasSnapshot {
   elements: any[];
-  appState: any;
-  files: any;
+  appState: Record<string, any>;
+  files: Record<string, any>;
   timestamp: number;
 }
 
 interface SharedState {
-  // Version tracking
-  originalState?: CanvasSnapshot;  // Snapshot when first shared
-  latestState?: CanvasSnapshot;    // Most recent state
+  originalState?: CanvasSnapshot;
+  latestState?: CanvasSnapshot;
 
-  // Legacy fields (for backward compatibility)
+  // Legacy fields kept for migration compatibility.
   elements?: any[];
   appState?: any;
   files?: any;
 
-  // Collaborative features
-  cursors?: { [userId: string]: CursorPosition };
-
-  // Content
-  markdownNotes?: any[];
-  imageHistory?: any[];
+  collaborators?: Record<string, CollaboratorPresence>;
 
   // Metadata
   lastActivity?: number;
@@ -42,24 +50,63 @@ interface SharedState {
 // Expiration: 90 days of inactivity
 const EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000; // 90 days in milliseconds
 
-// Cursor cleanup: remove cursors inactive for 10 seconds
+// Cursor cleanup: remove inactive collaborator pointers.
 const CURSOR_TIMEOUT_MS = 10 * 1000;
 
-export default class ExcalidrawParty implements Party.PartyKitServer {
+function decodeIncomingMessage(message: string | ArrayBuffer | ArrayBufferView): any {
+  if (message instanceof ArrayBuffer || ArrayBuffer.isView(message)) {
+    return decode(message);
+  }
+  try {
+    return decode(new TextEncoder().encode(message));
+  } catch {
+    try {
+      return JSON.parse(message);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function getSceneFromState(state: SharedState | null): CanvasSnapshot | null {
+  if (!state) return null;
+  if (state.latestState) return state.latestState;
+  if (state.elements || state.appState || state.files) {
+    return {
+      elements: state.elements || [],
+      appState: state.appState || {},
+      files: state.files || {},
+      timestamp: state.lastActivity || Date.now(),
+    };
+  }
+  return null;
+}
+
+function toRemoteCollaborator(collaborator: CollaboratorPresence) {
+  return {
+    id: collaborator.id,
+    username: collaborator.username,
+    avatarUrl: collaborator.avatarUrl,
+    socketId: collaborator.id,
+    pointer: collaborator.pointer,
+    button: collaborator.button,
+    selectedElementIds: collaborator.selectedElementIds,
+    color: collaborator.color,
+  };
+}
+
+export default class ExcalidrawParty implements Party.Server {
   constructor(readonly room: Party.PartyKitRoom) { }
 
   // Called when a new WebSocket connection is made
   async onConnect(conn: Party.PartyKitConnection, ctx: Party.PartyKitContext) {
     console.log(`[${this.room.id}] User ${conn.id} connected`);
 
-    // Get active connection count
     const connections = [...this.room.getConnections()];
     console.log(`[${this.room.id}] Active users: ${connections.length}`);
 
-    // Send current room state to new user
-    let state = await this.room.storage.get<SharedState>("canvasState");
+    let state = (await this.room.storage.get<SharedState>("canvasState")) ?? null;
 
-    // Check if room has expired (90 days of inactivity)
     if (state && state.lastActivity) {
       const inactiveTime = Date.now() - state.lastActivity;
       if (inactiveTime > EXPIRATION_MS) {
@@ -78,61 +125,43 @@ export default class ExcalidrawParty implements Party.PartyKitServer {
       }
     }
 
-    // Update last activity on connect
-    if (state) {
-      state.lastActivity = Date.now();
+    const now = Date.now();
 
-      // Clean up stale cursors
-      if (state.cursors) {
-        const now = Date.now();
-        const cursors = state.cursors;
-        Object.keys(cursors).forEach(userId => {
-          const cursor = cursors[userId];
-          if (now - cursor.lastUpdate > CURSOR_TIMEOUT_MS) {
-            delete cursors[userId];
+    if (state) {
+      state.lastActivity = now;
+
+      if (state.collaborators) {
+        for (const userId of Object.keys(state.collaborators)) {
+          const collaborator = state.collaborators[userId];
+          if (now - collaborator.lastUpdate > CURSOR_TIMEOUT_MS) {
+            delete state.collaborators[userId];
           }
-        });
+        }
       }
 
       await this.room.storage.put("canvasState", state);
     }
 
-    // Prepare state for client (backward compatible)
-    let clientState = null;
-    if (state) {
-      // For clients, send latestState if available, otherwise use legacy fields
-      const snapshot = state.latestState || {
-        elements: state.elements || [],
-        appState: state.appState || {},
-        files: state.files || {},
-        timestamp: state.lastActivity || Date.now()
-      };
-
-      clientState = {
-        elements: snapshot.elements,
-        appState: snapshot.appState,
-        files: snapshot.files,
-        markdownNotes: state.markdownNotes || [],
-        imageHistory: state.imageHistory || [],
-        cursors: state.cursors || {},
-        // Include version info
-        hasOriginalState: !!state.originalState,
-        originalTimestamp: state.originalState?.timestamp,
-        latestTimestamp: snapshot.timestamp
-      };
+    const scene = getSceneFromState(state);
+    const collaborators: Record<string, any> = {};
+    if (state?.collaborators) {
+      for (const [userId, collaborator] of Object.entries(
+        state.collaborators
+      ) as [string, CollaboratorPresence][]) {
+        collaborators[userId] = toRemoteCollaborator(collaborator);
+      }
     }
 
     const initMessage = {
       type: "init",
-      state: clientState,
-      activeUsers: state ? connections.length : 1,
-      userId: conn.id, // Send user's own ID for cursor tracking
+      userId: conn.id,
+      activeUsers: connections.length,
+      scene,
+      collaborators,
     };
 
-    // Send as MessagePack binary
     conn.send(encode(initMessage) as any);
 
-    // Broadcast user joined event with cursor init
     this.room.broadcast(
       encode({
         type: "user-joined",
@@ -144,92 +173,119 @@ export default class ExcalidrawParty implements Party.PartyKitServer {
   }
 
   // Called when a message is received from any connection
-  async onMessage(message: string | ArrayBuffer, sender: Party.PartyKitConnection) {
-    // Decode MessagePack binary
-    const data = decode(message instanceof ArrayBuffer ? message : new Uint8Array(Buffer.from(message))) as any;
-
+  async onMessage(message: string | ArrayBuffer | ArrayBufferView, sender: Party.PartyKitConnection) {
+    const data = decodeIncomingMessage(message) as any;
+    if (!data || typeof data !== "object") {
+      return;
+    }
     const now = Date.now();
+    const connections = [...this.room.getConnections()];
+    const activeUsers = connections.length;
 
-    // Handle different message types
-    if (data.type === "cursor-update") {
-      // Broadcast cursor position to all other clients (don't save to storage)
-      this.room.broadcast(message, [sender.id]);
+    if (data.type === "pointer-update" || data.type === "presence-update" || data.type === "cursor-update") {
+      const state = (await this.room.storage.get<SharedState>("canvasState")) || ({} as SharedState);
+      state.collaborators = state.collaborators || {};
 
-      // Optionally store cursor in state for new joiners
-      const currentState = await this.room.storage.get<SharedState>("canvasState") || {} as SharedState;
-      if (!currentState.cursors) {
-        currentState.cursors = {};
-      }
-
-      currentState.cursors[sender.id] = {
-        userId: sender.id,
-        userName: data.userName || `User ${sender.id.slice(0, 6)}`,
-        x: data.x,
-        y: data.y,
-        color: data.color,
-        lastUpdate: now
+      const existing = state.collaborators[sender.id] || {
+        id: sender.id,
+        lastUpdate: now,
       };
 
-      // Don't await - fire and forget to keep cursor updates fast
-      this.room.storage.put("canvasState", currentState);
-      return; // Don't broadcast again
+      const userPayload = data.user || {};
+      const pointerPayload =
+        data.type === "cursor-update"
+          ? { x: data.x, y: data.y, tool: "pointer" as const, renderCursor: true }
+          : data.pointer;
+
+      const collaborator: CollaboratorPresence = {
+        ...existing,
+        id: sender.id,
+        username:
+          userPayload.name ||
+          data.userName ||
+          existing.username ||
+          `User ${sender.id.slice(0, 6)}`,
+        avatarUrl: userPayload.avatarUrl || existing.avatarUrl,
+        color: userPayload.color || existing.color,
+        pointer: pointerPayload
+          ? {
+              x: pointerPayload.x,
+              y: pointerPayload.y,
+              tool: pointerPayload.tool === "laser" ? "laser" : "pointer",
+              renderCursor: true,
+            }
+          : existing.pointer,
+        button: data.button || existing.button || "up",
+        selectedElementIds: data.selectedElementIds || existing.selectedElementIds || {},
+        lastUpdate: now,
+      };
+
+      state.collaborators[sender.id] = collaborator;
+      state.lastActivity = now;
+      state.createdAt = state.createdAt || now;
+
+      this.room.storage.put("canvasState", state);
+
+      this.room.broadcast(
+        encode({
+          type: "pointer-update",
+          userId: sender.id,
+          collaborator: toRemoteCollaborator(collaborator),
+          activeUsers,
+        }) as any,
+        [sender.id]
+      );
+      return;
     }
 
-    // For other message types, broadcast to all other connections
-    this.room.broadcast(message, [sender.id]);
-
-    // Save latest state based on update type
-    if (data.type === "canvas-update") {
-      // Excalidraw elements, appState, files
-      const currentState = await this.room.storage.get<SharedState>("canvasState") || {} as SharedState;
+    if (data.type === "scene-update" || data.type === "canvas-update") {
+      const scene = data.scene || {
+        elements: data.elements || [],
+        appState: data.appState || {},
+        files: data.files || {},
+      };
 
       const snapshot: CanvasSnapshot = {
-        elements: data.elements,
-        appState: data.appState,
-        files: data.files,
-        timestamp: now
+        elements: scene.elements || [],
+        appState: scene.appState || {},
+        files: scene.files || {},
+        timestamp: now,
       };
 
-      // If this is the first canvas update, save as original state
-      if (!currentState.originalState && !currentState.elements) {
-        currentState.originalState = snapshot;
-        console.log(`[${this.room.id}] Saved original state (${snapshot.elements?.length || 0} elements)`);
+      const state = (await this.room.storage.get<SharedState>("canvasState")) || ({} as SharedState);
+
+      if (!state.originalState && !state.elements) {
+        state.originalState = snapshot;
+        console.log(
+          `[${this.room.id}] Saved original state (${snapshot.elements?.length || 0} elements)`
+        );
       }
 
-      // Always update latest state
-      currentState.latestState = snapshot;
-      currentState.lastActivity = now;
-      currentState.createdAt = currentState.createdAt || now;
+      state.latestState = snapshot;
+      state.lastActivity = now;
+      state.createdAt = state.createdAt || now;
+      delete state.elements;
+      delete state.appState;
+      delete state.files;
 
-      // Clean up legacy fields (migrated to versioned structure)
-      delete currentState.elements;
-      delete currentState.appState;
-      delete currentState.files;
+      await this.room.storage.put("canvasState", state);
 
-      await this.room.storage.put("canvasState", currentState);
-    }
-    else if (data.type === "markdown-update") {
-      // Markdown notes
-      const currentState = await this.room.storage.get<SharedState>("canvasState") || {} as SharedState;
-      currentState.markdownNotes = data.markdownNotes;
-      currentState.lastActivity = now;
-      currentState.createdAt = currentState.createdAt || now;
-
-      await this.room.storage.put("canvasState", currentState);
-    }
-    else if (data.type === "image-update") {
-      // Image generation history
-      const currentState = await this.room.storage.get<SharedState>("canvasState") || {} as SharedState;
-      currentState.imageHistory = data.imageHistory;
-      currentState.lastActivity = now;
-      currentState.createdAt = currentState.createdAt || now;
-
-      await this.room.storage.put("canvasState", currentState);
+      this.room.broadcast(
+        encode({
+          type: "scene-update",
+          userId: sender.id,
+          scene: snapshot,
+          sceneVersion: data.sceneVersion || now,
+          activeUsers,
+        }) as any,
+        [sender.id]
+      );
+      return;
     }
   }
 
   // Handle HTTP requests (proxy for web embeds)
-  async onRequest(req: Party.PartyKitRequest): Promise<Response> {
+  async onRequest(req: Party.Request): Promise<Response> {
     const url = new URL(req.url);
     const targetUrl = url.searchParams.get("url");
 
@@ -353,24 +409,23 @@ export default class ExcalidrawParty implements Party.PartyKitServer {
     console.log(`[${this.room.id}] User ${conn.id} disconnected`);
 
     const connections = [...this.room.getConnections()];
+    const activeUsers = connections.length;
 
-    // Remove disconnected user's cursor
     const currentState = await this.room.storage.get<SharedState>("canvasState");
-    if (currentState && currentState.cursors) {
-      delete currentState.cursors[conn.id];
+    if (currentState && currentState.collaborators) {
+      delete currentState.collaborators[conn.id];
+      currentState.lastActivity = Date.now();
       await this.room.storage.put("canvasState", currentState);
     }
 
-    // Broadcast user left event
     this.room.broadcast(encode({
       type: "user-left",
       userId: conn.id,
-      activeUsers: connections.length
+      activeUsers
     }) as any);
   }
+  static async onBeforeConnect(request: Party.Request, _lobby: Party.Lobby, _ctx: Party.ExecutionContext) {
+    // Optional: Add authentication or rate limiting here
+    return request;
+  }
 }
-
-ExcalidrawParty.onBeforeConnect = async (request, lobby) => {
-  // Optional: Add authentication or rate limiting here
-  return request;
-};

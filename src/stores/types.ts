@@ -6,6 +6,10 @@
  */
 
 import type { StoreApi } from 'zustand';
+import type {
+  Message as AIChatMessage,
+  MessageContent as AIChatMessageContent,
+} from '@/components/ai-chat/types';
 
 // ============================================================================
 // Base Types
@@ -87,34 +91,11 @@ export interface CanvasData {
 }
 
 // ============================================================================
-// Chat Types
+// Chat Types (single source of truth from ai-chat types)
 // ============================================================================
 
-export interface MessageContent {
-  type: 'text' | 'image';
-  text?: string;
-  url?: string;
-}
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: MessageContent[];
-  metadata?: {
-    timestamp: Date;
-    model?: string;
-    provider?: AIProvider;
-    canvasContext?: {
-      elementCount: number;
-      selectedElementIds: string[];
-      viewport: any;
-    };
-  };
-  reactions?: string[];
-  status?: 'sending' | 'sent' | 'error';
-  drawingCommand?: any[];
-  sourceCode?: string;
-}
+export type MessageContent = AIChatMessageContent;
+export type Message = AIChatMessage;
 
 // ============================================================================
 // Command Types
@@ -188,6 +169,7 @@ export type StoreGet = StoreApi<StoreState>['getState'];
 
 export interface CanvasSlice {
   // State
+  canvasData: CanvasData | null;
   elements: ExcalidrawElement[];
   appState: Partial<ExcalidrawAppState>;
   files: Record<string, any> | null;
@@ -199,9 +181,12 @@ export interface CanvasSlice {
   lastSaved: Date | null;
   
   // Actions
-  setCanvasData: (data: CanvasData) => void;
+  setCanvasData: (data: CanvasData | null) => void;
   setElements: (elements: ExcalidrawElement[]) => void;
   setAppState: (appState: Partial<ExcalidrawAppState>) => void;
+  loadCanvasState: (
+    state: { canvas?: CanvasData; [key: string]: unknown } | CanvasData
+  ) => void;
   setExcalidrawAPI: (api: ExcalidrawAPI | null) => void;
   setCanvasId: (id: string | null) => void;
   setCanvasTitle: (title: string) => void;
@@ -276,6 +261,7 @@ export interface ChatSlice {
   setChatError: (error: string | null) => void;
   clearChatError: () => void;
   // Image history actions
+  setImageHistory: (history: GeneratedImage[]) => void;
   addGeneratedImage: (image: GeneratedImage) => void;
   removeGeneratedImage: (id: string) => void;
   clearImageHistory: () => void;
@@ -284,6 +270,7 @@ export interface ChatSlice {
 export interface CommandSlice {
   // State
   pendingCommand: PendingCommand | null;
+  processedCommandId: string | null;
   
   // Actions
   dispatchCommand: <T extends CommandType>(

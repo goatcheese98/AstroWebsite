@@ -28,7 +28,7 @@ export const ExcalidrawElementSchema = z.object({
 export const CanvasDataSchema = z.object({
   elements: z.array(ExcalidrawElementSchema),
   appState: z.record(z.unknown()).optional(),
-  files: z.record(z.unknown()).optional(),
+  files: z.record(z.unknown()).nullable().optional(),
 });
 
 // ============================================================================

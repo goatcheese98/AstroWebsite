@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { exportToCanvas, exportToSvg } from "@excalidraw/excalidraw";
+import type { FileId } from "@excalidraw/excalidraw/element/types";
 
 export default function ExportToolbar() {
     const [exporting, setExporting] = useState<string | null>(null);
@@ -56,8 +57,8 @@ export default function ExportToolbar() {
         const fileIds: string[] = [];
         
         for (const [noteId, { dataUrl, position }] of noteImages.entries()) {
-            const fileId = `md-export-${noteId}`;
-            fileIds.push(fileId);
+            const fileId = `md-export-${noteId}` as FileId;
+            fileIds.push(fileId as string);
             
             // Create image element at markdown note position
             const imageElement = convertToExcalidrawElements([
@@ -68,7 +69,7 @@ export default function ExportToolbar() {
                     width: position.width,
                     height: position.height,
                     angle: position.angle || 0,
-                    fileId: fileId,
+                    fileId,
                 },
             ]);
             

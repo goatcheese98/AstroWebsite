@@ -2,18 +2,28 @@
  * CanvasCore - The Core Excalidraw Instance
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
-import type { ExcalidrawAPI, ExcalidrawElement, ExcalidrawAppState } from '@/stores';
+import type { ExcalidrawAPI } from '@/stores';
 
 // Import Excalidraw - the client:only directive in parent handles SSR
 import { Excalidraw } from "@excalidraw/excalidraw";
 
 interface CanvasCoreProps {
   isLoading?: boolean;
-  onApiReady: (api: ExcalidrawAPI) => void;
+  onApiReady: (api: any) => void;
   isSharedMode?: boolean;
-  renderTopRightUI?: () => React.ReactNode;
+  isCollaborating?: boolean;
+  onPointerUpdate?: (payload: {
+    pointer: { x: number; y: number; tool: "pointer" | "laser" };
+    button: "down" | "up";
+  }) => void;
+  onSceneChange?: (
+    elements: readonly any[],
+    appState: any,
+    files: any
+  ) => void;
+  renderTopRightUI?: (isMobile: boolean, appState: any) => React.ReactElement | null;
 }
 
 // Deep sanitize initial data to fix collaborators and other serialization issues
@@ -47,15 +57,20 @@ export default function CanvasCore({
   isLoading: propIsLoading,
   onApiReady,
   isSharedMode,
+  isCollaborating,
+  onPointerUpdate,
+  onSceneChange,
   renderTopRightUI,
 }: CanvasCoreProps) {
   const [initialData, setInitialData] = useState<any>(null);
   const [isReady, setIsReady] = useState(false);
   const { canvasData, setCanvasData, setDirty } = useUnifiedCanvasStore();
   const apiRef = useRef<ExcalidrawAPI | null>(null);
+  const hasInitializedRef = useRef(false);
   
   // Load initial data
   useEffect(() => {
+    if (hasInitializedRef.current) return;
     let dataToLoad = null;
     
     if (canvasData) {
@@ -78,12 +93,13 @@ export default function CanvasCore({
     // Sanitize before setting
     setInitialData(sanitizeInitialData(dataToLoad));
     setIsReady(true);
+    hasInitializedRef.current = true;
   }, [canvasData]);
   
   const handleChange = useCallback((
-    elements: readonly ExcalidrawElement[],
-    appState: ExcalidrawAppState,
-    files: BinaryFileData
+    elements: readonly any[],
+    appState: any,
+    files: any
   ) => {
     setCanvasData({
       elements: [...elements],
@@ -91,15 +107,31 @@ export default function CanvasCore({
       files: { ...files },
     });
     setDirty(true);
-  }, [setCanvasData, setDirty]);
+    onSceneChange?.(elements, appState, files);
+  }, [setCanvasData, setDirty, onSceneChange]);
   
   // Handle API ready - Excalidraw passes API via excalidrawAPI prop callback
-  const handleApiChange = useCallback((api: ExcalidrawAPI) => {
+  const handleApiChange = useCallback((api: any) => {
     if (api && api !== apiRef.current) {
       apiRef.current = api;
       onApiReady(api);
     }
   }, [onApiReady]);
+
+  const UIOptions = useMemo(
+    () => ({
+      canvasActions: {
+        changeViewBackgroundColor: true,
+        clearCanvas: !isSharedMode,
+        export: { saveFileToDisk: true },
+        loadScene: !isSharedMode,
+        saveToActiveFile: !isSharedMode,
+        toggleTheme: true,
+        saveAsImage: true,
+      },
+    }),
+    [isSharedMode]
+  );
   
   if (propIsLoading || !isReady) {
     return (
@@ -116,24 +148,14 @@ export default function CanvasCore({
     );
   }
   
-  const UIOptions = {
-    canvasActions: {
-      changeViewBackgroundColor: true,
-      clearCanvas: !isSharedMode,
-      export: { saveFileToDisk: true },
-      loadScene: !isSharedMode,
-      saveToActiveFile: !isSharedMode,
-      toggleTheme: true,
-      saveAsImage: true,
-    },
-  };
-  
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <Excalidraw
         excalidrawAPI={handleApiChange}
         initialData={initialData}
         onChange={handleChange}
+        isCollaborating={!!isCollaborating}
+        onPointerUpdate={onPointerUpdate}
         theme="light"
         UIOptions={UIOptions}
         name="Untitled Canvas"
@@ -141,10 +163,4 @@ export default function CanvasCore({
       />
     </div>
   );
-}
-
-interface BinaryFileData {
-  mimeType: string;
-  id: string;
-  dataURL?: string;
 }

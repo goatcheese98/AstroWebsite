@@ -15,6 +15,7 @@ import {
   isCanvasTooLarge,
 } from '@/lib/storage/canvas-storage';
 import { validateCanvasData } from '@/lib/schemas/canvas.schema';
+import type { CanvasData as StoredCanvasData } from '@/lib/types/excalidraw';
 
 export const prerender = false;
 
@@ -57,7 +58,13 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    if (isCanvasTooLarge(canvasData)) {
+    const normalizedCanvasData: StoredCanvasData = {
+      elements: canvasData.elements as StoredCanvasData['elements'],
+      appState: (canvasData.appState || {}) as StoredCanvasData['appState'],
+      files: (canvasData.files || null) as StoredCanvasData['files'],
+    };
+
+    if (isCanvasTooLarge(normalizedCanvasData)) {
       return new Response(
         JSON.stringify({ error: 'Canvas data exceeds 10MB limit' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -85,7 +92,7 @@ export const POST: APIRoute = async (context) => {
     const canvasId = nanoid();
     const r2Key = generateCanvasKey(auth.userId, canvasId);
     // Save to R2 (compressed)
-    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, canvasData);
+    const compressedSize = await saveCanvasToR2Compressed(runtime.env.CANVAS_STORAGE, r2Key, normalizedCanvasData);
 
     // Create D1 record with anonymous_id for dedup
     const canvas = await createCanvas(runtime.env.DB, {

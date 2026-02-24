@@ -106,12 +106,12 @@ export default defineConfig({
     ],
     build: {
         assets: 'assets',
-        // Faster builds: don't inline small assets
-        assetsInlineLimit: 4096,
     },
     vite: {
         build: {
             minify: 'esbuild',
+            // Faster builds: don't inline small assets
+            assetsInlineLimit: 4096,
             rollupOptions: {
                 output: {
                     // Manual chunking for faster builds & better caching
@@ -145,6 +145,7 @@ export default defineConfig({
                 'zod',
                 'html2canvas',
                 'katex',
+                '@msgpack/msgpack',
             ],
             exclude: [],
             force: false, // Don't force re-optimization

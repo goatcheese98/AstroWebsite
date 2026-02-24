@@ -32,8 +32,9 @@ export const createCanvasSlice: StateCreator<
   CanvasSlice
 > = (set, get) => ({
   // === State ===
+  canvasData: null,
   elements: [],
-  appState: defaultAppState,
+  appState: { ...defaultAppState },
   files: null,
   excalidrawAPI: null,
   isExcalidrawReady: false,
@@ -43,8 +44,20 @@ export const createCanvasSlice: StateCreator<
   lastSaved: null,
 
   // === Actions ===
-  setCanvasData: (data: CanvasData) => {
+  setCanvasData: (data: CanvasData | null) => {
+    if (!data) {
+      set({
+        canvasData: null,
+        elements: [],
+        appState: { ...defaultAppState },
+        files: null,
+        isDirty: false,
+      });
+      return;
+    }
+
     set({
+      canvasData: data,
       elements: data.elements || [],
       appState: { ...get().appState, ...data.appState },
       files: data.files || null,
@@ -53,13 +66,39 @@ export const createCanvasSlice: StateCreator<
   },
 
   setElements: (elements: ExcalidrawElement[]) => {
-    set({ elements, isDirty: true });
+    set((state) => ({
+      elements,
+      canvasData: {
+        elements,
+        appState: state.appState,
+        files: state.files,
+      },
+      isDirty: true,
+    }));
   },
 
   setAppState: (appState) => {
     set((state) => ({
       appState: { ...state.appState, ...appState },
+      canvasData: {
+        elements: state.elements,
+        appState: { ...state.appState, ...appState },
+        files: state.files,
+      },
     }));
+  },
+
+  loadCanvasState: (state) => {
+    const canvas = (state as { canvas?: CanvasData })?.canvas || (state as CanvasData);
+    if (!canvas || !Array.isArray(canvas.elements)) return;
+
+    set({
+      canvasData: canvas,
+      elements: canvas.elements || [],
+      appState: { ...defaultAppState, ...(canvas.appState || {}) },
+      files: canvas.files || null,
+      isDirty: false,
+    });
   },
 
   setExcalidrawAPI: (api: ExcalidrawAPI | null) => {
@@ -87,8 +126,9 @@ export const createCanvasSlice: StateCreator<
 
   resetCanvas: () => {
     set({
+      canvasData: null,
       elements: [],
-      appState: defaultAppState,
+      appState: { ...defaultAppState },
       files: null,
       isDirty: false,
       canvasId: null,

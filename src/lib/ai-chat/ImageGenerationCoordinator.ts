@@ -215,7 +215,11 @@ export async function generateImage(
     const result = validateGenerationResponse(data);
 
     // Process image dimensions
-    const processed = await processGeneratedImage(result.imageUrl);
+    const processedBase = await processGeneratedImage(result.imageUrl);
+    const processed: ImageGenerationResult = {
+      ...processedBase,
+      prompt: options.prompt,
+    };
 
     console.log("✅ Image generated successfully");
 

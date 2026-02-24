@@ -40,7 +40,7 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           });
 
           // Connect to PartyKit and send initial state
-          const partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.goatcheese98.partykit.dev";
+          const partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev";
           const wsUrl = `wss://${partyKitHost}/parties/main/${newRoomId}`;
 
           console.log("🌐 Connecting to PartyKit:", wsUrl);
@@ -50,25 +50,21 @@ export default function ShareModal({ isOpen, onClose, currentCanvasState }: Shar
           ws.onopen = () => {
             console.log("✅ Connected to PartyKit, sending initial state...");
 
-            // Send initial canvas state (MessagePack encoded)
+            // Seed room with current scene in native-collab format.
             const message = encode({
-              type: "canvas-update",
-              elements,
-              appState: {
-                viewBackgroundColor: appState.viewBackgroundColor,
-                currentItemStrokeColor: appState.currentItemStrokeColor,
-                currentItemBackgroundColor: appState.currentItemBackgroundColor,
-                currentItemFillStyle: appState.currentItemFillStyle,
-                currentItemStrokeWidth: appState.currentItemStrokeWidth,
-                currentItemRoughness: appState.currentItemRoughness,
-                currentItemOpacity: appState.currentItemOpacity,
-                currentItemFontFamily: appState.currentItemFontFamily,
-                currentItemFontSize: appState.currentItemFontSize,
-                currentItemTextAlign: appState.currentItemTextAlign,
-                currentItemStrokeStyle: appState.currentItemStrokeStyle,
-                currentItemRoundness: appState.currentItemRoundness,
+              type: "scene-update",
+              sceneVersion: Date.now(),
+              scene: {
+                elements,
+                appState: {
+                  viewBackgroundColor: appState.viewBackgroundColor,
+                  gridSize: appState.gridSize ?? null,
+                },
+                files,
               },
-              files,
+              user: {
+                name: "Share Seeder",
+              },
             });
 
             ws.send(message);
