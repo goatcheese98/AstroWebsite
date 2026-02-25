@@ -38,6 +38,10 @@ interface RemoteConfig {
   apiKey?: string;
 }
 
+type GatewayError = Error & {
+  status?: number;
+};
+
 type MaybeKVNamespace = {
   get: (key: string, type?: "text" | "json") => Promise<string | unknown | null>;
   put: (key: string, value: string) => Promise<void>;
@@ -94,7 +98,11 @@ function createRemoteGateway(
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const details = (data && (data.details || data.error)) || `Remote backend returned HTTP ${response.status}`;
-      throw new Error(typeof details === "string" ? details : "Remote backend request failed");
+      const error: GatewayError = new Error(
+        typeof details === "string" ? details : "Remote backend request failed",
+      );
+      error.status = response.status;
+      throw error;
     }
 
     return data as T;

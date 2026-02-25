@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildCanvasSafeImagePrompt,
+  buildPromptRefinerInput,
+} from "./prompts/visual-prompts.mjs";
 
 function parseEnvLine(line) {
   const trimmed = line.trim();
@@ -66,6 +70,8 @@ const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 const GOOGLE_GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || "";
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 const GEMINI_PROMPT_MODEL = process.env.GEMINI_PROMPT_MODEL || process.env.GEMINI_TEXT_MODEL || "gemini-3-flash-preview";
+const ENABLE_PROMPT_REFINER = process.env.ASSISTANT_ENABLE_PROMPT_REFINER === "true";
+const MAX_REQUEST_BODY_BYTES = Number(process.env.ASSISTANT_MAX_BODY_BYTES || 15_000_000);
 
 const state = {
   chatsByOwner: new Map(), // ownerId -> Map(chatId, chat)
@@ -89,13 +95,25 @@ function json(res, status, body) {
 function parseBody(req) {
   return new Promise((resolve) => {
     let data = "";
+    let tooLarge = false;
+
     req.on("data", (chunk) => {
+      if (tooLarge) {
+        return;
+      }
+
       data += chunk;
-      if (data.length > 2_000_000) {
-        req.destroy();
+      if (data.length > MAX_REQUEST_BODY_BYTES) {
+        tooLarge = true;
       }
     });
+
     req.on("end", () => {
+      if (tooLarge) {
+        resolve({ __parseError: "too_large" });
+        return;
+      }
+
       if (!data) {
         resolve({});
         return;
@@ -105,6 +123,10 @@ function parseBody(req) {
       } catch {
         resolve(null);
       }
+    });
+
+    req.on("error", () => {
+      resolve(null);
     });
   });
 }
@@ -217,6 +239,32 @@ function extractCodeBlock(text, language) {
   return match?.[1]?.trim() || null;
 }
 
+function resolveExpert(payload) {
+  const expert = payload?.generation?.expert;
+  if (expert === "general" || expert === "mermaid" || expert === "d2" || expert === "visual") {
+    return expert;
+  }
+
+  const mode = payload?.generation?.mode;
+  if (mode === "mermaid") return "mermaid";
+  if (mode === "d2") return "d2";
+  if (mode === "image" || mode === "sketch") return "visual";
+  return "general";
+}
+
+function resolveMode(payload) {
+  const mode = payload?.generation?.mode;
+  if (mode === "chat" || mode === "mermaid" || mode === "d2" || mode === "image" || mode === "sketch") {
+    return mode;
+  }
+
+  const expert = resolveExpert(payload);
+  if (expert === "mermaid") return "mermaid";
+  if (expert === "d2") return "d2";
+  if (expert === "visual") return "image";
+  return "chat";
+}
+
 function parseDataUrl(dataUrl) {
   if (typeof dataUrl !== "string") return null;
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -227,77 +275,6 @@ function parseDataUrl(dataUrl) {
 function bytesFromBase64(base64) {
   const sanitized = base64.replace(/\s+/g, "");
   return Math.floor((sanitized.length * 3) / 4);
-}
-
-function buildSketchStyleHint(style) {
-  switch (style) {
-    case "hand-drawn":
-      return "hand-drawn marker strokes, gentle wobble, human sketch character";
-    case "technical":
-      return "technical drafting look, straight controlled lines, engineering sketch clarity";
-    case "organic":
-      return "organic curves, softer irregular lines, natural freeform shapes";
-    default:
-      return "clean whiteboard illustration style with precise boundaries";
-  }
-}
-
-function buildSketchComplexityHint(complexity) {
-  switch (complexity) {
-    case "low":
-      return "minimal detail, large simple shapes, low visual density";
-    case "high":
-      return "high detail, rich structure, many meaningful sub-parts";
-    default:
-      return "balanced detail with clear hierarchy";
-  }
-}
-
-function buildCanvasSafeImagePrompt({ mode, text, sketch, hasReferenceImage }) {
-  const base = [
-    "Generate a single whiteboard-friendly visual asset for composition inside Excalidraw.",
-    "MANDATORY background rules:",
-    "- solid pure white background (#FFFFFF)",
-    "- no checkerboard pattern, no transparency grid, no paper texture",
-    "- no background objects, no sky, no room",
-    "- no shadow plane, no glow halo, no border frame",
-    "- keep the subject isolated and centered with padding",
-    "MANDATORY rendering rules:",
-    "- crisp silhouette and edges",
-    "- high subject/background separation",
-    "- avoid anti-aliased matte/fringe around the subject edges",
-    "- no watermark, no text overlay unless explicitly requested",
-    "- output should read clearly when scaled down on a canvas",
-    `User request: ${text}`,
-  ];
-
-  if (mode === "sketch") {
-    const style = sketch?.style || "clean";
-    const complexity = sketch?.complexity || "medium";
-    const colorPalette = Number.isFinite(sketch?.colorPalette) ? Math.max(2, Math.min(32, sketch.colorPalette)) : 8;
-    const detailLevel = Number.isFinite(sketch?.detailLevel) ? Math.max(0.2, Math.min(1, sketch.detailLevel)) : 0.75;
-    const edgeSensitivity = Number.isFinite(sketch?.edgeSensitivity)
-      ? Math.max(1, Math.min(100, sketch.edgeSensitivity))
-      : 18;
-
-    base.push("Sketch-specific rules:");
-    base.push(`- style: ${buildSketchStyleHint(style)}`);
-    base.push(`- complexity: ${buildSketchComplexityHint(complexity)}`);
-    base.push(`- color palette target: about ${colorPalette} dominant colors`);
-    base.push(`- detail level target: ${detailLevel.toFixed(2)} (0=minimal, 1=very detailed)`);
-    base.push(`- edge sensitivity target: ${edgeSensitivity} (favor edge clarity over smooth gradients)`);
-    base.push("- shapes should be segmentable for later vector conversion");
-  } else {
-    base.push("Image-specific rules:");
-    base.push("- deliver a clean standalone subject for direct canvas placement");
-    base.push("- keep empty white margins around the subject");
-  }
-
-  if (hasReferenceImage) {
-    base.push("Use the provided reference image for composition/content guidance while preserving all white-background constraints.");
-  }
-
-  return base.join("\n");
 }
 
 async function geminiGenerateContent({ model, contents, generationConfig }) {
@@ -413,14 +390,7 @@ async function refineCanvasPrompt(prompt, mode) {
         role: "user",
         parts: [
           {
-            text: [
-              "Rewrite this image generation prompt for maximum fidelity and composability in Excalidraw.",
-              "Do not remove hard constraints about the white background and subject isolation.",
-              "Output plain prompt text only (no markdown, no bullets prefix decoration).",
-              `Mode: ${mode}`,
-              "",
-              prompt,
-            ].join("\n"),
+            text: buildPromptRefinerInput(prompt, mode),
           },
         ],
       },
@@ -443,13 +413,16 @@ async function generateCanvasImageWithGemini(payload, mode) {
     mode,
     text: payload?.text || "",
     sketch: payload?.generation?.sketch,
+    visual: payload?.generation?.visual,
     hasReferenceImage: !!includeReference,
   });
 
-  try {
-    prompt = await refineCanvasPrompt(prompt, mode);
-  } catch {
-    // Keep base prompt if prompt refiner model is unavailable.
+  if (ENABLE_PROMPT_REFINER) {
+    try {
+      prompt = await refineCanvasPrompt(prompt, mode);
+    } catch {
+      // Keep base prompt if prompt refiner model is unavailable.
+    }
   }
 
   const parts = [{ text: prompt }];
@@ -504,7 +477,7 @@ async function runWorkerTask(task) {
   const assistant = messages.find((item) => item.id === task.messageId);
 
   try {
-    const mode = task.payload.generation?.mode;
+    const mode = resolveMode(task.payload);
     let text = "";
     let artifacts = [];
 
@@ -541,15 +514,16 @@ async function runWorkerTask(task) {
         dataUrl: generated.dataUrl,
         width: generated.width,
         height: generated.height,
-        source: mode,
+        source: "image",
+        ...(task.payload?.generation?.visual
+          ? { visual: task.payload.generation.visual }
+          : {}),
         ...(mode === "sketch" && task.payload?.generation?.sketch
           ? { sketchControls: task.payload.generation.sketch }
           : {}),
       });
 
-      text = mode === "sketch"
-        ? "Sketch image is ready. Add it directly, or vectorize it into editable canvas shapes."
-        : "Image asset is ready. Add it to canvas.";
+      text = "Image asset is ready. Add it directly, or vectorize it into editable canvas shapes.";
     } else {
       throw new Error(`Unsupported generation mode: ${mode || "unknown"}`);
     }
@@ -625,6 +599,13 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/v1/assistant/chats") {
       const body = await parseBody(req);
+      if (body && body.__parseError === "too_large") {
+        json(res, 413, {
+          error: `Request body too large (limit ${MAX_REQUEST_BODY_BYTES} bytes)`,
+        });
+        return;
+      }
+
       if (!body) {
         json(res, 400, { error: "Invalid JSON" });
         return;
@@ -666,6 +647,13 @@ const server = createServer(async (req, res) => {
 
       if (req.method === "POST") {
         const body = await parseBody(req);
+        if (body && body.__parseError === "too_large") {
+          json(res, 413, {
+            error: `Request body too large (limit ${MAX_REQUEST_BODY_BYTES} bytes). Try disabling canvas reference or selecting fewer elements.`,
+          });
+          return;
+        }
+
         const payload = body && typeof body === "object" && typeof body.payload === "object"
           ? body.payload
           : body;
@@ -676,7 +664,8 @@ const server = createServer(async (req, res) => {
         }
 
         const text = payload.text.trim();
-        const mode = payload.generation?.mode || "chat";
+        const mode = resolveMode(payload);
+        const expert = resolveExpert(payload);
 
         const userMessage = {
           id: randomUUID(),
@@ -743,6 +732,7 @@ const server = createServer(async (req, res) => {
             id: randomUUID(),
             chatId,
             role: "assistant",
+            expert,
             text: reply.trim(),
             status,
             createdAt: now(),
@@ -763,6 +753,7 @@ const server = createServer(async (req, res) => {
           id: randomUUID(),
           chatId,
           role: "assistant",
+          expert,
           text: "Queued generation job...",
           status: "pending",
           createdAt: now(),
@@ -777,7 +768,7 @@ const server = createServer(async (req, res) => {
           ownerId: owner,
           chatId,
           assistantMessageId: assistantMessage.id,
-          type: mode === "image" ? "image" : mode === "sketch" ? "sketch" : "diagram",
+          type: mode === "image" || mode === "sketch" ? "image" : "diagram",
           status: "queued",
           progress: 0,
           createdAt: now(),

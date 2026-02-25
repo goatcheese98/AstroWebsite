@@ -11,6 +11,7 @@ import {
 } from "./runtime-store";
 import type {
   AssistantArtifact,
+  AssistantExpert,
   AssistantGenerationConfig,
   AssistantJob,
   AssistantSendMessageInput,
@@ -36,14 +37,44 @@ function trimForPreview(text: string): string {
   return text.trim().slice(0, 2400);
 }
 
+function expertFromGeneration(generation: AssistantGenerationConfig): AssistantExpert {
+  if (
+    generation.expert === "general" ||
+    generation.expert === "mermaid" ||
+    generation.expert === "d2" ||
+    generation.expert === "visual"
+  ) {
+    return generation.expert;
+  }
+
+  if (generation.mode === "mermaid") return "mermaid";
+  if (generation.mode === "d2") return "d2";
+  if (generation.mode === "image" || generation.mode === "sketch") return "visual";
+  return "general";
+}
+
+function modeFromGeneration(generation: AssistantGenerationConfig) {
+  const mode = generation.mode;
+  if (mode === "chat" || mode === "mermaid" || mode === "d2" || mode === "image" || mode === "sketch") {
+    return mode;
+  }
+
+  const expert = expertFromGeneration(generation);
+  if (expert === "mermaid") return "mermaid";
+  if (expert === "d2") return "d2";
+  if (expert === "visual") return "image";
+  return "chat";
+}
+
 function buildSystemPrompt(generation: AssistantGenerationConfig): string {
+  const mode = modeFromGeneration(generation);
   const base = [
     "You are a precise whiteboard assistant.",
     "Respond concisely with deterministic outputs.",
     "Prefer practical outputs that can be rendered in a diagram canvas.",
   ];
 
-  if (generation.mode === "sketch" && generation.sketch) {
+  if (mode === "sketch" && generation.sketch) {
     base.push(
       `Sketch style=${generation.sketch.style}, complexity=${generation.sketch.complexity}, palette=${generation.sketch.colorPalette}, detail=${generation.sketch.detailLevel}, edgeSensitivity=${generation.sketch.edgeSensitivity}.`,
     );
@@ -71,7 +102,9 @@ async function generateDiagramArtifacts(
   input: AssistantSendMessageInput,
   config: LocalAssistantRuntimeConfig,
 ): Promise<AssistantArtifact[]> {
-  if (input.generation.mode === "d2") {
+  const mode = modeFromGeneration(input.generation);
+
+  if (mode === "d2") {
     let d2Code = extractCodeBlock(input.text, "d2") || input.text.trim();
 
     if (!extractCodeBlock(input.text, "d2") && config.anthropicApiKey) {
@@ -114,15 +147,16 @@ async function processJob(
   input: AssistantSendMessageInput,
   config: LocalAssistantRuntimeConfig,
 ): Promise<void> {
+  const mode = modeFromGeneration(input.generation);
   updateJob(ownerId, job.id, { status: "running", progress: 12 });
 
   try {
     let text = "";
     let artifacts: AssistantArtifact[] = [];
 
-    if (input.generation.mode === "mermaid" || input.generation.mode === "d2") {
+    if (mode === "mermaid" || mode === "d2") {
       artifacts = await generateDiagramArtifacts(input, config);
-      text = input.generation.mode === "mermaid"
+      text = mode === "mermaid"
         ? "Mermaid diagram is ready. Add it to canvas or edit the source."
         : "D2 diagram is ready. Add it to canvas or edit the source.";
       updateJob(ownerId, job.id, { progress: 100, status: "completed" });
@@ -182,6 +216,8 @@ export async function sendAssistantMessage(
   input: AssistantSendMessageInput,
   config: LocalAssistantRuntimeConfig,
 ): Promise<AssistantSendMessageResult> {
+  const mode = modeFromGeneration(input.generation);
+  const expert = expertFromGeneration(input.generation);
   const chat = getChat(ownerId, chatId);
   if (!chat) {
     throw new Error("Chat not found");
@@ -195,7 +231,7 @@ export async function sendAssistantMessage(
     artifacts: [],
   });
 
-  if (input.generation.mode === "chat") {
+  if (mode === "chat") {
     const history = listMessages(ownerId, chatId).slice(-20);
     const systemPrompt = buildSystemPrompt(input.generation);
 
@@ -244,6 +280,7 @@ export async function sendAssistantMessage(
     const assistantMessage = addMessage(ownerId, {
       chatId,
       role: "assistant",
+      expert,
       text: trimForPreview(replyText),
       status: assistantStatus,
       artifacts,
@@ -259,7 +296,8 @@ export async function sendAssistantMessage(
   const assistantMessage = addMessage(ownerId, {
     chatId,
     role: "assistant",
-    text: pickPendingText(input.generation.mode),
+    expert,
+    text: pickPendingText(mode),
     status: "pending",
     artifacts: [],
   });
@@ -268,9 +306,9 @@ export async function sendAssistantMessage(
     chatId,
     assistantMessageId: assistantMessage.id,
     type:
-      input.generation.mode === "image"
+      mode === "image"
         ? "image"
-        : input.generation.mode === "sketch"
+        : mode === "sketch"
           ? "sketch"
           : "diagram",
     status: "queued",

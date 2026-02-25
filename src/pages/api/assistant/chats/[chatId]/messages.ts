@@ -1,7 +1,9 @@
 import type { APIRoute } from "astro";
 import type {
+  AssistantExpert,
   AssistantMode,
   AssistantSendMessageInput,
+  VisualColorMode,
   SketchComplexity,
   SketchStyle,
 } from "@/lib/assistant/types";
@@ -9,16 +11,60 @@ import { createAssistantGateway } from "@/lib/assistant/backend-boundary";
 
 export const prerender = false;
 
+function errorStatus(error: unknown, fallback: number): number {
+  const status = (error as { status?: unknown })?.status;
+  if (typeof status === "number" && status >= 400 && status <= 599) {
+    return status;
+  }
+  return fallback;
+}
+
 function toMode(value: unknown): AssistantMode {
+  if (value === "sketch") {
+    return "image";
+  }
+
   if (
     value === "mermaid" ||
     value === "d2" ||
-    value === "image" ||
-    value === "sketch"
+    value === "image"
   ) {
     return value;
   }
   return "chat";
+}
+
+function toExpert(value: unknown, fallbackMode: AssistantMode): AssistantExpert {
+  if (
+    value === "general" ||
+    value === "mermaid" ||
+    value === "d2" ||
+    value === "visual"
+  ) {
+    return value;
+  }
+
+  if (fallbackMode === "mermaid") return "mermaid";
+  if (fallbackMode === "d2") return "d2";
+  if (fallbackMode === "image" || fallbackMode === "sketch") return "visual";
+  return "general";
+}
+
+function modeFromExpert(expert: AssistantExpert): AssistantMode {
+  switch (expert) {
+    case "mermaid":
+      return "mermaid";
+    case "d2":
+      return "d2";
+    case "visual":
+      return "image";
+    default:
+      return "chat";
+  }
+}
+
+function toColorMode(value: unknown): VisualColorMode {
+  return value === "bw" ? "bw" : "color";
 }
 
 function toStyle(value: unknown): SketchStyle {
@@ -64,7 +110,7 @@ export const GET: APIRoute = async (context) => {
         error: "Failed to list messages",
         details: error instanceof Error ? error.message : "Unknown error",
       }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: errorStatus(error, 400), headers: { "Content-Type": "application/json" } },
     );
   }
 };
@@ -104,7 +150,9 @@ export const POST: APIRoute = async (context) => {
     const clientId =
       typeof requestPayload.clientId === "string" ? requestPayload.clientId : undefined;
     const text = typeof requestPayload.text === "string" ? requestPayload.text : "";
-    const mode = toMode(requestPayload.generation?.mode);
+    const legacyMode = toMode(requestPayload.generation?.mode);
+    const expert = toExpert(requestPayload.generation?.expert, legacyMode);
+    const mode = modeFromExpert(expert);
 
     if (!text.trim()) {
       return new Response(JSON.stringify({ error: "Message text is required" }), {
@@ -116,24 +164,32 @@ export const POST: APIRoute = async (context) => {
     const payload: AssistantSendMessageInput = {
       text,
       generation: {
+        expert,
         mode,
         sourceImageDataUrl:
           typeof requestPayload.generation?.sourceImageDataUrl === "string"
             ? requestPayload.generation.sourceImageDataUrl
             : undefined,
-        sketch: {
-          style: toStyle(requestPayload.generation?.sketch?.style),
-          complexity: toComplexity(requestPayload.generation?.sketch?.complexity),
-          colorPalette: Number.isFinite(requestPayload.generation?.sketch?.colorPalette)
-            ? Number(requestPayload.generation.sketch.colorPalette)
-            : 8,
-          detailLevel: Number.isFinite(requestPayload.generation?.sketch?.detailLevel)
-            ? Number(requestPayload.generation.sketch.detailLevel)
-            : 0.7,
-          edgeSensitivity: Number.isFinite(requestPayload.generation?.sketch?.edgeSensitivity)
-            ? Number(requestPayload.generation.sketch.edgeSensitivity)
-            : 18,
+        visual: {
+          colorMode: toColorMode(requestPayload.generation?.visual?.colorMode),
         },
+        ...(requestPayload.generation?.sketch
+          ? {
+              sketch: {
+                style: toStyle(requestPayload.generation?.sketch?.style),
+                complexity: toComplexity(requestPayload.generation?.sketch?.complexity),
+                colorPalette: Number.isFinite(requestPayload.generation?.sketch?.colorPalette)
+                  ? Number(requestPayload.generation.sketch.colorPalette)
+                  : 16,
+                detailLevel: Number.isFinite(requestPayload.generation?.sketch?.detailLevel)
+                  ? Number(requestPayload.generation.sketch.detailLevel)
+                  : 0.7,
+                edgeSensitivity: Number.isFinite(requestPayload.generation?.sketch?.edgeSensitivity)
+                  ? Number(requestPayload.generation.sketch.edgeSensitivity)
+                  : 18,
+              },
+            }
+          : {}),
       },
     };
 
@@ -154,7 +210,7 @@ export const POST: APIRoute = async (context) => {
         error: "Failed to send message",
         details: error instanceof Error ? error.message : "Unknown error",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: errorStatus(error, 500), headers: { "Content-Type": "application/json" } },
     );
   }
 };

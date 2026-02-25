@@ -4,12 +4,13 @@
  * Renders canvas overlays and handles command-driven canvas actions.
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useUnifiedCanvasStore,
   useExcalidrawAPISafe,
   useCommandSubscriber,
   type ExcalidrawElement,
+  type Toast,
 } from '@/stores';
 import { convertToExcalidrawElements as convertToExcalidrawElementsRaw } from "@excalidraw/excalidraw";
 import { nanoid } from 'nanoid';
@@ -42,6 +43,12 @@ interface CanvasUIProps {
   isCollaborating: boolean;
 }
 
+const TOAST_EXIT_DURATION_MS = 220;
+
+type RenderedToast = Toast & {
+  isExiting: boolean;
+};
+
 export default function CanvasUI({
   isSharedMode,
   isCollaborating,
@@ -58,10 +65,52 @@ export default function CanvasUI({
     lastSaved,
     setChatOpen,
     setChatMinimized,
+    toggleChat,
     setAssetsOpen,
     removeToast,
     addToast,
   } = store;
+  const [renderedToasts, setRenderedToasts] = useState<RenderedToast[]>([]);
+
+  useEffect(() => {
+    setRenderedToasts((current) => {
+      const incoming = new Map(toasts.map((toast) => [toast.id, toast]));
+
+      const merged = current.map((toast) => {
+        const next = incoming.get(toast.id);
+        if (next) {
+          return { ...toast, ...next, isExiting: false };
+        }
+        return toast.isExiting ? toast : { ...toast, isExiting: true };
+      });
+
+      const knownIds = new Set(current.map((toast) => toast.id));
+      for (const toast of toasts) {
+        if (!knownIds.has(toast.id)) {
+          merged.push({ ...toast, isExiting: false });
+        }
+      }
+
+      return merged;
+    });
+  }, [toasts]);
+
+  useEffect(() => {
+    const exitingToasts = renderedToasts.filter((toast) => toast.isExiting);
+    if (exitingToasts.length === 0) {
+      return;
+    }
+
+    const timers = exitingToasts.map((toast) =>
+      setTimeout(() => {
+        setRenderedToasts((current) => current.filter((item) => item.id !== toast.id));
+      }, TOAST_EXIT_DURATION_MS)
+    );
+
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
+  }, [renderedToasts]);
 
   // Listen for AI chat drawing commands (excalidraw:draw event)
   useEffect(() => {
@@ -251,44 +300,8 @@ export default function CanvasUI({
       const { elements, isModification } = payload;
       
       try {
-        // Ensure all elements have required Excalidraw properties
-        let elementsToAdd = (elements as CanvasElementInput[]).map((el): ExcalidrawElement => {
-          const normalized: ExcalidrawElement = {
-          type: el.type || 'rectangle',
-          x: el.x ?? 0,
-          y: el.y ?? 0,
-          width: el.width ?? 100,
-          height: el.height ?? 100,
-          id: el.id || nanoid(),
-          // Required Excalidraw properties
-          angle: el.angle ?? 0,
-          strokeColor: el.strokeColor ?? '#000000',
-          backgroundColor: el.backgroundColor ?? 'transparent',
-          fillStyle: el.fillStyle ?? 'hachure',
-          strokeWidth: el.strokeWidth ?? 1,
-          strokeStyle: el.strokeStyle ?? 'solid',
-          roughness: el.roughness ?? 1,
-          opacity: el.opacity ?? 100,
-          roundness: el.roundness ?? null,
-          seed: el.seed ?? Math.floor(Math.random() * 100000),
-          version: el.version ?? 1,
-          versionNonce: el.versionNonce ?? Date.now(),
-          isDeleted: el.isDeleted ?? false,
-          groupIds: el.groupIds ?? [],
-          frameId: el.frameId ?? null,
-          boundElements: el.boundElements ?? null,
-          updated: el.updated ?? Date.now(),
-          link: el.link ?? null,
-          locked: el.locked ?? false,
-          };
-
-          if (typeof el.text === "string") normalized.text = el.text;
-          if (typeof el.fontSize === "number") normalized.fontSize = el.fontSize;
-          if (typeof el.fontFamily === "number") normalized.fontFamily = el.fontFamily;
-          if (Array.isArray(el.points)) normalized.points = el.points;
-
-          return normalized;
-        });
+        // Let Excalidraw normalize element internals (especially text fields).
+        let elementsToAdd = (elements as CanvasElementInput[]).map((el) => ({ ...el }));
         
         if (!isModification) {
           // Center elements on viewport
@@ -300,7 +313,7 @@ export default function CanvasUI({
 
           // Calculate bounding box
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          elementsToAdd.forEach((el: ExcalidrawElement) => {
+          elementsToAdd.forEach((el: CanvasElementInput) => {
             const x = el.x || 0;
             const y = el.y || 0;
             const w = el.width || 100;
@@ -316,15 +329,23 @@ export default function CanvasUI({
           const offsetX = sceneX - elementsCenterX;
           const offsetY = sceneY - elementsCenterY;
 
-          elementsToAdd = elementsToAdd.map((el: ExcalidrawElement) => ({
+          elementsToAdd = elementsToAdd.map((el: CanvasElementInput) => ({
             ...el,
-            x: el.x + offsetX,
-            y: el.y + offsetY,
+            x: (el.x ?? 0) + offsetX,
+            y: (el.y ?? 0) + offsetY,
           }));
         }
 
+        const converted = convertToSceneElements(elementsToAdd as CanvasElementInput[]);
+        const withCustomData = converted.map((el, index) => {
+          const customData = elementsToAdd[index]?.customData;
+          return typeof customData === 'object' && customData !== null
+            ? ({ ...el, customData } as ExcalidrawElement)
+            : el;
+        });
+
         const currentElements = api.getSceneElements();
-        api.updateScene({ elements: [...currentElements, ...elementsToAdd] });
+        api.updateScene({ elements: [...currentElements, ...withCustomData] });
         
         addToast('Elements added to canvas', 'success');
       } catch (err) {
@@ -524,15 +545,15 @@ export default function CanvasUI({
     }
   }, [api]);
 
-  // Open the unified assistant in image mode.
+  // Open the assistant with the visual expert selected.
   const handleGenerateImage = useCallback(() => {
     if (isChatMinimized) {
       setChatMinimized(false);
     }
     setChatOpen(true);
     window.dispatchEvent(
-      new CustomEvent('assistant:set-mode', {
-        detail: { mode: 'image' },
+      new CustomEvent('assistant:set-expert', {
+        detail: { expert: 'visual' },
       }),
     );
   }, [isChatMinimized, setChatMinimized, setChatOpen]);
@@ -599,30 +620,6 @@ export default function CanvasUI({
     <>
       {/* Right-side quick actions (restored) */}
       <div className="aw-canvas-controls">
-        <button
-          className="aw-control-btn"
-          onClick={() => runCanvasAction('generate-image')}
-          title="Generate image"
-          aria-label="Generate image"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
-          <span className="aw-label">Generate image</span>
-        </button>
-        <button
-          className={`aw-control-btn${isChatOpen ? ' active' : ''}`}
-          onClick={() => runCanvasAction('open-chat')}
-          title="AI chat"
-          aria-label="Open AI chat"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          <span className="aw-label">AI chat</span>
-        </button>
         <button
           className={`aw-control-btn${isAssetsOpen ? ' active' : ''}`}
           onClick={() => runCanvasAction('open-icons')}
@@ -716,9 +713,20 @@ export default function CanvasUI({
       {isChatOpen && (
         <AIChatContainer
           isOpen={isChatOpen}
-          onClose={() => setChatOpen(false)}
         />
       )}
+
+      <button
+        className={`aw-assistant-launcher${isChatOpen && !isChatMinimized ? ' active' : ''}`}
+        onClick={toggleChat}
+        aria-label={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
+        title={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+        </svg>
+        <span>Assistant</span>
+      </button>
 
       {/* Icon Library Panel */}
       <IconLibrary
@@ -727,22 +735,14 @@ export default function CanvasUI({
       />
 
       {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          bottom: 20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}>
-          {toasts.map((toast) => (
+      {renderedToasts.length > 0 && (
+        <div className="aw-toast-viewport">
+          {renderedToasts.map((toast) => (
             <ToastNotification
               key={toast.id}
               toast={toast}
-              onRemove={removeToast}
+              isExiting={toast.isExiting}
+              onDismiss={removeToast}
             />
           ))}
         </div>
@@ -835,12 +835,77 @@ export default function CanvasUI({
           margin: 4px 6px;
         }
 
+        .aw-toast-viewport {
+          position: fixed;
+          left: 50%;
+          bottom: 18px;
+          transform: translateX(-50%);
+          z-index: 1200;
+          width: min(560px, calc(100vw - 16px));
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          pointer-events: none;
+        }
+
+        .aw-toast-viewport > * {
+          pointer-events: auto;
+        }
+
+        .aw-assistant-launcher {
+          position: fixed;
+          right: 74px;
+          bottom: 16px;
+          z-index: 1002;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid rgba(203, 213, 225, 0.9);
+          background: rgba(255, 255, 255, 0.84);
+          color: #0f172a;
+          border-radius: 999px;
+          padding: 10px 14px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+          backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
+          -webkit-backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
+          transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .aw-assistant-launcher:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 13px 28px rgba(15, 23, 42, 0.16);
+        }
+
+        .aw-assistant-launcher.active {
+          border-color: #93c5fd;
+          background: rgba(239, 246, 255, 0.9);
+          color: #1e40af;
+          right: 16px;
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          justify-content: center;
+          border-radius: 12px;
+        }
+
+        .aw-assistant-launcher.active span {
+          display: none;
+        }
+
         @media (max-width: 768px) {
           .aw-canvas-controls {
             right: 8px;
             top: auto;
             bottom: 80px;
             padding: 2px;
+          }
+
+          .aw-toast-viewport {
+            width: calc(100vw - 12px);
+            bottom: 10px;
           }
 
           .aw-control-btn {
@@ -850,6 +915,20 @@ export default function CanvasUI({
 
           .aw-control-btn:hover .aw-label {
             display: none;
+          }
+
+          .aw-assistant-launcher {
+            right: 68px;
+            bottom: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+          }
+
+          .aw-assistant-launcher.active {
+            right: 12px;
+            width: 38px;
+            height: 38px;
+            padding: 0;
           }
         }
       `}</style>

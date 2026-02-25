@@ -71,6 +71,24 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
     if (!pendingCommand) return;
 
     const commandKey = `${pendingCommand.type}-${pendingCommand.timestamp}`;
+    const { type, payload } = pendingCommand;
+    const currentHandlers = handlersRef.current;
+
+    // Resolve the target handler before claiming. This avoids races where a
+    // subscriber without a matching handler claims and rejects the command.
+    const handlerName = COMMAND_TO_HANDLER[type];
+    if (!handlerName) {
+      const error = new Error(`Unknown command type: ${type}`);
+      console.error('[useCommandSubscriber]', error);
+      rejectCommand(error);
+      currentHandlers.onError?.(type, error);
+      return;
+    }
+
+    const handler = currentHandlers[handlerName];
+    if (!handler || typeof handler !== 'function') {
+      return;
+    }
     
     // Try to claim this command atomically
     if (globalClaimedCommands.has(commandKey)) {
@@ -86,39 +104,10 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
       globalClaimedCommands.delete(commandKey);
     };
 
-    const { type, payload } = pendingCommand;
-    const currentHandlers = handlersRef.current;
-
     console.log('[useCommandSubscriber] Claimed command:', type);
 
     // Notify general command handler
     currentHandlers.onCommand?.(type, payload);
-
-    // Get handler name from command type
-    const handlerName = COMMAND_TO_HANDLER[type];
-    
-    if (!handlerName) {
-      const error = new Error(`Unknown command type: ${type}`);
-      console.error('[useCommandSubscriber]', error);
-      rejectCommand(error);
-      currentHandlers.onError?.(type, error);
-      cleanup();
-      return;
-    }
-
-    // Get specific handler
-    const handler = currentHandlers[handlerName];
-
-    if (!handler || typeof handler !== 'function') {
-      // No handler for this command - reject and let other subscribers try
-      const error = new Error(`No handler for command: ${type}`);
-      console.warn('[useCommandSubscriber] No handler, releasing claim:', type);
-      globalClaimedCommands.delete(commandKey);
-      rejectCommand(error);
-      currentHandlers.onError?.(type, error);
-      cleanup();
-      return;
-    }
 
     // Execute handler
     Promise.resolve()

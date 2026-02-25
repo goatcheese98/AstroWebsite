@@ -1,6 +1,13 @@
 export type AssistantRole = "user" | "assistant" | "system";
 
 export type AssistantMode = "chat" | "mermaid" | "d2" | "image" | "sketch";
+export type AssistantExpert = "general" | "mermaid" | "d2" | "visual";
+
+export type VisualColorMode = "color" | "bw";
+
+export interface VisualGenerationOptions {
+  colorMode: VisualColorMode;
+}
 
 export type SketchStyle = "clean" | "hand-drawn" | "technical" | "organic";
 export type SketchComplexity = "low" | "medium" | "high";
@@ -14,8 +21,10 @@ export interface SketchControls {
 }
 
 export interface AssistantGenerationConfig {
-  mode: AssistantMode;
+  expert?: AssistantExpert;
+  mode?: AssistantMode;
   sourceImageDataUrl?: string;
+  visual?: VisualGenerationOptions;
   sketch?: SketchControls;
 }
 
@@ -32,6 +41,7 @@ export type AssistantArtifact =
       width: number;
       height: number;
       source: "image" | "sketch";
+      visual?: VisualGenerationOptions;
       sketchControls?: SketchControls;
     }
   | {
@@ -44,6 +54,7 @@ export interface AssistantMessage {
   id: string;
   chatId: string;
   role: AssistantRole;
+  expert?: AssistantExpert;
   text: string;
   status: "pending" | "complete" | "failed";
   createdAt: number;

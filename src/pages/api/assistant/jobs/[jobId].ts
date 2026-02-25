@@ -3,6 +3,14 @@ import { createAssistantGateway } from "@/lib/assistant/backend-boundary";
 
 export const prerender = false;
 
+function errorStatus(error: unknown, fallback: number): number {
+  const status = (error as { status?: unknown })?.status;
+  if (typeof status === "number" && status >= 400 && status <= 599) {
+    return status;
+  }
+  return fallback;
+}
+
 export const GET: APIRoute = async (context) => {
   try {
     const jobId = context.params.jobId;
@@ -39,7 +47,7 @@ export const GET: APIRoute = async (context) => {
         error: "Failed to fetch job",
         details: error instanceof Error ? error.message : "Unknown error",
       }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: errorStatus(error, 400), headers: { "Content-Type": "application/json" } },
     );
   }
 };

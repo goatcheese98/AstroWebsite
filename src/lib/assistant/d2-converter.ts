@@ -15,6 +15,14 @@ function cleanLabel(value: string): string {
   return value.replace(/^"|"$/g, "").trim();
 }
 
+function normalizeLabel(value: string | undefined, fallback: string): string {
+  const candidate = (value || "").trim();
+  if (!candidate || candidate.toLowerCase() === "undefined" || candidate.toLowerCase() === "null") {
+    return fallback;
+  }
+  return candidate;
+}
+
 function parseD2(input: string): { nodes: NodeSpec[]; edges: EdgeSpec[] } {
   const lines = input
     .split("\n")
@@ -38,15 +46,19 @@ function parseD2(input: string): { nodes: NodeSpec[]; edges: EdgeSpec[] } {
         nodeMap.set(to, { id: to, label: to });
       }
 
-      edges.push({ from, to, label });
+      edges.push({
+        from,
+        to,
+        label: label && label.toLowerCase() !== "undefined" ? label : undefined,
+      });
       continue;
     }
 
     const nodeMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.+)$/);
     if (nodeMatch) {
       const id = nodeMatch[1];
-      const label = cleanLabel(nodeMatch[2]);
-      nodeMap.set(id, { id, label: label || id });
+      const label = normalizeLabel(cleanLabel(nodeMatch[2]), id);
+      nodeMap.set(id, { id, label });
     }
   }
 
@@ -112,8 +124,13 @@ export function convertD2ToExcalidrawElements(source: string): unknown[] {
       width: node.width - 32,
       height: 20,
       text: node.label,
+      originalText: node.label,
       fontSize: 20,
       fontFamily: 3,
+      textAlign: "left",
+      verticalAlign: "top",
+      lineHeight: 1.25,
+      baseline: 24,
       strokeColor: "#111827",
       backgroundColor: "transparent",
       fillStyle: "solid",
@@ -164,8 +181,13 @@ export function convertD2ToExcalidrawElements(source: string): unknown[] {
         width: edge.label.length * 8,
         height: 16,
         text: edge.label,
+        originalText: edge.label,
         fontSize: 14,
         fontFamily: 3,
+        textAlign: "left",
+        verticalAlign: "top",
+        lineHeight: 1.25,
+        baseline: 17,
         strokeColor: "#475569",
         backgroundColor: "#ffffff",
         fillStyle: "solid",
