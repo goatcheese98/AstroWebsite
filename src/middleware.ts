@@ -34,4 +34,16 @@ const canvasRouting = defineMiddleware(async (context, next) => {
   return next();
 });
 
-export const onRequest = sequence(clerkMiddleware(), canvasRouting);
+const withClerk = sequence(clerkMiddleware(), canvasRouting);
+const withoutClerk = sequence(canvasRouting);
+
+export const onRequest = defineMiddleware(async (context, next) => {
+  const pathname = new URL(context.request.url).pathname;
+
+  // Avoid Clerk consuming request streams for assistant API payloads.
+  if (pathname.startsWith('/api/assistant/')) {
+    return withoutClerk(context, next);
+  }
+
+  return withClerk(context, next);
+});

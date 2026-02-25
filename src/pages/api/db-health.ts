@@ -58,7 +58,6 @@ export const GET: APIRoute = async ({ locals }) => {
       'verification_tokens',
       'canvases',
       'canvas_versions',
-      'canvas_shares',
     ];
 
     const missingTables = requiredTables.filter((t) => !tables.includes(t));
@@ -78,6 +77,7 @@ export const GET: APIRoute = async ({ locals }) => {
     const kvStatus = {
       SESSION_KV: !!runtime.env.SESSION_KV,
       RATE_LIMIT_KV: !!runtime.env.RATE_LIMIT_KV,
+      CANVAS_KV: !!runtime.env.CANVAS_KV,
     };
 
     // Check R2 binding
@@ -90,7 +90,8 @@ export const GET: APIRoute = async ({ locals }) => {
       BETTER_AUTH_SECRET: !!runtime.env.BETTER_AUTH_SECRET,
       BETTER_AUTH_URL: !!runtime.env.BETTER_AUTH_URL,
       ANTHROPIC_API_KEY: !!runtime.env.ANTHROPIC_API_KEY,
-      GOOGLE_GEMINI_API_KEY: !!runtime.env.GOOGLE_GEMINI_API_KEY,
+      AI_BACKEND_BASE_URL: !!runtime.env.AI_BACKEND_BASE_URL,
+      AI_BACKEND_API_KEY: !!runtime.env.AI_BACKEND_API_KEY,
       GOOGLE_CLIENT_ID: !!runtime.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: !!runtime.env.GOOGLE_CLIENT_SECRET,
       GITHUB_CLIENT_ID: !!runtime.env.GITHUB_CLIENT_ID,
@@ -126,7 +127,8 @@ export const GET: APIRoute = async ({ locals }) => {
             ? ['BETTER_AUTH_SECRET not set - using fallback (insecure)']
             : []),
           ...(!runtime.env.ANTHROPIC_API_KEY ? ['ANTHROPIC_API_KEY not set'] : []),
-          ...(!runtime.env.GOOGLE_GEMINI_API_KEY ? ['GOOGLE_GEMINI_API_KEY not set'] : []),
+          ...(!runtime.env.AI_BACKEND_BASE_URL ? ['AI_BACKEND_BASE_URL not set (local fallback runtime will be used)'] : []),
+          ...(!runtime.env.CANVAS_KV ? ['CANVAS_KV not configured (assistant local fallback chat persistence disabled)'] : []),
           ...(!runtime.env.GOOGLE_CLIENT_ID || !runtime.env.GOOGLE_CLIENT_SECRET
             ? ['Google OAuth not configured']
             : []),

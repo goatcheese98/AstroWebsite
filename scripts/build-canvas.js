@@ -72,6 +72,7 @@ export function restorePages() {
   const indexPath = path.join(pagesDir, 'index.astro');
   if (fs.existsSync(HOME_INDEX_BACKUP)) {
     fs.copyFileSync(HOME_INDEX_BACKUP, indexPath);
+    fs.unlinkSync(HOME_INDEX_BACKUP);
     console.log('  ↩️  Restored home page');
   }
 
@@ -113,6 +114,6 @@ if (command === 'prepare') {
 } else if (command === 'restore') {
   restorePages();
 } else {
-  console.log('Usage: node scripts/build-canvas.js [prepare|restore]');
+  console.log('Usage: bun run scripts/build-canvas.js [prepare|restore]');
   process.exit(1);
 }

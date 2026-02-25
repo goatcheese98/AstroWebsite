@@ -34,20 +34,10 @@ export const canvasVersions = sqliteTable('canvas_versions', {
   createdAt: integer('created_at').notNull(), // Unix timestamp (seconds)
 });
 
-// Canvas shares table
-export const canvasShares = sqliteTable('canvas_shares', {
-  id: text('id').primaryKey().notNull(),
-  canvasId: text('canvas_id').notNull().references(() => canvases.id, { onDelete: 'cascade' }),
-  shareToken: text('share_token').unique().notNull(),
-  expiresAt: integer('expires_at'), // Unix timestamp (seconds), nullable
-  createdAt: integer('created_at').notNull(), // Unix timestamp (seconds)
-});
-
 // Export schema for Drizzle
 export const schema = {
   canvases,
   canvasVersions,
-  canvasShares,
 };
 
 // Export types inferred from schema
@@ -55,5 +45,3 @@ export type Canvas = typeof canvases.$inferSelect;
 export type NewCanvas = typeof canvases.$inferInsert;
 export type CanvasVersion = typeof canvasVersions.$inferSelect;
 export type NewCanvasVersion = typeof canvasVersions.$inferInsert;
-export type CanvasShare = typeof canvasShares.$inferSelect;
-export type NewCanvasShare = typeof canvasShares.$inferInsert;

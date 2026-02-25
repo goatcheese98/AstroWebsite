@@ -1,51 +1,50 @@
 /**
- * CanvasUI - All UI Controls, Modals, and Panels
- * 
- * Restored element creation to use convertToExcalidrawElements
- * and proper element format matching the original ExcalidrawCanvas
+ * CanvasUI
+ *
+ * Renders canvas overlays and handles command-driven canvas actions.
  */
 
-import { useCallback, useState, useEffect } from 'react';
-import { useUnifiedCanvasStore, useExcalidrawAPISafe, useCommandSubscriber } from '@/stores';
+import { useCallback, useEffect } from 'react';
+import {
+  useUnifiedCanvasStore,
+  useExcalidrawAPISafe,
+  useCommandSubscriber,
+  type ExcalidrawElement,
+} from '@/stores';
+import { convertToExcalidrawElements as convertToExcalidrawElementsRaw } from "@excalidraw/excalidraw";
 import { nanoid } from 'nanoid';
 
 // Import sub-components
-import CanvasControls from '../islands/CanvasControls';
 import { AIChatContainer } from '../ai-chat';
 import IconLibrary from '../islands/IconLibrary';
-import SaveOptionsModal from '../islands/SaveOptionsModal';
-import ShareModal from '../islands/ShareModal';
 import CanvasStatusBadge from '../islands/CanvasStatusBadge';
 import ToastNotification from '../islands/ToastNotification';
-import ImageGenerationModal from '../ai-chat/ImageGenerationModal';
 
-// Lazy load convertToExcalidrawElements
-let convertToExcalidrawElements: ((elements: any[]) => any[]) | null = null;
-
-const loadConverter = async () => {
-  if (!convertToExcalidrawElements) {
-    const mod = await import('@excalidraw/excalidraw');
-    convertToExcalidrawElements = mod.convertToExcalidrawElements;
-  }
-  return convertToExcalidrawElements;
+type CanvasElementInput = Partial<ExcalidrawElement> & {
+  type?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  text?: string;
+  fontSize?: number;
+  fontFamily?: number;
+  points?: [number, number][];
 };
 
+const convertToSceneElements = (elements: CanvasElementInput[]): ExcalidrawElement[] =>
+  (
+    convertToExcalidrawElementsRaw as unknown as (input: CanvasElementInput[]) => ExcalidrawElement[]
+  )(elements);
+
 interface CanvasUIProps {
-  isSignedIn: boolean | undefined;
-  userId?: string | null;
-  userName?: string | null;
   isSharedMode: boolean;
-  isConnected: boolean;
-  activeUsers: number;
+  isCollaborating: boolean;
 }
 
 export default function CanvasUI({
-  isSignedIn,
-  userId,
-  userName,
   isSharedMode,
-  isConnected,
-  activeUsers,
+  isCollaborating,
 }: CanvasUIProps) {
   const store = useUnifiedCanvasStore();
   const api = useExcalidrawAPISafe();
@@ -54,63 +53,43 @@ export default function CanvasUI({
     isChatOpen,
     isChatMinimized,
     isAssetsOpen,
-    isShareModalOpen,
-    isImageGenModalOpen,
     toasts,
-    canvasTitle,
     isDirty,
     lastSaved,
     setChatOpen,
     setChatMinimized,
     setAssetsOpen,
-    setShareModalOpen,
-    setImageGenModalOpen,
     removeToast,
     addToast,
   } = store;
-
-  // Image generation state
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [selectedElementsForImageGen, setSelectedElementsForImageGen] = useState<string[]>([]);
-
-  // Load converter on mount
-  useEffect(() => {
-    loadConverter();
-  }, []);
-
-  // Update selected elements when image gen modal opens
-  useEffect(() => {
-    if (isImageGenModalOpen && api) {
-      const appState = api.getAppState();
-      const selectedIds = Object.keys(appState.selectedElementIds || {});
-      setSelectedElementsForImageGen(selectedIds);
-    }
-  }, [isImageGenModalOpen, api]);
 
   // Listen for AI chat drawing commands (excalidraw:draw event)
   useEffect(() => {
     if (!api) return;
 
-    const handleDrawCommand = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { elements, isModification } = (customEvent.detail as any) || {};
-      if (!elements || !Array.isArray(elements)) return;
+    const handleDrawCommand = (event: Event) => {
+      const customEvent = event as CustomEvent<{ elements?: unknown; isModification?: boolean }>;
+      const detail = customEvent.detail;
+      if (!Array.isArray(detail?.elements)) return;
+
+      const elements = detail.elements as CanvasElementInput[];
+      const isModification = detail.isModification === true;
 
       try {
-        const { convertToExcalidrawElements: converter } = await import('@excalidraw/excalidraw');
-        
         // Get viewport center for positioning if not a modification
         let elementsToConvert = elements;
         if (!isModification) {
           const appState = api.getAppState();
-          const viewportCenterX = (appState.width as number) / 2 || 400;
-          const viewportCenterY = (appState.height as number) / 2 || 300;
+          const viewportWidth = typeof appState.width === "number" ? appState.width : 800;
+          const viewportHeight = typeof appState.height === "number" ? appState.height : 600;
+          const viewportCenterX = viewportWidth / 2;
+          const viewportCenterY = viewportHeight / 2;
           const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
           const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
 
           // Calculate bounding box
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          elements.forEach((el: any) => {
+          elements.forEach((el: CanvasElementInput) => {
             const x = el.x || 0;
             const y = el.y || 0;
             const width = el.width || 0;
@@ -126,14 +105,14 @@ export default function CanvasUI({
           const offsetX = sceneX - elementsCenterX;
           const offsetY = sceneY - elementsCenterY;
 
-          elementsToConvert = elements.map((el: any) => ({
+          elementsToConvert = elements.map((el: CanvasElementInput) => ({
             ...el,
             x: (el.x || 0) + offsetX,
             y: (el.y || 0) + offsetY,
           }));
         }
 
-        const converted = converter(elementsToConvert);
+        const converted = convertToSceneElements(elementsToConvert);
         const currentElements = api.getSceneElements();
         api.updateScene({ elements: [...currentElements, ...converted] });
       } catch (err) {
@@ -201,7 +180,8 @@ export default function CanvasUI({
       
       try {
         // Ensure all elements have required Excalidraw properties
-        let elementsToAdd = elements.map((el: any) => ({
+        let elementsToAdd = (elements as CanvasElementInput[]).map((el): ExcalidrawElement => {
+          const normalized: ExcalidrawElement = {
           type: el.type || 'rectangle',
           x: el.x ?? 0,
           y: el.y ?? 0,
@@ -228,12 +208,15 @@ export default function CanvasUI({
           updated: el.updated ?? Date.now(),
           link: el.link ?? null,
           locked: el.locked ?? false,
-          // Type-specific properties
-          ...(el.text !== undefined && { text: el.text }),
-          ...(el.fontSize !== undefined && { fontSize: el.fontSize }),
-          ...(el.fontFamily !== undefined && { fontFamily: el.fontFamily }),
-          ...(el.points !== undefined && { points: el.points }),
-        }));
+          };
+
+          if (typeof el.text === "string") normalized.text = el.text;
+          if (typeof el.fontSize === "number") normalized.fontSize = el.fontSize;
+          if (typeof el.fontFamily === "number") normalized.fontFamily = el.fontFamily;
+          if (Array.isArray(el.points)) normalized.points = el.points;
+
+          return normalized;
+        });
         
         if (!isModification) {
           // Center elements on viewport
@@ -245,7 +228,7 @@ export default function CanvasUI({
 
           // Calculate bounding box
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          elementsToAdd.forEach((el: any) => {
+          elementsToAdd.forEach((el: ExcalidrawElement) => {
             const x = el.x || 0;
             const y = el.y || 0;
             const w = el.width || 100;
@@ -261,7 +244,7 @@ export default function CanvasUI({
           const offsetX = sceneX - elementsCenterX;
           const offsetY = sceneY - elementsCenterY;
 
-          elementsToAdd = elementsToAdd.map((el: any) => ({
+          elementsToAdd = elementsToAdd.map((el: ExcalidrawElement) => ({
             ...el,
             x: el.x + offsetX,
             y: el.y + offsetY,
@@ -323,10 +306,6 @@ export default function CanvasUI({
     input.click();
   }, [api, addToast]);
 
-  const handleShare = useCallback(() => {
-    setShareModalOpen(true);
-  }, [setShareModalOpen]);
-
   // Create markdown note element - with full default content from original
   const handleCreateMarkdown = useCallback(async () => {
     if (!api) {
@@ -335,12 +314,6 @@ export default function CanvasUI({
     }
 
     try {
-      const converter = await loadConverter();
-      if (!converter) {
-        addToast('Converter not loaded', 'error');
-        return;
-      }
-
       // Get viewport center for positioning
       const appState = api.getAppState();
       const viewportCenterX = (appState.width as number) / 2 || 400;
@@ -370,7 +343,7 @@ export default function CanvasUI({
         },
       };
 
-      const converted = converter([newElement]);
+      const converted = convertToSceneElements([newElement]);
       const currentElements = api.getSceneElements();
       api.updateScene({ elements: [...currentElements, ...converted] });
 
@@ -387,12 +360,6 @@ export default function CanvasUI({
     }
 
     try {
-      const converter = await loadConverter();
-      if (!converter) {
-        addToast('Converter not loaded', 'error');
-        return;
-      }
-
       // Import DEFAULT_NOTE_STATE
       const { DEFAULT_NOTE_STATE } = await import('@/components/islands/rich-text');
 
@@ -428,7 +395,7 @@ export default function CanvasUI({
         },
       };
 
-      const converted = converter([newElement]);
+      const converted = convertToSceneElements([newElement]);
       const currentElements = api.getSceneElements();
       api.updateScene({ elements: [...currentElements, ...converted] });
 
@@ -445,12 +412,6 @@ export default function CanvasUI({
     }
 
     try {
-      const converter = await loadConverter();
-      if (!converter) {
-        addToast('Converter not loaded', 'error');
-        return;
-      }
-
       // Get viewport center for positioning
       const appState = api.getAppState();
       const viewportCenterX = (appState.width as number) / 2 || 400;
@@ -482,7 +443,7 @@ export default function CanvasUI({
         },
       };
 
-      const converted = converter([newElement]);
+      const converted = convertToSceneElements([newElement]);
       const currentElements = api.getSceneElements();
       api.updateScene({ elements: [...currentElements, ...converted] });
 
@@ -491,62 +452,192 @@ export default function CanvasUI({
     }
   }, [api]);
 
-  // Handle image generation
+  // Open the unified assistant in image mode.
   const handleGenerateImage = useCallback(() => {
-    setImageGenModalOpen(true);
-  }, [setImageGenModalOpen]);
-
-  // Handle image generation submit - close modal immediately and show toast
-  const handleImageGenSubmit = useCallback(async (options: any) => {
-    if (!api) return;
-
-    // Close modal immediately and show generating toast
-    setImageGenModalOpen(false);
-    addToast('Generating image...', 'loading');
-
-    setIsGeneratingImage(true);
-    try {
-      // TODO: Connect to image generation system via store
-      console.log('Image generation requested:', options);
-      addToast('Image generation not yet implemented', 'info');
-    } catch (err) {
-      console.error('Error in image generation:', err);
-      addToast('Failed to generate image', 'error');
-    } finally {
-      setIsGeneratingImage(false);
+    if (isChatMinimized) {
+      setChatMinimized(false);
     }
-  }, [api, addToast, setImageGenModalOpen]);
+    setChatOpen(true);
+    window.dispatchEvent(
+      new CustomEvent('assistant:set-mode', {
+        detail: { mode: 'image' },
+      }),
+    );
+  }, [isChatMinimized, setChatMinimized, setChatOpen]);
+
+  const runCanvasAction = useCallback((action?: string) => {
+    if (!action) return;
+
+    switch (action) {
+      case 'open-chat':
+        if (isChatMinimized) {
+          setChatMinimized(false);
+        }
+        setChatOpen(true);
+        break;
+      case 'open-icons':
+        setAssetsOpen(true);
+        break;
+      case 'create-markdown':
+        void handleCreateMarkdown();
+        break;
+      case 'create-rich-text':
+        void handleCreateRichText();
+        break;
+      case 'create-web-embed':
+        void handleCreateWebEmbed();
+        break;
+      case 'generate-image':
+        handleGenerateImage();
+        break;
+      case 'save-rj':
+        void handleSave();
+        break;
+      case 'load-rj':
+        handleLoad();
+        break;
+      default:
+        break;
+    }
+  }, [
+    handleCreateMarkdown,
+    handleCreateRichText,
+    handleCreateWebEmbed,
+    handleGenerateImage,
+    handleLoad,
+    handleSave,
+    isChatMinimized,
+    setAssetsOpen,
+    setChatMinimized,
+    setChatOpen,
+  ]);
+
+  // Handle commands from native Excalidraw MainMenu add-on entries
+  useEffect(() => {
+    const handleMenuAction = (event: Event) => {
+      const customEvent = event as CustomEvent<{ action?: string }>;
+      runCanvasAction(customEvent.detail?.action);
+    };
+
+    window.addEventListener('aw:canvas-menu-action', handleMenuAction);
+    return () => window.removeEventListener('aw:canvas-menu-action', handleMenuAction);
+  }, [runCanvasAction]);
 
   return (
     <>
+      {/* Right-side quick actions (restored) */}
+      <div className="aw-canvas-controls">
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('generate-image')}
+          title="Generate image"
+          aria-label="Generate image"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
+          </svg>
+          <span className="aw-label">Generate image</span>
+        </button>
+        <button
+          className={`aw-control-btn${isChatOpen ? ' active' : ''}`}
+          onClick={() => runCanvasAction('open-chat')}
+          title="AI chat"
+          aria-label="Open AI chat"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="aw-label">AI chat</span>
+        </button>
+        <button
+          className={`aw-control-btn${isAssetsOpen ? ' active' : ''}`}
+          onClick={() => runCanvasAction('open-icons')}
+          title="Icon library"
+          aria-label="Open icon library"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="aw-label">Icon library</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('create-markdown')}
+          title="Add markdown note"
+          aria-label="Add markdown note"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="12" y1="18" x2="12" y2="12" />
+            <line x1="9" y1="15" x2="15" y2="15" />
+          </svg>
+          <span className="aw-label">Markdown note</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('create-rich-text')}
+          title="Add rich text note"
+          aria-label="Add rich text note"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 7V4h16v3" />
+            <path d="M9 20h6" />
+            <path d="M12 4v16" />
+            <path d="M8 12h8" />
+          </svg>
+          <span className="aw-label">Rich text note</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('create-web-embed')}
+          title="Add web embed"
+          aria-label="Add web embed"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          <span className="aw-label">Web embed</span>
+        </button>
+        <div className="aw-divider" />
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('save-rj')}
+          title="Save as .rj"
+          aria-label="Save as .rj"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          <span className="aw-label">Save .rj</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('load-rj')}
+          title="Open .rj/.excalidraw"
+          aria-label="Open .rj or .excalidraw"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <span className="aw-label">Open file</span>
+        </button>
+      </div>
+
       {/* Status Badge */}
       <CanvasStatusBadge
         isDirty={isDirty}
         lastSaved={lastSaved}
         isSharedMode={isSharedMode}
-        isConnected={isConnected}
-        activeUsers={activeUsers}
-      />
-
-      {/* Main Controls */}
-      <CanvasControls
-        onOpenChat={() => {
-          if (isChatMinimized) {
-            setChatMinimized(false);
-          } else {
-            setChatOpen(true);
-          }
-        }}
-        onOpenAssets={() => setAssetsOpen(true)}
-        isChatOpen={isChatOpen && !isChatMinimized}
-        isAssetsOpen={isAssetsOpen}
-        onSaveState={handleSave}
-        onLoadState={handleLoad}
-        onCreateMarkdown={handleCreateMarkdown}
-        onCreateWebEmbed={handleCreateWebEmbed}
-        onCreateLexical={handleCreateRichText}
-        onShare={handleShare}
-        onGenerateImage={handleGenerateImage}
+        isCollaborating={isCollaborating}
       />
 
       {/* AI Chat Panel */}
@@ -561,23 +652,6 @@ export default function CanvasUI({
       <IconLibrary
         isOpen={isAssetsOpen}
         onClose={() => setAssetsOpen(false)}
-      />
-
-      {/* Share Modal */}
-      <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setShareModalOpen(false)}
-      />
-
-      {/* Image Generation Modal */}
-      <ImageGenerationModal
-        isOpen={isImageGenModalOpen}
-        onClose={() => setImageGenModalOpen(false)}
-        selectedElements={selectedElementsForImageGen}
-        elementSnapshots={new Map()}
-        canvasState={null}
-        onGenerate={handleImageGenSubmit}
-        isGenerating={isGeneratingImage}
       />
 
       {/* Toast Notifications */}
@@ -601,7 +675,112 @@ export default function CanvasUI({
           ))}
         </div>
       )}
+
+      <style>{`
+        .aw-canvas-controls {
+          position: fixed;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          z-index: 1000;
+          pointer-events: none;
+          background: white;
+          padding: 2px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .aw-canvas-controls > * {
+          pointer-events: auto;
+        }
+
+        .aw-control-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          background: white;
+          border: 1px solid transparent;
+          border-radius: 7px;
+          cursor: pointer;
+          color: #4b5563;
+          transition: all 0.15s ease;
+          position: relative;
+        }
+
+        .aw-control-btn svg {
+          width: 16px;
+          height: 16px;
+          stroke-width: 2.2;
+        }
+
+        .aw-control-btn:hover {
+          background: #f3f4f6;
+          color: #111827;
+        }
+
+        .aw-control-btn:active {
+          background: #e5e7eb;
+        }
+
+        .aw-control-btn.active {
+          background: #eef2ff;
+          color: #4f46e5;
+          border-color: #c7d2fe;
+        }
+
+        .aw-label {
+          position: absolute;
+          right: 100%;
+          top: 50%;
+          transform: translateY(-50%) translateX(-8px);
+          padding: 4px 8px;
+          background: #111827;
+          color: white;
+          border-radius: 4px;
+          font-size: 0.7rem;
+          font-weight: 500;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.2s ease;
+          z-index: 1002;
+        }
+
+        .aw-control-btn:hover .aw-label {
+          opacity: 1;
+          transform: translateY(-50%) translateX(-12px);
+        }
+
+        .aw-divider {
+          height: 1px;
+          background: #e5e7eb;
+          margin: 4px 6px;
+        }
+
+        @media (max-width: 768px) {
+          .aw-canvas-controls {
+            right: 8px;
+            top: auto;
+            bottom: 80px;
+            padding: 2px;
+          }
+
+          .aw-control-btn {
+            width: 32px;
+            height: 32px;
+          }
+
+          .aw-control-btn:hover .aw-label {
+            display: none;
+          }
+        }
+      `}</style>
     </>
   );
 }
-

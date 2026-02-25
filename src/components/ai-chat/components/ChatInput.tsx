@@ -24,9 +24,7 @@ export interface ChatInputProps {
     /** Whether we're on mobile */
     isMobile?: boolean;
     /** Current AI provider */
-    aiProvider?: "kimi" | "claude";
-    /** Callback to toggle AI provider */
-    onToggleProvider?: () => void;
+    aiProvider?: "claude";
 }
 
 /**
@@ -54,12 +52,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onKeyDown,
         isMobile = false,
         aiProvider = "claude",
-        onToggleProvider,
     }, ref) {
         const hasInput = input.trim().length > 0;
         const canSend = hasInput && !isLoading;
         const hasSelection = selectedElementsCount > 0;
-        const isKimi = aiProvider === "kimi";
         
         // Context-aware placeholder - shorter on mobile
         const placeholder = isMobile 
@@ -152,26 +148,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         )}
                     </div>
 
-                    {/* Right side - Model Selector */}
-                    {onToggleProvider && (
-                        <button
-                            onClick={onToggleProvider}
-                            title={`Click to switch to ${isKimi ? "Claude" : "Kimi K2.5"}`}
-                            className="provider-badge"
-                            data-provider={aiProvider}
-                            style={{
-                                padding: isMobile ? "8px 12px" : "5px 10px",
-                                fontSize: isMobile ? "13px" : "11px",
-                                minHeight: isMobile ? "36px" : undefined,
-                                touchAction: "manipulation",
-                            }}
-                        >
-                            {isKimi ? "Kimi K2.5" : "Claude"}
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                <path d="M7 17L17 7M17 7H7M17 7V17" />
-                            </svg>
-                        </button>
-                    )}
+                    {/* Right side - Model (fixed) */}
+                    <div
+                        className="provider-badge"
+                        data-provider={aiProvider}
+                        style={{
+                            padding: isMobile ? "8px 12px" : "5px 10px",
+                            fontSize: isMobile ? "13px" : "11px",
+                            minHeight: isMobile ? "36px" : undefined,
+                            touchAction: "manipulation",
+                            cursor: "default",
+                        }}
+                    >
+                        Claude
+                    </div>
                 </div>
                 
                 {/* Input Area */}

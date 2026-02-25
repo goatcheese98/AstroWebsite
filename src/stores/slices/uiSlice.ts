@@ -21,7 +21,6 @@ export const createUISlice: StateCreator<
   isChatOpen: false,
   isChatMinimized: false,
   isAssetsOpen: false,
-  isShareModalOpen: false,
   isImageGenModalOpen: false,
   isSaveModalOpen: false,
   toasts: [],
@@ -59,10 +58,6 @@ export const createUISlice: StateCreator<
 
   toggleAssets: () => {
     set((state) => ({ isAssetsOpen: !state.isAssetsOpen }));
-  },
-
-  setShareModalOpen: (open: boolean) => {
-    set({ isShareModalOpen: open });
   },
 
   setImageGenModalOpen: (open: boolean) => {
@@ -106,7 +101,6 @@ export const createUISlice: StateCreator<
   isAnyModalOpen: () => {
     const state = get();
     return (
-      state.isShareModalOpen ||
       state.isImageGenModalOpen ||
       state.isSaveModalOpen
     );

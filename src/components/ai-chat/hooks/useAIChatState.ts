@@ -117,7 +117,7 @@ export function useAIChatState(options: UseAIChatStateOptions): UseAIChatStateRe
   }, [setAIProvider]);
 
   const toggleProvider = useCallback(() => {
-    setAIProvider((prev: AIProvider) => prev === "kimi" ? "claude" : "kimi");
+    setAIProvider("claude");
   }, [setAIProvider]);
 
   const appendMessage = useCallback((message: Message) => {

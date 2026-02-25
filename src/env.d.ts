@@ -25,8 +25,9 @@ interface Env {
 
   // API Keys (already defined in .env)
   ANTHROPIC_API_KEY: string;
-  MOONSHOT_API_KEY: string;
-  GOOGLE_GEMINI_API_KEY: string;
+  // Optional independent backend boundary config
+  AI_BACKEND_BASE_URL?: string;
+  AI_BACKEND_API_KEY?: string;
 
   // Auth settings (optional)
   ENABLE_API_AUTH?: string;
@@ -36,4 +37,3 @@ interface Env {
   CLERK_SECRET_KEY?: string;
   PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
 }
-

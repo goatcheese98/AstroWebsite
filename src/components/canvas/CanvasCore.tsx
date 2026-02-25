@@ -4,53 +4,67 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
-import type { ExcalidrawAPI } from '@/stores';
+import type {
+  CanvasData,
+  ExcalidrawAppState,
+  ExcalidrawElement,
+} from '@/stores';
 
 // Import Excalidraw - the client:only directive in parent handles SSR
 import { Excalidraw } from "@excalidraw/excalidraw";
 
+type SceneFiles = Record<string, unknown>;
+
 interface CanvasCoreProps {
   isLoading?: boolean;
-  onApiReady: (api: any) => void;
+  onApiReady: (api: unknown) => void;
   isSharedMode?: boolean;
   isCollaborating?: boolean;
-  onPointerUpdate?: (payload: {
-    pointer: { x: number; y: number; tool: "pointer" | "laser" };
-    button: "down" | "up";
-  }) => void;
   onSceneChange?: (
-    elements: readonly any[],
-    appState: any,
-    files: any
+    elements: readonly ExcalidrawElement[],
+    appState: Partial<ExcalidrawAppState>,
+    files: SceneFiles
   ) => void;
-  renderTopRightUI?: (isMobile: boolean, appState: any) => React.ReactElement | null;
+  renderTopRightUI?: (isMobile: boolean, appState: unknown) => React.ReactElement | null;
+  children?: React.ReactNode;
 }
 
 // Deep sanitize initial data to fix collaborators and other serialization issues
-const sanitizeInitialData = (data: any): any => {
-  if (!data) return null;
-  
-  const sanitized = { ...data };
-  
-  // Remove collaborators if not a Map (causes forEach error)
-  if (sanitized.appState) {
-    sanitized.appState = { ...sanitized.appState };
-    if (sanitized.appState.collaborators && !(sanitized.appState.collaborators instanceof Map)) {
-      delete sanitized.appState.collaborators;
-    }
+const sanitizeInitialData = (data: unknown): CanvasData | null => {
+  if (!data || typeof data !== "object") return null;
+
+  const source = data as Partial<CanvasData> & {
+    appState?: ExcalidrawAppState;
+    files?: unknown;
+  };
+
+  const appState: Partial<ExcalidrawAppState> =
+    source.appState && typeof source.appState === "object"
+      ? { ...source.appState }
+      : {};
+
+  // Remove invalid collaborator state to avoid runtime forEach errors.
+  if (
+    appState.collaborators &&
+    !(appState.collaborators instanceof Map)
+  ) {
+    delete appState.collaborators;
   }
-  
-  // Ensure elements is an array
-  if (!sanitized.elements || !Array.isArray(sanitized.elements)) {
-    sanitized.elements = [];
-  }
-  
-  // Ensure files is an object
-  if (!sanitized.files || typeof sanitized.files !== 'object') {
-    sanitized.files = {};
-  }
-  
-  return sanitized;
+
+  const elements = Array.isArray(source.elements)
+    ? [...source.elements]
+    : [];
+
+  const files =
+    source.files && typeof source.files === "object"
+      ? ({ ...source.files } as Record<string, unknown>)
+      : {};
+
+  return {
+    elements,
+    appState,
+    files,
+  };
 };
 
 export default function CanvasCore({
@@ -58,14 +72,14 @@ export default function CanvasCore({
   onApiReady,
   isSharedMode,
   isCollaborating,
-  onPointerUpdate,
   onSceneChange,
   renderTopRightUI,
+  children,
 }: CanvasCoreProps) {
-  const [initialData, setInitialData] = useState<any>(null);
+  const [initialData, setInitialData] = useState<CanvasData | null>(null);
   const [isReady, setIsReady] = useState(false);
   const { canvasData, setCanvasData, setDirty } = useUnifiedCanvasStore();
-  const apiRef = useRef<ExcalidrawAPI | null>(null);
+  const apiRef = useRef<unknown>(null);
   const hasInitializedRef = useRef(false);
   
   // Load initial data
@@ -97,21 +111,33 @@ export default function CanvasCore({
   }, [canvasData]);
   
   const handleChange = useCallback((
-    elements: readonly any[],
-    appState: any,
-    files: any
+    elements: readonly unknown[],
+    appState: unknown,
+    files: unknown
   ) => {
+    const safeElements = Array.isArray(elements)
+      ? (elements as ExcalidrawElement[])
+      : [];
+    const safeAppState =
+      appState && typeof appState === "object"
+        ? (appState as Partial<ExcalidrawAppState>)
+        : {};
+    const safeFiles =
+      files && typeof files === "object"
+        ? ({ ...files } as SceneFiles)
+        : {};
+
     setCanvasData({
-      elements: [...elements],
-      appState: { ...appState },
-      files: { ...files },
+      elements: [...safeElements],
+      appState: { ...safeAppState },
+      files: { ...safeFiles },
     });
     setDirty(true);
-    onSceneChange?.(elements, appState, files);
+    onSceneChange?.(safeElements, safeAppState, safeFiles);
   }, [setCanvasData, setDirty, onSceneChange]);
   
   // Handle API ready - Excalidraw passes API via excalidrawAPI prop callback
-  const handleApiChange = useCallback((api: any) => {
+  const handleApiChange = useCallback((api: unknown) => {
     if (api && api !== apiRef.current) {
       apiRef.current = api;
       onApiReady(api);
@@ -152,15 +178,16 @@ export default function CanvasCore({
     <div style={{ width: '100%', height: '100%' }}>
       <Excalidraw
         excalidrawAPI={handleApiChange}
-        initialData={initialData}
+        initialData={initialData as React.ComponentProps<typeof Excalidraw>["initialData"]}
         onChange={handleChange}
         isCollaborating={!!isCollaborating}
-        onPointerUpdate={onPointerUpdate}
         theme="light"
         UIOptions={UIOptions}
         name="Untitled Canvas"
         renderTopRightUI={renderTopRightUI}
-      />
+      >
+        {children}
+      </Excalidraw>
     </div>
   );
 }

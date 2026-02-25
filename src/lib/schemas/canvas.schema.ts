@@ -85,13 +85,6 @@ export const ListCanvasesQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
-/**
- * Create share link request
- */
-export const CreateShareRequestSchema = z.object({
-  expiresInDays: z.number().min(1).max(365).optional(),
-});
-
 // ============================================================================
 // Canvas Response Schemas
 // ============================================================================
@@ -131,15 +124,6 @@ export const CanvasListResponseSchema = z.object({
 });
 
 /**
- * Share link response
- */
-export const ShareLinkResponseSchema = z.object({
-  shareToken: z.string(),
-  shareUrl: z.string(),
-  expiresAt: z.number().nullable(),
-});
-
-/**
  * Canvas version response
  */
 export const CanvasVersionResponseSchema = z.object({
@@ -167,11 +151,9 @@ export type CanvasData = z.infer<typeof CanvasDataSchema>;
 export type CreateCanvasRequest = z.infer<typeof CreateCanvasRequestSchema>;
 export type UpdateCanvasRequest = z.infer<typeof UpdateCanvasRequestSchema>;
 export type ListCanvasesQuery = z.infer<typeof ListCanvasesQuerySchema>;
-export type CreateShareRequest = z.infer<typeof CreateShareRequestSchema>;
 export type CanvasMetadataResponse = z.infer<typeof CanvasMetadataResponseSchema>;
 export type CanvasResponse = z.infer<typeof CanvasResponseSchema>;
 export type CanvasListResponse = z.infer<typeof CanvasListResponseSchema>;
-export type ShareLinkResponse = z.infer<typeof ShareLinkResponseSchema>;
 export type CanvasVersionResponse = z.infer<typeof CanvasVersionResponseSchema>;
 export type CanvasErrorResponse = z.infer<typeof CanvasErrorResponseSchema>;
 

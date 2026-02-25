@@ -15,7 +15,7 @@ import type {
 // Base Types
 // ============================================================================
 
-export type AIProvider = "kimi" | "claude";
+export type AIProvider = "claude";
 export type ContextMode = "all" | "selected";
 
 export interface Toast {
@@ -207,7 +207,6 @@ export interface UISlice {
   isChatOpen: boolean;
   isChatMinimized: boolean;
   isAssetsOpen: boolean;
-  isShareModalOpen: boolean;
   isImageGenModalOpen: boolean;
   isSaveModalOpen: boolean;
   toasts: Toast[];
@@ -218,7 +217,6 @@ export interface UISlice {
   toggleChat: () => void;
   setAssetsOpen: (open: boolean) => void;
   toggleAssets: () => void;
-  setShareModalOpen: (open: boolean) => void;
   setImageGenModalOpen: (open: boolean) => void;
   setSaveModalOpen: (open: boolean) => void;
   

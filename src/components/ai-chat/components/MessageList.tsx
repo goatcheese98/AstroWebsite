@@ -11,7 +11,7 @@ export interface MessageListProps {
     /** Error message (null if none) */
     error: string | null;
     /** Current AI provider for loading text */
-    aiProvider: "kimi" | "claude";
+    aiProvider: "claude";
     /** Canvas state for message context */
     canvasState?: any;
     /** Whether the preview panel is visible (adds left padding) */
@@ -58,7 +58,7 @@ function EmptyState() {
 /**
  * Loading indicator while AI thinks
  */
-function LoadingIndicator({ provider }: { provider: "kimi" | "claude" }) {
+function LoadingIndicator({ provider }: { provider: "claude" }) {
     return (
         <div style={{
             display: "flex",
@@ -81,7 +81,7 @@ function LoadingIndicator({ provider }: { provider: "kimi" | "claude" }) {
                 fontSize: "13px",
                 color: "var(--color-text-secondary)",
             }}>
-                {provider === "kimi" ? "Kimi is thinking..." : "Claude is thinking..."}
+                {provider === "claude" ? "Claude is thinking..." : "Thinking..."}
             </span>
             
             <style>{`

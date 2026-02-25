@@ -6,12 +6,10 @@
  * - localStorage read/write
  * - Debounced auto-save
  * - Version checking and migration
- * - Server save (when implemented)
+ * - Local persistence only (server save handled elsewhere)
  * 
  * Event-driven architecture for React integration
  */
-
-import type { ExcalidrawAPI } from "@/stores";
 
 export interface CanvasData {
   elements: any[];
@@ -27,7 +25,7 @@ export interface PersistenceState {
 
 interface PersistenceEvents {
   "state-change": PersistenceState;
-  "saved": { to: "localStorage" | "server" };
+  "saved": { to: "localStorage" };
   "loaded": { from: "localStorage" };
   error: Error;
 }
@@ -181,42 +179,6 @@ export class CanvasPersistenceCoordinator extends EventTarget {
   forceSave(canvasData: CanvasData, canvasId: string | null): void {
     this.cancelPendingSave();
     this.executeSave(canvasData, canvasId);
-  }
-
-  /**
-   * Save to server (placeholder for future implementation)
-   */
-  async saveToServer(
-    api: ExcalidrawAPI,
-    canvasId: string | null
-  ): Promise<{ success: boolean; id: string }> {
-    this._isSaving = true;
-    this.emitStateChange();
-
-    try {
-      const data = {
-        elements: api.getSceneElements(),
-        appState: api.getAppState(),
-        files: api.getFiles(),
-      };
-
-      // TODO: Implement actual server save
-      console.log("💾 Saving to server:", data);
-
-      this._lastSaved = new Date();
-      this._hasUnsavedChanges = false;
-      this._isSaving = false;
-
-      this.emitStateChange();
-      this.emit("saved", { to: "server" });
-
-      return { success: true, id: canvasId || "local" };
-    } catch (err) {
-      this._isSaving = false;
-      this.emitStateChange();
-      this.emit("error", err instanceof Error ? err : new Error("Server save failed"));
-      throw err;
-    }
   }
 
   /**

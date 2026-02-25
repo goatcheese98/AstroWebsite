@@ -3,7 +3,7 @@
  * 
  * Handles:
  * - Prompt building with system instructions
- * - Gemini API communication
+ * - Independent worker API communication
  * - Image processing and insertion
  * - Error handling
  * 
@@ -28,6 +28,22 @@ export interface ImageGenerationCallbacks {
   onSuccess?: (result: ImageGenerationResult) => void;
   onError?: (error: ImageGenerationError) => void;
   onImageLoaded?: (imageUrl: string, prompt: string) => void;
+}
+
+interface GenerationResponseData {
+  message?: string;
+  imageData?: string;
+  details?: string;
+  error?: string;
+  mimeType?: string;
+  prompt?: string;
+}
+
+interface GenerationRequestBody {
+  prompt: string;
+  model: string;
+  mode: "visual" | "text";
+  imageData?: string;
 }
 
 /**
@@ -107,8 +123,8 @@ FINAL REMINDER: The background color is ${bgColor}. This is NON-NEGOTIABLE. Ever
  */
 export function getGenerationModel(useProModel: boolean): string {
   return useProModel
-    ? "gemini-3-pro-image-preview"
-    : "gemini-2.5-flash-image";
+    ? "worker-image-pro"
+    : "worker-image-standard";
 }
 
 /**
@@ -139,29 +155,32 @@ export function processGeneratedImage(
 /**
  * Validates image generation response
  */
-export function validateGenerationResponse(data: any): ImageGenerationResult {
+export function validateGenerationResponse(data: unknown): ImageGenerationResult {
+  const payload: GenerationResponseData =
+    data && typeof data === "object" ? (data as GenerationResponseData) : {};
+
   // Check for AI confusion
   if (
-    data.message &&
-    (data.message.toLowerCase().includes("do not understand") ||
-      data.message.toLowerCase().includes("cannot understand"))
+    payload.message &&
+    (payload.message.toLowerCase().includes("do not understand") ||
+      payload.message.toLowerCase().includes("cannot understand"))
   ) {
     throw new Error(
       "I do not understand this prompt. Please provide clearer instructions."
     );
   }
 
-  if (!data.imageData) {
-    throw new Error(data.details || data.error || "Image generation failed");
+  if (!payload.imageData) {
+    throw new Error(payload.details || payload.error || "Image generation failed");
   }
 
-  const imageUrl = `data:${data.mimeType};base64,${data.imageData}`;
+  const imageUrl = `data:${payload.mimeType};base64,${payload.imageData}`;
 
   return {
     imageUrl,
     width: 0, // Will be set after image loads
     height: 0,
-    prompt: data.prompt || "",
+    prompt: payload.prompt || "",
   };
 }
 
@@ -176,12 +195,12 @@ export async function generateImage(
   const hasReference = options.hasReference !== false && screenshotData?.length > 0;
 
   console.log("🎨 Starting image generation...");
-  console.log("🤖 Model:", options.useProModel ? "Gemini 3 Pro" : "Gemini 2.5 Flash");
+  console.log("🤖 Model profile:", options.useProModel ? "Worker Pro" : "Worker Standard");
 
   try {
     const systemInstructions = buildGenerationPrompt(options);
 
-    const requestBody: any = {
+    const requestBody: GenerationRequestBody = {
       prompt: systemInstructions,
       model: getGenerationModel(options.useProModel),
       mode: hasReference ? "visual" : "text",
@@ -197,7 +216,7 @@ export async function generateImage(
       body: JSON.stringify(requestBody),
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as GenerationResponseData;
 
     if (!response.ok) {
       if (

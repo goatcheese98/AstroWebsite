@@ -22,16 +22,16 @@ export const CLAUDE_CONFIG = {
 } as const;
 
 // ============================================================================
-// Gemini API Configuration
+// Image Worker Configuration
 // ============================================================================
 
-export const GEMINI_CONFIG = {
+export const IMAGE_WORKER_CONFIG = {
   // Generation parameters
   TEMPERATURE: 0.9,
 
   // Model versions
-  DEFAULT_MODEL: 'gemini-2.5-flash-image',
-  ALLOWED_MODELS: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'] as const,
+  DEFAULT_MODEL: 'worker-image-standard',
+  ALLOWED_MODELS: ['worker-image-standard', 'worker-image-pro'] as const,
 
   // Request limits
   MAX_PROMPT_LENGTH: 2000, // Maximum characters for image generation prompt
@@ -61,13 +61,13 @@ export const API_CONFIG = {
 
 // Type helpers
 export type ClaudeModel = (typeof CLAUDE_CONFIG.ALLOWED_MODELS)[number];
-export type GeminiModel = (typeof GEMINI_CONFIG.ALLOWED_MODELS)[number];
+export type ImageWorkerModel = (typeof IMAGE_WORKER_CONFIG.ALLOWED_MODELS)[number];
 
 // Validation helpers
 export function isValidClaudeModel(model: string): model is ClaudeModel {
   return CLAUDE_CONFIG.ALLOWED_MODELS.includes(model as ClaudeModel);
 }
 
-export function isValidGeminiModel(model: string): model is GeminiModel {
-  return GEMINI_CONFIG.ALLOWED_MODELS.includes(model as GeminiModel);
+export function isValidImageWorkerModel(model: string): model is ImageWorkerModel {
+  return IMAGE_WORKER_CONFIG.ALLOWED_MODELS.includes(model as ImageWorkerModel);
 }

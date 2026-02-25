@@ -1,0 +1,9 @@
+{
+  "name": "assistant-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch server.mjs",
+    "dev:node": "node server.mjs"
+  }
+}

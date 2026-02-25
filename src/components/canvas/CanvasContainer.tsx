@@ -1,23 +1,18 @@
 /**
- * CanvasContainer - Unified Canvas Component
- * 
- * Consolidates functionality from:
- * - ExcalidrawCanvas.tsx (2,468 lines) - Core canvas + collaboration
- * - CanvasApp.tsx (759 lines) - UI controls + modals
- * - CanvasAppRefactored.tsx (470 lines) - Store-based approach
- * - CanvasRoot.tsx (64 lines) - Provider wrapper
- * 
- * Architecture:
- * - Uses unified Zustand store for all state
- * - No eventBus (direct store actions)
- * - No ExcalidrawProvider (store holds API reference)
- * - Extracted hooks for testability
+ * CanvasContainer
+ *
+ * Hosts the Excalidraw instance and composes canvas UI layers.
  */
 
-import { useRef, useCallback, useMemo } from 'react';
-import { useUnifiedCanvasStore, useExcalidrawAPISafe, useSetExcalidrawAPI } from '@/stores';
+import { useRef, useCallback, useMemo, useState } from 'react';
+import {
+  useUnifiedCanvasStore,
+  useExcalidrawAPISafe,
+  useSetExcalidrawAPI,
+  type ExcalidrawAPI,
+} from '@/stores';
 import { useCanvasPersistence } from './hooks/useCanvasPersistence';
-import { useExcalidrawCollaboration } from './hooks/useExcalidrawCollaboration';
+import { LiveCollaborationTrigger, MainMenu } from "@excalidraw/excalidraw";
 
 // Sub-components
 import CanvasCore from './CanvasCore';
@@ -27,13 +22,15 @@ import CanvasAvatar from '../islands/CanvasAvatar';
 
 import "@excalidraw/excalidraw/index.css";
 
+declare global {
+  interface Window {
+    excalidrawAPI?: ExcalidrawAPI;
+  }
+}
+
 interface CanvasContainerProps {
-  /** Enable PartyKit collaboration */
+  /** Enable collaboration mode on mount */
   isSharedMode?: boolean;
-  /** Room ID for collaboration */
-  shareRoomId?: string;
-  /** PartyKit host URL */
-  partyKitHost?: string;
   /** Force clear canvas on mount (new canvas mode) */
   shouldClearOnMount?: boolean;
 
@@ -46,63 +43,138 @@ interface CanvasContainerProps {
 
 export default function CanvasContainer({
   isSharedMode = false,
-  shareRoomId,
-  partyKitHost = import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev",
   shouldClearOnMount = false,
   isSignedIn = false,
   userId = null,
   userName = null,
   avatarUrl = null,
 }: CanvasContainerProps) {
-  // const { isSignedIn } = useUser(); // Removed
   const containerRef = useRef<HTMLDivElement>(null);
 
   // === STORE CONNECTION ===
   const store = useUnifiedCanvasStore();
   const {
     canvasId,
-    setCanvasId,
     addToast,
   } = store;
+  const [isCollaborating, setIsCollaborating] = useState(isSharedMode);
 
   // === API MANAGEMENT ===
   const api = useExcalidrawAPISafe();
   const setApi = useSetExcalidrawAPI();
 
-  const handleApiReady = useCallback((excalidrawApi: any) => {
+  const handleApiReady = useCallback((api: unknown) => {
+    const excalidrawApi = api as ExcalidrawAPI;
     setApi(excalidrawApi);
-    (window as any).excalidrawAPI = excalidrawApi;
+    window.excalidrawAPI = excalidrawApi;
   }, [setApi]);
 
   // === PERSISTENCE ===
   useCanvasPersistence({
-    api,
     canvasId,
     shouldClearOnMount,
-    onSave: (id) => {
-      setCanvasId(id);
-      addToast('Canvas saved', 'success');
-    },
     onError: (err) => {
       addToast(`Save failed: ${err.message}`, 'error');
     },
   });
 
-  // === NATIVE EXCALIDRAW COLLABORATION ===
-  const { isConnected, activeUsers, onPointerUpdate, onSceneChange } = useExcalidrawCollaboration({
-    enabled: isSharedMode,
-    roomId: shareRoomId,
-    partyKitHost,
-    api,
-    user: {
-      id: userId,
-      name: userName,
-      avatarUrl,
-    },
-    onConnect: () => addToast('Connected to collaboration room', 'success'),
-    onDisconnect: () => addToast('Disconnected from room', 'info'),
-    onError: (err) => addToast(`Connection error: ${err.message}`, 'error'),
-  });
+  const toggleCollaboration = useCallback(() => {
+    setIsCollaborating((prev) => {
+      const next = !prev;
+      addToast(
+        next
+          ? "Native collaboration mode enabled"
+          : "Native collaboration mode disabled",
+        "info"
+      );
+      return next;
+    });
+  }, [addToast]);
+
+  const dispatchCanvasMenuAction = useCallback((action: string) => {
+    window.dispatchEvent(
+      new CustomEvent("aw:canvas-menu-action", {
+        detail: { action },
+      })
+    );
+  }, []);
+
+  const renderTopRightUI = useMemo(
+    () => (_isMobile: boolean, _appState: unknown) => (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <LiveCollaborationTrigger
+          isCollaborating={isCollaborating}
+          onSelect={toggleCollaboration}
+        />
+        <CanvasAvatar
+          user={isSignedIn && userId ? {
+            id: userId,
+            name: userName || undefined,
+            email: undefined,
+            avatarUrl: avatarUrl || undefined,
+          } : null}
+          isAuthenticated={!!isSignedIn}
+          isLoading={false}
+        />
+      </div>
+    ),
+    [avatarUrl, isCollaborating, isSignedIn, toggleCollaboration, userId, userName]
+  );
+
+  const renderMainMenu = useMemo(
+    () => (
+      <MainMenu>
+        <MainMenu.DefaultItems.LoadScene />
+        <MainMenu.DefaultItems.SaveToActiveFile />
+        <MainMenu.DefaultItems.Export />
+        <MainMenu.DefaultItems.SaveAsImage />
+        <MainMenu.DefaultItems.LiveCollaborationTrigger
+          isCollaborating={isCollaborating}
+          onSelect={toggleCollaboration}
+        />
+        <MainMenu.DefaultItems.CommandPalette />
+        <MainMenu.DefaultItems.SearchMenu />
+        <MainMenu.Separator />
+        <MainMenu.Group title="AstroWeb add-ons">
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("open-chat")}>
+            AI chat
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("open-icons")}>
+            Icon library
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-markdown")}>
+            Add markdown note
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-rich-text")}>
+            Add rich text note
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-web-embed")}>
+            Add web embed
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("generate-image")}>
+            Generate image
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("save-rj")}>
+            Save as .rj
+          </MainMenu.Item>
+          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("load-rj")}>
+            Open .rj/.excalidraw
+          </MainMenu.Item>
+        </MainMenu.Group>
+        <MainMenu.Separator />
+        <MainMenu.DefaultItems.Help />
+        <MainMenu.DefaultItems.ClearCanvas />
+        <MainMenu.Separator />
+        <MainMenu.Group title="Excalidraw links">
+          <MainMenu.DefaultItems.Socials />
+        </MainMenu.Group>
+        <MainMenu.Separator />
+        <MainMenu.DefaultItems.ToggleTheme />
+        <MainMenu.DefaultItems.ChangeCanvasBackground />
+      </MainMenu>
+    ),
+    [dispatchCanvasMenuAction, isCollaborating, toggleCollaboration]
+  );
 
   return (
     <div
@@ -120,34 +192,19 @@ export default function CanvasContainer({
       <CanvasCore
         onApiReady={handleApiReady}
         isSharedMode={isSharedMode}
-        isCollaborating={isSharedMode}
-        onPointerUpdate={onPointerUpdate}
-        onSceneChange={onSceneChange}
-        renderTopRightUI={useMemo(() => (_isMobile: boolean, _appState: any) => (
-          <CanvasAvatar
-            user={isSignedIn && userId ? {
-              id: userId,
-              name: userName || undefined,
-              email: undefined,
-              avatarUrl: avatarUrl || undefined,
-            } : null}
-            isAuthenticated={!!isSignedIn}
-            isLoading={false}
-          />
-        ), [isSignedIn, userId, userName, avatarUrl])}
-      />
+        isCollaborating={isCollaborating}
+        renderTopRightUI={renderTopRightUI}
+      >
+        {renderMainMenu}
+      </CanvasCore>
 
       {/* Notes Layer (markdown, embeds) */}
       <CanvasNotesLayer api={api} />
 
       {/* UI Layer (controls, modals, chat) */}
       <CanvasUI
-        isSignedIn={isSignedIn}
-        userId={userId}
-        userName={userName}
         isSharedMode={isSharedMode}
-        isConnected={isConnected}
-        activeUsers={activeUsers}
+        isCollaborating={isCollaborating}
       />
     </div>
   );

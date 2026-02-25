@@ -11,6 +11,7 @@
  */
 
 import { nanoid } from "nanoid";
+import type { ExcalidrawElement } from "@/stores";
 import type {
   AIProvider,
   ContextMode,
@@ -61,10 +62,10 @@ export class ChatCoordinator {
   }
 
   /**
-   * Toggle between Kimi and Claude
+   * Claude is the only provider in this runtime.
    */
   toggleProvider(): AIProvider {
-    this.provider = this.provider === "kimi" ? "claude" : "kimi";
+    this.provider = "claude";
     return this.provider;
   }
 
@@ -125,7 +126,7 @@ export class ChatCoordinator {
       let elementData = "";
 
       if (canvasState?.elements) {
-        const selectedElementData = canvasState.elements.filter((el: any) =>
+        const selectedElementData = canvasState.elements.filter((el) =>
           selectedElements.includes(el.id)
         );
         if (selectedElementData.length > 0) {
@@ -168,11 +169,11 @@ export class ChatCoordinator {
       messageContent.push({ type: "image", url: screenshotData });
     }
 
-    const appState = (canvasState?.appState || {}) as any;
+    const appState = canvasState?.appState;
     const zoom =
-      typeof appState.zoom === "number"
+      typeof appState?.zoom === "number"
         ? appState.zoom
-        : appState.zoom?.value ?? 1;
+        : appState?.zoom?.value ?? 1;
 
     return {
       id: nanoid(),
@@ -184,8 +185,8 @@ export class ChatCoordinator {
           elementCount: canvasState?.elements?.length || 0,
           selectedElementIds: selectedElements,
           viewport: {
-            scrollX: appState.scrollX ?? 0,
-            scrollY: appState.scrollY ?? 0,
+            scrollX: appState?.scrollX ?? 0,
+            scrollY: appState?.scrollY ?? 0,
             zoom,
           },
         },
@@ -233,16 +234,10 @@ export class ChatCoordinator {
           ? `\n\nCurrently selected elements (${selectedElements.length}):\n${request.getSelectionContext()}`
           : "";
 
-      const endpoint =
-        this.provider === "kimi" ? "/api/chat-kimi" : "/api/chat";
-      const model =
-        this.provider === "kimi"
-          ? "kimi-k2.5"
-          : "claude-sonnet-4-20250514";
+      const endpoint = "/api/chat";
+      const model = "claude-sonnet-4-20250514";
 
-      console.log(
-        `🤖 Sending to ${this.provider === "kimi" ? "Kimi K2.5" : "Claude"}...`
-      );
+      console.log("🤖 Sending to Claude...");
 
       // Create abort controller for cancellation
       this.abortController = new AbortController();
@@ -312,7 +307,10 @@ export class ChatCoordinator {
   /**
    * Handle API errors
    */
-  private handleAPIError(data: any, status: number): void {
+  private handleAPIError(
+    data: { details?: string; error?: string; [key: string]: unknown },
+    status: number
+  ): void {
     console.error(`❌ ${this.provider} API error:`, data);
     const errorMessage =
       data.details || data.error || `${this.provider} API failed`;
@@ -322,11 +320,10 @@ export class ChatCoordinator {
       status === 429;
 
     if (isOverloaded) {
-      const otherProvider = this.provider === "kimi" ? "claude" : "kimi";
       this.onError({
-        message: `${this.provider} is currently overloaded. Click the provider badge to switch to ${otherProvider} instead.`,
+        message: `${this.provider} is currently overloaded. Please retry in a moment.`,
         isOverloaded: true,
-        suggestedProvider: otherProvider,
+        suggestedProvider: "claude",
       });
     } else {
       this.onError({ message: errorMessage });
@@ -341,7 +338,7 @@ export class ChatCoordinator {
     model: string
   ): Promise<ParsedResponse> {
     let displayMessage = message;
-    let drawingCommand: any[] | undefined;
+    let drawingCommand: ExcalidrawElement[] | undefined;
     let sourceCode: string | undefined;
     let embedUrl: string | undefined;
 
@@ -380,9 +377,9 @@ export class ChatCoordinator {
 
       if (jsonMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+          const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]) as unknown;
           if (Array.isArray(parsed)) {
-            drawingCommand = parsed;
+            drawingCommand = parsed as ExcalidrawElement[];
             sourceCode = jsonMatch[0];
             displayMessage = message.replace(
               jsonMatch[0],
@@ -439,10 +436,8 @@ export class ChatCoordinator {
 
     this.onMessage(assistantMessage);
 
-    // Emit web embed event if present
+    // Emit a canvas event when the response requests a web embed.
     if (parsed.embedUrl) {
-      // This is a side effect - could be moved to a separate event bus
-      // or handled by the caller
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("canvas:create-web-embed", {

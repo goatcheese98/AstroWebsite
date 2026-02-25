@@ -147,8 +147,6 @@ export function usePanels() {
     isAssetsOpen: state.isAssetsOpen,
     setAssetsOpen: state.setAssetsOpen,
     toggleAssets: state.toggleAssets,
-    isShareModalOpen: state.isShareModalOpen,
-    setShareModalOpen: state.setShareModalOpen,
     isImageGenModalOpen: state.isImageGenModalOpen,
     setImageGenModalOpen: state.setImageGenModalOpen,
     isSaveModalOpen: state.isSaveModalOpen,

@@ -5,27 +5,22 @@
  * Handles auto-saving canvas to localStorage
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useUnifiedCanvasStore } from '@/stores';
-import type { ExcalidrawAPI } from '@/stores';
 import { 
   CanvasPersistenceCoordinator,
   type PersistenceState 
 } from '@/lib/persistence/CanvasPersistenceCoordinator';
 
 interface UseCanvasPersistenceOptions {
-  api: ExcalidrawAPI | null;
   canvasId: string | null;
   shouldClearOnMount: boolean;
-  onSave?: (id: string) => void;
   onError?: (error: Error) => void;
 }
 
 export function useCanvasPersistence({
-  api,
   canvasId,
   shouldClearOnMount,
-  onSave,
   onError,
 }: UseCanvasPersistenceOptions) {
   const { canvasData, setCanvasData, setDirty, setLastSaved } = useUnifiedCanvasStore();
@@ -39,11 +34,10 @@ export function useCanvasPersistence({
     
     // Subscribe to events
     const handleSaved = (e: Event) => {
-      const customEvent = e as CustomEvent<{ to: "localStorage" | "server" }>;
-      if (customEvent.detail.to === "localStorage") {
-        setLastSaved(new Date());
-        setDirty(false);
-      }
+      const customEvent = e as CustomEvent<{ to: "localStorage" }>;
+      if (customEvent.detail.to !== "localStorage") return;
+      setLastSaved(new Date());
+      setDirty(false);
     };
     
     const handleError = (e: Event) => {
@@ -87,23 +81,6 @@ export function useCanvasPersistence({
       coordinator.cancelPendingSave();
     };
   }, [canvasData, canvasId]);
-  
-  // Manual save to server
-  const saveToServer = useCallback(async () => {
-    if (!api) return;
-    
-    const coordinator = coordinatorRef.current;
-    if (!coordinator) return;
-    
-    try {
-      const result = await coordinator.saveToServer(api, canvasId);
-      onSave?.(result.id);
-    } catch (err) {
-      // Error already emitted by coordinator
-    }
-  }, [api, canvasId, onSave]);
-  
-  return { saveToServer };
 }
 
 // Re-export types

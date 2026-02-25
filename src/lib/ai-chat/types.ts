@@ -4,20 +4,20 @@
  */
 
 import type { Message } from "@/components/ai-chat/types";
+import type { ExcalidrawAppState, ExcalidrawElement } from "@/stores";
 
-export type AIProvider = "kimi" | "claude";
+export type AIProvider = "claude";
 
 export type ContextMode = "all" | "selected";
 
 export type ChatMessage = Message;
 
 export interface CanvasState {
-  elements: any[];
-  appState: {
+  elements: ExcalidrawElement[];
+  appState: Partial<ExcalidrawAppState> & {
     scrollX: number;
     scrollY: number;
     zoom: { value: number };
-    [key: string]: any;
   };
 }
 
@@ -34,7 +34,7 @@ export interface SendMessageRequest {
 
 export interface ParsedResponse {
   displayMessage: string;
-  drawingCommand?: any[];
+  drawingCommand?: ExcalidrawElement[];
   sourceCode?: string;
   embedUrl?: string;
 }

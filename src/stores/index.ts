@@ -1,22 +1,5 @@
 /**
- * Stores Index - New Architecture
- * 
- * This is the new unified store architecture that replaces:
- * - unifiedCanvasStore.ts (old monolithic store)
- * - eventBus/eventEmitter (replaced with commands and async functions)
- * - ExcalidrawContext (replaced with store slices)
- * 
- * Migration Guide:
- *   Before: import { useUnifiedCanvasStore } from '@/stores';
- *   After:  import { useStore, useCanvas, usePanels } from '@/stores';
- * 
- *   Before: canvasEvents.emit('excalidraw:insert-image', data);
- *   After:  const { insertImage } = useCanvasCommands();
- *           await insertImage(data.imageData, data.width, data.height);
- * 
- *   Before: canvasEvents.on('excalidraw:screenshot-captured', cb);
- *   After:  const { capture } = useScreenshotCapture();
- *           const result = await capture({ quality: 'high' });
+ * Central exports for store hooks, async helpers, and store types.
  */
 
 // ============================================================================
@@ -98,19 +81,9 @@ export type {
 } from './types';
 
 // ============================================================================
-// Backward Compatibility (deprecated)
+// Compatibility Alias
 // ============================================================================
 
 import { useStore } from './store';
 
-/**
- * @deprecated Use useStore or specific selector hooks instead
- * This is kept for backward compatibility during migration
- */
 export const useUnifiedCanvasStore = useStore;
-
-/**
- * @deprecated Use useStore instead
- * Alias for backward compatibility
- */
-export const useCanvasStore = useStore;

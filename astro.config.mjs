@@ -128,7 +128,7 @@ export default defineConfig({
         },
         esbuild: {
             // This removes all console.log and debugger statements from the production build
-            // but keeps them perfectly intact during 'npm run dev'
+            // but keeps them perfectly intact during 'bun run dev'
             drop: ['console', 'debugger'],
         },
         optimizeDeps: {

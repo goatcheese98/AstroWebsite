@@ -19,7 +19,7 @@ export const createChatSlice: StateCreator<
 > = (set, get) => ({
   // === State ===
   messages: [],
-  aiProvider: 'kimi',
+  aiProvider: 'claude',
   contextMode: 'all',
   isChatLoading: false,
   chatError: null,

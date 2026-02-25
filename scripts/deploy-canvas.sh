@@ -7,7 +7,7 @@ echo "🚀 Deploying AI Canvas..."
 
 # Build canvas-only
 echo "📦 Building canvas-only..."
-npm run build:canvas
+bun run build:canvas
 
 # Check if wrangler.toml exists and backup
 if [ -f "wrangler.toml" ]; then
@@ -21,7 +21,7 @@ cp wrangler.canvas.toml wrangler.toml
 
 # Deploy
 echo "☁️  Deploying to Cloudflare Pages..."
-wrangler pages deploy dist --project-name=ai-canvas
+bunx wrangler pages deploy dist --project-name=ai-canvas
 
 # Restore original config
 if [ -f "wrangler.backup.toml" ]; then

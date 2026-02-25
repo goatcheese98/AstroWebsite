@@ -1,396 +1,853 @@
-/**
- * AIChatContainer - Chat Interface for AI Canvas
- * Uses unified Zustand store for state management
- * 
- * Added minimize functionality - shows compact button when minimized
- */
-
-import React, { useRef, useCallback, useEffect, useState } from "react";
-
-// Unified Store
-import { useUnifiedCanvasStore } from "@/stores";
-
-// Hooks
-import { useAIChatState } from "./hooks/useAIChatState";
-import { useCanvasCommands } from "./hooks/useCanvasCommands";
-import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useElementSelection } from "./useElementSelection";
-import { useMobileDetection } from "./hooks/useMobileDetection";
-
-// Components
-import { ChatPanel } from "./components/ChatPanel";
-import { ChatHeader } from "./components/ChatHeader";
-import { CanvasContextOverlay } from "./components/CanvasContextOverlay";
-import { MessageList } from "./components/MessageList";
-import { ChatInput } from "./components/ChatInput";
-
-// Modals
-import TemplateModal from "./TemplateModal";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { nanoid } from "nanoid";
+import { captureScreenshot, useUnifiedCanvasStore } from "@/stores";
+import type {
+  AssistantArtifact,
+  AssistantChat,
+  AssistantMessage,
+  AssistantMode,
+  SketchControls,
+} from "@/lib/assistant/types";
+import { convertD2ToExcalidrawElements } from "@/lib/assistant/d2-converter";
+import { vectorizeImageToSketchElements } from "@/lib/assistant/sketch-vectorizer";
 
 export interface AIChatContainerProps {
-    /** Whether the chat panel is visible */
-    isOpen: boolean;
-    /** Callback when user closes the panel */
-    onClose: () => void;
-    /** Initial width of the panel in pixels */
-    initialWidth?: number;
+  isOpen: boolean;
+  onClose: () => void;
+  initialWidth?: number;
 }
 
-/**
- * Minimized Chat Button - Compact pill button shown when chat is minimized
- * Matches the design in the screenshot: pill shape, green dot, positioned at bottom
- */
-function MinimizedChatButton({
-    onExpand,
-    onClose,
-    aiProvider,
+const DEFAULT_SKETCH_CONTROLS: SketchControls = {
+  style: "clean",
+  complexity: "medium",
+  colorPalette: 8,
+  detailLevel: 0.75,
+  edgeSensitivity: 18,
+};
+
+function getAssistantClientId(): string {
+  if (typeof window === "undefined") {
+    return "server";
+  }
+
+  const key = "aw:assistant:client-id";
+  const existing = window.localStorage.getItem(key);
+  if (existing) {
+    return existing;
+  }
+
+  const next = nanoid();
+  window.localStorage.setItem(key, next);
+  return next;
+}
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function modeLabel(mode: AssistantMode): string {
+  switch (mode) {
+    case "mermaid":
+      return "Mermaid";
+    case "d2":
+      return "D2";
+    case "image":
+      return "Image";
+    case "sketch":
+      return "Sketch";
+    default:
+      return "Chat";
+  }
+}
+
+async function fetchMermaidElements(code: string): Promise<unknown[]> {
+  const { convertMermaidToCanvas } = await import("@/lib/mermaid-converter");
+  const result = await convertMermaidToCanvas(code);
+  return result.elements || [];
+}
+
+function MinimizedButton({
+  onExpand,
+  onClose,
 }: {
-    onExpand: () => void;
-    onClose: () => void;
-    aiProvider: "kimi" | "claude";
+  onExpand: () => void;
+  onClose: () => void;
 }) {
-    return (
-        <div
-            style={{
-                position: "fixed",
-                bottom: "20px",
-                right: "80px", // Positioned left of the help button
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "10px 16px",
-                background: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "9999px", // Full pill shape
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                fontSize: "14px",
-                fontWeight: 500,
-                color: "#374151",
-                transition: "all 0.2s ease",
-                cursor: "pointer",
-                zIndex: 100,
-            }}
-            onClick={onExpand}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.12)";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
-            }}
-        >
-            <span>AI Chat</span>
-            
-            {/* Green status dot */}
-            <span
-                style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: aiProvider === 'kimi' ? '#22c55e' : '#f97316',
-                    flexShrink: 0,
-                }}
-            />
-
-            {/* Close button - separate from expand click area */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                }}
-                title="Close"
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "20px",
-                    height: "20px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#9ca3af",
-                    borderRadius: "50%",
-                    transition: "all 0.15s",
-                    marginLeft: "4px",
-                    padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#f3f4f6";
-                    e.currentTarget.style.color = "#374151";
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#9ca3af";
-                }}
-            >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-    );
+  return (
+    <div
+      onClick={onExpand}
+      style={{
+        position: "fixed",
+        right: 80,
+        bottom: 20,
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 999,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 14px",
+        cursor: "pointer",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+        zIndex: 1000,
+      }}
+    >
+      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+        Assistant
+      </span>
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+        style={{
+          border: "none",
+          background: "transparent",
+          color: "#6b7280",
+          cursor: "pointer",
+        }}
+        title="Close"
+      >
+        ✕
+      </button>
+    </div>
+  );
 }
 
-/**
- * AI Chat Container - Chat Interface for AI Canvas
- * Uses unified Zustand store for state management
- */
 export default function AIChatContainer({
-    isOpen,
-    onClose,
-    initialWidth = 340,
+  isOpen,
+  onClose,
+  initialWidth = 940,
 }: AIChatContainerProps) {
-    // === 📱 MOBILE DETECTION ===
-    const { isMobile, viewportWidth } = useMobileDetection();
+  const store = useUnifiedCanvasStore();
+  const {
+    isChatMinimized,
+    setChatMinimized,
+    dispatchCommand,
+    addToast,
+    getExcalidrawAPI,
+  } = store;
 
-    // === STORE INTEGRATION ===
-    const store = useUnifiedCanvasStore();
-    const {
-        messages,
-        setMessages,
-        aiProvider,
-        setAIProvider,
-        contextMode,
-        setContextMode,
-        imageHistory,
-        setImageHistory,
-        isChatLoading,
-        setChatLoading,
-        chatError,
-        setChatError,
-        clearChatError,
-        addToast,
-        isChatMinimized,
-        setChatMinimized,
-    } = store;
+  const [clientId] = useState(() => getAssistantClientId());
+  const [chats, setChats] = useState<AssistantChat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [mode, setMode] = useState<AssistantMode>("chat");
+  const [sketchControls, setSketchControls] = useState<SketchControls>(
+    DEFAULT_SKETCH_CONTROLS,
+  );
+  const [sending, setSending] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingChats, setLoadingChats] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingJobs, setPendingJobs] = useState<string[]>([]);
+  const [includeCanvasReference, setIncludeCanvasReference] = useState(true);
 
-    // === 🧠 REFS ===
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [hasLoadedPendingState, setHasLoadedPendingState] = useState(false);
+  const requestHeaders = useMemo(
+    () => ({
+      "Content-Type": "application/json",
+      "x-assistant-client-id": clientId,
+    }),
+    [clientId],
+  );
 
-    // Close handler - can be extended for mobile backdrop
-    const handleCloseRequest = useCallback(() => {
-        onClose();
-    }, [onClose]);
-
-    // === 🧠 HOOKS ===
-
-    // Element selection from canvas
-    const {
-        selectedElements,
-        elementSnapshots,
-        clearSelection,
-        getSelectionContext,
-    } = useElementSelection({
-        enabled: isOpen && !isChatMinimized,
+  const createChat = useCallback(async (): Promise<string> => {
+    const response = await fetch("/api/assistant/chats", {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify({ clientId, title: "New chat" }),
     });
 
-    // Panel dimensions - vertical resize enabled
-    const panelWidth = isMobile ? viewportWidth : 360;
-    const [panelHeight, setPanelHeight] = useState(600);
-    const [isResizingHeight, setIsResizingHeight] = useState(false);
-    const [showTemplates, setShowTemplates] = useState(false);
-
-    // Vertical resize handling
-    const startResize = useCallback((e: React.MouseEvent) => {
-        if (isMobile) return;
-        e.preventDefault();
-        setIsResizingHeight(true);
-        document.body.style.cursor = "ns-resize";
-        document.body.style.userSelect = "none";
-    }, [isMobile]);
-
-    // Handle vertical resize mouse movement
-    useEffect(() => {
-        if (!isResizingHeight) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            const newHeight = window.innerHeight - e.clientY - 20;
-            const clampedHeight = Math.max(300, Math.min(newHeight, window.innerHeight - 100));
-            setPanelHeight(clampedHeight);
-        };
-
-        const handleMouseUp = () => {
-            setIsResizingHeight(false);
-            document.body.style.cursor = "";
-            document.body.style.userSelect = "";
-        };
-
-        document.addEventListener("mousemove", handleMouseMove);
-        document.addEventListener("mouseup", handleMouseUp);
-
-        return () => {
-            document.removeEventListener("mousemove", handleMouseMove);
-            document.removeEventListener("mouseup", handleMouseUp);
-        };
-    }, [isResizingHeight]);
-
-    // Core chat state (local UI state still in hook)
-    const {
-        input,
-        setInput,
-        canvasState,
-        setCanvasState,
-        handleSend: handleSendMessage,
-    } = useAIChatState({
-        isOpen: isOpen && !isChatMinimized,
-        initialWidth,
-        onClose,
-    });
-
-    // Canvas commands
-    const {
-        drawElements,
-        updateElements,
-    } = useCanvasCommands({
-        isOpen: isOpen && !isChatMinimized,
-        onStateUpdate: setCanvasState,
-    });
-
-    // Track selection changes for auto-switching context mode
-    const previousSelectionCountRef = useRef(0);
-
-    useEffect(() => {
-        const currentCount = selectedElements.length;
-        const previousCount = previousSelectionCountRef.current;
-
-        if (contextMode === "all" && currentCount > 0 && currentCount < (canvasState?.elements?.length || 0)) {
-            setContextMode("selected");
-        }
-
-        previousSelectionCountRef.current = currentCount;
-    }, [selectedElements.length, contextMode, setContextMode, canvasState?.elements?.length]);
-
-    // === 🚀 ACTIONS ===
-
-    const handleSend = useCallback(async () => {
-        const selectedImageData: string[] = [];
-
-        if (contextMode === "selected" && selectedElements.length > 0) {
-            elementSnapshots.forEach((snapshot) => {
-                if (snapshot.type === 'image' && snapshot.imageDataURL) {
-                    selectedImageData.push(snapshot.imageDataURL);
-                }
-            });
-        }
-
-        const imageForAI = selectedImageData.length > 0 ? selectedImageData[0] : null;
-
-        await handleSendMessage({
-            screenshotData: imageForAI,
-            selectedElements,
-            getSelectionContext,
-        });
-    }, [contextMode, selectedElements, elementSnapshots, handleSendMessage, getSelectionContext]);
-
-    // Keyboard shortcuts
-    const { handleKeyDown } = useKeyboardShortcuts({
-        onSend: handleSend,
-        onClose,
-        hasInput: input.trim().length > 0,
-        isLoading: isChatLoading,
-    });
-
-    // === 🎨 RENDER ===
-
-    if (!isOpen) return null;
-
-    // Show minimized button when minimized
-    if (isChatMinimized) {
-        return (
-            <MinimizedChatButton
-                onExpand={() => setChatMinimized(false)}
-                onClose={onClose}
-                aiProvider={aiProvider}
-            />
-        );
+    const data = await response.json();
+    if (!response.ok || !data.chat?.id) {
+      throw new Error(data.details || data.error || "Failed to create chat");
     }
 
+    setChats((prev) => [data.chat, ...prev]);
+    return data.chat.id as string;
+  }, [clientId, requestHeaders]);
+
+  const loadChats = useCallback(async () => {
+    setLoadingChats(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/assistant/chats?clientId=${encodeURIComponent(clientId)}`,
+        { headers: requestHeaders },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Failed to load chats");
+      }
+
+      const nextChats = (data.chats || []) as AssistantChat[];
+      setChats(nextChats);
+
+      if (nextChats.length === 0) {
+        const newChatId = await createChat();
+        setActiveChatId(newChatId);
+      } else if (!activeChatId || !nextChats.find((chat) => chat.id === activeChatId)) {
+        setActiveChatId(nextChats[0].id);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load chats");
+    } finally {
+      setLoadingChats(false);
+    }
+  }, [activeChatId, clientId, createChat, requestHeaders]);
+
+  const loadMessages = useCallback(
+    async (chatId: string) => {
+      setLoadingMessages(true);
+      setError(null);
+
+      try {
+        const response = await fetch(
+          `/api/assistant/chats/${chatId}/messages?clientId=${encodeURIComponent(clientId)}`,
+          { headers: requestHeaders },
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.details || data.error || "Failed to load messages");
+        }
+
+        setMessages((data.messages || []) as AssistantMessage[]);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Failed to load messages");
+      } finally {
+        setLoadingMessages(false);
+      }
+    },
+    [clientId, requestHeaders],
+  );
+
+  useEffect(() => {
+    if (!isOpen || isChatMinimized) {
+      return;
+    }
+
+    void loadChats();
+  }, [isOpen, isChatMinimized, loadChats]);
+
+  useEffect(() => {
+    if (!isOpen || isChatMinimized || !activeChatId) {
+      return;
+    }
+    void loadMessages(activeChatId);
+  }, [activeChatId, isOpen, isChatMinimized, loadMessages]);
+
+  useEffect(() => {
+    const handleSetMode = (event: Event) => {
+      const customEvent = event as CustomEvent<{ mode?: AssistantMode }>;
+      if (customEvent.detail?.mode) {
+        setMode(customEvent.detail.mode);
+      }
+    };
+
+    window.addEventListener("assistant:set-mode", handleSetMode);
+    return () => window.removeEventListener("assistant:set-mode", handleSetMode);
+  }, []);
+
+  useEffect(() => {
+    if (pendingJobs.length === 0) {
+      return;
+    }
+
+    const timer = window.setInterval(async () => {
+      const statuses = await Promise.all(
+        pendingJobs.map(async (jobId) => {
+          try {
+            const response = await fetch(
+              `/api/assistant/jobs/${jobId}?clientId=${encodeURIComponent(clientId)}`,
+              { headers: requestHeaders },
+            );
+            const data = await response.json();
+            if (!response.ok) {
+              return { jobId, status: "failed" };
+            }
+            return { jobId, status: data.job?.status as string };
+          } catch {
+            return { jobId, status: "failed" };
+          }
+        }),
+      );
+
+      const unresolved = statuses
+        .filter((entry) => entry.status === "queued" || entry.status === "running")
+        .map((entry) => entry.jobId);
+
+      if (unresolved.length !== pendingJobs.length && activeChatId) {
+        await loadMessages(activeChatId);
+      }
+
+      setPendingJobs(unresolved);
+    }, 1400);
+
+    return () => window.clearInterval(timer);
+  }, [activeChatId, clientId, loadMessages, pendingJobs, requestHeaders]);
+
+  const buildSourceImage = useCallback(async () => {
+    if (!includeCanvasReference || (mode !== "image" && mode !== "sketch")) {
+      return undefined;
+    }
+
+    const api = getExcalidrawAPI();
+    if (!api) {
+      return undefined;
+    }
+
+    const selectedIds = Object.entries(api.getAppState().selectedElementIds || {})
+      .filter(([, selected]) => Boolean(selected))
+      .map(([id]) => id);
+
+    try {
+      const screenshot = await captureScreenshot(api, {
+        quality: "high",
+        elementIds: selectedIds.length > 0 ? selectedIds : undefined,
+      });
+      return screenshot.dataUrl;
+    } catch {
+      return undefined;
+    }
+  }, [getExcalidrawAPI, includeCanvasReference, mode]);
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || sending) {
+      return;
+    }
+
+    let chatId = activeChatId;
+    try {
+      setSending(true);
+      setError(null);
+
+      if (!chatId) {
+        chatId = await createChat();
+        setActiveChatId(chatId);
+      }
+
+      const sourceImageDataUrl = await buildSourceImage();
+
+      const response = await fetch(`/api/assistant/chats/${chatId}/messages`, {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({
+          clientId,
+          text: input,
+          generation: {
+            mode,
+            sourceImageDataUrl,
+            sketch: sketchControls,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Failed to send message");
+      }
+
+      setInput("");
+      setPendingJobs((prev) => [...new Set([...prev, ...(data.pendingJobIds || [])])]);
+      await loadMessages(chatId);
+      await loadChats();
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  }, [
+    activeChatId,
+    buildSourceImage,
+    clientId,
+    createChat,
+    input,
+    loadChats,
+    loadMessages,
+    mode,
+    requestHeaders,
+    sending,
+    sketchControls,
+  ]);
+
+  const handleAddImageToCanvas = useCallback(
+    async (artifact: Extract<AssistantArtifact, { type: "image-data" }>) => {
+      try {
+        await dispatchCommand("insertImage", {
+          imageData: artifact.dataUrl,
+          type: artifact.mimeType.includes("png") ? "png" : "jpeg",
+          width: artifact.width,
+          height: artifact.height,
+        });
+        addToast("Image added to canvas", "success");
+      } catch (canvasError) {
+        addToast(
+          `Failed to add image: ${canvasError instanceof Error ? canvasError.message : "Unknown error"}`,
+          "error",
+        );
+      }
+    },
+    [addToast, dispatchCommand],
+  );
+
+  const handleVectorizeSketch = useCallback(
+    async (artifact: Extract<AssistantArtifact, { type: "image-data" }>) => {
+      try {
+        const elements = await vectorizeImageToSketchElements(artifact.dataUrl, {
+          controls: artifact.sketchControls || sketchControls,
+        });
+
+        await dispatchCommand("drawElements", {
+          elements,
+          isModification: false,
+        });
+
+        addToast(`Sketch vectorized: ${elements.length} elements`, "success", 4500);
+      } catch (vectorizeError) {
+        addToast(
+          `Vectorization failed: ${vectorizeError instanceof Error ? vectorizeError.message : "Unknown error"}`,
+          "error",
+          4500,
+        );
+      }
+    },
+    [addToast, dispatchCommand, sketchControls],
+  );
+
+  const handleApplyCodeArtifact = useCallback(
+    async (artifact: Extract<AssistantArtifact, { type: "code" }>) => {
+      try {
+        const elements = artifact.language === "mermaid"
+          ? await fetchMermaidElements(artifact.code)
+          : convertD2ToExcalidrawElements(artifact.code);
+
+        if (!elements || elements.length === 0) {
+          addToast("No drawable elements were generated", "info");
+          return;
+        }
+
+        await dispatchCommand("drawElements", {
+          elements,
+          isModification: false,
+        });
+        addToast(`Added ${artifact.language.toUpperCase()} diagram to canvas`, "success");
+      } catch (applyError) {
+        addToast(
+          `Failed to add diagram: ${applyError instanceof Error ? applyError.message : "Unknown error"}`,
+          "error",
+          4500,
+        );
+      }
+    },
+    [addToast, dispatchCommand],
+  );
+
+  const handleApplyElementArtifact = useCallback(
+    async (artifact: Extract<AssistantArtifact, { type: "canvas-elements" }>) => {
+      try {
+        await dispatchCommand("drawElements", {
+          elements: artifact.elements,
+          isModification: false,
+        });
+        addToast("Elements added to canvas", "success");
+      } catch (applyError) {
+        addToast(
+          `Failed to add elements: ${applyError instanceof Error ? applyError.message : "Unknown error"}`,
+          "error",
+        );
+      }
+    },
+    [addToast, dispatchCommand],
+  );
+
+  if (!isOpen) {
+    return null;
+  }
+
+  if (isChatMinimized) {
     return (
-        <>
-            {/* Canvas Context Preview - Separate container to the LEFT of chat */}
-            <CanvasContextOverlay
-                contextMode={contextMode}
-                onContextModeChange={setContextMode}
-                selectedElements={selectedElements}
-                elementSnapshots={elementSnapshots}
-                canvasElementCount={canvasState?.elements?.length || 0}
-                onClearSelection={clearSelection}
-            />
+      <MinimizedButton
+        onExpand={() => setChatMinimized(false)}
+        onClose={onClose}
+      />
+    );
+  }
 
-            <ChatPanel
-                isOpen={isOpen}
-                width={panelWidth}
-                height={panelHeight}
-                onResizeStart={startResize}
-                onClose={onClose}
-                isMobile={isMobile}
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 88,
+        bottom: 20,
+        width: `min(${initialWidth}px, calc(100vw - 104px))`,
+        height: "min(760px, calc(100vh - 36px))",
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        boxShadow: "0 16px 36px rgba(0, 0, 0, 0.14)",
+        zIndex: 999,
+        display: "grid",
+        gridTemplateColumns: "240px 1fr",
+        overflow: "hidden",
+      }}
+    >
+      <aside style={{ borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ padding: 14, borderBottom: "1px solid #f3f4f6", display: "flex", gap: 8 }}>
+          <button
+            onClick={() => {
+              void createChat().then((chatId) => {
+                setActiveChatId(chatId);
+                setMessages([]);
+              });
+            }}
+            style={{
+              flex: 1,
+              border: "1px solid #d1d5db",
+              background: "#f8fafc",
+              borderRadius: 8,
+              padding: "8px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + New Chat
+          </button>
+          <button
+            onClick={() => setChatMinimized(true)}
+            title="Minimize"
+            style={{ border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+          >
+            _
+          </button>
+          <button
+            onClick={onClose}
+            title="Close"
+            style={{ border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: "10px 12px", fontSize: 11, color: "#6b7280" }}>
+          {loadingChats ? "Loading chats..." : `${chats.length} chat${chats.length === 1 ? "" : "s"}`}
+        </div>
+
+        <div style={{ overflowY: "auto", padding: 8, minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+          {chats.map((chat) => (
+            <button
+              key={chat.id}
+              onClick={() => setActiveChatId(chat.id)}
+              style={{
+                textAlign: "left",
+                borderRadius: 8,
+                border: activeChatId === chat.id ? "1px solid #60a5fa" : "1px solid #e5e7eb",
+                background: activeChatId === chat.id ? "#eff6ff" : "#ffffff",
+                padding: "10px 8px",
+                cursor: "pointer",
+              }}
             >
-                {/* Header with minimize button */}
-                <ChatHeader 
-                    onClose={onClose}
-                    onMinimize={!isMobile ? () => setChatMinimized(true) : undefined}
-                />
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {chat.title || "Untitled"}
+              </div>
+              {chat.lastMessagePreview ? (
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {chat.lastMessagePreview}
+                </div>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </aside>
 
-                {/* Messages wrapper */}
-                <div style={{
-                    flex: 1,
-                    position: "relative",
-                    minHeight: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                }}>
-                    {/* Messages - with empty state showing "Start creating with AI" */}
-                    <MessageList
-                        ref={messagesEndRef}
-                        messages={messages}
-                        isLoading={isChatLoading}
-                        error={chatError}
-                        aiProvider={aiProvider}
-                        canvasState={canvasState}
-                        hasPreviewPanel={false}
-                    />
+      <section style={{ display: "grid", gridTemplateRows: "auto 1fr auto", minHeight: 0 }}>
+        <header style={{ padding: "12px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <strong style={{ fontSize: 13, color: "#111827" }}>Unified Assistant</strong>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>Model: Claude Sonnet 4</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 11, color: "#4b5563" }}>Mode</label>
+            <select
+              value={mode}
+              onChange={(event) => setMode(event.target.value as AssistantMode)}
+              style={{ border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, padding: "4px 8px" }}
+            >
+              <option value="chat">Chat</option>
+              <option value="mermaid">Mermaid</option>
+              <option value="d2">D2</option>
+              <option value="image">Image</option>
+              <option value="sketch">Sketch</option>
+            </select>
+          </div>
+        </header>
+
+        <div style={{ overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
+          {loadingMessages ? <div style={{ fontSize: 12, color: "#6b7280" }}>Loading messages...</div> : null}
+          {!loadingMessages && messages.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              Start a new chat and generate diagrams, sketches, and image assets directly in this window.
+            </div>
+          ) : null}
+
+          {messages.map((message) => {
+            const isUser = message.role === "user";
+            return (
+              <div
+                key={message.id}
+                style={{
+                  alignSelf: isUser ? "flex-end" : "flex-start",
+                  maxWidth: "90%",
+                  background: isUser ? "#1f2937" : "#f8fafc",
+                  color: isUser ? "#ffffff" : "#111827",
+                  border: isUser ? "none" : "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                }}
+              >
+                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>
+                  {isUser ? "You" : "Assistant"} • {formatTime(message.createdAt)}
+                  {!isUser ? ` • ${message.status}` : ""}
                 </div>
 
-                {/* Input Area - with model selector and mode toggle */}
-                <ChatInput
-                    ref={inputRef}
-                    input={input}
-                    onInputChange={setInput}
-                    onSend={handleSend}
-                    onOpenTemplates={() => setShowTemplates(true)}
-                    isLoading={isChatLoading}
-                    selectedElementsCount={selectedElements.length}
-                    contextMode={contextMode}
-                    onContextModeChange={setContextMode}
-                    onClearSelection={clearSelection}
-                    onKeyDown={handleKeyDown}
-                    isMobile={isMobile}
-                    aiProvider={aiProvider}
-                    onToggleProvider={() => setAIProvider(aiProvider === 'kimi' ? 'claude' : 'kimi')}
-                />
-            </ChatPanel>
+                <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{message.text}</div>
 
-            {/* Modals */}
-            <TemplateModal
-                isOpen={showTemplates}
-                onClose={() => setShowTemplates(false)}
-                onSelect={(template) => {
-                    if (template.variables.length === 0) {
-                        setInput(template.template);
-                    } else {
-                        let filled = template.template;
-                        template.variables.forEach(v => {
-                            const value = v.type === "select" ? v.options?.[0] || "" : `[${v.label}]`;
-                            filled = filled.replace(`{${v.name}}`, value);
-                        });
-                        setInput(filled);
-                    }
-                    setShowTemplates(false);
-                    inputRef.current?.focus();
-                }}
-                selectedElementsCount={selectedElements.length}
+                {message.artifacts?.map((artifact, artifactIndex) => (
+                  <div key={`${message.id}-${artifactIndex}`} style={{ marginTop: 10 }}>
+                    {artifact.type === "code" ? (
+                      <details>
+                        <summary style={{ fontSize: 12, cursor: "pointer", color: "#2563eb" }}>
+                          {artifact.language.toUpperCase()} source
+                        </summary>
+                        <pre
+                          style={{
+                            marginTop: 8,
+                            fontSize: 11,
+                            background: "#111827",
+                            color: "#e5e7eb",
+                            padding: 10,
+                            borderRadius: 8,
+                            overflowX: "auto",
+                          }}
+                        >
+                          {artifact.code}
+                        </pre>
+                        <button
+                          onClick={() => {
+                            void handleApplyCodeArtifact(artifact);
+                          }}
+                          style={{
+                            marginTop: 8,
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Add to Canvas
+                        </button>
+                      </details>
+                    ) : null}
+
+                    {artifact.type === "image-data" ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <img
+                          src={artifact.dataUrl}
+                          alt="Generated"
+                          style={{
+                            maxWidth: "100%",
+                            borderRadius: 8,
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                          }}
+                        />
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => {
+                              void handleAddImageToCanvas(artifact);
+                            }}
+                            style={{
+                              border: "1px solid #d1d5db",
+                              background: "#ffffff",
+                              borderRadius: 8,
+                              padding: "6px 10px",
+                              fontSize: 12,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Add Image
+                          </button>
+                          {artifact.source === "sketch" ? (
+                            <button
+                              onClick={() => {
+                                void handleVectorizeSketch(artifact);
+                              }}
+                              style={{
+                                border: "1px solid #0f766e",
+                                background: "#14b8a6",
+                                color: "#ffffff",
+                                borderRadius: 8,
+                                padding: "6px 10px",
+                                fontSize: 12,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Vectorize to Canvas
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {artifact.type === "canvas-elements" ? (
+                      <button
+                        onClick={() => {
+                          void handleApplyElementArtifact(artifact);
+                        }}
+                        style={{
+                          border: "1px solid #d1d5db",
+                          background: "#ffffff",
+                          borderRadius: 8,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Add Generated Elements
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          {pendingJobs.length > 0 ? (
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              {pendingJobs.length} background job{pendingJobs.length === 1 ? "" : "s"} running...
+            </div>
+          ) : null}
+
+          {error ? (
+            <div style={{ fontSize: 12, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 10px" }}>
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <footer style={{ borderTop: "1px solid #f3f4f6", padding: 12, display: "grid", gap: 10 }}>
+          {(mode === "image" || mode === "sketch") ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <label style={{ fontSize: 11, color: "#4b5563", display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={includeCanvasReference}
+                  onChange={(event) => setIncludeCanvasReference(event.target.checked)}
+                />
+                Use selected canvas content as reference
+              </label>
+
+              {mode === "sketch" ? (
+                <>
+                  <select
+                    value={sketchControls.style}
+                    onChange={(event) => {
+                      setSketchControls((prev) => ({
+                        ...prev,
+                        style: event.target.value as SketchControls["style"],
+                      }));
+                    }}
+                    style={{ border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, padding: "4px 8px" }}
+                  >
+                    <option value="clean">Clean</option>
+                    <option value="hand-drawn">Hand-drawn</option>
+                    <option value="technical">Technical</option>
+                    <option value="organic">Organic</option>
+                  </select>
+
+                  <select
+                    value={sketchControls.complexity}
+                    onChange={(event) => {
+                      setSketchControls((prev) => ({
+                        ...prev,
+                        complexity: event.target.value as SketchControls["complexity"],
+                      }));
+                    }}
+                    style={{ border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, padding: "4px 8px" }}
+                  >
+                    <option value="low">Low detail</option>
+                    <option value="medium">Medium detail</option>
+                    <option value="high">High detail</option>
+                  </select>
+
+                  <label style={{ fontSize: 11, color: "#4b5563", display: "flex", alignItems: "center", gap: 6 }}>
+                    Detail
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={1}
+                      step={0.05}
+                      value={sketchControls.detailLevel}
+                      onChange={(event) => {
+                        setSketchControls((prev) => ({
+                          ...prev,
+                          detailLevel: Number(event.target.value),
+                        }));
+                      }}
+                    />
+                  </label>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleSend();
+                }
+              }}
+              placeholder={`(${modeLabel(mode)}) Ask assistant...`}
+              style={{
+                flex: 1,
+                border: "1px solid #d1d5db",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 13,
+              }}
             />
-        </>
-    );
+            <button
+              onClick={() => {
+                void handleSend();
+              }}
+              disabled={sending || !input.trim()}
+              style={{
+                border: "1px solid #0f172a",
+                background: sending ? "#cbd5e1" : "#111827",
+                color: "#ffffff",
+                borderRadius: 10,
+                padding: "10px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: sending ? "not-allowed" : "pointer",
+              }}
+            >
+              {sending ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
 }

@@ -20,7 +20,7 @@ export interface CanvasState {
     };
     chat: {
         messages: Message[];
-        aiProvider: "kimi" | "claude";
+        aiProvider: "claude";
         contextMode: "all" | "selected";
     };
     images: {
@@ -36,7 +36,7 @@ export interface CanvasState {
 export interface CurrentStateData {
     excalidrawAPI: ExcalidrawAPI;
     messages: Message[];
-    aiProvider: "kimi" | "claude";
+    aiProvider: "claude";
     contextMode: "all" | "selected";
     imageHistory: ImageHistoryItem[];
 }
@@ -333,7 +333,7 @@ function convertExcalidrawToCanvasState(excalidrawData: ExcalidrawFileData): Can
         },
         chat: {
             messages: [],
-            aiProvider: "kimi",
+            aiProvider: "claude",
             contextMode: "all",
         },
         images: {
@@ -396,7 +396,7 @@ export async function loadCanvasStateFromFile(file: File): Promise<LoadStateResu
                 },
                 chat: {
                     messages: [],
-                    aiProvider: "kimi",
+                    aiProvider: "claude",
                     contextMode: "all",
                 },
                 images: {

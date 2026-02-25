@@ -11,15 +11,15 @@
  */
 
 import { useUnifiedCanvasStore } from "@/stores";
+import type { ExcalidrawAppState, ExcalidrawElement } from "@/stores";
 
 export interface CanvasState {
-  elements: any[];
-  appState: {
+  elements: ExcalidrawElement[];
+  appState: Partial<ExcalidrawAppState> & {
     scrollX: number;
     scrollY: number;
     zoom: { value: number };
     selectedElementIds?: Record<string, boolean>;
-    [key: string]: any;
   };
 }
 
@@ -90,7 +90,7 @@ export function getCanvasDescription(canvasState: CanvasState | null): string {
  * Dispatch a draw elements command
  */
 export function drawElements(
-  elements: any[],
+  elements: ExcalidrawElement[],
   isModification = false
 ): boolean {
   try {
@@ -118,7 +118,7 @@ export function drawElements(
 /**
  * Dispatch an update elements command
  */
-export function updateElements(elements: any[]): boolean {
+export function updateElements(elements: ExcalidrawElement[]): boolean {
   try {
     if (!Array.isArray(elements)) {
       console.error("❌ Invalid update command: elements must be an array");
@@ -236,7 +236,7 @@ export class CanvasCommandProcessor {
   /**
    * Draw elements on canvas
    */
-  draw(elements: any[], isModification = false): boolean {
+  draw(elements: ExcalidrawElement[], isModification = false): boolean {
     const success = drawElements(elements, isModification);
     if (success) {
       this.refreshState();
@@ -247,7 +247,7 @@ export class CanvasCommandProcessor {
   /**
    * Update existing elements
    */
-  update(elements: any[]): boolean {
+  update(elements: ExcalidrawElement[]): boolean {
     const success = updateElements(elements);
     if (success) {
       this.refreshState();

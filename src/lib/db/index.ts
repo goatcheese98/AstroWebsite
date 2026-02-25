@@ -10,13 +10,10 @@ import { nanoid } from 'nanoid';
 import {
   canvases,
   canvasVersions,
-  canvasShares,
   type Canvas,
   type NewCanvas,
   type CanvasVersion,
   type NewCanvasVersion,
-  type CanvasShare,
-  type NewCanvasShare,
 } from './schema';
 
 // ============================================================================
@@ -260,86 +257,4 @@ export async function getCanvasVersions(
     .all();
 
   return results;
-}
-
-// ============================================================================
-// Canvas Share Queries
-// ============================================================================
-
-// Export CanvasShare type from schema (for backward compatibility)
-export type { CanvasShare };
-
-export async function createCanvasShare(
-  db: D1Database,
-  canvasId: string,
-  expiresInDays?: number
-): Promise<CanvasShare> {
-  const drizzleDb = createDbClient(db);
-  const id = nanoid();
-  const shareToken = nanoid(32); // Longer token for shares
-  const now = Math.floor(Date.now() / 1000);
-  const expiresAt = expiresInDays ? now + expiresInDays * 24 * 60 * 60 : null;
-
-  const newShare: NewCanvasShare = {
-    id,
-    canvasId,
-    shareToken,
-    expiresAt,
-    createdAt: now,
-  };
-
-  await drizzleDb.insert(canvasShares).values(newShare).run();
-
-  const result = await drizzleDb
-    .select()
-    .from(canvasShares)
-    .where(eq(canvasShares.id, id))
-    .get();
-
-  if (!result) {
-    throw new Error('Failed to create canvas share');
-  }
-
-  return result;
-}
-
-export async function getCanvasShare(
-  db: D1Database,
-  shareToken: string
-): Promise<CanvasShare | null> {
-  const drizzleDb = createDbClient(db);
-
-  const result = await drizzleDb
-    .select()
-    .from(canvasShares)
-    .where(eq(canvasShares.shareToken, shareToken))
-    .get();
-
-  if (!result) {
-    return null;
-  }
-
-  // Check if expired
-  if (result.expiresAt) {
-    const now = Math.floor(Date.now() / 1000);
-    if (result.expiresAt < now) {
-      return null; // Expired
-    }
-  }
-
-  return result;
-}
-
-export async function deleteCanvasShare(
-  db: D1Database,
-  shareToken: string
-): Promise<boolean> {
-  const drizzleDb = createDbClient(db);
-
-  const result = await drizzleDb
-    .delete(canvasShares)
-    .where(eq(canvasShares.shareToken, shareToken))
-    .run();
-
-  return (result.meta?.rows_written ?? 0) > 0;
 }

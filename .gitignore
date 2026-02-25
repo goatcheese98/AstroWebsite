@@ -7,7 +7,7 @@ dist/
 node_modules/
 
 # logs
-npm-debug.log*
+*-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
@@ -31,3 +31,10 @@ pnpm-debug.log*
 wrangler.backup.toml
 wrangler.toml
 .wrangler/
+.partykit/
+package-lock.json
+
+# local analysis artifacts
+files.txt
+line_counts.txt
+projects_list.txt

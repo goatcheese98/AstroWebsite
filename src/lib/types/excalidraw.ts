@@ -97,17 +97,6 @@ export interface CanvasVersionInfo {
 }
 
 /**
- * Canvas share information
- */
-export interface CanvasShareInfo {
-  id: string;
-  canvasId: string;
-  shareToken: string;
-  expiresAt: number | null;
-  createdAt: number;
-}
-
-/**
  * Type guard to check if data is valid CanvasData
  */
 export function isCanvasData(data: unknown): data is CanvasData {

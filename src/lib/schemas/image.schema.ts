@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { GEMINI_CONFIG } from '../api-config';
+import { IMAGE_WORKER_CONFIG } from '../api-config';
 
 // ============================================================================
 // Image Generation Request Schema
@@ -21,15 +21,15 @@ export const ImageGenerationRequestSchema = z.object({
       invalid_type_error: 'Prompt must be a string',
     })
     .min(
-      GEMINI_CONFIG.MIN_PROMPT_LENGTH,
-      `Prompt too short. Minimum ${GEMINI_CONFIG.MIN_PROMPT_LENGTH} characters`
+      IMAGE_WORKER_CONFIG.MIN_PROMPT_LENGTH,
+      `Prompt too short. Minimum ${IMAGE_WORKER_CONFIG.MIN_PROMPT_LENGTH} characters`
     )
     .max(
-      GEMINI_CONFIG.MAX_PROMPT_LENGTH,
-      `Prompt too long. Maximum ${GEMINI_CONFIG.MAX_PROMPT_LENGTH} characters`
+      IMAGE_WORKER_CONFIG.MAX_PROMPT_LENGTH,
+      `Prompt too long. Maximum ${IMAGE_WORKER_CONFIG.MAX_PROMPT_LENGTH} characters`
     )
     .transform((str) => str.trim()) // Auto-trim whitespace
-    .refine((str) => str.length >= GEMINI_CONFIG.MIN_PROMPT_LENGTH, {
+    .refine((str) => str.length >= IMAGE_WORKER_CONFIG.MIN_PROMPT_LENGTH, {
       message: 'Prompt cannot be only whitespace',
     })
     // Reject null bytes
@@ -45,13 +45,13 @@ export const ImageGenerationRequestSchema = z.object({
       message: 'Prompt contains too many consecutive newlines',
     }),
   model: z
-    .enum(GEMINI_CONFIG.ALLOWED_MODELS, {
+    .enum(IMAGE_WORKER_CONFIG.ALLOWED_MODELS, {
       errorMap: () => ({
-        message: `Invalid model. Allowed: ${GEMINI_CONFIG.ALLOWED_MODELS.join(', ')}`,
+        message: `Invalid model. Allowed: ${IMAGE_WORKER_CONFIG.ALLOWED_MODELS.join(', ')}`,
       }),
     })
     .optional()
-    .default(GEMINI_CONFIG.DEFAULT_MODEL),
+    .default(IMAGE_WORKER_CONFIG.DEFAULT_MODEL),
 });
 
 // ============================================================================
@@ -77,47 +77,47 @@ export const ImageGenerationErrorResponseSchema = z.object({
 });
 
 // ============================================================================
-// Gemini API Response Type Schemas
+// Model API Response Type Schemas
 // ============================================================================
 
 /**
- * Gemini inline data schema (for type safety)
+ * Inline data schema (for type safety)
  */
-export const GeminiInlineDataSchema = z.object({
+export const ModelInlineDataSchema = z.object({
   data: z.string(),
   mimeType: z.string(),
 });
 
 /**
- * Gemini part schema (can be text or inline data)
+ * Part schema (can be text or inline data)
  */
-export const GeminiPartSchema = z.object({
-  inlineData: GeminiInlineDataSchema.optional(),
+export const ModelPartSchema = z.object({
+  inlineData: ModelInlineDataSchema.optional(),
   text: z.string().optional(),
 });
 
 /**
- * Gemini content schema
+ * Content schema
  */
-export const GeminiContentSchema = z.object({
+export const ModelContentSchema = z.object({
   role: z.string(),
-  parts: z.array(GeminiPartSchema),
+  parts: z.array(ModelPartSchema),
 });
 
 /**
- * Gemini candidate schema
+ * Candidate schema
  */
-export const GeminiCandidateSchema = z.object({
-  content: GeminiContentSchema,
+export const ModelCandidateSchema = z.object({
+  content: ModelContentSchema,
   finishReason: z.string().optional(),
   safetyRatings: z.array(z.unknown()).optional(),
 });
 
 /**
- * Gemini response schema
+ * Response schema
  */
-export const GeminiResponseSchema = z.object({
-  candidates: z.array(GeminiCandidateSchema).optional(),
+export const ModelResponseSchema = z.object({
+  candidates: z.array(ModelCandidateSchema).optional(),
 });
 
 // ============================================================================
@@ -127,11 +127,11 @@ export const GeminiResponseSchema = z.object({
 export type ImageGenerationRequest = z.infer<typeof ImageGenerationRequestSchema>;
 export type ImageGenerationResponse = z.infer<typeof ImageGenerationResponseSchema>;
 export type ImageGenerationErrorResponse = z.infer<typeof ImageGenerationErrorResponseSchema>;
-export type GeminiInlineData = z.infer<typeof GeminiInlineDataSchema>;
-export type GeminiPart = z.infer<typeof GeminiPartSchema>;
-export type GeminiContent = z.infer<typeof GeminiContentSchema>;
-export type GeminiCandidate = z.infer<typeof GeminiCandidateSchema>;
-export type GeminiResponse = z.infer<typeof GeminiResponseSchema>;
+export type ModelInlineData = z.infer<typeof ModelInlineDataSchema>;
+export type ModelPart = z.infer<typeof ModelPartSchema>;
+export type ModelContent = z.infer<typeof ModelContentSchema>;
+export type ModelCandidate = z.infer<typeof ModelCandidateSchema>;
+export type ModelResponse = z.infer<typeof ModelResponseSchema>;
 
 // ============================================================================
 // Validation Helper Functions

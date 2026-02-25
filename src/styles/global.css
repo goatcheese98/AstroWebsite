@@ -649,7 +649,7 @@ img[loading] {
   background: var(--color-accent-light);
 }
 
-/* Provider Badge (Claude/Kimi) */
+/* Provider Badge (Claude) */
 .provider-badge {
   display: flex;
   align-items: center;
@@ -661,15 +661,6 @@ img[loading] {
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
-}
-
-.provider-badge[data-provider="kimi"] {
-  background: #10b981;
-  border: 1px solid #059669;
-}
-
-.provider-badge[data-provider="kimi"]:hover {
-  background: #059669;
 }
 
 .provider-badge[data-provider="claude"] {

@@ -24,7 +24,7 @@ export type MessageContent =
 export interface MessageMetadata {
     timestamp: Date;
     model?: string;
-    provider?: "kimi" | "claude";
+    provider?: "claude";
     tokens?: { input: number; output: number };
     latency?: number;
     canvasContext?: CanvasContext;
