@@ -59,4 +59,4 @@ jobs:
         run: |
           bunx wrangler --version
           bunx wrangler pages project list
-          bunx wrangler pages deploy dist --project-name=ai-canvas --config wrangler.canvas.jsonc
+          bunx wrangler pages deploy dist --project-name=ai-canvas

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "dev:canvas": "astro dev",
-    "dev:preview": "bun run build && bunx wrangler pages dev dist --port=4321 --config wrangler.jsonc",
+    "dev:preview": "bun run build && bunx wrangler pages dev dist --port=4321",
     "dev:party": "bunx partykit dev",
     "build": "astro build",
     "build:fast": "bun run scripts/build-fast.js",
@@ -15,8 +15,8 @@
     "preview": "astro preview",
     "preview:canvas": "DEPLOY_TARGET=canvas astro preview",
     "deploy": "bun run deploy:web",
-    "deploy:web": "bun run build && bunx wrangler pages deploy dist --project-name=astroweb --config wrangler.jsonc",
-    "deploy:canvas": "bun run build:canvas && bunx wrangler pages deploy dist --project-name=ai-canvas --config wrangler.canvas.jsonc",
+    "deploy:web": "bun run build && bunx wrangler pages deploy dist --project-name=astroweb",
+    "deploy:canvas": "bun run build:canvas && bunx wrangler pages deploy dist --project-name=ai-canvas",
     "astro": "astro",
     "test": "bunx vitest run"
   },
