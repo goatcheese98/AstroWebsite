@@ -257,14 +257,15 @@ function buildCanvasSafeImagePrompt({ mode, text, sketch, hasReferenceImage }) {
   const base = [
     "Generate a single whiteboard-friendly visual asset for composition inside Excalidraw.",
     "MANDATORY background rules:",
-    "- transparent background alpha channel",
-    "- no background objects, no sky, no room, no paper texture",
+    "- solid pure white background (#FFFFFF)",
+    "- no checkerboard pattern, no transparency grid, no paper texture",
+    "- no background objects, no sky, no room",
     "- no shadow plane, no glow halo, no border frame",
     "- keep the subject isolated and centered with padding",
     "MANDATORY rendering rules:",
     "- crisp silhouette and edges",
     "- high subject/background separation",
-    "- avoid anti-aliased matte/fringe around the subject",
+    "- avoid anti-aliased matte/fringe around the subject edges",
     "- no watermark, no text overlay unless explicitly requested",
     "- output should read clearly when scaled down on a canvas",
     `User request: ${text}`,
@@ -289,11 +290,11 @@ function buildCanvasSafeImagePrompt({ mode, text, sketch, hasReferenceImage }) {
   } else {
     base.push("Image-specific rules:");
     base.push("- deliver a clean standalone subject for direct canvas placement");
-    base.push("- keep empty transparent margins around the subject");
+    base.push("- keep empty white margins around the subject");
   }
 
   if (hasReferenceImage) {
-    base.push("Use the provided reference image for composition/content guidance while preserving all transparency constraints.");
+    base.push("Use the provided reference image for composition/content guidance while preserving all white-background constraints.");
   }
 
   return base.join("\n");
@@ -414,7 +415,7 @@ async function refineCanvasPrompt(prompt, mode) {
           {
             text: [
               "Rewrite this image generation prompt for maximum fidelity and composability in Excalidraw.",
-              "Do not remove hard constraints about transparency/background.",
+              "Do not remove hard constraints about the white background and subject isolation.",
               "Output plain prompt text only (no markdown, no bullets prefix decoration).",
               `Mode: ${mode}`,
               "",

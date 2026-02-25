@@ -4,15 +4,19 @@ import { SITE } from '../lib/constants';
 
 export async function GET(context: { site: URL }) {
   const posts = await getCollection('blog');
+  type BlogPost = (typeof posts)[number];
   const published = posts
-    .filter((post) => !post.data.draft)
-    .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+    .filter((post: BlogPost) => !post.data.draft)
+    .sort(
+      (a: BlogPost, b: BlogPost) =>
+        b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+    );
 
   return rss({
     title: SITE.title,
     description: SITE.description,
     site: context.site || SITE.siteUrl,
-    items: published.map((post) => ({
+    items: published.map((post: BlogPost) => ({
       title: post.data.title,
       description: post.data.description,
       pubDate: post.data.pubDate,

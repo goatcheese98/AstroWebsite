@@ -33,13 +33,17 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+function channelChroma(r: number, g: number, b: number): number {
+  return Math.max(r, g, b) - Math.min(r, g, b);
+}
+
 function averageColor(
   data: Uint8ClampedArray,
   width: number,
   x: number,
   y: number,
   cellSize: number,
-): { r: number; g: number; b: number; a: number; brightness: number } {
+): { r: number; g: number; b: number; a: number; brightness: number; chroma: number } {
   let r = 0;
   let g = 0;
   let b = 0;
@@ -60,7 +64,7 @@ function averageColor(
   }
 
   if (count === 0) {
-    return { r: 255, g: 255, b: 255, a: 0, brightness: 255 };
+    return { r: 255, g: 255, b: 255, a: 0, brightness: 255, chroma: 0 };
   }
 
   const avgR = Math.round(r / count);
@@ -68,6 +72,7 @@ function averageColor(
   const avgB = Math.round(b / count);
   const avgA = Math.round(a / count);
   const brightness = (avgR * 0.299) + (avgG * 0.587) + (avgB * 0.114);
+  const chroma = channelChroma(avgR, avgG, avgB);
 
   return {
     r: avgR,
@@ -75,6 +80,7 @@ function averageColor(
     b: avgB,
     a: avgA,
     brightness,
+    chroma,
   };
 }
 
@@ -130,6 +136,11 @@ export async function vectorizeImageToSketchElements(
 
       const color = averageColor(imageData.data, width, x, y, cellSize);
       if (color.a < 24) {
+        continue;
+      }
+
+      // Ignore white/near-white paper backgrounds from generated assets.
+      if (color.brightness > 245 && color.chroma < 12) {
         continue;
       }
 
