@@ -84,9 +84,13 @@ if (DEPLOY_TARGET === 'canvas') {
 const siteUrl = DEPLOY_TARGET === 'canvas'
     ? (process.env.CANVAS_SITE_URL || 'https://canvas.rohanjasani.com')
     : (process.env.SITE_URL || 'https://rohanjasani.com');
+const wranglerConfigPath = DEPLOY_TARGET === 'canvas'
+    ? './wrangler.canvas.jsonc'
+    : './wrangler.jsonc';
 
 console.log(`[astro-config] Deploy target: ${DEPLOY_TARGET}`);
 console.log(`[astro-config] Site URL: ${siteUrl}`);
+console.log(`[astro-config] Wrangler config: ${wranglerConfigPath}`);
 
 export default defineConfig({
     site: siteUrl,
@@ -94,7 +98,7 @@ export default defineConfig({
     adapter: cloudflare({
         platformProxy: {
             enabled: true,
-            configPath: './wrangler.jsonc',
+            configPath: wranglerConfigPath,
         },
     }),
     integrations: [

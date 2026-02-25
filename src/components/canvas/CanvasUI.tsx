@@ -124,6 +124,54 @@ export default function CanvasUI({
     return () => window.removeEventListener('excalidraw:draw', handleDrawCommand);
   }, [api]);
 
+  // Repair legacy/broken image elements to avoid Excalidraw hit-test crashes.
+  useEffect(() => {
+    if (!api) return;
+
+    const files = api.getFiles() || {};
+    const currentElements = api.getSceneElements();
+    let changed = false;
+
+    const repairedElements = currentElements.flatMap((element) => {
+      if (element.type !== 'image') {
+        return [element];
+      }
+
+      const imageElement = element as ExcalidrawElement & {
+        fileId?: string;
+        status?: string;
+        scale?: [number, number];
+      };
+      const file = imageElement.fileId ? (files as Record<string, any>)[imageElement.fileId] : undefined;
+
+      // Drop broken image elements that cannot resolve to binary file data.
+      if (!imageElement.fileId || !file || typeof file.dataURL !== 'string' || file.dataURL.length === 0) {
+        changed = true;
+        return [];
+      }
+
+      const patch: Partial<typeof imageElement> = {};
+      if (imageElement.status !== 'saved') {
+        patch.status = 'saved';
+      }
+      if (!Array.isArray(imageElement.scale) || imageElement.scale.length !== 2) {
+        patch.scale = [1, 1];
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return [element];
+      }
+
+      changed = true;
+      return [{ ...imageElement, ...patch }];
+    });
+
+    if (changed) {
+      api.updateScene({ elements: repairedElements });
+      console.warn('[CanvasUI] Repaired invalid image elements in scene');
+    }
+  }, [api]);
+
   // Handle commands from the store (image insertion, etc.)
   useCommandSubscriber({
     onInsertImage: async (payload) => {
@@ -142,31 +190,55 @@ export default function CanvasUI({
       const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
       const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
 
+      const detectedMimeType =
+        typeof imageData === 'string'
+          ? imageData.match(/^data:([^;]+);base64,/)?.[1] || 'image/png'
+          : 'image/png';
+
+      const fileId = nanoid();
+
       const newElement = {
+        id: nanoid(),
         type: 'image',
         x: sceneX - (width || 400) / 2,
         y: sceneY - (height || 300) / 2,
         width: width || 400,
         height: height || 300,
-        fileId: nanoid(),
-        status: 'pending',
-        id: nanoid(),
+        angle: 0,
+        strokeColor: 'transparent',
+        backgroundColor: 'transparent',
+        fillStyle: 'hachure',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roundness: null,
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        boundElements: null,
+        updated: Date.now(),
+        link: null,
+        locked: false,
+        fileId,
+        status: 'saved',
+        scale: [1, 1] as [number, number],
+        seed: Math.floor(Math.random() * 100000),
         version: 1,
         versionNonce: Date.now(),
       };
 
       // Add the image file
       const file = {
-        id: newElement.fileId,
-        mimeType: 'image/png',
+        id: fileId,
+        mimeType: detectedMimeType,
         dataURL: imageData,
         created: Date.now(),
       };
 
+      api.addFiles([file]);
       const currentElements = api.getSceneElements();
-      api.updateScene({ 
+      api.updateScene({
         elements: [...currentElements, newElement],
-        files: { ...api.getFiles(), [file.id]: file },
       });
       
       addToast('Image inserted', 'success');

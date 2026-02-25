@@ -63,6 +63,13 @@ function modeLabel(mode: AssistantMode): string {
   }
 }
 
+function modelLabel(mode: AssistantMode): string {
+  if (mode === "image" || mode === "sketch") {
+    return "Gemini 2.5 Flash Image";
+  }
+  return "Claude Sonnet 4";
+}
+
 async function fetchMermaidElements(code: string): Promise<unknown[]> {
   const { convertMermaidToCanvas } = await import("@/lib/mermaid-converter");
   const result = await convertMermaidToCanvas(code);
@@ -569,7 +576,7 @@ export default function AIChatContainer({
         <header style={{ padding: "12px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <strong style={{ fontSize: 13, color: "#111827" }}>Unified Assistant</strong>
-            <span style={{ fontSize: 11, color: "#6b7280" }}>Model: Claude Sonnet 4</span>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>Model: {modelLabel(mode)}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{ fontSize: 11, color: "#4b5563" }}>Mode</label>

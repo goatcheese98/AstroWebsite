@@ -1,10 +1,71 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+function parseEnvLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+
+  const normalized = trimmed.startsWith("export ") ? trimmed.slice(7).trim() : trimmed;
+  const separator = normalized.indexOf("=");
+  if (separator <= 0) return null;
+
+  const key = normalized.slice(0, separator).trim();
+  if (!key) return null;
+
+  let value = normalized.slice(separator + 1).trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1);
+  }
+
+  return { key, value };
+}
+
+function loadEnvFromFile(path) {
+  if (!existsSync(path)) return;
+
+  const content = readFileSync(path, "utf8");
+  const lines = content.split(/\r?\n/);
+  for (const line of lines) {
+    const parsed = parseEnvLine(line);
+    if (!parsed) continue;
+    if (typeof process.env[parsed.key] === "undefined") {
+      process.env[parsed.key] = parsed.value;
+    }
+  }
+}
+
+function loadEnvironment() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = new Set([
+    resolve(process.cwd(), ".env"),
+    resolve(process.cwd(), ".dev.vars"),
+    resolve(here, ".env"),
+    resolve(here, ".dev.vars"),
+    resolve(here, "../../.env"),
+    resolve(here, "../../.dev.vars"),
+  ]);
+
+  for (const path of candidates) {
+    loadEnvFromFile(path);
+  }
+}
+
+loadEnvironment();
 
 const PORT = Number(process.env.PORT || 8788);
 const BACKEND_API_KEY = process.env.AI_BACKEND_API_KEY || "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
+const GOOGLE_GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || "";
+const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const GEMINI_PROMPT_MODEL = process.env.GEMINI_PROMPT_MODEL || process.env.GEMINI_TEXT_MODEL || "gemini-3-flash-preview";
 
 const state = {
   chatsByOwner: new Map(), // ownerId -> Map(chatId, chat)
@@ -124,10 +185,305 @@ async function claudeText(system, prompt) {
   return block?.text || "";
 }
 
+async function geminiText(system, prompt) {
+  const response = await geminiGenerateContent({
+    model: GEMINI_PROMPT_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `${system}\n\n${prompt}`,
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.35,
+      maxOutputTokens: 2000,
+    },
+  });
+
+  const text = firstGeminiText(response);
+  if (!text) {
+    throw new Error("Gemini returned no text");
+  }
+  return text;
+}
+
 function extractCodeBlock(text, language) {
   const pattern = new RegExp("```" + language + "\\s*\\n([\\s\\S]*?)\\n```", "i");
   const match = text.match(pattern);
   return match?.[1]?.trim() || null;
+}
+
+function parseDataUrl(dataUrl) {
+  if (typeof dataUrl !== "string") return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
+function bytesFromBase64(base64) {
+  const sanitized = base64.replace(/\s+/g, "");
+  return Math.floor((sanitized.length * 3) / 4);
+}
+
+function buildSketchStyleHint(style) {
+  switch (style) {
+    case "hand-drawn":
+      return "hand-drawn marker strokes, gentle wobble, human sketch character";
+    case "technical":
+      return "technical drafting look, straight controlled lines, engineering sketch clarity";
+    case "organic":
+      return "organic curves, softer irregular lines, natural freeform shapes";
+    default:
+      return "clean whiteboard illustration style with precise boundaries";
+  }
+}
+
+function buildSketchComplexityHint(complexity) {
+  switch (complexity) {
+    case "low":
+      return "minimal detail, large simple shapes, low visual density";
+    case "high":
+      return "high detail, rich structure, many meaningful sub-parts";
+    default:
+      return "balanced detail with clear hierarchy";
+  }
+}
+
+function buildCanvasSafeImagePrompt({ mode, text, sketch, hasReferenceImage }) {
+  const base = [
+    "Generate a single whiteboard-friendly visual asset for composition inside Excalidraw.",
+    "MANDATORY background rules:",
+    "- transparent background alpha channel",
+    "- no background objects, no sky, no room, no paper texture",
+    "- no shadow plane, no glow halo, no border frame",
+    "- keep the subject isolated and centered with padding",
+    "MANDATORY rendering rules:",
+    "- crisp silhouette and edges",
+    "- high subject/background separation",
+    "- avoid anti-aliased matte/fringe around the subject",
+    "- no watermark, no text overlay unless explicitly requested",
+    "- output should read clearly when scaled down on a canvas",
+    `User request: ${text}`,
+  ];
+
+  if (mode === "sketch") {
+    const style = sketch?.style || "clean";
+    const complexity = sketch?.complexity || "medium";
+    const colorPalette = Number.isFinite(sketch?.colorPalette) ? Math.max(2, Math.min(32, sketch.colorPalette)) : 8;
+    const detailLevel = Number.isFinite(sketch?.detailLevel) ? Math.max(0.2, Math.min(1, sketch.detailLevel)) : 0.75;
+    const edgeSensitivity = Number.isFinite(sketch?.edgeSensitivity)
+      ? Math.max(1, Math.min(100, sketch.edgeSensitivity))
+      : 18;
+
+    base.push("Sketch-specific rules:");
+    base.push(`- style: ${buildSketchStyleHint(style)}`);
+    base.push(`- complexity: ${buildSketchComplexityHint(complexity)}`);
+    base.push(`- color palette target: about ${colorPalette} dominant colors`);
+    base.push(`- detail level target: ${detailLevel.toFixed(2)} (0=minimal, 1=very detailed)`);
+    base.push(`- edge sensitivity target: ${edgeSensitivity} (favor edge clarity over smooth gradients)`);
+    base.push("- shapes should be segmentable for later vector conversion");
+  } else {
+    base.push("Image-specific rules:");
+    base.push("- deliver a clean standalone subject for direct canvas placement");
+    base.push("- keep empty transparent margins around the subject");
+  }
+
+  if (hasReferenceImage) {
+    base.push("Use the provided reference image for composition/content guidance while preserving all transparency constraints.");
+  }
+
+  return base.join("\n");
+}
+
+async function geminiGenerateContent({ model, contents, generationConfig }) {
+  if (!GOOGLE_GEMINI_API_KEY) {
+    throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(GOOGLE_GEMINI_API_KEY)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents,
+        generationConfig,
+      }),
+    },
+  );
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data?.error?.message || data?.error || `Gemini HTTP ${response.status}`;
+    throw new Error(typeof detail === "string" ? detail : "Gemini request failed");
+  }
+
+  return data;
+}
+
+function firstGeminiText(data) {
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    for (const part of parts) {
+      if (typeof part?.text === "string" && part.text.trim()) {
+        return part.text.trim();
+      }
+    }
+  }
+  return "";
+}
+
+function firstGeminiInlineImage(data) {
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    for (const part of parts) {
+      const inlineData = part?.inlineData || part?.inline_data;
+      const mimeType = inlineData?.mimeType || inlineData?.mime_type;
+      const base64 = inlineData?.data;
+      if (typeof mimeType === "string" && typeof base64 === "string" && base64.length > 0) {
+        return { mimeType, base64 };
+      }
+    }
+  }
+  return null;
+}
+
+function inferImageDimensions(mimeType, base64) {
+  try {
+    const buffer = Buffer.from(base64, "base64");
+
+    // PNG width/height at bytes 16..24.
+    if (
+      mimeType === "image/png" &&
+      buffer.length >= 24 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47
+    ) {
+      return {
+        width: buffer.readUInt32BE(16),
+        height: buffer.readUInt32BE(20),
+      };
+    }
+
+    // Basic JPEG SOF parser for width/height.
+    if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+      let offset = 2;
+      while (offset + 9 < buffer.length) {
+        if (buffer[offset] !== 0xff) {
+          offset += 1;
+          continue;
+        }
+
+        const marker = buffer[offset + 1];
+        const segmentLength = buffer.readUInt16BE(offset + 2);
+        const isSOF = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+
+        if (isSOF && offset + 9 < buffer.length) {
+          return {
+            height: buffer.readUInt16BE(offset + 5),
+            width: buffer.readUInt16BE(offset + 7),
+          };
+        }
+
+        if (!segmentLength || segmentLength < 2) break;
+        offset += 2 + segmentLength;
+      }
+    }
+  } catch {
+    // Fall through to default size.
+  }
+
+  return { width: 1024, height: 1024 };
+}
+
+async function refineCanvasPrompt(prompt, mode) {
+  const response = await geminiGenerateContent({
+    model: GEMINI_PROMPT_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: [
+              "Rewrite this image generation prompt for maximum fidelity and composability in Excalidraw.",
+              "Do not remove hard constraints about transparency/background.",
+              "Output plain prompt text only (no markdown, no bullets prefix decoration).",
+              `Mode: ${mode}`,
+              "",
+              prompt,
+            ].join("\n"),
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 700,
+    },
+  });
+
+  const refined = firstGeminiText(response);
+  return refined || prompt;
+}
+
+async function generateCanvasImageWithGemini(payload, mode) {
+  const sourceImage = parseDataUrl(payload?.generation?.sourceImageDataUrl);
+  const includeReference = sourceImage && bytesFromBase64(sourceImage.base64) <= 2_500_000;
+
+  let prompt = buildCanvasSafeImagePrompt({
+    mode,
+    text: payload?.text || "",
+    sketch: payload?.generation?.sketch,
+    hasReferenceImage: !!includeReference,
+  });
+
+  try {
+    prompt = await refineCanvasPrompt(prompt, mode);
+  } catch {
+    // Keep base prompt if prompt refiner model is unavailable.
+  }
+
+  const parts = [{ text: prompt }];
+  if (includeReference) {
+    parts.push({
+      inline_data: {
+        mime_type: sourceImage.mimeType,
+        data: sourceImage.base64,
+      },
+    });
+  }
+
+  const response = await geminiGenerateContent({
+    model: GEMINI_IMAGE_MODEL,
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      temperature: 0.35,
+      responseModalities: ["TEXT", "IMAGE"],
+    },
+  });
+
+  const image = firstGeminiInlineImage(response);
+  if (!image) {
+    const text = firstGeminiText(response);
+    throw new Error(text || "Gemini did not return an image");
+  }
+
+  const size = inferImageDimensions(image.mimeType, image.base64);
+  return {
+    prompt,
+    mimeType: image.mimeType,
+    dataUrl: `data:${image.mimeType};base64,${image.base64}`,
+    width: size.width,
+    height: size.height,
+  };
 }
 
 function enqueueJob({ owner, jobId, chatId, messageId, payload }) {
@@ -169,9 +525,32 @@ async function runWorkerTask(task) {
 
       artifacts.push({ type: "code", language: mode, code });
       text = `${mode.toUpperCase()} diagram is ready.`;
+    } else if (mode === "image" || mode === "sketch") {
+      job.progress = 40;
+      job.updatedAt = now();
+
+      const generated = await generateCanvasImageWithGemini(task.payload, mode);
+
+      job.progress = 90;
+      job.updatedAt = now();
+
+      artifacts.push({
+        type: "image-data",
+        mimeType: generated.mimeType,
+        dataUrl: generated.dataUrl,
+        width: generated.width,
+        height: generated.height,
+        source: mode,
+        ...(mode === "sketch" && task.payload?.generation?.sketch
+          ? { sketchControls: task.payload.generation.sketch }
+          : {}),
+      });
+
+      text = mode === "sketch"
+        ? "Sketch image is ready. Add it directly, or vectorize it into editable canvas shapes."
+        : "Image asset is ready. Add it to canvas.";
     } else {
-      // Stub for worker image/sketch generation; replace with actual model + vector pipeline.
-      throw new Error("Image/sketch worker not configured yet. Connect your model pipeline here.");
+      throw new Error(`Unsupported generation mode: ${mode || "unknown"}`);
     }
 
     if (assistant) {
@@ -212,11 +591,6 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (!authOk(req)) {
-      json(res, 401, { error: "Unauthorized" });
-      return;
-    }
-
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
     if (req.method === "GET" && url.pathname === "/") {
@@ -224,8 +598,14 @@ const server = createServer(async (req, res) => {
         service: "assistant-backend",
         status: "ok",
         version: 1,
+        authRequired: !!BACKEND_API_KEY,
         hint: "Use /v1/assistant/chats?clientId=dev-local or call via Astro proxy.",
       });
+      return;
+    }
+
+    if (!authOk(req)) {
+      json(res, 401, { error: "Unauthorized" });
       return;
     }
 
@@ -322,21 +702,41 @@ const server = createServer(async (req, res) => {
           let reply = "";
           let status = "complete";
           const artifacts = [];
+          let modelUsed = "claude";
 
           try {
             reply = await claudeText(
               "You are a concise and practical whiteboard assistant.",
               `Conversation:\n\n${history}\n\nASSISTANT:`,
             );
-
-            const mermaid = extractCodeBlock(reply, "mermaid");
-            if (mermaid) artifacts.push({ type: "code", language: "mermaid", code: mermaid });
-            const d2 = extractCodeBlock(reply, "d2");
-            if (d2) artifacts.push({ type: "code", language: "d2", code: d2 });
           } catch (error) {
-            status = "failed";
-            reply = `Claude request failed: ${error instanceof Error ? error.message : "Unknown error"}`;
+            if (GOOGLE_GEMINI_API_KEY) {
+              try {
+                reply = await geminiText(
+                  "You are a concise and practical whiteboard assistant.",
+                  `Conversation:\n\n${history}\n\nASSISTANT:`,
+                );
+                modelUsed = "gemini-fallback";
+              } catch (fallbackError) {
+                status = "failed";
+                reply =
+                  `Claude request failed: ${error instanceof Error ? error.message : "Unknown error"}\n` +
+                  `Gemini fallback failed: ${fallbackError instanceof Error ? fallbackError.message : "Unknown error"}`;
+              }
+            } else {
+              status = "failed";
+              reply = `Claude request failed: ${error instanceof Error ? error.message : "Unknown error"}`;
+            }
           }
+
+          if (status === "complete" && modelUsed === "gemini-fallback") {
+            reply = `${reply.trim()}\n\n(Generated via Gemini fallback because Claude was unavailable.)`;
+          }
+
+          const mermaid = extractCodeBlock(reply, "mermaid");
+          if (mermaid) artifacts.push({ type: "code", language: "mermaid", code: mermaid });
+          const d2 = extractCodeBlock(reply, "d2");
+          if (d2) artifacts.push({ type: "code", language: "d2", code: d2 });
 
           const assistantMessage = {
             id: randomUUID(),
@@ -421,4 +821,10 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`assistant-backend listening on http://localhost:${PORT}`);
+  console.log(
+    `assistant-backend env: ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY ? "set" : "missing"}, GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY ? "set" : "missing"}, AI_BACKEND_API_KEY=${BACKEND_API_KEY ? "set" : "missing"}`,
+  );
+  console.log(
+    `assistant-backend models: CLAUDE_MODEL=${CLAUDE_MODEL}, GEMINI_IMAGE_MODEL=${GEMINI_IMAGE_MODEL}, GEMINI_PROMPT_MODEL=${GEMINI_PROMPT_MODEL}`,
+  );
 });

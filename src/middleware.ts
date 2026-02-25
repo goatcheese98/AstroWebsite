@@ -37,7 +37,7 @@ const canvasRouting = defineMiddleware(async (context, next) => {
 const withClerk = sequence(clerkMiddleware(), canvasRouting);
 const withoutClerk = sequence(canvasRouting);
 
-export const onRequest = defineMiddleware(async (context, next) => {
+export const onRequest = async (context: any, next: any) => {
   const pathname = new URL(context.request.url).pathname;
 
   // Avoid Clerk consuming request streams for assistant API payloads.
@@ -46,4 +46,4 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   return withClerk(context, next);
-});
+};
