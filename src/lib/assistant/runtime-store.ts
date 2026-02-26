@@ -91,6 +91,37 @@ export function getChat(ownerId: string, chatId: string): AssistantChat | null {
   return state.chats.get(chatId) ?? null;
 }
 
+export function deleteChat(ownerId: string, chatId: string): boolean {
+  const state = getOwnerState(ownerId);
+  if (!state.chats.has(chatId)) {
+    return false;
+  }
+
+  state.chats.delete(chatId);
+  state.messagesByChat.delete(chatId);
+
+  for (const [jobId, job] of state.jobs.entries()) {
+    if (job.chatId === chatId) {
+      state.jobs.delete(jobId);
+    }
+  }
+
+  return true;
+}
+
+export function clearChats(ownerId: string): number {
+  const state = getOwnerState(ownerId);
+  const removed = state.chats.size;
+  if (removed === 0) {
+    return 0;
+  }
+
+  state.chats.clear();
+  state.messagesByChat.clear();
+  state.jobs.clear();
+  return removed;
+}
+
 export function listMessages(ownerId: string, chatId: string): AssistantMessage[] {
   const state = getOwnerState(ownerId);
   return [...(state.messagesByChat.get(chatId) ?? [])].sort(

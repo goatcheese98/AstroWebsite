@@ -1,5 +1,4 @@
 import { nanoid } from "nanoid";
-import { convertD2ToExcalidrawElements } from "./d2-converter";
 
 export type D2RenderVariant = "default" | "sketch" | "ascii";
 
@@ -254,15 +253,6 @@ async function renderD2WithEngine(
   return renderOutput;
 }
 
-function applyD2SketchVariant(elements: unknown[]): unknown[] {
-  return (elements as Array<Record<string, any>>).map((el) => ({
-    ...el,
-    roughness: el.type === "text" ? 0 : 2,
-    fillStyle: el.type === "text" ? "solid" : "hachure",
-    strokeWidth: typeof el.strokeWidth === "number" ? Math.max(1, el.strokeWidth) : 2,
-  }));
-}
-
 export function parseSvgDimensions(svgMarkup: string): { width: number; height: number } {
   function finiteSize(width: number, height: number): { width: number; height: number } | null {
     if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
@@ -339,23 +329,41 @@ export async function renderCodeArtifactToSvg(input: {
     const svgMarkup = await renderD2WithEngine(input.code, d2Variant);
     const dimensions = parseSvgDimensions(svgMarkup);
     return { svgMarkup, ...dimensions };
-  } catch {
+  } catch (error) {
     if (d2Variant === "ascii") {
       const ascii = asciiFromD2(input.code);
       const svgMarkup = asciiToSvg(ascii);
       const dimensions = parseSvgDimensions(svgMarkup);
       return { svgMarkup, ...dimensions };
     }
+    throw (error instanceof Error ? error : new Error("D2 render failed"));
+  }
+}
 
-    const baseElements = convertD2ToExcalidrawElements(input.code);
-    const variantElements = d2Variant === "sketch" ? applyD2SketchVariant(baseElements) : baseElements;
-    const svgMarkup = await exportElementsToSvgMarkup(variantElements);
-    const dimensions = parseSvgDimensions(svgMarkup);
-    return { svgMarkup, ...dimensions };
+function encodeSvgToBase64(svgMarkup: string): string | null {
+  if (typeof btoa !== "function" || typeof TextEncoder === "undefined") {
+    return null;
+  }
+
+  try {
+    const bytes = new TextEncoder().encode(svgMarkup);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const chunk = bytes.subarray(offset, offset + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
+  } catch {
+    return null;
   }
 }
 
 export function svgToDataUrl(svgMarkup: string): string {
+  const base64 = encodeSvgToBase64(svgMarkup);
+  if (base64) {
+    return `data:image/svg+xml;base64,${base64}`;
+  }
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 }
 

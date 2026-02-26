@@ -175,6 +175,57 @@ function chatMessages(chatId) {
   return list;
 }
 
+function deleteOwnerChat(owner, chatId) {
+  const chats = ownerChats(owner);
+  if (!chats.has(chatId)) {
+    return false;
+  }
+
+  chats.delete(chatId);
+  state.messagesByChat.delete(chatId);
+
+  const jobs = ownerJobs(owner);
+  for (const [jobId, job] of jobs.entries()) {
+    if (job.chatId === chatId) {
+      jobs.delete(jobId);
+    }
+  }
+
+  state.workerQueue = state.workerQueue.filter(
+    (task) => !(task.owner === owner && task.chatId === chatId),
+  );
+
+  return true;
+}
+
+function clearOwnerChats(owner) {
+  const chats = ownerChats(owner);
+  const chatIds = new Set(chats.keys());
+  const count = chatIds.size;
+  if (count === 0) {
+    return 0;
+  }
+
+  chats.clear();
+
+  for (const chatId of chatIds) {
+    state.messagesByChat.delete(chatId);
+  }
+
+  const jobs = ownerJobs(owner);
+  for (const [jobId, job] of jobs.entries()) {
+    if (chatIds.has(job.chatId)) {
+      jobs.delete(jobId);
+    }
+  }
+
+  state.workerQueue = state.workerQueue.filter(
+    (task) => !(task.owner === owner && chatIds.has(task.chatId)),
+  );
+
+  return count;
+}
+
 async function claudeText(system, prompt) {
   if (!ANTHROPIC_API_KEY) {
     return "Claude unavailable: ANTHROPIC_API_KEY not configured";
@@ -627,6 +678,24 @@ const server = createServer(async (req, res) => {
       state.messagesByChat.set(id, []);
 
       json(res, 201, { chat });
+      return;
+    }
+
+    if (req.method === "DELETE" && url.pathname === "/v1/assistant/chats") {
+      const cleared = clearOwnerChats(owner);
+      json(res, 200, { cleared });
+      return;
+    }
+
+    const chatPath = url.pathname.match(/^\/v1\/assistant\/chats\/([^/]+)$/);
+    if (req.method === "DELETE" && chatPath) {
+      const chatId = decodeURIComponent(chatPath[1]);
+      const deleted = deleteOwnerChat(owner, chatId);
+      if (!deleted) {
+        json(res, 404, { error: "Chat not found" });
+        return;
+      }
+      json(res, 200, { deleted: true });
       return;
     }
 

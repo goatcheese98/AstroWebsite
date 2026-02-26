@@ -65,7 +65,6 @@ export default function CanvasUI({
     lastSaved,
     setChatOpen,
     setChatMinimized,
-    toggleChat,
     setAssetsOpen,
     removeToast,
     addToast,
@@ -241,7 +240,7 @@ export default function CanvasUI({
 
       const detectedMimeType =
         typeof imageData === 'string'
-          ? imageData.match(/^data:([^;]+);base64,/)?.[1] || 'image/png'
+          ? imageData.match(/^data:([^;,]+)[;,]/)?.[1] || 'image/png'
           : 'image/png';
 
       const fileId = nanoid();
@@ -616,6 +615,27 @@ export default function CanvasUI({
     return () => window.removeEventListener('aw:canvas-menu-action', handleMenuAction);
   }, [runCanvasAction]);
 
+  const handleAssistantLauncherClick = useCallback(() => {
+    if (isChatOpen && !isChatMinimized) {
+      setChatMinimized(true);
+      return;
+    }
+
+    if (isChatMinimized) {
+      setChatMinimized(false);
+    }
+    setChatOpen(true);
+  }, [isChatMinimized, isChatOpen, setChatMinimized, setChatOpen]);
+
+  const handleAssistantLauncherDoubleClick = useCallback(() => {
+    if (isChatOpen) {
+      setChatOpen(false);
+      return;
+    }
+    setChatMinimized(false);
+    setChatOpen(true);
+  }, [isChatOpen, setChatMinimized, setChatOpen]);
+
   return (
     <>
       {/* Right-side quick actions (restored) */}
@@ -718,14 +738,14 @@ export default function CanvasUI({
 
       <button
         className={`aw-assistant-launcher${isChatOpen && !isChatMinimized ? ' active' : ''}`}
-        onClick={toggleChat}
+        onClick={handleAssistantLauncherClick}
+        onDoubleClick={handleAssistantLauncherDoubleClick}
         aria-label={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
-        title={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
+        title={isChatOpen && !isChatMinimized ? "Click to minimize, double-click to close" : "Open assistant"}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
         </svg>
-        <span>Assistant</span>
       </button>
 
       {/* Icon Library Panel */}
@@ -854,7 +874,7 @@ export default function CanvasUI({
 
         .aw-assistant-launcher {
           position: fixed;
-          right: 74px;
+          right: 16px;
           bottom: 16px;
           z-index: 1002;
           display: inline-flex;
@@ -863,14 +883,18 @@ export default function CanvasUI({
           border: 1px solid rgba(203, 213, 225, 0.9);
           background: rgba(255, 255, 255, 0.84);
           color: #0f172a;
-          border-radius: 999px;
-          padding: 10px 14px;
-          font-size: 13px;
+          border-radius: 12px;
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          justify-content: center;
+          font-size: 12px;
           font-weight: 700;
           cursor: pointer;
           box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
           backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
           -webkit-backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
+          overflow: hidden;
           transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
         }
 
@@ -883,16 +907,6 @@ export default function CanvasUI({
           border-color: #93c5fd;
           background: rgba(239, 246, 255, 0.9);
           color: #1e40af;
-          right: 16px;
-          width: 40px;
-          height: 40px;
-          padding: 0;
-          justify-content: center;
-          border-radius: 12px;
-        }
-
-        .aw-assistant-launcher.active span {
-          display: none;
         }
 
         @media (max-width: 768px) {
@@ -918,17 +932,8 @@ export default function CanvasUI({
           }
 
           .aw-assistant-launcher {
-            right: 68px;
-            bottom: 10px;
-            padding: 9px 12px;
-            font-size: 12px;
-          }
-
-          .aw-assistant-launcher.active {
             right: 12px;
-            width: 38px;
-            height: 38px;
-            padding: 0;
+            bottom: 10px;
           }
         }
       `}</style>

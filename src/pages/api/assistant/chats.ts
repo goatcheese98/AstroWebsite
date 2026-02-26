@@ -68,3 +68,36 @@ export const POST: APIRoute = async (context) => {
     );
   }
 };
+
+export const DELETE: APIRoute = async (context) => {
+  try {
+    const url = new URL(context.request.url);
+    const requestBody = await context.request
+      .clone()
+      .json()
+      .catch(() => ({} as Record<string, unknown>));
+    const clientId = url.searchParams.get("clientId")
+      || (typeof requestBody.clientId === "string" ? requestBody.clientId : undefined)
+      || undefined;
+
+    const gateway = createAssistantGateway(context);
+    const cleared = await gateway.clearChats({ clientId });
+
+    return new Response(JSON.stringify({ cleared }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error("[assistant/chats] DELETE failed", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to clear chat history",
+        details: error instanceof Error ? error.message : "Unknown error",
+      }),
+      { status: errorStatus(error, 400), headers: { "Content-Type": "application/json" } },
+    );
+  }
+};

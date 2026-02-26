@@ -1,6 +1,8 @@
 import type { APIContext } from "astro";
 import {
+  clearAssistantChats,
   createAssistantChat,
+  deleteAssistantChat,
   getAssistantJob,
   listAssistantChats,
   listAssistantMessages,
@@ -24,6 +26,8 @@ import {
 export interface AssistantGateway {
   listChats(input: { clientId?: string }): Promise<AssistantChat[]>;
   createChat(input: { clientId?: string; title?: string }): Promise<AssistantChat>;
+  deleteChat(input: { clientId?: string; chatId: string }): Promise<boolean>;
+  clearChats(input: { clientId?: string }): Promise<number>;
   listMessages(input: { clientId?: string; chatId: string }): Promise<AssistantMessage[]>;
   sendMessage(input: {
     clientId?: string;
@@ -77,7 +81,7 @@ function createRemoteGateway(
   remote: RemoteConfig,
 ): AssistantGateway {
   async function remoteRequest<T>(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     path: string,
     clientId?: string,
     body?: unknown,
@@ -126,6 +130,24 @@ function createRemoteGateway(
         { clientId, title },
       );
       return data.chat;
+    },
+
+    async deleteChat({ clientId, chatId }) {
+      const data = await remoteRequest<{ deleted?: boolean }>(
+        "DELETE",
+        `/v1/assistant/chats/${encodeURIComponent(chatId)}?clientId=${encodeURIComponent(clientId || "")}`,
+        clientId,
+      );
+      return data.deleted !== false;
+    },
+
+    async clearChats({ clientId }) {
+      const data = await remoteRequest<{ cleared?: number }>(
+        "DELETE",
+        `/v1/assistant/chats?clientId=${encodeURIComponent(clientId || "")}`,
+        clientId,
+      );
+      return typeof data.cleared === "number" ? data.cleared : 0;
     },
 
     async listMessages({ clientId, chatId }) {
@@ -212,6 +234,26 @@ function createLocalGateway(context: APIContext): AssistantGateway {
       const chat = createAssistantChat(ownerId, title);
       await persist(ownerId);
       return chat;
+    },
+
+    async deleteChat({ clientId, chatId }) {
+      const ownerId = await resolveAssistantOwnerId(context, clientId);
+      await ensureHydrated(ownerId);
+      const deleted = deleteAssistantChat(ownerId, chatId);
+      if (deleted) {
+        await persist(ownerId);
+      }
+      return deleted;
+    },
+
+    async clearChats({ clientId }) {
+      const ownerId = await resolveAssistantOwnerId(context, clientId);
+      await ensureHydrated(ownerId);
+      const cleared = clearAssistantChats(ownerId);
+      if (cleared > 0) {
+        await persist(ownerId);
+      }
+      return cleared;
     },
 
     async listMessages({ clientId, chatId }) {

@@ -1,6 +1,8 @@
 import {
   addMessage,
+  clearChats,
   createChat,
+  deleteChat,
   createJob,
   getChat,
   getJob,
@@ -23,7 +25,6 @@ import {
   buildMermaidPrompt,
   extractCodeBlock,
 } from "./parsing";
-import { convertD2ToExcalidrawElements } from "./d2-converter";
 import { generateTextWithClaude } from "./claude";
 
 export interface LocalAssistantRuntimeConfig {
@@ -118,11 +119,7 @@ async function generateDiagramArtifacts(
       d2Code = extractCodeBlock(generated, "d2") || generated.trim();
     }
 
-    const elements = convertD2ToExcalidrawElements(d2Code);
-    return [
-      { type: "code", language: "d2", code: d2Code },
-      { type: "canvas-elements", source: "d2", elements },
-    ];
+    return [{ type: "code", language: "d2", code: d2Code }];
   }
 
   let mermaidCode = extractCodeBlock(input.text, "mermaid") || input.text.trim();
@@ -202,6 +199,14 @@ export function createAssistantChat(ownerId: string, title?: string) {
   return createChat(ownerId, title);
 }
 
+export function deleteAssistantChat(ownerId: string, chatId: string) {
+  return deleteChat(ownerId, chatId);
+}
+
+export function clearAssistantChats(ownerId: string) {
+  return clearChats(ownerId);
+}
+
 export function listAssistantMessages(ownerId: string, chatId: string) {
   return listMessages(ownerId, chatId);
 }
@@ -270,11 +275,6 @@ export async function sendAssistantMessage(
     const d2FromReply = extractCodeBlock(replyText, "d2");
     if (d2FromReply) {
       artifacts.push({ type: "code", language: "d2", code: d2FromReply });
-      artifacts.push({
-        type: "canvas-elements",
-        source: "d2",
-        elements: convertD2ToExcalidrawElements(d2FromReply),
-      });
     }
 
     const assistantMessage = addMessage(ownerId, {

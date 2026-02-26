@@ -9,7 +9,6 @@ import type {
   SketchControls,
   VisualColorMode,
 } from "@/lib/assistant/types";
-import { convertD2ToExcalidrawElements } from "@/lib/assistant/d2-converter";
 import {
   normalizeSketchImageDataUrl,
   vectorizeImageToSketch,
@@ -107,7 +106,7 @@ function modelLabel(expert: AssistantExpert): string {
   if (expert === "visual") {
     return "Gemini 2.5 Flash Image";
   }
-  return "Claude Sonnet 4";
+  return "Claude Sonnet 4.6";
 }
 
 function expertFromMessage(message: AssistantMessage): AssistantExpert {
@@ -217,13 +216,35 @@ function chatMonogram(title: string): string {
   return trimmed.charAt(0).toUpperCase();
 }
 
+async function resolveImageDimensions(
+  imageDataUrl: string,
+  fallback: { width: number; height: number },
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const naturalWidth = Math.max(1, Math.round(img.naturalWidth || img.width || fallback.width));
+      const naturalHeight = Math.max(1, Math.round(img.naturalHeight || img.height || fallback.height));
+      resolve({ width: naturalWidth, height: naturalHeight });
+    };
+    img.onerror = () => {
+      resolve({
+        width: Math.max(1, Math.round(fallback.width)),
+        height: Math.max(1, Math.round(fallback.height)),
+      });
+    };
+    img.src = imageDataUrl;
+  });
+}
+
 export default function AIChatContainer({
   isOpen,
-  initialWidth = 940,
+  initialWidth = 660,
 }: AIChatContainerProps) {
   const store = useUnifiedCanvasStore();
   const {
     isChatMinimized,
+    setChatOpen,
     dispatchCommand,
     addToast,
     getExcalidrawAPI,
@@ -275,6 +296,15 @@ export default function AIChatContainer({
   const [vectorizeSummaryByArtifact, setVectorizeSummaryByArtifact] = useState<Record<string, string>>({});
   const [d2RenderVariantByArtifact, setD2RenderVariantByArtifact] = useState<Record<string, D2RenderVariant>>({});
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const historyExpandedWidth = 268;
+  const historyCollapsedWidth = 74;
+  const chatContentWidth = Math.max(520, Math.min(initialWidth, 740));
+  const historyWidth = isHistoryCollapsed ? historyCollapsedWidth : historyExpandedWidth;
+  const panelWidth = `min(${chatContentWidth + historyWidth}px, calc(100vw - 96px))`;
+  const historyTextDelay = isHistoryCollapsed ? "0ms" : "92ms";
+  const historyTextTransition = `opacity 180ms ease ${historyTextDelay}, transform 180ms ease ${historyTextDelay}`;
+  const historyIconTransition = "opacity 110ms ease, transform 110ms ease";
 
   const requestHeaders = useMemo(
     () => ({
@@ -283,6 +313,12 @@ export default function AIChatContainer({
     }),
     [clientId],
   );
+
+  useEffect(() => {
+    if (isHistoryCollapsed) {
+      setHoveredChatId(null);
+    }
+  }, [isHistoryCollapsed]);
 
   const createChat = useCallback(async (): Promise<string> => {
     const response = await fetch("/api/assistant/chats", {
@@ -306,6 +342,93 @@ export default function AIChatContainer({
       setMessages([]);
     });
   }, [createChat]);
+
+  const handleDeleteChat = useCallback(
+    (chatId: string) => {
+      if (typeof window !== "undefined") {
+        const confirmed = window.confirm("Delete this chat from history?");
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      void (async () => {
+        try {
+          setError(null);
+          const response = await fetch(
+            `/api/assistant/chats/${encodeURIComponent(chatId)}?clientId=${encodeURIComponent(clientId)}`,
+            {
+              method: "DELETE",
+              headers: requestHeaders,
+            },
+          );
+          const data = await response.json().catch(() => ({} as Record<string, unknown>));
+          if (!response.ok) {
+            throw new Error(
+              (typeof data.details === "string" && data.details)
+                || (typeof data.error === "string" && data.error)
+                || "Failed to delete chat",
+            );
+          }
+
+          const remainingChats = chats.filter((chat) => chat.id !== chatId);
+          setChats(remainingChats);
+
+          if (activeChatId === chatId) {
+            setMessages([]);
+            if (remainingChats.length > 0) {
+              setActiveChatId(remainingChats[0].id);
+              return;
+            }
+
+            const newChatId = await createChat();
+            setActiveChatId(newChatId);
+          }
+        } catch (deleteError) {
+          setError(deleteError instanceof Error ? deleteError.message : "Failed to delete chat");
+        }
+      })();
+    },
+    [activeChatId, chats, clientId, createChat, requestHeaders],
+  );
+
+  const handleClearChatHistory = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("Clear all chats in history?");
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    void (async () => {
+      try {
+        setError(null);
+        const response = await fetch(`/api/assistant/chats?clientId=${encodeURIComponent(clientId)}`, {
+          method: "DELETE",
+          headers: requestHeaders,
+          body: JSON.stringify({ clientId }),
+        });
+        const data = await response.json().catch(() => ({} as Record<string, unknown>));
+        if (!response.ok) {
+          throw new Error(
+            (typeof data.details === "string" && data.details)
+              || (typeof data.error === "string" && data.error)
+              || "Failed to clear chat history",
+          );
+        }
+
+        setChats([]);
+        setMessages([]);
+        setPendingJobs([]);
+        setActiveChatId(null);
+        const newChatId = await createChat();
+        setActiveChatId(newChatId);
+        addToast("Chat history cleared", "success");
+      } catch (clearError) {
+        setError(clearError instanceof Error ? clearError.message : "Failed to clear chat history");
+      }
+    })();
+  }, [addToast, clientId, createChat, requestHeaders]);
 
   const loadChats = useCallback(async () => {
     setLoadingChats(true);
@@ -721,29 +844,22 @@ export default function AIChatContainer({
   const handleApplyCodeArtifact = useCallback(
     async (artifact: Extract<AssistantArtifact, { type: "code" }>) => {
       try {
-        const elements = artifact.language === "mermaid"
-          ? (await fetchMermaidRenderPayload(artifact.code)).elements
-          : convertD2ToExcalidrawElements(artifact.code);
+        if (artifact.language !== "mermaid") {
+          addToast("Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.", "info", 4500);
+          return;
+        }
+        const elements = (await fetchMermaidRenderPayload(artifact.code)).elements;
 
         if (!elements || elements.length === 0) {
           addToast("No drawable elements were generated", "info");
           return;
         }
 
-        if (artifact.language === "d2") {
-          addToast("Editable D2 conversion is beta and may not match playground layout exactly.", "info", 5000);
-        }
-
         await dispatchCommand("drawElements", {
           elements,
           isModification: false,
         });
-        addToast(
-          artifact.language === "d2"
-            ? "Added editable D2 diagram (beta)"
-            : `Added ${artifact.language.toUpperCase()} diagram to canvas`,
-          "success",
-        );
+        addToast("Added MERMAID diagram to canvas", "success");
       } catch (applyError) {
         addToast(
           `Failed to add diagram: ${applyError instanceof Error ? applyError.message : "Unknown error"}`,
@@ -831,12 +947,14 @@ export default function AIChatContainer({
           ? (d2RenderVariantByArtifact[artifactKey] || "default")
           : "default";
         const { svgMarkup, width, height } = await buildCodeArtifactSvg(artifact, d2Variant);
+        const imageData = svgToDataUrl(svgMarkup);
+        const naturalDimensions = await resolveImageDimensions(imageData, { width, height });
 
         await dispatchCommand("insertImage", {
-          imageData: svgToDataUrl(svgMarkup),
+          imageData,
           type: "svg",
-          width,
-          height,
+          width: naturalDimensions.width,
+          height: naturalDimensions.height,
         });
 
         addToast("SVG added to canvas", "success");
@@ -904,16 +1022,14 @@ export default function AIChatContainer({
     async (artifact: Extract<AssistantArtifact, { type: "canvas-elements" }>) => {
       try {
         if (artifact.source === "d2") {
-          addToast("Editable D2 conversion is beta and may not match playground layout exactly.", "info", 5000);
+          addToast("Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.", "info", 4500);
+          return;
         }
         await dispatchCommand("drawElements", {
           elements: artifact.elements,
           isModification: false,
         });
-        addToast(
-          artifact.source === "d2" ? "Added editable D2 diagram (beta)" : "Elements added to canvas",
-          "success",
-        );
+        addToast("Elements added to canvas", "success");
       } catch (applyError) {
         addToast(
           `Failed to add elements: ${applyError instanceof Error ? applyError.message : "Unknown error"}`,
@@ -938,194 +1054,374 @@ export default function AIChatContainer({
         position: "fixed",
         right: 88,
         bottom: 20,
-        width: `min(${initialWidth}px, calc(100vw - 104px))`,
-        height: "min(760px, calc(100vh - 36px))",
-        background: "linear-gradient(135deg, rgba(255,255,255,0.42), rgba(248,250,252,0.34))",
-        border: "1px solid rgba(203,213,225,0.52)",
-        borderRadius: 18,
-        boxShadow: "0 22px 44px rgba(15,23,42,0.12)",
+        width: panelWidth,
+        height: "min(744px, calc(100vh - 34px))",
+        background: "linear-gradient(130deg, rgba(255,255,255,0.52), rgba(248,250,252,0.4))",
+        border: "1px solid rgba(203,213,225,0.58)",
+        borderRadius: 16,
+        boxShadow: "0 18px 42px rgba(15,23,42,0.13)",
         backdropFilter: "blur(22px) saturate(1.08) brightness(1.04)",
         WebkitBackdropFilter: "blur(22px) saturate(1.08) brightness(1.04)",
         zIndex: 999,
         display: "grid",
-        gridTemplateColumns: isHistoryCollapsed ? "72px 1fr" : "280px 1fr",
+        gridTemplateColumns: `${historyWidth}px minmax(0, 1fr)`,
         overflow: "hidden",
-        transition: "grid-template-columns 0.2s ease",
+        transition: "width 0.3s cubic-bezier(0.22, 1, 0.36, 1), grid-template-columns 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+        willChange: "width, grid-template-columns",
+        fontFamily: "var(--font-body, var(--font-ui, sans-serif))",
+        color: "#0f172a",
       }}
     >
       <aside
         style={{
-          borderRight: "1px solid rgba(226,232,240,0.66)",
+          borderRight: "1px solid rgba(226,232,240,0.82)",
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
           overflow: "hidden",
-          background: "rgba(255,255,255,0.2)",
+          background: "rgba(255,255,255,0.44)",
         }}
       >
-        {isHistoryCollapsed ? (
-          <div style={{ display: "grid", gridTemplateRows: "auto 1fr auto", minHeight: 0, height: "100%" }}>
-            <div style={{ padding: 10, borderBottom: "1px solid rgba(226,232,240,0.66)", display: "flex", justifyContent: "center" }}>
-              <button
-                onClick={() => setIsHistoryCollapsed(false)}
-                title="Expand chat history"
+        <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: 0, height: "100%" }}>
+          <div
+            style={{
+              padding: 8,
+              borderBottom: "1px solid rgba(226,232,240,0.78)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "space-between",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                color: "#64748b",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                maxWidth: isHistoryCollapsed ? 0 : 120,
+                opacity: isHistoryCollapsed ? 0 : 1,
+                transform: isHistoryCollapsed ? "translateX(-6px)" : "translateX(0)",
+                transition: `max-width 220ms ease ${historyTextDelay}, ${historyTextTransition}`,
+                pointerEvents: "none",
+              }}
+            >
+              Chat history
+            </span>
+            <button
+              onClick={() => setIsHistoryCollapsed((prev) => !prev)}
+              title={isHistoryCollapsed ? "Expand chat history" : "Collapse chat history"}
+              style={{
+                border: "1px solid rgba(203,213,225,0.95)",
+                background: "rgba(255,255,255,0.88)",
+                color: "#334155",
+                borderRadius: 10,
+                width: 32,
+                height: 32,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "background 0.16s ease, border-color 0.16s ease",
+              }}
+              aria-label={isHistoryCollapsed ? "Expand chat history" : "Collapse chat history"}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2.2" />
+                <line x1="6.1" y1="2.8" x2="6.1" y2="13.2" />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            style={{
+              overflowY: "auto",
+              padding: isHistoryCollapsed ? "8px 6px" : "8px",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              alignItems: "stretch",
+              transition: "padding 220ms ease",
+            }}
+          >
+            {chats.map((chat) => (
+              <div
+                key={chat.id}
                 style={{
-                  border: "1px solid rgba(203,213,225,0.9)",
-                  background: "rgba(255,255,255,0.72)",
-                  color: "#334155",
-                  borderRadius: 8,
-                  width: 34,
-                  height: 30,
-                  display: "inline-flex",
-                  alignItems: "center",
+                  position: "relative",
+                  width: "100%",
+                  display: "flex",
                   justifyContent: "center",
-                  cursor: "pointer",
                 }}
-                aria-label="Expand chat history"
+                onMouseEnter={() => setHoveredChatId(chat.id)}
+                onMouseLeave={() => setHoveredChatId(null)}
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2.2" />
-                  <line x1="6.1" y1="2.8" x2="6.1" y2="13.2" />
-                </svg>
-              </button>
-            </div>
-            <div style={{ overflowY: "auto", padding: "8px 6px", minHeight: 0, display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-              {chats.map((chat) => (
                 <button
-                  key={chat.id}
                   onClick={() => setActiveChatId(chat.id)}
-                  title={chat.title || "Untitled"}
+                  title={isHistoryCollapsed ? (chat.title || "Untitled") : undefined}
                   style={{
-                    width: 48,
-                    minHeight: 44,
-                    borderRadius: 10,
+                    width: isHistoryCollapsed ? 48 : "100%",
+                    minHeight: 46,
+                    textAlign: "left",
+                    borderRadius: 11,
                     border: activeChatId === chat.id ? "1px solid #60a5fa" : "1px solid rgba(226,232,240,0.95)",
-                    background: activeChatId === chat.id ? "rgba(219,234,254,0.86)" : "rgba(255,255,255,0.78)",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    fontWeight: 700,
+                    background: activeChatId === chat.id ? "rgba(219,234,254,0.9)" : "rgba(255,255,255,0.88)",
+                    padding: isHistoryCollapsed ? "4px" : "11px 34px 11px 10px",
                     cursor: "pointer",
                     display: "inline-flex",
-                    alignItems: "center",
+                    flexDirection: "column",
+                    alignItems: isHistoryCollapsed ? "center" : "flex-start",
                     justifyContent: "center",
-                    padding: 4,
+                    transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease, border-color 140ms ease, background 140ms ease",
                   }}
                 >
-                  {chatMonogram(chat.title || "Untitled")}
-                </button>
-              ))}
-            </div>
-            <div style={{ padding: 8, borderTop: "1px solid rgba(226,232,240,0.66)", display: "flex", justifyContent: "center" }}>
-              <button
-                onClick={handleCreateNewChat}
-                title="New chat"
-                style={{
-                  width: 46,
-                  height: 36,
-                  border: "1px solid rgba(148,163,184,0.42)",
-                  background: "rgba(241,245,249,0.82)",
-                  borderRadius: 10,
-                  fontSize: 20,
-                  lineHeight: 1,
-                  fontWeight: 500,
-                  color: "#0f172a",
-                  cursor: "pointer",
-                }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div style={{ padding: 14, borderBottom: "1px solid rgba(226,232,240,0.66)", display: "flex", gap: 8 }}>
-              <button
-                onClick={() => setIsHistoryCollapsed(true)}
-                title="Collapse chat history"
-                style={{
-                  border: "1px solid rgba(203,213,225,0.9)",
-                  background: "rgba(255,255,255,0.72)",
-                  color: "#334155",
-                  borderRadius: 8,
-                  width: 34,
-                  height: 30,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-                aria-label="Collapse chat history"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2.2" />
-                  <line x1="6.1" y1="2.8" x2="6.1" y2="13.2" />
-                </svg>
-              </button>
-              <button
-                onClick={handleCreateNewChat}
-                style={{
-                  flex: 1,
-                  border: "1px solid rgba(148,163,184,0.42)",
-                  background: "rgba(241,245,249,0.85)",
-                  borderRadius: 10,
-                  padding: "9px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#0f172a",
-                  cursor: "pointer",
-                }}
-              >
-                + New Chat
-              </button>
-            </div>
-
-            <div style={{ padding: "10px 12px", fontSize: 11, color: "#64748b" }}>
-              {loadingChats ? "Loading chats..." : `${chats.length} chat${chats.length === 1 ? "" : "s"}`}
-            </div>
-
-            <div style={{ overflowY: "auto", padding: 8, minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-              {chats.map((chat) => (
-                <button
-                  key={chat.id}
-                  onClick={() => setActiveChatId(chat.id)}
-                  style={{
-                    textAlign: "left",
-                    borderRadius: 10,
-                    border: activeChatId === chat.id ? "1px solid #60a5fa" : "1px solid rgba(226,232,240,0.95)",
-                    background: activeChatId === chat.id ? "rgba(219,234,254,0.86)" : "rgba(255,255,255,0.86)",
-                    padding: "10px 9px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {chat.title || "Untitled"}
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      minHeight: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: isHistoryCollapsed ? "center" : "flex-start",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#0f172a",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        opacity: isHistoryCollapsed ? 0 : 1,
+                        transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                        transition: historyTextTransition,
+                      }}
+                    >
+                      {chat.title || "Untitled"}
+                    </span>
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: "#0f172a",
+                        opacity: isHistoryCollapsed ? 1 : 0,
+                        transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                        transition: historyIconTransition,
+                      }}
+                    >
+                      {chatMonogram(chat.title || "Untitled")}
+                    </span>
                   </div>
                   {chat.lastMessagePreview ? (
-                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#64748b",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        marginTop: isHistoryCollapsed ? 0 : 4,
+                        maxHeight: isHistoryCollapsed ? 0 : 18,
+                        opacity: isHistoryCollapsed ? 0 : 1,
+                        transition: `max-height 180ms ease ${historyTextDelay}, margin-top 180ms ease ${historyTextDelay}, opacity 160ms ease ${historyTextDelay}`,
+                      }}
+                    >
                       {chat.lastMessagePreview}
                     </div>
                   ) : null}
                 </button>
-              ))}
-            </div>
-          </>
-        )}
-      </aside>
 
-      <section style={{ display: "grid", gridTemplateRows: "auto 1fr auto", minHeight: 0, background: "rgba(255,255,255,0.14)" }}>
-        <header style={{ padding: "12px 14px", borderBottom: "1px solid rgba(226,232,240,0.9)", display: "flex", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "grid", gap: 1 }}>
-              <strong style={{ fontSize: 13, color: "#0f172a" }}>Canvas Assistant</strong>
-              <span style={{ fontSize: 11, color: "#64748b" }}>Model: {modelLabel(selectedExpert)}</span>
+                <button
+                  onClick={() => handleDeleteChat(chat.id)}
+                  title="Delete chat"
+                  aria-label="Delete chat"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    border: "1px solid rgba(226,232,240,0.95)",
+                    background: "rgba(255,255,255,0.86)",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    color: "#64748b",
+                    fontSize: 14,
+                    lineHeight: 1,
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: `translateY(-50%) ${!isHistoryCollapsed && hoveredChatId === chat.id ? "scale(1)" : "scale(0.9)"}`,
+                    opacity: !isHistoryCollapsed && hoveredChatId === chat.id ? 1 : 0,
+                    pointerEvents: !isHistoryCollapsed && hoveredChatId === chat.id ? "auto" : "none",
+                    transition: "opacity 0.16s ease, transform 0.16s ease",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            <div
+              style={{
+                width: "100%",
+                marginTop: 2,
+                paddingTop: 8,
+                borderTop: "1px solid rgba(226,232,240,0.66)",
+                display: "grid",
+                gap: 6,
+                justifyItems: "stretch",
+              }}
+            >
+              <button
+                onClick={handleCreateNewChat}
+                title="New chat"
+                style={{
+                  width: isHistoryCollapsed ? 48 : "100%",
+                  height: 36,
+                  border: "1px solid rgba(148,163,184,0.5)",
+                  background: "rgba(241,245,249,0.9)",
+                  borderRadius: 10,
+                  padding: isHistoryCollapsed ? 0 : "0 12px",
+                  lineHeight: 1,
+                  fontWeight: 600,
+                  color: "#0f172a",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: isHistoryCollapsed ? "center" : "flex-start",
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 18,
+                    opacity: isHistoryCollapsed ? 1 : 0,
+                    transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                    transition: historyIconTransition,
+                  }}
+                >
+                  +
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    whiteSpace: "nowrap",
+                    opacity: isHistoryCollapsed ? 0 : 1,
+                    transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                    transition: historyTextTransition,
+                  }}
+                >
+                  + New chat
+                </span>
+              </button>
+              <button
+                onClick={handleClearChatHistory}
+                title="Clear chat history"
+                aria-label="Clear chat history"
+                style={{
+                  width: isHistoryCollapsed ? 48 : "100%",
+                  height: 28,
+                  border: "1px solid rgba(203,213,225,0.95)",
+                  background: "rgba(255,255,255,0.86)",
+                  borderRadius: 10,
+                  padding: isHistoryCollapsed ? 0 : "0 10px",
+                  fontWeight: 600,
+                  color: "#64748b",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: isHistoryCollapsed ? 1 : 0,
+                    transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                    transition: historyIconTransition,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M2.8 4.4h10.4" />
+                    <path d="M6 4.4V3.2h4v1.2" />
+                    <path d="M4.8 4.4l.6 8h5.2l.6-8" />
+                  </svg>
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    whiteSpace: "nowrap",
+                    opacity: isHistoryCollapsed ? 0 : 1,
+                    transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                    transition: historyTextTransition,
+                  }}
+                >
+                  Clear
+                </span>
+              </button>
             </div>
           </div>
+        </div>
+      </aside>
+
+      <section style={{ display: "grid", gridTemplateRows: "auto 1fr auto", minHeight: 0, background: "rgba(255,255,255,0.22)" }}>
+        <header style={{ padding: "13px 16px", borderBottom: "1px solid rgba(226,232,240,0.9)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "grid", gap: 1 }}>
+              <strong style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Canvas Assistant</strong>
+            </div>
+          </div>
+          <button
+            onClick={() => setChatOpen(false)}
+            title="Close assistant"
+            aria-label="Close assistant"
+            style={{
+              border: "1px solid rgba(203,213,225,0.95)",
+              background: "rgba(255,255,255,0.9)",
+              borderRadius: 10,
+              width: 30,
+              height: 30,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#475569",
+              cursor: "pointer",
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </header>
 
-        <div style={{ overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
+        <div style={{ overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
           {loadingMessages ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading messages...</div> : null}
           {!loadingMessages && messages.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#64748b" }}>
+            <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
               Start a new chat and generate diagrams and visual assets directly in this window.
             </div>
           ) : null}
@@ -1331,22 +1627,24 @@ export default function AIChatContainer({
                           >
                             Download PNG
                           </button>
-                          <button
-                            onClick={() => {
-                              void handleApplyCodeArtifact(artifact);
-                            }}
-                            style={{
-                              border: "1px solid #0f766e",
-                              background: artifact.language === "mermaid" ? "#0f766e" : "#1e3a8a",
-                              color: "#ffffff",
-                              borderRadius: 8,
-                              padding: "5px 9px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {artifact.language === "mermaid" ? "Add Native Sketch" : "Add Editable Diagram (Beta)"}
-                          </button>
+                          {artifact.language === "mermaid" ? (
+                            <button
+                              onClick={() => {
+                                void handleApplyCodeArtifact(artifact);
+                              }}
+                              style={{
+                                border: "1px solid #0f766e",
+                                background: "#0f766e",
+                                color: "#ffffff",
+                                borderRadius: 8,
+                                padding: "5px 9px",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Add Native Sketch
+                            </button>
+                          ) : null}
                         </div>
 
                         <details>
@@ -1512,7 +1810,7 @@ export default function AIChatContainer({
                       </div>
                     ) : null}
 
-                    {artifact.type === "canvas-elements" ? (
+                    {artifact.type === "canvas-elements" && artifact.source !== "d2" ? (
                       <button
                         onClick={() => {
                           void handleApplyElementArtifact(artifact);
@@ -1526,7 +1824,7 @@ export default function AIChatContainer({
                           cursor: "pointer",
                         }}
                       >
-                        {artifact.source === "d2" ? "Add Editable Diagram (Beta)" : "Add Generated Elements"}
+                        Add Generated Elements
                       </button>
                     ) : null}
                         </>
@@ -1712,7 +2010,7 @@ export default function AIChatContainer({
                   void handleSend();
                 }
               }}
-              placeholder={`(${expertLabel(selectedExpert)}) Ask assistant...`}
+              placeholder="Ask assistant..."
               style={{
                 flex: 1,
                 border: "1px solid rgba(203,213,225,0.95)",
@@ -1728,19 +2026,32 @@ export default function AIChatContainer({
                 void handleSend();
               }}
               disabled={sending || !input.trim()}
+              aria-label={sending ? "Sending message" : "Send message"}
               style={{
                 border: "1px solid #0f172a",
                 background: sending ? "#cbd5e1" : "#111827",
                 color: "#ffffff",
                 borderRadius: 10,
-                padding: "10px 14px",
-                fontSize: 13,
-                fontWeight: 600,
+                width: 40,
+                height: 40,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 cursor: sending ? "not-allowed" : "pointer",
               }}
             >
-              {sending ? "Sending..." : "Send"}
+              {sending ? (
+                <span style={{ fontSize: 16, lineHeight: 1 }}>…</span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M2 8h9" />
+                  <path d="M8.5 4.8L12 8l-3.5 3.2" />
+                </svg>
+              )}
             </button>
+          </div>
+          <div style={{ fontSize: 11, color: "#64748b", textAlign: "right" }}>
+            Model: {modelLabel(selectedExpert)}
           </div>
         </footer>
       </section>

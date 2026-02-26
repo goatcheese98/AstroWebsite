@@ -91,14 +91,6 @@ export default function CanvasContainer({
     });
   }, [addToast]);
 
-  const dispatchCanvasMenuAction = useCallback((action: string) => {
-    window.dispatchEvent(
-      new CustomEvent("aw:canvas-menu-action", {
-        detail: { action },
-      })
-    );
-  }, []);
-
   const renderTopRightUI = useMemo(
     () => (_isMobile: boolean, _appState: unknown) => (
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -135,33 +127,6 @@ export default function CanvasContainer({
         <MainMenu.DefaultItems.CommandPalette />
         <MainMenu.DefaultItems.SearchMenu />
         <MainMenu.Separator />
-        <MainMenu.Group title="AstroWeb add-ons">
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("open-chat")}>
-            AI chat
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("open-icons")}>
-            Icon library
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-markdown")}>
-            Add markdown note
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-rich-text")}>
-            Add rich text note
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("create-web-embed")}>
-            Add web embed
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("generate-image")}>
-            Generate image
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("save-rj")}>
-            Save as .rj
-          </MainMenu.Item>
-          <MainMenu.Item onSelect={() => dispatchCanvasMenuAction("load-rj")}>
-            Open .rj/.excalidraw
-          </MainMenu.Item>
-        </MainMenu.Group>
-        <MainMenu.Separator />
         <MainMenu.DefaultItems.Help />
         <MainMenu.DefaultItems.ClearCanvas />
         <MainMenu.Separator />
@@ -173,7 +138,7 @@ export default function CanvasContainer({
         <MainMenu.DefaultItems.ChangeCanvasBackground />
       </MainMenu>
     ),
-    [dispatchCanvasMenuAction, isCollaborating, toggleCollaboration]
+    [isCollaborating, toggleCollaboration]
   );
 
   return (
