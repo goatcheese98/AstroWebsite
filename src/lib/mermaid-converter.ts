@@ -12,7 +12,6 @@ async function loadMermaidConverter() {
   if (!mermaidConverter) {
     try {
       mermaidConverter = await import("@excalidraw/mermaid-to-excalidraw");
-      console.log("✅ Mermaid converter loaded");
     } catch (err) {
       console.error("❌ Failed to load Mermaid converter:", err);
       throw new Error("Failed to load Mermaid converter. Please check your installation.");
@@ -51,8 +50,6 @@ export async function convertMermaidToCanvas(
       throw new Error("Empty Mermaid code provided");
     }
 
-    console.log("🧜‍♀️ Converting Mermaid diagram:", cleanCode.substring(0, 100) + "...");
-
     const result = await converter.parseMermaidToExcalidraw(cleanCode, {
       themeVariables: {
         fontSize: "20px",
@@ -61,8 +58,6 @@ export async function convertMermaidToCanvas(
         curve: "basis", // Smooth curves for better visuals
       },
     });
-
-    console.log(`✅ Converted Mermaid to ${result.elements.length} Excalidraw elements`);
 
     return {
       elements: result.elements,

@@ -104,8 +104,6 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
       globalClaimedCommands.delete(commandKey);
     };
 
-    console.log('[useCommandSubscriber] Claimed command:', type);
-
     // Notify general command handler
     currentHandlers.onCommand?.(type, payload);
 
@@ -113,7 +111,6 @@ export function useCommandSubscriber(handlers: UseCommandSubscriberOptions): voi
     Promise.resolve()
       .then(() => handler(payload as never))
       .then((result) => {
-        console.log('[useCommandSubscriber] Handler succeeded:', type);
         resolveCommand(result);
         currentHandlers.onSuccess?.(type, result);
       })

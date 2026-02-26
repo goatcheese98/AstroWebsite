@@ -94,14 +94,9 @@
     },
   ];
 
-  let mounted = $state(false);
-
-  $effect(() => {
-    mounted = true;
-  });
 </script>
 
-<div class="skills-container" class:mounted>
+<div class="skills-container">
   <div class="skills-grid">
     {#each categories as category, i (category.id)}
       <div
@@ -170,14 +165,6 @@
 <style>
   .skills-container {
     width: 100%;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-
-  .skills-container.mounted {
-    opacity: 1;
-    transform: translateY(0);
   }
 
   .skills-grid {

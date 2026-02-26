@@ -101,7 +101,6 @@ export class CanvasPersistenceCoordinator extends EventTarget {
         return null;
       }
 
-      console.log("📂 Loaded canvas from localStorage");
       this.emit("loaded", { from: "localStorage" });
       return data.canvasData;
     } catch (err) {
