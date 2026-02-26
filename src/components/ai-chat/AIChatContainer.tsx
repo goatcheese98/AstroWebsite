@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { captureScreenshot, useUnifiedCanvasStore } from "@/stores";
 import type {
@@ -264,7 +264,6 @@ export default function AIChatContainer({
   );
   const [sending, setSending] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [loadingChats, setLoadingChats] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingJobs, setPendingJobs] = useState<string[]>([]);
   const [includeCanvasReference, setIncludeCanvasReference] = useState(true);
@@ -431,7 +430,6 @@ export default function AIChatContainer({
   }, [addToast, clientId, createChat, requestHeaders]);
 
   const loadChats = useCallback(async () => {
-    setLoadingChats(true);
     setError(null);
 
     try {
@@ -455,8 +453,6 @@ export default function AIChatContainer({
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load chats");
-    } finally {
-      setLoadingChats(false);
     }
   }, [activeChatId, clientId, createChat, requestHeaders]);
 

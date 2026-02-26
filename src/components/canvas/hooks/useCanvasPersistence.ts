@@ -52,9 +52,7 @@ export function useCanvasPersistence({
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       
-      if (shouldClearOnMount) {
-        console.log('🧹 Fresh canvas mode - skipping load');
-      } else {
+      if (!shouldClearOnMount) {
         const savedData = coordinator.loadFromStorage();
         if (savedData) {
           setCanvasData(savedData);

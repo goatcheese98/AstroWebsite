@@ -228,9 +228,7 @@ export default function CanvasUI({
         return;
       }
       const { imageData, width, height } = payload;
-      
-      console.log('[CanvasUI] Inserting image:', width, height);
-      
+
       // Create a new image element
       const appState = api.getAppState();
       const viewportCenterX = (appState.width || 800) / 2;
