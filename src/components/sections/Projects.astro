@@ -125,9 +125,6 @@ const getRealIndex = (loopIndex: number) => {
 
       <div class="projects-carousel__controls">
         <button type="button" class="carousel-btn" data-carousel-prev aria-label="Previous project">&lt;</button>
-        <p class="projects-carousel__status">
-          <span data-carousel-index>1</span> / {totalSlides}
-        </p>
         <button type="button" class="carousel-btn" data-carousel-next aria-label="Next project">&gt;</button>
       </div>
     </div>
@@ -207,7 +204,7 @@ const getRealIndex = (loopIndex: number) => {
 
   .project-slide .project-card:hover {
     transform: none;
-    box-shadow: var(--shadow-md);
+    box-shadow: 6px 6px 0 var(--color-stroke, #1d1d1d);
   }
 
   .project-card__content {
@@ -328,14 +325,6 @@ const getRealIndex = (loopIndex: number) => {
     transform: translateY(-1px);
   }
 
-  .projects-carousel__status {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    min-width: 4.2rem;
-    text-align: center;
-  }
-
   @media (max-width: 900px) {
     .projects-carousel {
       max-width: 100%;
@@ -385,9 +374,8 @@ const getRealIndex = (loopIndex: number) => {
     const track = root.querySelector("[data-carousel-track]") as HTMLElement | null;
     const prev = root.querySelector("[data-carousel-prev]") as HTMLButtonElement | null;
     const next = root.querySelector("[data-carousel-next]") as HTMLButtonElement | null;
-    const status = root.querySelector("[data-carousel-index]") as HTMLElement | null;
     const total = Number(root.dataset.total || "0");
-    if (!viewport || !track || !prev || !next || !status || total <= 0) return;
+    if (!viewport || !track || !prev || !next || total <= 0) return;
 
     const slides = Array.from(track.querySelectorAll(".project-slide")) as HTMLElement[];
     if (slides.length < 3) return;
@@ -419,8 +407,6 @@ const getRealIndex = (loopIndex: number) => {
         else if (delta < -1) slide.classList.add("is-far-left");
         else if (delta > 1) slide.classList.add("is-far-right");
       });
-
-      status.textContent = String(getRealIndex(index) + 1);
     };
 
     const moveTo = (nextIndex: number, animate = true) => {
@@ -451,7 +437,8 @@ const getRealIndex = (loopIndex: number) => {
       if (reducedMotion) onTransitionEnd();
     };
 
-    const onTransitionEnd = () => {
+    const onTransitionEnd = (e?: TransitionEvent) => {
+      if (e && e.target !== track) return;
       if (index === 0) {
         moveTo(total, false);
       } else if (index === total + 1) {

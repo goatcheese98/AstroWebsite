@@ -5,7 +5,6 @@ import Projects from "../components/sections/Projects.astro";
 import Experience from "../components/sections/Experience.astro";
 import BentoSkills from "../components/islands/BentoSkills.svelte";
 import SectionHeader from "../components/ui/SectionHeader.astro";
-import SketchDivider from "../components/sketch/SketchDivider.astro";
 import { PROJECTS, SKILLS } from "../lib/constants";
 
 const marqueeItems = [
@@ -34,7 +33,6 @@ const marqueeItems = [
       </div>
     </section>
 
-    <SketchDivider variant="wavy" class="landing-divider" />
     <Projects />
     <Experience />
 
@@ -168,9 +166,8 @@ const marqueeItems = [
   }
 
   .landing-marquee {
-    margin-block: var(--space-sm) var(--space-lg);
-    border-block: 1px solid var(--color-stroke-muted);
-    background: color-mix(in srgb, var(--color-bg) 78%, var(--color-fill-1));
+    margin-block: var(--space-sm) 0;
+    background: #0d0d12;
     overflow: hidden;
     position: relative;
   }
@@ -181,25 +178,25 @@ const marqueeItems = [
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 70px;
+    width: 60px;
     z-index: 2;
     pointer-events: none;
   }
 
   .landing-marquee::before {
     left: 0;
-    background: linear-gradient(90deg, var(--color-bg), transparent);
+    background: linear-gradient(90deg, #0d0d12, transparent);
   }
 
   .landing-marquee::after {
     right: 0;
-    background: linear-gradient(-90deg, var(--color-bg), transparent);
+    background: linear-gradient(-90deg, #0d0d12, transparent);
   }
 
   .landing-marquee__track {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 0;
     width: max-content;
     animation: landing-marquee 32s linear infinite;
   }
@@ -208,20 +205,28 @@ const marqueeItems = [
     list-style: none;
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.7rem 0.5rem;
+    gap: 0;
+    padding: 0.72rem 0.5rem;
   }
 
   .landing-marquee__list li {
     white-space: nowrap;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-    letter-spacing: 0.03em;
-    padding: 0.26rem 0.62rem;
-    border: 1px solid var(--color-stroke-muted);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-surface) 76%, var(--color-bg));
+    color: #ffd600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.26rem 1rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .landing-marquee__list li::after {
+    content: "✦";
+    margin-left: 1rem;
+    color: #ff5c3a;
+    opacity: 0.8;
   }
 
   @keyframes landing-marquee {
@@ -237,13 +242,128 @@ const marqueeItems = [
     padding-block: clamp(1.5rem, 3.8vw, 2.5rem);
   }
 
-  .landing-page :global(.sketch-divider) {
-    margin-block: var(--space-md);
-    opacity: 0.65;
-  }
 
   .landing-page :global(.section-header) {
     margin-bottom: var(--space-lg);
+  }
+
+  /* ── Section color zones ── */
+  .landing-page :global(#projects),
+  .landing-page :global(#experience),
+  .landing-page :global(#skills) {
+    position: relative;
+  }
+
+  .landing-page :global(#projects)  { background: rgba(180, 230, 20,  0.07); }
+  .landing-page :global(#experience){ background: rgba(255, 210,  0,  0.07); }
+  .landing-page :global(#skills)    { background: rgba(255,  80, 40,  0.06); }
+
+  :global([data-theme="dark"]) .landing-page :global(#projects)  { background: rgba(180, 230, 20,  0.06); }
+  :global([data-theme="dark"]) .landing-page :global(#experience){ background: rgba(255, 210,  0,  0.06); }
+  :global([data-theme="dark"]) .landing-page :global(#skills)    { background: rgba(255,  80, 40,  0.05); }
+
+  /* ── Animated wave edges via pseudo-elements ──
+     Only background-position is animated — GPU-composited, zero layout cost.
+     A bright spotlight travels along a 4px strip at top and bottom,
+     creating a slow shimmer that reads as a living border wave.           */
+
+  .landing-page :global(#projects)::before,
+  .landing-page :global(#projects)::after,
+  .landing-page :global(#experience)::before,
+  .landing-page :global(#experience)::after,
+  .landing-page :global(#skills)::before,
+  .landing-page :global(#skills)::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-size: 300% 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .landing-page :global(#projects)::before  { top: 0; }
+  .landing-page :global(#projects)::after   { bottom: 0; }
+  .landing-page :global(#experience)::before{ top: 0; }
+  .landing-page :global(#experience)::after { bottom: 0; }
+  .landing-page :global(#skills)::before    { top: 0; }
+  .landing-page :global(#skills)::after     { bottom: 0; }
+
+  /* Projects top — lime only (nothing above) */
+  .landing-page :global(#projects)::before {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(180, 230, 20, 0.55) 20%,
+      rgba(220, 255, 60, 0.95) 50%,
+      rgba(180, 230, 20, 0.55) 80%,
+      transparent 100%
+    );
+    animation: wave-edge 7s ease-in-out infinite alternate;
+  }
+
+  /* Projects bottom + Experience top — lime → yellow blend */
+  .landing-page :global(#projects)::after,
+  .landing-page :global(#experience)::before {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(195, 240, 10, 0.6) 15%,
+      rgba(215, 252, 20, 0.95) 35%,
+      rgba(255, 228, 0, 0.95) 65%,
+      rgba(255, 210, 0, 0.6) 85%,
+      transparent 100%
+    );
+    animation: wave-edge 7.5s ease-in-out infinite alternate;
+    animation-delay: -1.5s;
+  }
+
+  /* Experience bottom + Skills top — yellow → coral blend */
+  .landing-page :global(#experience)::after,
+  .landing-page :global(#skills)::before {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(255, 220, 0, 0.6) 15%,
+      rgba(255, 235, 30, 0.95) 35%,
+      rgba(255, 100, 50, 0.95) 65%,
+      rgba(255, 80, 40, 0.6) 85%,
+      transparent 100%
+    );
+    animation: wave-edge 7s ease-in-out infinite alternate;
+    animation-delay: -2.5s;
+  }
+
+  /* Skills bottom — coral only */
+  .landing-page :global(#skills)::after {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(255, 80, 40, 0.50) 20%,
+      rgba(255, 130, 90, 0.90) 50%,
+      rgba(255, 80, 40, 0.50) 80%,
+      transparent 100%
+    );
+    animation: wave-edge 6s ease-in-out infinite alternate;
+    animation-delay: -1.5s;
+  }
+
+  @keyframes wave-edge {
+    from { background-position:   0% 0; }
+    to   { background-position: 100% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-page :global(#projects)::before,
+    .landing-page :global(#projects)::after,
+    .landing-page :global(#experience)::before,
+    .landing-page :global(#experience)::after,
+    .landing-page :global(#skills)::before,
+    .landing-page :global(#skills)::after {
+      animation: none;
+      background-position: 50% 0;
+    }
   }
 
   :global(body.landing-grid-mode)::before {

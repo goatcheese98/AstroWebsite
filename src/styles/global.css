@@ -1160,6 +1160,7 @@ img[loading] {
     transform 0.2s ease,
     box-shadow 0.2s ease;
   overflow: hidden;
+  box-shadow: 4px 4px 0 var(--color-stroke);
 }
 
 .sketch-card__accent {
@@ -1174,8 +1175,8 @@ img[loading] {
 }
 
 .sketch-card:hover {
-  transform: translateX(4px);
-  box-shadow: var(--shadow-md);
+  transform: translate(-3px, -3px);
+  box-shadow: 7px 7px 0 var(--color-stroke);
 }
 
 .sketch-card:hover .sketch-card__accent {

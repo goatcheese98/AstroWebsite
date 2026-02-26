@@ -21,11 +21,13 @@
     if (isAction) return;
     isAction = true;
 
-    // Choose randomly between 'scan' and 'backflip'
-    const actionType = Math.random() > 0.5 ? "backflip" : "scan";
+    // Choose randomly between 'scan', 'backflip', and 'spin'
+    const actions = ["backflip", "scan", "spin"];
+    const actionType = actions[Math.floor(Math.random() * actions.length)];
     currentActionClass = actionType;
 
-    let duration = actionType === "backflip" ? 3500 : 2800;
+    let duration =
+      actionType === "backflip" ? 3500 : actionType === "spin" ? 2500 : 2800;
 
     setTimeout(() => {
       isAction = false;
@@ -33,11 +35,9 @@
     }, duration);
   }
 
-  // Calculate dynamic rotation based on mouse position to simulate turning towards the cursor.
-  // When cursor moves left-to-right, it maps to a full 900-degree rotation.
-  const rotationDegrees = $derived(
-    (mouseOffset.x / 30) * 450, // xOffset is between -30 and +30. This makes full range -450 to +450 = 900 degrees
-  );
+  // Bounded viewing angle to keep 3D volume instead of paper thin
+  const tiltY = $derived((mouseOffset.x / 15) * 16);
+  const tiltX = $derived((mouseOffset.y / 7.5) * -10);
 </script>
 
 <div
@@ -54,15 +54,18 @@
     class="shadow"
     class:acting={isAction}
     style="transform: translateX({-mouseOffset.x}px); opacity: {currentActionClass ===
-    'backflip'
+      'backflip' || currentActionClass === 'spin'
       ? '0.1'
       : ''}"
   ></div>
 
-  <!-- Wrapper for 900-deg tracking relative to the cursor -->
+  <!-- Realistically bounded 3D wrapper -->
   <div
     class="robot-wrapper"
-    style="transform: rotateY({rotationDegrees}deg); transition: transform 0.2s ease-out;"
+    class:action-spin={currentActionClass === "spin"}
+    style={currentActionClass !== "spin"
+      ? `transform: rotateY(${tiltY}deg) rotateX(${tiltX}deg); transition: transform 0.2s ease-out;`
+      : ""}
   >
     <svg
       viewBox="0 0 800 600"
@@ -70,6 +73,7 @@
       class:acting={isAction}
       class:action-scan={currentActionClass === "scan"}
       class:action-backflip={currentActionClass === "backflip"}
+      class:action-spin={currentActionClass === "spin"}
       class:hovering={isHovering}
       style="transform: translate({mouseOffset.x}px, {mouseOffset.y}px)"
     >
@@ -611,6 +615,83 @@
     65% {
       transform: rotate(30deg);
     } /* Brace for landing */
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+
+  /* =================================== */
+  /* Spin Trick                          */
+  /* =================================== */
+
+  /* Global height jump for the robot */
+  .spot-robot.action-spin {
+    animation: spin-jump 2.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  }
+
+  @keyframes spin-jump {
+    0% {
+      transform: translateY(0);
+    }
+    15% {
+      transform: translateY(30px);
+    } /* crouch windup */
+    30% {
+      transform: translateY(-300px);
+    } /* blast off */
+    70% {
+      transform: translateY(-300px);
+    } /* hang time */
+    85% {
+      transform: translateY(15px);
+    } /* land */
+    100% {
+      transform: translateY(0);
+    } /* settle */
+  }
+
+  /* Rapid rotation on the 3D wrapper itself */
+  .robot-wrapper.action-spin {
+    animation: spin1080-rotate 2.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  }
+
+  @keyframes spin1080-rotate {
+    0% {
+      transform: rotateY(0deg) rotateX(0deg);
+    }
+    15% {
+      transform: rotateY(-20deg) rotateX(0deg);
+    }
+    70% {
+      transform: rotateY(1080deg) rotateX(0deg);
+    }
+    100% {
+      transform: rotateY(1080deg) rotateX(0deg);
+    }
+  }
+
+  /* Spin trick leg tucks */
+  .spot-robot.action-spin .fore-right,
+  .spot-robot.action-spin .fore-left,
+  .spot-robot.action-spin .hind-right,
+  .spot-robot.action-spin .hind-left {
+    animation: spin-leg-tuck 2.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  }
+
+  @keyframes spin-leg-tuck {
+    0% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(-10deg);
+    }
+    30%,
+    65% {
+      transform: rotate(30deg);
+    }
+    85% {
+      transform: rotate(-15deg);
+    }
     100% {
       transform: rotate(0deg);
     }

@@ -93,6 +93,12 @@ const totalCards = EXPERIENCES.length;
     margin-bottom: var(--space-lg);
   }
 
+  /* Prevent global sketch-card hover transform from fighting the JS stack */
+  .experience-card:hover {
+    transform: none;
+    cursor: pointer;
+  }
+
   .experience-stack {
     position: relative;
     max-width: 800px;
@@ -110,6 +116,8 @@ const totalCards = EXPERIENCES.length;
     background: color-mix(in srgb, var(--color-surface) 97%, var(--color-fill-1));
     max-height: 52px;
     overflow: hidden;
+    /* suppress global sketch-card offset shadow on peeked cards */
+    box-shadow: none;
     transition:
       top 300ms cubic-bezier(0.4, 0, 0.2, 1),
       max-height 350ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -122,7 +130,7 @@ const totalCards = EXPERIENCES.length;
     z-index: 30;
     max-height: 420px;
     overflow: hidden;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 6px 6px 0 var(--color-stroke);
   }
 
   .experience-card__content {
@@ -306,8 +314,6 @@ const totalCards = EXPERIENCES.length;
 
     const PEEK_H = 52;
     const n = cards.length;
-    const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
-    const timers = new Map<HTMLElement, number>();
 
     const activate = (target: HTMLElement) => {
       const targetIdx = cards.indexOf(target);
@@ -318,7 +324,6 @@ const totalCards = EXPERIENCES.length;
           card.style.top = `${(n - 1) * PEEK_H}px`;
           card.style.zIndex = "30";
         } else {
-          // slot: higher original index = higher up on screen (lower slot number)
           const slot = (n - 1 - i) - (targetIdx > i ? 1 : 0);
           card.style.top = `${slot * PEEK_H}px`;
           card.style.zIndex = String(n - slot + 1);
@@ -326,71 +331,25 @@ const totalCards = EXPERIENCES.length;
       });
     };
 
-    const clearTimer = (card: HTMLElement) => {
-      const t = timers.get(card);
-      if (t) {
-        window.clearTimeout(t);
-        timers.delete(card);
-      }
-    };
+    const reset = () => activate(cards[0]);
 
-    const clearAllTimers = () => {
-      cards.forEach((card) => clearTimer(card));
-    };
-
-    const onEnter = (card: HTMLElement) => {
-      if (isMobile()) return;
-      clearTimer(card);
-      const timer = window.setTimeout(() => activate(card), 2500);
-      timers.set(card, timer);
-    };
-
-    const onLeave = (card: HTMLElement) => {
-      clearTimer(card);
-    };
-
-    const onClick = (card: HTMLElement) => {
-      clearTimer(card);
-      activate(card);
-    };
-
-    const reset = () => {
-      clearAllTimers();
-      activate(cards[0]);
-    };
-
-    const enterHandlers = new Map<HTMLElement, () => void>();
-    const leaveHandlers = new Map<HTMLElement, () => void>();
     const clickHandlers = new Map<HTMLElement, () => void>();
 
     cards.forEach((card) => {
-      const enterHandler = () => onEnter(card);
-      const leaveHandler = () => onLeave(card);
-      const clickHandler = () => onClick(card);
-      enterHandlers.set(card, enterHandler);
-      leaveHandlers.set(card, leaveHandler);
+      const clickHandler = () => activate(card);
       clickHandlers.set(card, clickHandler);
-      card.addEventListener("pointerenter", enterHandler);
-      card.addEventListener("pointerleave", leaveHandler);
       card.addEventListener("click", clickHandler);
     });
-    stack.addEventListener("pointerleave", reset);
     window.addEventListener("resize", reset);
 
     reset();
 
     (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup?.();
     (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup = () => {
-      clearAllTimers();
       cards.forEach((card) => {
-        const enterHandler = enterHandlers.get(card);
-        const leaveHandler = leaveHandlers.get(card);
         const clickHandler = clickHandlers.get(card);
-        if (enterHandler) card.removeEventListener("pointerenter", enterHandler);
-        if (leaveHandler) card.removeEventListener("pointerleave", leaveHandler);
         if (clickHandler) card.removeEventListener("click", clickHandler);
       });
-      stack.removeEventListener("pointerleave", reset);
       window.removeEventListener("resize", reset);
     };
   }

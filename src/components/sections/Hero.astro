@@ -57,12 +57,6 @@ const TITLES = [
     </div>
   </div>
 
-  <!-- Scroll indicator -->
-  <div class="hero__scroll-indicator" aria-hidden="true">
-    <div class="scroll-indicator__mouse">
-      <div class="scroll-indicator__wheel"></div>
-    </div>
-  </div>
 </section>
 
 <script>
@@ -224,54 +218,6 @@ const TITLES = [
     padding-top: 20px;
   }
 
-  .hero__scroll-indicator {
-    position: static;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    opacity: 0.5;
-    margin-top: var(--space-md);
-    animation: fade-up 0.8s ease-out 0.5s both;
-  }
-
-  .scroll-indicator__mouse {
-    width: 26px;
-    height: 40px;
-    border: 2px solid var(--color-text-muted);
-    border-radius: 13px;
-    position: relative;
-    filter: url(#sketch-filter);
-  }
-
-  /* Mobile/Touch: Disable filter */
-  @media (hover: none) and (pointer: coarse) {
-    .scroll-indicator__mouse {
-      filter: none;
-    }
-  }
-
-  .scroll-indicator__wheel {
-    width: 4px;
-    height: 8px;
-    background: var(--color-text-muted);
-    border-radius: 2px;
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    animation: scroll-wheel 1.5s ease-in-out infinite;
-  }
-
-  @keyframes scroll-wheel {
-    0% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(12px);
-    }
-  }
 
   /* Desktop: side by side */
   @media (min-width: 901px) {
@@ -320,8 +266,5 @@ const TITLES = [
       justify-content: center;
     }
 
-    .hero__scroll-indicator {
-      display: none;
-    }
   }
 </style>
