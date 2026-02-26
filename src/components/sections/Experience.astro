@@ -4,82 +4,82 @@ import SketchHighlight from "../sketch/SketchHighlight.astro";
 import { EXPERIENCES } from "../../lib/constants";
 
 const LOGO_FILES: Record<string, string> = {
-  ubc: '/logos/UBC.png',
-  goldman: '/logos/Goldman.jpeg',
-  megaplex: '/logos/megaplex.jpeg',
+  ubc: "/logos/UBC.png",
+  goldman: "/logos/Goldman.jpeg",
+  megaplex: "/logos/megaplex.jpeg",
 };
+
+const totalCards = EXPERIENCES.length;
 ---
 
 <section class="experience section-gap" id="experience" aria-label="Experience">
   <div class="container">
     <SectionHeader title="Experience" subtitle="Where I've worked." />
 
-    <div class="timeline">
+    <div
+      class="experience-stack"
+      style={`--stack-count: ${totalCards};`}
+      data-experience-stack
+      aria-label="Experience stack"
+    >
       {
-        EXPERIENCES.map((exp) => (
-          <article class="timeline__item">
-            <div class="timeline__marker" aria-hidden="true">
-              <div
-                class:list={[
-                  "timeline__dot",
-                  { "timeline__dot--active": exp.current },
-                ]}
-                style={exp.accentColor ? `--dot-color: ${exp.accentColor}` : ''}
-              >
-                {exp.current && <span class="timeline__pulse" style={exp.accentColor ? `--pulse-color: ${exp.accentColor}` : ''} />}
-              </div>
-              <div class="timeline__line" />
-            </div>
-            <div 
-              class="sketch-card timeline__card" 
-              style={`--hover-accent: ${exp.accentColor || 'var(--color-accent)'}`}
-            >
-              <div class="sketch-card__accent" aria-hidden="true"></div>
-              <div class="timeline__content">
-                <div class="timeline__header">
-                  <div class="timeline__title-group">
-                    <h3 class="timeline__role">
-                      {exp.current ? (
-                        <SketchHighlight>{exp.role}</SketchHighlight>
-                      ) : (
-                        exp.role
-                      )}
-                    </h3>
-                    <div class="timeline__company-row">
-                      {exp.logo && (
-                        <span class="timeline__logo-wrapper">
-                          <img 
-                            src={LOGO_FILES[exp.logo]}
-                            alt=""
-                            class="timeline__logo"
-                            width="20"
-                            height="20"
-                          />
-                        </span>
-                      )}
-                      <p class="timeline__company">{exp.company}</p>
-                    </div>
+        EXPERIENCES.map((exp, index) => (
+          <article
+            class={`sketch-card experience-card${index === 0 ? " is-focused" : ""}`}
+            style={`--hover-accent: ${exp.accentColor || "var(--color-accent)"}; --stack-index: ${index}; --stack-z: ${totalCards - index};`}
+            data-stack-card
+          >
+            <div class="sketch-card__accent" aria-hidden="true"></div>
+            <div class="experience-card__content">
+              <div class="experience-card__header">
+                <div class="experience-card__title-group">
+                  <h3 class="experience-card__role">
+                    {exp.current ? <SketchHighlight>{exp.role}</SketchHighlight> : exp.role}
+                  </h3>
+                  <div class="experience-card__company-row">
+                    {exp.logo && (
+                      <span class="experience-card__logo-wrapper">
+                        <img
+                          src={LOGO_FILES[exp.logo]}
+                          alt=""
+                          class="experience-card__logo"
+                          width="34"
+                          height="34"
+                        />
+                      </span>
+                    )}
+                    <p class="experience-card__company">{exp.company}</p>
                   </div>
-                  <span class="timeline__period">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    {exp.period}
-                  </span>
                 </div>
-                <p class="timeline__desc">{exp.description}</p>
-                <ul class="timeline__highlights">
-                  {exp.highlights.map((highlight) => (
-                    <li class="timeline__highlight">
-                      <span class="highlight__bullet" />
-                      {highlight}
-                    </li>
-                  ))}
-                </ul>
+                <span class="experience-card__period">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  {exp.period}
+                </span>
               </div>
+
+              <p class="experience-card__desc">{exp.description}</p>
+
+              <ul class="experience-card__highlights">
+                {exp.highlights.map((highlight) => (
+                  <li class="experience-card__highlight">
+                    <span class="highlight__bullet" />
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
             </div>
           </article>
         ))
@@ -89,142 +89,104 @@ const LOGO_FILES: Record<string, string> = {
 </section>
 
 <style>
-  .timeline {
+  .experience :global(.section-header) {
+    margin-bottom: var(--space-lg);
+  }
+
+  .experience-stack {
     position: relative;
     max-width: 800px;
     margin-inline: auto;
+    height: calc((var(--stack-count) - 1) * 52px + 400px);
   }
 
-  .timeline__item {
-    position: relative;
-    padding-left: 60px;
-    padding-bottom: var(--space-xl);
-    display: flex;
-  }
-
-  .timeline__item:last-child {
-    padding-bottom: 0;
-  }
-
-  .timeline__item:last-child .timeline__line {
-    display: none;
-  }
-
-  .timeline__marker {
+  .experience-card {
     position: absolute;
-    left: 0;
-    top: 8px;
-    width: 40px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    inset-inline: 0;
+    /* Pre-JS default: assume card 0 is active — higher index = higher up (lower slot index) */
+    top: calc((var(--stack-count) - 1 - var(--stack-index)) * 52px);
+    z-index: var(--stack-z);
+    padding: var(--space-md);
+    background: color-mix(in srgb, var(--color-surface) 97%, var(--color-fill-1));
+    max-height: 52px;
+    overflow: hidden;
+    transition:
+      top 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      max-height 350ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 300ms ease;
+    cursor: pointer;
   }
 
-  .timeline__dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 3px solid var(--color-stroke-muted);
-    background: var(--color-bg);
-    filter: url(#sketch-filter);
-    position: relative;
-    z-index: 2;
-    transition: border-color 0.3s ease, background 0.3s ease;
+  .experience-card.is-focused {
+    top: calc((var(--stack-count) - 1) * 52px);
+    z-index: 30;
+    max-height: 420px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
   }
 
-  .timeline__dot--active {
-    background: var(--dot-color, var(--color-accent));
-    border-color: var(--dot-color, var(--color-accent));
-    box-shadow: 0 0 0 4px var(--pulse-color, var(--color-accent-glow));
-  }
-
-  .timeline__pulse {
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid var(--pulse-color, var(--color-accent));
-    animation: pulse-ring 2s ease-out infinite;
-  }
-
-  @keyframes pulse-ring {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(1.8); opacity: 0; }
-  }
-
-  .timeline__line {
-    width: 2px;
-    flex: 1;
-    background: linear-gradient(to bottom, var(--color-stroke-muted), transparent);
-    margin-top: var(--space-sm);
-    min-height: 40px;
-  }
-
-  .timeline__card {
-    flex: 1;
-    padding: var(--space-lg);
-  }
-
-  .timeline__content {
+  .experience-card__content {
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
   }
 
-  .timeline__header {
+  .experience-card__header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     flex-wrap: wrap;
     gap: var(--space-sm);
-    margin-bottom: var(--space-sm);
   }
 
-  .timeline__title-group {
+  .experience-card__title-group {
     flex: 1;
     min-width: 0;
   }
 
-  .timeline__role {
+  .experience-card__role {
     font-family: var(--font-hand);
     font-size: var(--text-xl);
     margin-bottom: var(--space-xs);
     line-height: 1.3;
   }
 
-  .timeline__company-row {
+  .experience-card__company-row {
     display: flex;
-    align-items: center;
-    gap: var(--space-xs);
+    align-items: flex-start;
+    gap: var(--space-sm);
   }
 
-  .timeline__logo-wrapper {
-    width: 20px;
-    height: 20px;
+  .experience-card__logo-wrapper {
+    width: 34px;
+    height: 34px;
     flex-shrink: 0;
-    flex-grow: 0;
     overflow: hidden;
-    border-radius: 3px;
+    border-radius: 4px;
     background: var(--color-bg);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .timeline__logo {
-    width: 20px;
-    height: 20px;
+  .experience-card__logo {
+    width: 34px;
+    height: 34px;
     object-fit: contain;
     display: block;
   }
 
-  .timeline__company {
+  .experience-card__company {
     font-family: var(--font-hand);
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     color: var(--hover-accent, var(--color-accent));
     font-weight: 600;
-    transition: color 0.3s ease;
+    line-height: 1.35;
   }
 
-  .timeline__period {
+  .experience-card__period {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -239,32 +201,32 @@ const LOGO_FILES: Record<string, string> = {
     flex-shrink: 0;
   }
 
-  .timeline__desc {
+  .experience-card__desc {
     font-size: var(--text-base);
     color: var(--color-text-muted);
-    line-height: 1.7;
-    margin-bottom: var(--space-md);
+    line-height: 1.65;
+    margin-bottom: var(--space-xs);
   }
 
-  .timeline__highlights {
+  .experience-card__highlights {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
 
-  .timeline__highlight {
-    font-size: var(--text-sm);
+  .experience-card__highlight {
+    font-size: var(--text-base);
     color: var(--color-text);
-    padding-left: 1.5em;
+    padding-left: 1.35em;
     position: relative;
-    line-height: 1.6;
+    line-height: 1.55;
     transition: all 0.15s ease;
-    padding: var(--space-xs) var(--space-xs) var(--space-xs) 1.5em;
+    padding: var(--space-xs) var(--space-xs) var(--space-xs) 1.35em;
     border-radius: var(--radius-sm);
-    margin-left: -0.5em;
+    margin-left: -0.4em;
   }
 
-  .timeline__highlight:hover {
+  .experience-card__highlight:hover {
     background: var(--color-bg);
     color: var(--hover-accent, var(--color-accent));
   }
@@ -272,7 +234,7 @@ const LOGO_FILES: Record<string, string> = {
   .highlight__bullet {
     position: absolute;
     left: 0.25em;
-    top: 0.65em;
+    top: 0.62em;
     width: 8px;
     height: 8px;
     background: var(--hover-accent, var(--color-accent));
@@ -281,39 +243,166 @@ const LOGO_FILES: Record<string, string> = {
     transition: transform 0.15s ease;
   }
 
-  .timeline__highlight:hover .highlight__bullet {
+  .experience-card__highlight:hover .highlight__bullet {
     transform: scale(1.2);
   }
 
-  @media (max-width: 640px) {
-    .timeline__item {
-      padding-left: 40px;
+  @media (max-width: 900px) {
+    .experience-stack {
+      height: auto;
+      display: grid;
+      gap: var(--space-md);
     }
 
-    .timeline__marker {
-      width: 30px;
+    .experience-card {
+      position: relative;
+      inset-inline: auto;
+      top: auto;
+      transform: none;
+      z-index: auto;
+      box-shadow: none;
+      max-height: none;
+      overflow: visible;
+      opacity: 1;
     }
 
-    .timeline__header {
+    .experience-card.is-focused {
+      top: auto;
+      transform: none;
+      z-index: auto;
+      box-shadow: none;
+      max-height: none;
+      overflow: visible;
+      opacity: 1;
+    }
+
+    .experience-card__header {
       flex-direction: column;
-      gap: var(--space-sm);
+      align-items: flex-start;
     }
 
-    .timeline__period {
-      align-self: flex-start;
+    .experience-card__role {
+      font-size: var(--text-lg);
     }
 
-    .timeline__card {
-      padding: var(--space-md);
+    .experience-card__company {
+      font-size: var(--text-base);
     }
 
-    .timeline__highlight {
-      margin-left: 0;
-      padding-left: 1.5em;
-    }
-
-    .highlight__bullet {
-      left: 0.25em;
+    .experience-card__desc,
+    .experience-card__highlight {
+      font-size: var(--text-sm);
     }
   }
 </style>
+
+<script>
+  function initExperienceStack() {
+    const stack = document.querySelector("[data-experience-stack]") as HTMLElement | null;
+    if (!stack) return;
+
+    const cards = Array.from(stack.querySelectorAll("[data-stack-card]")) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    const PEEK_H = 52;
+    const n = cards.length;
+    const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
+    const timers = new Map<HTMLElement, number>();
+
+    const activate = (target: HTMLElement) => {
+      const targetIdx = cards.indexOf(target);
+      cards.forEach((card, i) => {
+        const isActive = i === targetIdx;
+        card.classList.toggle("is-focused", isActive);
+        if (isActive) {
+          card.style.top = `${(n - 1) * PEEK_H}px`;
+          card.style.zIndex = "30";
+        } else {
+          // slot: higher original index = higher up on screen (lower slot number)
+          const slot = (n - 1 - i) - (targetIdx > i ? 1 : 0);
+          card.style.top = `${slot * PEEK_H}px`;
+          card.style.zIndex = String(n - slot + 1);
+        }
+      });
+    };
+
+    const clearTimer = (card: HTMLElement) => {
+      const t = timers.get(card);
+      if (t) {
+        window.clearTimeout(t);
+        timers.delete(card);
+      }
+    };
+
+    const clearAllTimers = () => {
+      cards.forEach((card) => clearTimer(card));
+    };
+
+    const onEnter = (card: HTMLElement) => {
+      if (isMobile()) return;
+      clearTimer(card);
+      const timer = window.setTimeout(() => activate(card), 2500);
+      timers.set(card, timer);
+    };
+
+    const onLeave = (card: HTMLElement) => {
+      clearTimer(card);
+    };
+
+    const onClick = (card: HTMLElement) => {
+      clearTimer(card);
+      activate(card);
+    };
+
+    const reset = () => {
+      clearAllTimers();
+      activate(cards[0]);
+    };
+
+    const enterHandlers = new Map<HTMLElement, () => void>();
+    const leaveHandlers = new Map<HTMLElement, () => void>();
+    const clickHandlers = new Map<HTMLElement, () => void>();
+
+    cards.forEach((card) => {
+      const enterHandler = () => onEnter(card);
+      const leaveHandler = () => onLeave(card);
+      const clickHandler = () => onClick(card);
+      enterHandlers.set(card, enterHandler);
+      leaveHandlers.set(card, leaveHandler);
+      clickHandlers.set(card, clickHandler);
+      card.addEventListener("pointerenter", enterHandler);
+      card.addEventListener("pointerleave", leaveHandler);
+      card.addEventListener("click", clickHandler);
+    });
+    stack.addEventListener("pointerleave", reset);
+    window.addEventListener("resize", reset);
+
+    reset();
+
+    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup?.();
+    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup = () => {
+      clearAllTimers();
+      cards.forEach((card) => {
+        const enterHandler = enterHandlers.get(card);
+        const leaveHandler = leaveHandlers.get(card);
+        const clickHandler = clickHandlers.get(card);
+        if (enterHandler) card.removeEventListener("pointerenter", enterHandler);
+        if (leaveHandler) card.removeEventListener("pointerleave", leaveHandler);
+        if (clickHandler) card.removeEventListener("click", clickHandler);
+      });
+      stack.removeEventListener("pointerleave", reset);
+      window.removeEventListener("resize", reset);
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initExperienceStack);
+  } else {
+    initExperienceStack();
+  }
+
+  document.addEventListener("astro:page-load", initExperienceStack);
+  document.addEventListener("astro:before-swap", () => {
+    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup?.();
+  });
+</script>

@@ -1,0 +1,1046 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE, PROJECTS, EXPERIENCES, SKILLS } from "../lib/constants";
+
+const topProjects = PROJECTS.slice(0, 3);
+const topSkills = SKILLS.slice(0, 6);
+const roles = ["Business Analyst", "Data Storyteller", "Product Builder", "Analytics Engineer"];
+---
+
+<BaseLayout
+  title="Demo 3 — Editorial Portfolio"
+  description="Retro editorial zine concept for Rohan Jasani's portfolio."
+>
+  <div class="z-root">
+
+    <!-- NAV -->
+    <header class="z-nav">
+      <a href="#top" class="z-logo">
+        <span class="z-logo-block">RJ</span>
+        <span>{SITE.author}</span>
+      </a>
+      <nav class="z-nav-links">
+        <a href="#work">Work</a>
+        <a href="#skills">Skills</a>
+        <a href="#xp">Experience</a>
+        <a href="#hello" class="z-nav-cta">Say Hello</a>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="z-hero" id="top">
+      <div class="z-hero-bg-word" aria-hidden="true">ROHAN</div>
+
+      <div class="z-hero-inner">
+        <div class="z-hero-left">
+          <div class="z-sticker z-sticker--yellow">Available for work ✦</div>
+          <h1 class="z-hero-title">
+            I turn <em>data</em><br />into<br />
+            <span class="z-hero-title-outline">stories</span><br />that move<br />
+            <span class="z-hero-title-fill">people.</span>
+          </h1>
+          <p class="z-hero-sub">
+            Hi, I'm <strong>{SITE.author}</strong> —
+            <span id="z-role">{roles[0]}</span>
+            with a knack for translating complex systems into clear, compelling decisions.
+          </p>
+          <div class="z-hero-btns">
+            <a href="#work" class="z-btn z-btn--primary">Explore my work →</a>
+            <a href={SITE.socialLinks.linkedin} target="_blank" rel="noopener" class="z-btn z-btn--outline">LinkedIn ↗</a>
+          </div>
+        </div>
+
+        <aside class="z-hero-right" aria-hidden="true">
+          <div class="z-card-stack">
+            <div class="z-stat-card z-stat-card--coral">
+              <span class="z-stat-num">{PROJECTS.length}+</span>
+              <span class="z-stat-label">Projects shipped</span>
+            </div>
+            <div class="z-stat-card z-stat-card--mint">
+              <span class="z-stat-num">{EXPERIENCES.length}</span>
+              <span class="z-stat-label">Industry roles</span>
+            </div>
+            <div class="z-stat-card z-stat-card--violet">
+              <span class="z-stat-num">{SKILLS.length}</span>
+              <span class="z-stat-label">Tools mastered</span>
+            </div>
+          </div>
+
+          <div class="z-deco-ring"></div>
+          <div class="z-deco-dot-grid" aria-hidden="true">
+            {Array.from({ length: 25 }).map(() => <span></span>)}
+          </div>
+        </aside>
+      </div>
+
+      <!-- Horizontal scroll ticker -->
+      <div class="z-tape z-tape--top">
+        <div class="z-tape-track">
+          <span>Product Strategy</span><span>✦</span>
+          <span>Data Analytics</span><span>✦</span>
+          <span>Experimentation</span><span>✦</span>
+          <span>Visualization</span><span>✦</span>
+          <span>Full-Stack Build</span><span>✦</span>
+          <span>Decision Intelligence</span><span>✦</span>
+          <span>Product Strategy</span><span>✦</span>
+          <span>Data Analytics</span><span>✦</span>
+          <span>Experimentation</span><span>✦</span>
+          <span>Visualization</span><span>✦</span>
+          <span>Full-Stack Build</span><span>✦</span>
+          <span>Decision Intelligence</span><span>✦</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROJECTS -->
+    <section id="work" class="z-section z-section--lime">
+      <div class="z-section-inner">
+        <div class="z-section-header">
+          <p class="z-overline">Selected Work</p>
+          <h2 class="z-section-title">Things I've<br /><em>actually</em> built.</h2>
+          <div class="z-sticker z-sticker--coral z-sticker--rotate-neg">Case studies →</div>
+        </div>
+
+        <div class="z-project-grid">
+          {topProjects.map((p, i) => (
+            <article class="z-project-card" style={`--accent: ${p.accentColor || "#f97316"}`}>
+              <div class="z-project-num">0{i + 1}</div>
+              <div class="z-project-body">
+                <h3>{p.title}</h3>
+                <p>{p.description}</p>
+                <ul class="z-project-tags">
+                  {p.tags.slice(0, 4).map(t => <li>{t}</li>)}
+                </ul>
+              </div>
+              <div class="z-project-foot">
+                {p.codeUrl && <a href={p.codeUrl} target="_blank" rel="noopener" class="z-link-pill">Code ↗</a>}
+                {p.demoUrl && <a href={p.demoUrl} class="z-link-pill z-link-pill--dark">Demo ↗</a>}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- SKILLS -->
+    <section id="skills" class="z-section z-section--coral">
+      <div class="z-section-inner">
+        <div class="z-section-header z-section-header--right">
+          <p class="z-overline">Skill Signals</p>
+          <h2 class="z-section-title">My toolkit<br />for making<br /><em>things happen.</em></h2>
+        </div>
+
+        <div class="z-skills-grid">
+          {topSkills.map((s, i) => (
+            <div class="z-skill-pill" style={`--delay: ${i * 60}ms`}>
+              <div class="z-skill-top">
+                <span class="z-skill-name">{s.name}</span>
+                <span class="z-skill-pct">{s.level}%</span>
+              </div>
+              <div class="z-skill-bar">
+                <div class="z-skill-fill" style={`width: ${s.level}%`}></div>
+              </div>
+              <span class="z-skill-cat">{s.category}</span>
+            </div>
+          ))}
+        </div>
+
+        <!-- floating tag cloud -->
+        <div class="z-tag-cloud">
+          {SKILLS.slice(6).map(s => <span class="z-tag-float">{s.name}</span>)}
+        </div>
+      </div>
+    </section>
+
+    <!-- EXPERIENCE -->
+    <section id="xp" class="z-section z-section--dark">
+      <div class="z-section-inner">
+        <div class="z-section-header">
+          <p class="z-overline z-overline--light">Career Arc</p>
+          <h2 class="z-section-title z-section-title--light">
+            Where I've<br />been &amp; what<br /><em>I learned.</em>
+          </h2>
+        </div>
+
+        <div class="z-timeline">
+          {EXPERIENCES.map((e, i) => (
+            <article class="z-xp-card" style={`--xp-accent: ${e.accentColor || "#f97316"}; --i: ${i}`}>
+              <div class="z-xp-accent-bar"></div>
+              <div class="z-xp-content">
+                <p class="z-xp-period">{e.period}</p>
+                <h3 class="z-xp-role">{e.role}</h3>
+                <p class="z-xp-company">{e.company}</p>
+                <p class="z-xp-desc">{e.description}</p>
+                <ul class="z-xp-highlights">
+                  {e.highlights.map(h => <li>{h}</li>)}
+                </ul>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section id="hello" class="z-section z-section--yellow">
+      <div class="z-contact-inner">
+        <div class="z-contact-deco" aria-hidden="true">
+          <div class="z-deco-circle z-deco-circle--big"></div>
+          <div class="z-deco-circle z-deco-circle--sm"></div>
+        </div>
+        <p class="z-overline">Open to opportunities</p>
+        <h2 class="z-contact-title">Let's build<br />something<br /><span class="z-contact-title-outline">unforgettable.</span></h2>
+        <p class="z-contact-sub">
+          Internships, full-time analytics roles, ambitious side projects — I'm in.
+        </p>
+        <div class="z-contact-btns">
+          {SITE.socialLinks.email && (
+            <a href={SITE.socialLinks.email} class="z-btn z-btn--dark z-btn--lg">Drop me a line →</a>
+          )}
+          {SITE.socialLinks.github && (
+            <a href={SITE.socialLinks.github} target="_blank" rel="noopener" class="z-btn z-btn--ghost-dark">GitHub ↗</a>
+          )}
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.z-root -->
+</BaseLayout>
+
+<script>
+  // Role rotator
+  const roleEl = document.getElementById("z-role");
+  const roles = ["Business Analyst", "Data Storyteller", "Product Builder", "Analytics Engineer"];
+  if (roleEl) {
+    let idx = 0;
+    setInterval(() => {
+      roleEl.classList.add("z-role-exit");
+      setTimeout(() => {
+        idx = (idx + 1) % roles.length;
+        roleEl.textContent = roles[idx];
+        roleEl.classList.remove("z-role-exit");
+        roleEl.classList.add("z-role-enter");
+        setTimeout(() => roleEl.classList.remove("z-role-enter"), 400);
+      }, 300);
+    }, 2800);
+  }
+
+  // Scroll-reveal
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!prefersReduced) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("z-in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    document
+      .querySelectorAll(".z-project-card, .z-skill-pill, .z-xp-card, .z-stat-card")
+      .forEach((el) => {
+        el.classList.add("z-hidden");
+        io.observe(el);
+      });
+  }
+</script>
+
+<style>
+  /* ─── Fonts ─── */
+  @import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap");
+
+  /* ─── Reset / Root ─── */
+  :global(body) {
+    margin: 0;
+    background: #faf9f6;
+    overflow-x: hidden;
+  }
+
+  .z-root {
+    --coral:   #ff5c3a;
+    --lime:    #c8f135;
+    --mint:    #00c9a7;
+    --violet:  #7c3aed;
+    --yellow:  #ffd600;
+    --dark:    #0d0d12;
+    --cream:   #faf9f6;
+    --text:    #0d0d12;
+    --text-soft: #585876;
+
+    font-family: "DM Sans", system-ui, sans-serif;
+    color: var(--text);
+  }
+
+  /* ─── NAV ─── */
+  .z-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: rgba(250, 249, 246, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 2px solid var(--dark);
+  }
+
+  .z-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: "DM Sans", sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .z-logo-block {
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    background: var(--dark);
+    color: var(--yellow);
+    font-family: "Playfair Display", serif;
+    font-size: 1rem;
+    border-radius: 6px;
+  }
+
+  .z-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .z-nav-links a {
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    transition: background 150ms ease, color 150ms ease;
+  }
+
+  .z-nav-links a:hover {
+    background: var(--dark);
+    color: var(--yellow);
+  }
+
+  .z-nav-cta {
+    background: var(--coral) !important;
+    color: white !important;
+    font-weight: 700 !important;
+  }
+
+  .z-nav-cta:hover {
+    background: #e04e30 !important;
+  }
+
+  /* ─── HERO ─── */
+  .z-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--cream);
+    border-bottom: 2px solid var(--dark);
+  }
+
+  .z-hero-bg-word {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: "Playfair Display", serif;
+    font-size: clamp(12rem, 30vw, 26rem);
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 2px rgba(13, 13, 18, 0.06);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    letter-spacing: -0.04em;
+    z-index: 0;
+  }
+
+  .z-hero-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    align-items: center;
+    gap: clamp(2rem, 5vw, 6rem);
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(3rem, 7vw, 5rem) 2.5rem 2rem;
+  }
+
+  .z-hero-title {
+    font-family: "Playfair Display", serif;
+    font-size: clamp(2.8rem, 7vw, 6.2rem);
+    font-weight: 900;
+    line-height: 0.96;
+    letter-spacing: -0.02em;
+    margin: 1.5rem 0 1.2rem;
+  }
+
+  .z-hero-title em {
+    font-style: italic;
+    color: var(--coral);
+  }
+
+  .z-hero-title-outline {
+    -webkit-text-stroke: 3px var(--dark);
+    color: transparent;
+  }
+
+  .z-hero-title-fill {
+    color: var(--mint);
+  }
+
+  .z-hero-sub {
+    font-size: clamp(1rem, 1.8vw, 1.22rem);
+    line-height: 1.6;
+    color: var(--text-soft);
+    max-width: 48ch;
+    margin-bottom: 2rem;
+  }
+
+  .z-hero-sub strong {
+    color: var(--text);
+  }
+
+  #z-role {
+    color: var(--violet);
+    font-weight: 700;
+    display: inline-block;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .z-role-exit {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  .z-role-enter {
+    animation: z-role-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes z-role-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.94); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Sticker */
+  .z-sticker {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: "DM Mono", monospace;
+    letter-spacing: 0.04em;
+    border: 2px solid var(--dark);
+    box-shadow: 3px 3px 0 var(--dark);
+    white-space: nowrap;
+  }
+
+  .z-sticker--yellow   { background: var(--yellow); }
+  .z-sticker--coral    { background: var(--coral); color: white; }
+  .z-sticker--rotate-neg { transform: rotate(-4deg); }
+
+  /* Hero right */
+  .z-hero-right {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .z-card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .z-stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1.1rem 1.3rem;
+    border-radius: 1rem;
+    border: 2px solid var(--dark);
+    box-shadow: 5px 5px 0 var(--dark);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .z-stat-card:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 8px 8px 0 var(--dark);
+  }
+
+  .z-stat-card--coral  { background: var(--coral); color: white; }
+  .z-stat-card--mint   { background: var(--mint); color: white; }
+  .z-stat-card--violet { background: var(--violet); color: white; }
+
+  .z-stat-num {
+    font-family: "Playfair Display", serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .z-stat-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0.88;
+    font-family: "DM Mono", monospace;
+  }
+
+  /* Deco */
+  .z-deco-ring {
+    position: absolute;
+    bottom: -40px;
+    right: -30px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 3px dashed rgba(13, 13, 18, 0.18);
+    pointer-events: none;
+  }
+
+  .z-deco-dot-grid {
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .z-deco-dot-grid span {
+    width: 5px;
+    height: 5px;
+    background: rgba(13, 13, 18, 0.18);
+    border-radius: 50%;
+    display: block;
+  }
+
+  /* Hero buttons */
+  .z-hero-btns {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .z-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.7rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+    border: 2px solid var(--dark);
+    box-shadow: 3px 3px 0 var(--dark);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .z-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--dark);
+  }
+
+  .z-btn--primary   { background: var(--lime); color: var(--dark); }
+  .z-btn--outline   { background: transparent; color: var(--dark); }
+  .z-btn--dark      { background: var(--dark); color: var(--yellow); border-color: var(--dark); box-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
+  .z-btn--ghost-dark { background: transparent; color: var(--dark); }
+  .z-btn--lg        { font-size: 1.1rem; padding: 0.9rem 2rem; }
+
+  /* ─── TAPE TICKER ─── */
+  .z-tape {
+    overflow: hidden;
+    background: var(--dark);
+    border-top: 2px solid var(--dark);
+    padding: 0.75rem 0;
+    margin-top: auto;
+  }
+
+  .z-tape-track {
+    display: flex;
+    gap: 2rem;
+    width: max-content;
+    animation: z-tape-scroll 30s linear infinite;
+    color: var(--yellow);
+    font-family: "DM Mono", monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  @keyframes z-tape-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ─── SECTIONS ─── */
+  .z-section {
+    border-bottom: 2px solid var(--dark);
+  }
+
+  .z-section--lime  { background: var(--lime); }
+  .z-section--coral { background: #fff0ec; }
+  .z-section--dark  { background: var(--dark); }
+  .z-section--yellow { background: var(--yellow); }
+
+  .z-section-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(3rem, 7vw, 5rem) 2.5rem;
+  }
+
+  .z-section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: clamp(2rem, 4vw, 3.5rem);
+  }
+
+  .z-section-header--right {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .z-overline {
+    font-family: "DM Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+  }
+
+  .z-overline--light { color: rgba(255,255,255,0.5); }
+
+  .z-section-title {
+    font-family: "Playfair Display", serif;
+    font-size: clamp(2.2rem, 5vw, 4rem);
+    font-weight: 900;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .z-section-title em {
+    font-style: italic;
+    color: var(--coral);
+  }
+
+  .z-section-title--light {
+    color: white;
+  }
+
+  .z-section-title--light em {
+    color: var(--mint);
+  }
+
+  /* ─── PROJECTS ─── */
+  .z-project-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+  }
+
+  .z-project-card {
+    background: white;
+    border: 2px solid var(--dark);
+    border-radius: 1rem;
+    box-shadow: 5px 5px 0 var(--dark);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .z-project-card:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: 9px 9px 0 var(--dark);
+  }
+
+  .z-project-num {
+    padding: 1rem 1.2rem 0.5rem;
+    font-family: "Playfair Display", serif;
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--accent, #f97316);
+    opacity: 0.25;
+  }
+
+  .z-project-body {
+    padding: 0 1.2rem 0.75rem;
+    flex: 1;
+  }
+
+  .z-project-body h3 {
+    font-family: "Playfair Display", serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+  }
+
+  .z-project-body p {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--text-soft);
+    margin: 0 0 0.75rem;
+  }
+
+  .z-project-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .z-project-tags li {
+    font-family: "DM Mono", monospace;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--dark);
+    color: var(--text-soft);
+  }
+
+  .z-project-foot {
+    padding: 0.75rem 1.2rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+    border-top: 1.5px solid rgba(13, 13, 18, 0.1);
+  }
+
+  .z-link-pill {
+    font-family: "DM Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--dark);
+    color: var(--text);
+    text-decoration: none;
+    background: var(--lime);
+    transition: background 150ms ease;
+  }
+
+  .z-link-pill:hover  { background: var(--yellow); }
+  .z-link-pill--dark  { background: var(--dark); color: white; }
+  .z-link-pill--dark:hover { background: #333; }
+
+  /* ─── SKILLS ─── */
+  .z-skills-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .z-skill-pill {
+    background: white;
+    border: 2px solid var(--dark);
+    border-radius: 0.85rem;
+    padding: 1rem 1.1rem;
+    box-shadow: 4px 4px 0 var(--dark);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .z-skill-pill:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 7px 7px 0 var(--dark);
+  }
+
+  .z-skill-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.45rem;
+  }
+
+  .z-skill-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .z-skill-pct {
+    font-family: "DM Mono", monospace;
+    font-size: 0.82rem;
+    color: var(--coral);
+    font-weight: 700;
+  }
+
+  .z-skill-bar {
+    height: 6px;
+    background: rgba(13, 13, 18, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.35rem;
+  }
+
+  .z-skill-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--coral), var(--violet));
+  }
+
+  .z-skill-cat {
+    font-family: "DM Mono", monospace;
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .z-tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .z-tag-float {
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1.5px solid rgba(13, 13, 18, 0.25);
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.7);
+  }
+
+  /* ─── EXPERIENCE ─── */
+  .z-timeline {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin-top: 1rem;
+  }
+
+  .z-xp-card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 1rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 200ms ease, background 200ms ease;
+  }
+
+  .z-xp-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .z-xp-accent-bar {
+    height: 4px;
+    background: var(--xp-accent, var(--coral));
+    flex-shrink: 0;
+  }
+
+  .z-xp-content {
+    padding: 1.2rem 1.3rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .z-xp-period {
+    font-family: "DM Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .z-xp-role {
+    font-family: "Playfair Display", serif;
+    font-size: 1.15rem;
+    color: white;
+    margin: 0;
+  }
+
+  .z-xp-company {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--xp-accent, var(--mint));
+    margin: 0;
+  }
+
+  .z-xp-desc {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0.3rem 0 0;
+  }
+
+  .z-xp-highlights {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .z-xp-highlights li {
+    position: relative;
+    padding-left: 1rem;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.45;
+  }
+
+  .z-xp-highlights li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--xp-accent, var(--mint));
+    font-size: 0.7rem;
+    top: 0.05em;
+  }
+
+  /* ─── CONTACT ─── */
+  .z-contact-inner {
+    position: relative;
+    overflow: hidden;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(4rem, 9vw, 7rem) 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .z-contact-title {
+    font-family: "Playfair Display", serif;
+    font-size: clamp(2.8rem, 7vw, 6rem);
+    font-weight: 900;
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    margin: 0;
+    color: var(--dark);
+  }
+
+  .z-contact-title-outline {
+    -webkit-text-stroke: 3px var(--dark);
+    color: transparent;
+  }
+
+  .z-contact-sub {
+    font-size: 1.1rem;
+    color: var(--text-soft);
+    max-width: 50ch;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .z-contact-btns {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* Contact deco circles */
+  .z-contact-deco {
+    position: absolute;
+    right: 2.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .z-deco-circle {
+    border-radius: 50%;
+    border: 3px solid var(--dark);
+    position: absolute;
+  }
+
+  .z-deco-circle--big {
+    width: clamp(12rem, 24vw, 22rem);
+    height: clamp(12rem, 24vw, 22rem);
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(13, 13, 18, 0.05);
+  }
+
+  .z-deco-circle--sm {
+    width: clamp(6rem, 12vw, 11rem);
+    height: clamp(6rem, 12vw, 11rem);
+    right: clamp(3rem, 6vw, 5.5rem);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(13, 13, 18, 0.08);
+  }
+
+  /* ─── Scroll Reveal ─── */
+  .z-hidden {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+    transition: opacity 420ms ease, transform 420ms ease;
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+
+  .z-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 1024px) {
+    .z-hero-inner    { grid-template-columns: 1fr; }
+    .z-hero-right    { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+    .z-card-stack    { flex-direction: row; max-width: none; }
+    .z-project-grid,
+    .z-timeline      { grid-template-columns: 1fr 1fr; }
+    .z-skills-grid   { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .z-nav           { padding: 0.85rem 1.2rem; }
+    .z-nav-links a:not(.z-nav-cta) { display: none; }
+    .z-hero-inner    { padding: 2rem 1.2rem 1.5rem; }
+    .z-hero-bg-word  { display: none; }
+    .z-card-stack    { flex-direction: column; width: 100%; }
+    .z-project-grid,
+    .z-timeline,
+    .z-skills-grid   { grid-template-columns: 1fr; }
+    .z-section-inner { padding: 2.5rem 1.2rem; }
+    .z-contact-inner { padding: 3rem 1.2rem; }
+    .z-contact-deco  { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .z-tape-track,
+    .z-stat-card,
+    .z-project-card,
+    .z-skill-pill,
+    .z-btn { animation: none; transition: none; }
+  }
+</style>

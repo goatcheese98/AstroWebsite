@@ -21,6 +21,7 @@ export const SITE: SiteMetadata = {
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Home", href: "/" },
+  { label: "Demo", href: "/demo" },
   { label: "AI Canvas", href: "/ai-canvas" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Blog", href: "/blog" },

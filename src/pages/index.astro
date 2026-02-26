@@ -6,33 +6,60 @@ import Experience from "../components/sections/Experience.astro";
 import BentoSkills from "../components/islands/BentoSkills.svelte";
 import SectionHeader from "../components/ui/SectionHeader.astro";
 import SketchDivider from "../components/sketch/SketchDivider.astro";
+import { PROJECTS, SKILLS } from "../lib/constants";
+
+const marqueeItems = [
+  ...new Set([
+    ...SKILLS.map((skill) => skill.category),
+    ...PROJECTS.flatMap((project) => project.tags),
+  ]),
+].slice(0, 14);
 ---
 
 <PageLayout title="Home">
-  <Hero />
+  <div class="landing-page" id="landing-page">
+    <div class="landing-progress" id="landing-progress" aria-hidden="true"></div>
+    <div class="landing-glow" aria-hidden="true"></div>
 
-  <SketchDivider variant="wavy" />
-  <Projects />
-  <SketchDivider variant="zigzag" />
-  <Experience />
-  <SketchDivider variant="zigzag" />
+    <Hero />
 
-  <section class="skills section-gap" id="skills" aria-label="Skills">
-    <div class="container">
-      <SectionHeader 
-        title="Skills & Expertise" 
-        subtitle="A generalist's toolkit spanning data, technology, and strategy" 
-      />
-      <BentoSkills client:load />
-    </div>
-  </section>
+    <section class="landing-marquee" aria-label="Portfolio highlights">
+      <div class="landing-marquee__track">
+        <ul class="landing-marquee__list">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
+        <ul class="landing-marquee__list" aria-hidden="true">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+    </section>
 
+    <SketchDivider variant="wavy" class="landing-divider" />
+    <Projects />
+    <Experience />
+
+    <section class="skills section-gap" id="skills" aria-label="Skills">
+      <div class="container">
+        <SectionHeader
+          title="Skills & Expertise"
+          subtitle="A generalist's toolkit spanning data, technology, and strategy"
+        />
+        <BentoSkills client:load />
+      </div>
+    </section>
+  </div>
 </PageLayout>
 
 <script>
   import { annotate } from "rough-notation";
 
-  function initAnnotations() {
+  function initLandingPage() {
+    const existingCleanup = (window as Window & { __landingCleanup?: () => void })
+      .__landingCleanup;
+    if (existingCleanup) existingCleanup();
+
+    document.body.classList.add("landing-grid-mode");
+
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -49,12 +76,211 @@ import SketchDivider from "../components/sketch/SketchDivider.astro";
       });
       annotation.show();
     }
+
+    const landingEl = document.querySelector("#landing-page") as HTMLElement | null;
+    const progressEl = document.querySelector("#landing-progress") as HTMLElement | null;
+
+    const updateProgress = () => {
+      if (!progressEl) return;
+      const doc = document.documentElement;
+      const maxScroll = doc.scrollHeight - window.innerHeight;
+      const ratio = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+      progressEl.style.transform = `scaleX(${ratio})`;
+    };
+
+    let pointerFrame = 0;
+    const updateGlow = (event: PointerEvent) => {
+      if (!landingEl || reducedMotion) return;
+      if (pointerFrame) cancelAnimationFrame(pointerFrame);
+      pointerFrame = requestAnimationFrame(() => {
+        const x = (event.clientX / window.innerWidth) * 100;
+        const y = (event.clientY / window.innerHeight) * 100;
+        landingEl.style.setProperty("--landing-mouse-x", `${x}%`);
+        landingEl.style.setProperty("--landing-mouse-y", `${y}%`);
+      });
+    };
+
+    updateProgress();
+    window.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+    window.addEventListener("pointermove", updateGlow, { passive: true });
+
+    const cleanup = () => {
+      window.removeEventListener("scroll", updateProgress);
+      window.removeEventListener("resize", updateProgress);
+      window.removeEventListener("pointermove", updateGlow);
+      document.body.classList.remove("landing-grid-mode");
+    };
+
+    (window as Window & { __landingCleanup?: () => void }).__landingCleanup =
+      cleanup;
   }
 
   // Run on page load
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initAnnotations);
+    document.addEventListener("DOMContentLoaded", initLandingPage);
   } else {
-    initAnnotations();
+    initLandingPage();
   }
+
+  document.addEventListener("astro:page-load", initLandingPage);
+  document.addEventListener("astro:before-swap", () => {
+    const cleanup = (window as Window & { __landingCleanup?: () => void })
+      .__landingCleanup;
+    if (cleanup) cleanup();
+  });
 </script>
+
+<style>
+  .landing-page {
+    --landing-mouse-x: 48%;
+    --landing-mouse-y: 16%;
+    position: relative;
+  }
+
+  .landing-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    transform-origin: left center;
+    transform: scaleX(0);
+    z-index: 240;
+    background: linear-gradient(
+      90deg,
+      var(--color-accent),
+      var(--color-gradient-end),
+      var(--color-accent)
+    );
+  }
+
+  .landing-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(
+      circle 480px at var(--landing-mouse-x) var(--landing-mouse-y),
+      rgba(59, 130, 246, 0.07),
+      transparent 72%
+    );
+  }
+
+  .landing-marquee {
+    margin-block: var(--space-sm) var(--space-lg);
+    border-block: 1px solid var(--color-stroke-muted);
+    background: color-mix(in srgb, var(--color-bg) 78%, var(--color-fill-1));
+    overflow: hidden;
+    position: relative;
+  }
+
+  .landing-marquee::before,
+  .landing-marquee::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 70px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .landing-marquee::before {
+    left: 0;
+    background: linear-gradient(90deg, var(--color-bg), transparent);
+  }
+
+  .landing-marquee::after {
+    right: 0;
+    background: linear-gradient(-90deg, var(--color-bg), transparent);
+  }
+
+  .landing-marquee__track {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: max-content;
+    animation: landing-marquee 32s linear infinite;
+  }
+
+  .landing-marquee__list {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.7rem 0.5rem;
+  }
+
+  .landing-marquee__list li {
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    letter-spacing: 0.03em;
+    padding: 0.26rem 0.62rem;
+    border: 1px solid var(--color-stroke-muted);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-surface) 76%, var(--color-bg));
+  }
+
+  @keyframes landing-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .landing-page :global(.section-gap) {
+    padding-block: clamp(1.5rem, 3.8vw, 2.5rem);
+  }
+
+  .landing-page :global(.sketch-divider) {
+    margin-block: var(--space-md);
+    opacity: 0.65;
+  }
+
+  .landing-page :global(.section-header) {
+    margin-bottom: var(--space-lg);
+  }
+
+  :global(body.landing-grid-mode)::before {
+    background-image:
+      linear-gradient(
+        to right,
+        rgba(var(--dot-color-rgb), 0.22) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(var(--dot-color-rgb), 0.22) 1px,
+        transparent 1px
+      );
+    background-size: 34px 34px;
+    opacity: 0.35;
+  }
+
+  @media (max-width: 900px) {
+    .landing-marquee__list {
+      padding: 0.62rem 0.45rem;
+      gap: 0.45rem;
+    }
+
+    .landing-page :global(.section-gap) {
+      padding-block: clamp(1.25rem, 5vw, 1.8rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-marquee__track {
+      animation: none;
+      transform: translateX(0);
+    }
+
+    .landing-glow {
+      display: none;
+    }
+  }
+</style>

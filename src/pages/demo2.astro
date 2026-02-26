@@ -1,0 +1,821 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE, PROJECTS, EXPERIENCES, SKILLS } from "../lib/constants";
+import RoboDogBot from "../components/islands/RoboDogBot.svelte";
+
+// Playful themes often use bright contrasting colors, large rounded corners, bouncy animations.
+const heroTitles = [
+    "Creative Explorer",
+    "Digital Dreamer",
+    "Code Wizard",
+    "Vibrant Creator",
+];
+
+const topProjects = PROJECTS.slice(0, 3);
+---
+
+<BaseLayout
+    title="Playful Portfolio Demo"
+    description="Colorful and playful alternative landing page concept."
+>
+    <div class="playful-root">
+        <div class="floating-blobs">
+            <div class="blob blob-1"></div>
+            <div class="blob blob-2"></div>
+            <div class="blob blob-3"></div>
+            <div class="blob blob-4"></div>
+        </div>
+
+        <header class="playful-nav">
+            <div class="logo">
+                <span class="logo-emoji">✨</span>
+                <span class="logo-text">{SITE.author}</span>
+            </div>
+            <nav>
+                <a href="#projects" class="nav-btn">My Magic</a>
+                <a href="#skills" class="nav-btn">Wand Skills</a>
+                <a href="#contact" class="nav-btn primary">Say Hello!</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="hero-section">
+                <div class="hero-content">
+                    <div class="badge">🚀 Welcome to my universe</div>
+                    <h1 class="hero-title">
+                        I craft <span class="text-gradient">colorful</span> digital
+                        experiences
+                    </h1>
+                    <p class="hero-subtitle">
+                        Hi! I'm {SITE.author}, a <span id="rotating-text"
+                            >{heroTitles[0]}</span
+                        > who loves turning ideas into interactive playgrounds. Let's
+                        make something awesome together.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="#projects" class="btn bounce">See My Work 🎨</a
+                        >
+                        <a href="#contact" class="btn outline">Let's Chat 💬</a>
+                    </div>
+                </div>
+                <div class="hero-image-placeholder">
+                    <!-- Svelte RoboDog Component -->
+                    <RoboDogBot client:load />
+                </div>
+            </section>
+
+            <section id="projects" class="projects-section">
+                <h2 class="section-title">Magical Creations 🪄</h2>
+                <div class="bento-grid">
+                    {
+                        topProjects.map((project, i) => (
+                            <div class={`bento-card card-${i}`}>
+                                <h3>{project.title}</h3>
+                                <p>
+                                    {project.description ||
+                                        "A wonderful project filled with joy, colors, and a tiny bit of magic!"}
+                                </p>
+                                <div class="tags">
+                                    {project.tags.slice(0, 3).map((tag) => (
+                                        <span class="pill">{tag}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    }
+                    <div class="bento-card highlight-card">
+                        <h3>And many more...</h3>
+                        <p>Always experimenting, always learning.</p>
+                        <div class="emoji-cluster">🚀 🌟 💡 🎨</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="skills" class="skills-section">
+                <h2 class="section-title">My Toolbox 🧰</h2>
+                <div class="marquee-container">
+                    <div class="marquee-content">
+                        <span
+                            >HTML/CSS ✨ Javascript 🚀 Astro 🌌 React ⚛️ Node.js
+                            🟩 Python 🐍 UI/UX 🎨 Figma 🖌️&nbsp;</span
+                        >
+                        <span
+                            >HTML/CSS ✨ Javascript 🚀 Astro 🌌 React ⚛️ Node.js
+                            🟩 Python 🐍 UI/UX 🎨 Figma 🖌️&nbsp;</span
+                        >
+                    </div>
+                </div>
+            </section>
+
+            <section id="contact" class="contact-section">
+                <div class="contact-card">
+                    <h2>Ready to start a new adventure? 🗺️</h2>
+                    <p>
+                        I'm always open to new ideas, coffee chats, and fun
+                        projects.
+                    </p>
+                    <a
+                        href={SITE.socialLinks?.email ||
+                            "mailto:hi@example.com"}
+                        class="btn huge pulse">Drop a Message 📨</a
+                    >
+                </div>
+            </section>
+        </main>
+    </div>
+</BaseLayout>
+
+<script>
+    // Rotating text logic
+    const titles = [
+        "Creative Explorer",
+        "Digital Dreamer",
+        "Code Wizard",
+        "Vibrant Creator",
+    ];
+    const rotatingEl = document.getElementById("rotating-text");
+
+    if (rotatingEl) {
+        let index = 0;
+        setInterval(() => {
+            index = (index + 1) % titles.length;
+            rotatingEl.style.opacity = "0";
+            rotatingEl.style.transform = "translateY(10px)";
+
+            setTimeout(() => {
+                rotatingEl.textContent = titles[index];
+                rotatingEl.style.opacity = "1";
+                rotatingEl.style.transform = "translateY(0)";
+            }, 300);
+        }, 2500);
+    }
+</script>
+
+<style>
+    /* Playful Theme Styles */
+    @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+    :global(body) {
+        margin: 0;
+        font-family: "Outfit", sans-serif;
+        background-color: #fcf9f2;
+        overflow-x: hidden;
+    }
+
+    .playful-root {
+        position: relative;
+        color: #1a1a2e;
+        min-height: 100vh;
+        overflow: hidden;
+        padding-bottom: 5rem;
+    }
+
+    /* Floating background blobs */
+    .floating-blobs {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: -1;
+        pointer-events: none;
+        filter: blur(80px);
+        opacity: 0.6;
+    }
+
+    .blob {
+        position: absolute;
+        border-radius: 50%;
+        animation: float 20s infinite alternate ease-in-out;
+    }
+
+    .blob-1 {
+        width: 40vw;
+        height: 40vw;
+        background: #ffaa00;
+        top: -10%;
+        left: -5%;
+    }
+    .blob-2 {
+        width: 50vw;
+        height: 50vw;
+        background: #ff007f;
+        top: 20%;
+        right: -10%;
+        animation-delay: -5s;
+    }
+    .blob-3 {
+        width: 45vw;
+        height: 45vw;
+        background: #00f0ff;
+        bottom: -10%;
+        left: 20%;
+        animation-delay: -10s;
+    }
+    .blob-4 {
+        width: 30vw;
+        height: 30vw;
+        background: #8a2be2;
+        top: 40%;
+        left: 40%;
+        animation-delay: -15s;
+    }
+
+    @keyframes float {
+        0% {
+            transform: translate(0, 0) scale(1);
+        }
+        50% {
+            transform: translate(100px, 50px) scale(1.1);
+        }
+        100% {
+            transform: translate(-50px, 100px) scale(0.9);
+        }
+    }
+
+    /* Navigation */
+    .playful-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.2rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        position: sticky;
+        top: 1.5rem;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(16px);
+        border-radius: 100px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        transition: transform 0.3s ease;
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1a1a2e;
+    }
+
+    .logo-emoji {
+        font-size: 1.8rem;
+        animation: spin 6s infinite linear;
+    }
+
+    @keyframes spin {
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    nav {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .nav-btn {
+        text-decoration: none;
+        color: #1a1a2e;
+        font-weight: 600;
+        padding: 0.5rem 1.2rem;
+        border-radius: 50px;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .nav-btn:hover {
+        background: white;
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .nav-btn.primary {
+        background: #1a1a2e;
+        color: white;
+    }
+
+    .nav-btn.primary:hover {
+        background: #3f3f5a;
+        box-shadow: 0 5px 20px rgba(26, 26, 46, 0.3);
+    }
+
+    /* Main Layout */
+    main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
+
+    /* Hero Section */
+    .hero-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 80vh;
+        gap: 4rem;
+        padding-top: 4rem;
+    }
+
+    .hero-content {
+        flex: 1;
+        max-width: 600px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: white;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #ff007f;
+        box-shadow: 0 4px 15px rgba(255, 0, 127, 0.15);
+        margin-bottom: 2rem;
+        border: 2px solid #ffe5f1;
+        animation: wobbly 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes wobbly {
+        0% {
+            transform: rotate(-2deg);
+        }
+        100% {
+            transform: rotate(2deg);
+        }
+    }
+
+    .hero-title {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(3rem, 5vw, 4.5rem);
+        line-height: 1.1;
+        margin-bottom: 1.5rem;
+        color: #1a1a2e;
+    }
+
+    .text-gradient {
+        background: linear-gradient(135deg, #ff007f, #ffaa00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+        font-size: 1.2rem;
+        line-height: 1.6;
+        color: #4a4a68;
+        margin-bottom: 2.5rem;
+    }
+
+    #rotating-text {
+        display: inline-block;
+        color: #8a2be2;
+        font-weight: 800;
+        transition:
+            opacity 0.3s ease,
+            transform 0.3s ease;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem 2rem;
+        border-radius: 100px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        cursor: pointer;
+        border: none;
+    }
+
+    .btn.bounce {
+        background: linear-gradient(135deg, #1a1a2e, #3f3f5a);
+        color: white;
+        box-shadow: 0 10px 25px rgba(26, 26, 46, 0.2);
+    }
+
+    .btn.bounce:hover {
+        transform: translateY(-8px) scale(1.05);
+        box-shadow: 0 15px 35px rgba(26, 26, 46, 0.3);
+    }
+
+    .btn.outline {
+        background: white;
+        color: #1a1a2e;
+        border: 2px solid #1a1a2e;
+    }
+
+    .btn.outline:hover {
+        background: #1a1a2e;
+        color: white;
+        transform: translateY(-5px);
+    }
+
+    .hero-image-placeholder {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .abstract-shape {
+        width: 380px;
+        height: 380px;
+        max-width: 100%;
+        background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.9),
+            rgba(255, 255, 255, 0.5)
+        );
+        backdrop-filter: blur(20px);
+        border: 6px solid white;
+        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        animation: morph 8s ease-in-out infinite;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+        position: relative;
+    }
+
+    .abstract-shape::after {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(45deg, #ff007f, #ffaa00);
+        z-index: -1;
+        opacity: 0.4;
+        filter: blur(20px);
+        animation: morph 8s ease-in-out infinite reverse;
+    }
+
+    .shape-inner {
+        font-size: 6rem;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes morph {
+        0% {
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        }
+        50% {
+            border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+        }
+        100% {
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        }
+    }
+
+    /* Projects Section */
+    .projects-section,
+    .skills-section,
+    .contact-section {
+        padding: 6rem 0;
+    }
+
+    .section-title {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 3rem;
+        margin-bottom: 3.5rem;
+        text-align: center;
+        color: #1a1a2e;
+    }
+
+    .bento-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+        grid-auto-rows: minmax(280px, auto);
+    }
+
+    .bento-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(15px);
+        border-radius: 2rem;
+        padding: 2.5rem;
+        border: 3px solid white;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+        transition:
+            transform 0.3s ease,
+            box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .bento-card:hover {
+        transform: translateY(-10px) rotate(1.5deg);
+        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
+    }
+
+    .bento-card h3 {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.8rem;
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #1a1a2e;
+    }
+
+    .bento-card p {
+        color: #4a4a68;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+    }
+
+    .pill {
+        background: white;
+        color: #1a1a2e;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #f0f0f5;
+    }
+
+    .card-0 {
+        background: linear-gradient(
+            135deg,
+            rgba(255, 230, 240, 0.9),
+            rgba(255, 255, 255, 0.9)
+        );
+    }
+    .card-1 {
+        background: linear-gradient(
+            135deg,
+            rgba(230, 245, 255, 0.9),
+            rgba(255, 255, 255, 0.9)
+        );
+    }
+    .card-2 {
+        background: linear-gradient(
+            135deg,
+            rgba(240, 255, 230, 0.9),
+            rgba(255, 255, 255, 0.9)
+        );
+    }
+
+    .highlight-card {
+        background: linear-gradient(135deg, #1a1a2e, #3f3f5a);
+        color: white;
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+        border-color: #3f3f5a;
+    }
+
+    .highlight-card h3 {
+        color: white;
+    }
+    .highlight-card p {
+        color: #d0d0df;
+    }
+
+    .emoji-cluster {
+        font-size: 2.5rem;
+        letter-spacing: 0.8rem;
+        margin-top: 1rem;
+        animation: jiggle 4s infinite;
+    }
+
+    @keyframes jiggle {
+        0%,
+        100% {
+            transform: rotate(0);
+        }
+        25% {
+            transform: rotate(5deg) scale(1.1);
+        }
+        50% {
+            transform: rotate(-5deg);
+        }
+        75% {
+            transform: rotate(5deg);
+        }
+    }
+
+    /* Skills Marquee */
+    .marquee-container {
+        width: 100vw;
+        margin-left: calc(-50vw + 50%);
+        background: linear-gradient(90deg, #ff007f, #ffaa00, #00f0ff, #8a2be2);
+        background-size: 200% auto;
+        padding: 2rem 0;
+        overflow: hidden;
+        position: relative;
+        transform: rotate(-3deg) scale(1.05);
+        box-shadow: 0 15px 40px rgba(255, 0, 127, 0.3);
+        animation: gradientShift 10s ease infinite;
+    }
+
+    @keyframes gradientShift {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
+
+    .marquee-content {
+        display: flex;
+        width: 200%;
+        animation: scroll 25s linear infinite;
+    }
+
+    .marquee-content span {
+        width: 50%;
+        color: white;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        white-space: nowrap;
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.15);
+    }
+
+    @keyframes scroll {
+        0% {
+            transform: translateX(0);
+        }
+        100% {
+            transform: translateX(-50%);
+        }
+    }
+
+    /* Contact Section */
+    .contact-card {
+        background: white;
+        border-radius: 3.5rem;
+        padding: 6rem 3rem;
+        text-align: center;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.08);
+        border: 5px dashed #ffaa00;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .contact-card::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(
+            circle,
+            rgba(0, 240, 255, 0.15) 0%,
+            transparent 60%
+        );
+        z-index: 0;
+        animation: breathe 8s infinite alternate;
+    }
+
+    @keyframes breathe {
+        0% {
+            transform: scale(1);
+        }
+        100% {
+            transform: scale(1.1);
+        }
+    }
+
+    .contact-card h2,
+    .contact-card p,
+    .contact-card .btn {
+        position: relative;
+        z-index: 1;
+    }
+
+    .contact-card h2 {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 3rem;
+        margin-bottom: 1.5rem;
+        color: #1a1a2e;
+    }
+
+    .contact-card p {
+        font-size: 1.3rem;
+        color: #4a4a68;
+        margin-bottom: 3.5rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .btn.huge {
+        font-size: 1.6rem;
+        padding: 1.5rem 3.5rem;
+        background: #ff007f;
+        color: white;
+        border-radius: 100px;
+    }
+
+    .btn.huge:hover {
+        background: #e60073;
+        transform: translateY(-8px) scale(1.05);
+    }
+
+    .pulse {
+        animation: pulse-shadow 2.5s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @keyframes pulse-shadow {
+        0% {
+            box-shadow: 0 0 0 0 rgba(255, 0, 127, 0.5);
+        }
+        70% {
+            box-shadow: 0 0 0 25px rgba(255, 0, 127, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(255, 0, 127, 0);
+        }
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+        .hero-section {
+            flex-direction: column;
+            text-align: center;
+            padding-top: 3rem;
+            gap: 3rem;
+        }
+        .hero-buttons {
+            justify-content: center;
+        }
+        .hero-subtitle {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .abstract-shape {
+            width: 300px;
+            height: 300px;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .playful-nav {
+            flex-direction: column;
+            gap: 1rem;
+            border-radius: 20px;
+            padding: 1rem;
+        }
+        .marquee-container {
+            transform: rotate(0) scale(1);
+        }
+        .nav-btn {
+            font-size: 0.95rem;
+            padding: 0.5rem 1rem;
+        }
+        .hero-title {
+            font-size: 2.5rem;
+        }
+        .contact-card {
+            padding: 4rem 1.5rem;
+            border-radius: 2rem;
+            border-width: 3px;
+        }
+        .contact-card h2 {
+            font-size: 2rem;
+        }
+        .btn.huge {
+            font-size: 1.2rem;
+            padding: 1rem 2rem;
+        }
+    }
+</style>

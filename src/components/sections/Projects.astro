@@ -1,128 +1,221 @@
 ---
+import type { Project } from "../../types";
 import SectionHeader from "../ui/SectionHeader.astro";
 import SketchButton from "../ui/SketchButton.astro";
 import { PROJECTS } from "../../lib/constants";
+
+const DUMMY_PROJECT: Project = {
+  title: "Decision Intelligence Sandbox",
+  description:
+    "Experimental analytics sandbox for rapid KPI hypothesis testing, scenario simulation, and narrative reporting.",
+  tags: ["Product", "Analytics", "Experimentation", "Strategy"],
+  codeUrl: "#",
+  demoUrl: "#",
+  featured: false,
+  accentColor: "#0ea5e9",
+};
+
+const carouselProjects = PROJECTS.length >= 5 ? PROJECTS : [...PROJECTS, DUMMY_PROJECT];
+const totalSlides = carouselProjects.length;
+const loopProjects = [
+  carouselProjects[totalSlides - 1],
+  ...carouselProjects,
+  carouselProjects[0],
+];
+
+const getRealIndex = (loopIndex: number) => {
+  if (loopIndex === 0) return totalSlides - 1;
+  if (loopIndex === totalSlides + 1) return 0;
+  return loopIndex - 1;
+};
 ---
 
 <section class="projects section-gap" id="projects" aria-label="Projects">
   <div class="container">
     <SectionHeader title="Projects" subtitle="A few things I've built." />
 
-    <div class="projects__grid">
-      {
-        PROJECTS.map((project) => (
-          <article class="project-card-wrapper">
-            <div 
-              class="sketch-card project-card" 
-              style={`--hover-accent: ${project.accentColor || 'var(--color-accent)'}`}
-            >
-              <div class="sketch-card__accent" aria-hidden="true"></div>
-              <div class="project-card__content">
-                <div class="project-card__top">
-                  {project.featured && (
-                    <span class="project-card__featured">
-                      <span class="featured__star">★</span>
-                      Featured
-                    </span>
-                  )}
-                  <h3 class="project-card__title">{project.title}</h3>
-                  <p class="project-card__desc">{project.description}</p>
-                </div>
+    <div class="projects-carousel" data-carousel-root data-total={totalSlides}>
+      <div class="projects-carousel__viewport" data-carousel-viewport>
+        <div class="projects-carousel__track" data-carousel-track tabindex="0" aria-label="Projects carousel">
+          {
+            loopProjects.map((project, loopIndex) => {
+              const realIndex = getRealIndex(loopIndex);
+              const demoIsExternal = Boolean(project.demoUrl?.startsWith("http"));
+              const codeIsExternal = Boolean(project.codeUrl?.startsWith("http"));
 
-                <div class="project-card__bottom">
-                  <div class="project-card__tags">
-                    {project.tags.map((tag) => (
-                      <span class="project-tag">{tag}</span>
-                    ))}
+              return (
+                <article
+                  class="project-slide"
+                  data-slide-index={loopIndex}
+                  data-real-index={realIndex}
+                  aria-label={`Project ${realIndex + 1} of ${totalSlides}`}
+                >
+                  <div
+                    class="sketch-card project-card"
+                    style={`--hover-accent: ${project.accentColor || "var(--color-accent)"}`}
+                  >
+                    <div class="sketch-card__accent" aria-hidden="true"></div>
+                    <div class="project-card__content">
+                      <div class="project-card__top">
+                        {project.featured && (
+                          <span class="project-card__featured">
+                            <span class="featured__star">*</span>
+                            Featured
+                          </span>
+                        )}
+                        <h3 class="project-card__title">{project.title}</h3>
+                        <p class="project-card__desc">{project.description}</p>
+                      </div>
+
+                      <div class="project-card__bottom">
+                        <div class="project-card__tags">
+                          {project.tags.map((tag) => (
+                            <span class="project-tag">{tag}</span>
+                          ))}
+                        </div>
+                        <div class="project-card__links">
+                          {project.demoUrl && (
+                            <SketchButton
+                              href={project.demoUrl}
+                              size="sm"
+                              target={demoIsExternal ? "_blank" : undefined}
+                              rel={demoIsExternal ? "noopener" : undefined}
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                              Demo
+                            </SketchButton>
+                          )}
+                          {project.codeUrl && (
+                            <SketchButton
+                              href={project.codeUrl}
+                              variant="secondary"
+                              size="sm"
+                              target={codeIsExternal ? "_blank" : undefined}
+                              rel={codeIsExternal ? "noopener" : undefined}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                              </svg>
+                              Code
+                            </SketchButton>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="project-card__links">
-                    {project.demoUrl && (
-                      <SketchButton
-                        href={project.demoUrl}
-                        size="sm"
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          <polyline points="15 3 21 3 21 9" />
-                          <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                        Demo
-                      </SketchButton>
-                    )}
-                    {project.codeUrl && (
-                      <SketchButton
-                        href={project.codeUrl}
-                        variant="secondary"
-                        size="sm"
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        Code
-                      </SketchButton>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </article>
-        ))
-      }
+                </article>
+              );
+            })
+          }
+        </div>
+      </div>
+
+      <div class="projects-carousel__controls">
+        <button type="button" class="carousel-btn" data-carousel-prev aria-label="Previous project">&lt;</button>
+        <p class="projects-carousel__status">
+          <span data-carousel-index>1</span> / {totalSlides}
+        </p>
+        <button type="button" class="carousel-btn" data-carousel-next aria-label="Next project">&gt;</button>
+      </div>
     </div>
   </div>
 </section>
 
 <style>
-  .projects__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: var(--space-lg);
+  .projects :global(.section-header) {
+    margin-bottom: var(--space-md);
   }
 
-  @media (min-width: 1024px) {
-    .projects__grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
+  .projects-carousel {
+    max-width: 1040px;
+    margin-inline: auto;
   }
 
-  @media (max-width: 1023px) and (min-width: 640px) {
-    .projects__grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
+  .projects-carousel__viewport {
+    overflow-x: hidden;
+    overflow-y: visible;
+    perspective: 1200px;
+    padding-block: var(--space-md) var(--space-md);
   }
 
-  .project-card-wrapper {
-    height: 100%;
+  .projects-carousel__track {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-md);
+    width: max-content;
+    will-change: transform;
+  }
+
+  .project-slide {
+    width: clamp(250px, 25vw, 320px);
+    transform-origin: center center;
+    transition:
+      transform 420ms ease,
+      opacity 320ms ease,
+      filter 320ms ease;
+    opacity: 0.5;
+    filter: saturate(0.75) blur(0.2px);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .project-slide.is-active {
+    transform: scale(1.02) translateZ(44px);
+    opacity: 1;
+    z-index: 4;
+    filter: none;
+  }
+
+  .project-slide.is-prev {
+    transform: rotateY(18deg) scale(0.9) translateX(4px);
+    opacity: 0.86;
+    z-index: 3;
+  }
+
+  .project-slide.is-next {
+    transform: rotateY(-18deg) scale(0.9) translateX(-4px);
+    opacity: 0.86;
+    z-index: 3;
+  }
+
+  .project-slide.is-far-left {
+    transform: rotateY(22deg) scale(0.82);
+    opacity: 0.34;
+  }
+
+  .project-slide.is-far-right {
+    transform: rotateY(-22deg) scale(0.82);
+    opacity: 0.34;
   }
 
   .project-card {
     height: 100%;
   }
 
+  .project-slide .project-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+  }
+
   .project-card__content {
     display: flex;
     flex-direction: column;
     height: 100%;
-    gap: var(--space-md);
-    padding: var(--space-lg);
+    gap: var(--space-sm);
+    padding: var(--space-md);
   }
 
   .project-card__top {
@@ -132,7 +225,7 @@ import { PROJECTS } from "../../lib/constants";
   .project-card__bottom {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
   }
 
   .project-card__featured {
@@ -145,7 +238,7 @@ import { PROJECTS } from "../../lib/constants";
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
-    margin-bottom: var(--space-sm);
+    margin-bottom: var(--space-xs);
   }
 
   .featured__star {
@@ -165,15 +258,15 @@ import { PROJECTS } from "../../lib/constants";
   .project-card__title {
     font-family: var(--font-hand);
     font-size: var(--text-xl);
-    margin-bottom: var(--space-sm);
-    line-height: 1.3;
+    margin-bottom: var(--space-xs);
+    line-height: 1.28;
     color: var(--color-text);
   }
 
   .project-card__desc {
     color: var(--color-text-muted);
     font-size: var(--text-base);
-    line-height: 1.7;
+    line-height: 1.6;
   }
 
   .project-card__tags {
@@ -207,14 +300,213 @@ import { PROJECTS } from "../../lib/constants";
     border-top: 1px solid var(--color-stroke-muted);
   }
 
-  @media (max-width: 768px) {
-    .projects__grid {
-      grid-template-columns: 1fr;
-      gap: var(--space-lg);
+  .projects-carousel__controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-md);
+    margin-top: var(--space-xs);
+  }
+
+  .carousel-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--color-stroke-muted);
+    background: var(--color-surface);
+    color: var(--color-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .carousel-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    transform: translateY(-1px);
+  }
+
+  .projects-carousel__status {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    min-width: 4.2rem;
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .projects-carousel {
+      max-width: 100%;
+    }
+
+    .projects-carousel__viewport {
+      perspective: none;
+      padding-bottom: var(--space-sm);
+    }
+
+    .project-slide {
+      width: clamp(250px, 70vw, 340px);
+      opacity: 0.9;
+      filter: none;
+    }
+
+    .project-slide.is-active,
+    .project-slide.is-prev,
+    .project-slide.is-next,
+    .project-slide.is-far-left,
+    .project-slide.is-far-right {
+      transform: none;
+      opacity: 1;
     }
 
     .project-card__content {
       padding: var(--space-md);
+      gap: var(--space-sm);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .project-slide,
+    .projects-carousel__track,
+    .carousel-btn {
+      transition: none;
     }
   }
 </style>
+
+<script>
+  function initProjectsCarousel() {
+    const root = document.querySelector("[data-carousel-root]") as HTMLElement | null;
+    if (!root) return;
+
+    const viewport = root.querySelector("[data-carousel-viewport]") as HTMLElement | null;
+    const track = root.querySelector("[data-carousel-track]") as HTMLElement | null;
+    const prev = root.querySelector("[data-carousel-prev]") as HTMLButtonElement | null;
+    const next = root.querySelector("[data-carousel-next]") as HTMLButtonElement | null;
+    const status = root.querySelector("[data-carousel-index]") as HTMLElement | null;
+    const total = Number(root.dataset.total || "0");
+    if (!viewport || !track || !prev || !next || !status || total <= 0) return;
+
+    const slides = Array.from(track.querySelectorAll(".project-slide")) as HTMLElement[];
+    if (slides.length < 3) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let index = 1;
+    let transitioning = false;
+
+    const getRealIndex = (loopIndex: number) => {
+      if (loopIndex === 0) return total - 1;
+      if (loopIndex === total + 1) return 0;
+      return loopIndex - 1;
+    };
+
+    const updateClasses = () => {
+      slides.forEach((slide, i) => {
+        slide.classList.remove(
+          "is-active",
+          "is-prev",
+          "is-next",
+          "is-far-left",
+          "is-far-right",
+        );
+
+        const delta = i - index;
+        if (delta === 0) slide.classList.add("is-active");
+        else if (delta === -1) slide.classList.add("is-prev");
+        else if (delta === 1) slide.classList.add("is-next");
+        else if (delta < -1) slide.classList.add("is-far-left");
+        else if (delta > 1) slide.classList.add("is-far-right");
+      });
+
+      status.textContent = String(getRealIndex(index) + 1);
+    };
+
+    const moveTo = (nextIndex: number, animate = true) => {
+      index = nextIndex;
+      const viewportWidth = viewport.clientWidth;
+      const slide = slides[index];
+      const slideWidth = slide.getBoundingClientRect().width;
+      const offset = -slide.offsetLeft + (viewportWidth - slideWidth) / 2;
+
+      track.style.transition = animate
+        ? "transform 440ms cubic-bezier(0.22, 0.61, 0.36, 1)"
+        : "none";
+      track.style.transform = `translate3d(${offset}px, 0, 0)`;
+      updateClasses();
+    };
+
+    const onNext = () => {
+      if (transitioning) return;
+      transitioning = true;
+      moveTo(index + 1, !reducedMotion);
+      if (reducedMotion) onTransitionEnd();
+    };
+
+    const onPrev = () => {
+      if (transitioning) return;
+      transitioning = true;
+      moveTo(index - 1, !reducedMotion);
+      if (reducedMotion) onTransitionEnd();
+    };
+
+    const onTransitionEnd = () => {
+      if (index === 0) {
+        moveTo(total, false);
+      } else if (index === total + 1) {
+        moveTo(1, false);
+      }
+      transitioning = false;
+    };
+
+    const onResize = () => moveTo(index, false);
+
+    const onKeydown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowRight") onNext();
+      if (event.key === "ArrowLeft") onPrev();
+    };
+
+    const onSlideClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("a, button")) return;
+      const slide = target.closest(".project-slide") as HTMLElement | null;
+      if (!slide) return;
+      const targetIndex = Number(slide.dataset.slideIndex || "0");
+      if (targetIndex === index) return;
+
+      transitioning = true;
+      moveTo(targetIndex, !reducedMotion);
+    };
+
+    prev.addEventListener("click", onPrev);
+    next.addEventListener("click", onNext);
+    track.addEventListener("transitionend", onTransitionEnd);
+    track.addEventListener("keydown", onKeydown);
+    track.addEventListener("click", onSlideClick);
+    window.addEventListener("resize", onResize);
+
+    moveTo(index, false);
+
+    (window as Window & { __projectsCarouselCleanup?: () => void }).__projectsCarouselCleanup?.();
+    (window as Window & { __projectsCarouselCleanup?: () => void }).__projectsCarouselCleanup = () => {
+      prev.removeEventListener("click", onPrev);
+      next.removeEventListener("click", onNext);
+      track.removeEventListener("transitionend", onTransitionEnd);
+      track.removeEventListener("keydown", onKeydown);
+      track.removeEventListener("click", onSlideClick);
+      window.removeEventListener("resize", onResize);
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initProjectsCarousel);
+  } else {
+    initProjectsCarousel();
+  }
+
+  document.addEventListener("astro:page-load", initProjectsCarousel);
+  document.addEventListener("astro:before-swap", () => {
+    (window as Window & { __projectsCarouselCleanup?: () => void }).__projectsCarouselCleanup?.();
+  });
+</script>
