@@ -1,6 +1,4 @@
 ---
-import SketchButton from "../ui/SketchButton.astro";
-import SketchArrow from "../sketch/SketchArrow.astro";
 import PathfinderBot from "../islands/PathfinderBot.svelte";
 import { SITE } from "../../lib/constants";
 
@@ -13,6 +11,8 @@ const TITLES = [
 ---
 
 <section class="hero section-gap" aria-label="Introduction">
+  <div class="hero__bg-word" aria-hidden="true">ROHAN</div>
+
   <div class="container">
     <div class="hero__content">
       <div class="hero__text">
@@ -35,20 +35,9 @@ const TITLES = [
           management analytics, data visualization, and cross-functional
           collaboration.
         </p>
-        <div class="hero__actions">
-          <SketchButton href="/#projects">
-            View Projects
-            <SketchArrow direction="down" size={20} />
-          </SketchButton>
-          <SketchButton
-            href={SITE.socialLinks.linkedin || "#"}
-            variant="secondary"
-            target="_blank"
-            rel="noopener"
-          >
-            LinkedIn
-          </SketchButton>
-        </div>
+
+        <div class="hero__sticker">Available for work ✦</div>
+
       </div>
 
       <div class="hero__deco" aria-hidden="true">
@@ -56,7 +45,6 @@ const TITLES = [
       </div>
     </div>
   </div>
-
 </section>
 
 <script>
@@ -116,10 +104,55 @@ const TITLES = [
 <style>
   .hero {
     position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    padding-block: clamp(1.25rem, 4vw, 3rem) clamp(0.75rem, 2vw, 1.5rem);
+    padding-block: clamp(0.5rem, 2vw, 1.25rem) clamp(0.75rem, 2vw, 1.5rem);
+  }
+
+  /* ── Watermark ── */
+  .hero__bg-word {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(10rem, 28vw, 22rem);
+    font-weight: 900;
+    font-family: var(--font-ui);
+    color: transparent;
+    -webkit-text-stroke: 2px rgba(13, 13, 18, 0.055);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    letter-spacing: -0.04em;
+    z-index: 0;
+  }
+
+  :global([data-theme="dark"]) .hero__bg-word {
+    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Sticker ── */
+  .hero__sticker {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.38rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    background: rgba(200, 241, 53, 0.85);
+    border: 2px solid #0d0d12;
+    box-shadow: 3px 3px 0 #0d0d12;
+    margin-top: var(--space-md);
+    width: fit-content;
+    color: #0d0d12;
+  }
+
+  :global([data-theme="dark"]) .hero__sticker {
+    background: rgba(200, 241, 53, 0.75);
   }
 
   .hero__content {
@@ -184,14 +217,8 @@ const TITLES = [
   }
 
   @keyframes blink {
-    0%,
-    50% {
-      opacity: 1;
-    }
-    51%,
-    100% {
-      opacity: 0;
-    }
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .hero__pitch {
@@ -199,14 +226,8 @@ const TITLES = [
     font-size: var(--text-lg);
     color: var(--color-text-muted);
     line-height: 1.8;
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-md);
     max-width: 50ch;
-  }
-
-  .hero__actions {
-    display: flex;
-    gap: var(--space-md);
-    flex-wrap: wrap;
   }
 
   .hero__deco {
@@ -217,7 +238,6 @@ const TITLES = [
     min-width: 340px;
     padding-top: 20px;
   }
-
 
   /* Desktop: side by side */
   @media (min-width: 901px) {
@@ -245,14 +265,14 @@ const TITLES = [
       margin-inline: auto;
     }
 
-    .hero__actions {
-      justify-content: center;
-    }
-
     .hero__deco {
       order: 2;
       min-width: auto;
       padding-top: 10px;
+    }
+
+    .hero__sticker {
+      margin-inline: auto;
     }
   }
 
@@ -266,5 +286,8 @@ const TITLES = [
       justify-content: center;
     }
 
+    .hero__bg-word {
+      display: none;
+    }
   }
 </style>

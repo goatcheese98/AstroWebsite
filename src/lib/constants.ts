@@ -74,12 +74,12 @@ export const EXPERIENCES: Experience[] = [
   {
     company: "UBC Sauder School of Business",
     role: "Master of Business Analytics Candidate",
-    period: "2025 — Present",
+    period: "Aug 2025 — Present",
     description:
-      "Pursuing advanced training in business analytics, data science, and strategic decision-making.",
+      "Pursuing advanced training in business analytics, data science, and strategic decision-making at one of Canada's top business schools.",
     highlights: [
-      "Expected graduation: April 2026",
-      "Developing expertise in predictive modeling, data visualization, and business intelligence",
+      "Expected graduation: August 2026",
+      "Coursework: ML for Business, Data Modernization, Optimal Decision Making, Modeling Uncertainty",
     ],
     current: true,
     accentColor: "#1e3a5f",
@@ -87,26 +87,27 @@ export const EXPERIENCES: Experience[] = [
   },
   {
     company: "Goldman Sachs",
-    role: "Business Operations Analyst",
+    role: "Consumer Wealth Management Analyst",
     period: "June 2022 — Feb 2023",
     description:
-      "Streamlined client onboarding and ensured data integrity for wealth management operations.",
+      "Supported high-net-worth client onboarding and compliance operations within the Consumer Wealth Management division.",
     highlights: [
-      "Maintained SEC-compliant client documentation and flagged data inconsistencies",
-      "Served as liaison between Consumer Wealth and Private Wealth Management teams",
+      "Screened 200+ documentation packages weekly with 100% SEC regulatory compliance",
+      "Flagged fraudulent activity and compliance risks using proprietary databases",
+      "Resolved 95% of documentation issues within 48 hours as cross-regional liaison",
     ],
     accentColor: "#7399C6",
     logo: "goldman",
   },
   {
-    company: "Megaplex Theatres",
+    company: "Larry H. Miller Megaplex Theatres",
     role: "Data Analytics Intern",
     period: "March 2022 — June 2022",
     description:
-      "Analyzed 3 years of movie sales data to evaluate predictive value of YouTube trailer views.",
+      "Investigated the relationship between YouTube trailer viewership and U.S. theatre sales using statistical analysis.",
     highlights: [
-      "Built Python web scraper to collect trailer data via YouTube API",
-      "Delivered insights that informed strategic marketing decisions",
+      "Built automated Python web scraper leveraging YouTube API to compile trailer + sales database",
+      "Performed correlation analysis and hypothesis testing, identifying negligible viewership-to-sales correlation",
     ],
     accentColor: "#6B2C91",
     logo: "megaplex",

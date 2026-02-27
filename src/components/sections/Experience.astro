@@ -93,9 +93,14 @@ const totalCards = EXPERIENCES.length;
     margin-bottom: var(--space-lg);
   }
 
+  .experience.section-gap {
+    padding-bottom: 0;
+  }
+
   /* Prevent global sketch-card hover transform from fighting the JS stack */
+  .experience-card,
   .experience-card:hover {
-    transform: none;
+    transform: none !important;
     cursor: pointer;
   }
 
@@ -103,34 +108,32 @@ const totalCards = EXPERIENCES.length;
     position: relative;
     max-width: 800px;
     margin-inline: auto;
-    height: calc((var(--stack-count) - 1) * 52px + 400px);
+    height: calc((var(--stack-count) - 1) * 140px + 340px);
   }
 
   .experience-card {
     position: absolute;
-    inset-inline: 0;
-    /* Pre-JS default: assume card 0 is active — higher index = higher up (lower slot index) */
-    top: calc((var(--stack-count) - 1 - var(--stack-index)) * 52px);
+    left: 0;
+    right: 0;
+    top: calc((var(--stack-count) - 1 - var(--stack-index)) * 140px);
     z-index: var(--stack-z);
     padding: var(--space-md);
-    background: color-mix(in srgb, var(--color-surface) 97%, var(--color-fill-1));
-    max-height: 52px;
-    overflow: hidden;
-    /* suppress global sketch-card offset shadow on peeked cards */
+    background: var(--color-surface);
+    /* no max-height — card extends to natural height, lower portion hidden by higher z-index card */
     box-shadow: none;
     transition:
       top 300ms cubic-bezier(0.4, 0, 0.2, 1),
-      max-height 350ms cubic-bezier(0.4, 0, 0.2, 1),
-      box-shadow 300ms ease;
+      box-shadow 300ms ease,
+      left 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      right 300ms cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
   }
 
   .experience-card.is-focused {
-    top: calc((var(--stack-count) - 1) * 52px);
+    top: calc((var(--stack-count) - 1) * 140px);
     z-index: 30;
-    max-height: 420px;
-    overflow: hidden;
-    box-shadow: 6px 6px 0 var(--color-stroke);
+    box-shadow: 8px 8px 0 var(--color-stroke);
+    opacity: 1;
   }
 
   .experience-card__content {
@@ -223,15 +226,15 @@ const totalCards = EXPERIENCES.length;
   }
 
   .experience-card__highlight {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6em;
     font-size: var(--text-base);
     color: var(--color-text);
-    padding-left: 1.35em;
-    position: relative;
     line-height: 1.55;
     transition: all 0.15s ease;
-    padding: var(--space-xs) var(--space-xs) var(--space-xs) 1.35em;
+    padding: var(--space-xs);
     border-radius: var(--radius-sm);
-    margin-left: -0.4em;
   }
 
   .experience-card__highlight:hover {
@@ -240,9 +243,8 @@ const totalCards = EXPERIENCES.length;
   }
 
   .highlight__bullet {
-    position: absolute;
-    left: 0.25em;
-    top: 0.62em;
+    flex-shrink: 0;
+    margin-top: 0.44em;
     width: 8px;
     height: 8px;
     background: var(--hover-accent, var(--color-accent));
@@ -262,25 +264,14 @@ const totalCards = EXPERIENCES.length;
       gap: var(--space-md);
     }
 
-    .experience-card {
-      position: relative;
-      inset-inline: auto;
-      top: auto;
-      transform: none;
-      z-index: auto;
-      box-shadow: none;
-      max-height: none;
-      overflow: visible;
-      opacity: 1;
-    }
-
+    .experience-card,
     .experience-card.is-focused {
+      position: relative;
+      left: auto;
+      right: auto;
       top: auto;
-      transform: none;
       z-index: auto;
       box-shadow: none;
-      max-height: none;
-      overflow: visible;
       opacity: 1;
     }
 
@@ -312,7 +303,7 @@ const totalCards = EXPERIENCES.length;
     const cards = Array.from(stack.querySelectorAll("[data-stack-card]")) as HTMLElement[];
     if (cards.length === 0) return;
 
-    const PEEK_H = 52;
+    const PEEK_H = 140;
     const n = cards.length;
 
     const activate = (target: HTMLElement) => {
@@ -323,10 +314,19 @@ const totalCards = EXPERIENCES.length;
         if (isActive) {
           card.style.top = `${(n - 1) * PEEK_H}px`;
           card.style.zIndex = "30";
+          card.style.opacity = "1";
+          card.style.left = "0px";
+          card.style.right = "0px";
         } else {
           const slot = (n - 1 - i) - (targetIdx > i ? 1 : 0);
           card.style.top = `${slot * PEEK_H}px`;
-          card.style.zIndex = String(n - slot + 1);
+          // higher slot = lower in viewport = higher z-index, so it covers the card above it
+          card.style.zIndex = String(slot + 2);
+          const shrink = (n - 1) - slot;
+          const inset = `${shrink * 4}%`;
+          card.style.left = inset;
+          card.style.right = inset;
+          card.style.opacity = "1";
         }
       });
     };

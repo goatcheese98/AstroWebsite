@@ -33,16 +33,30 @@ const marqueeItems = [
       </div>
     </section>
 
-    <Projects />
-    <Experience />
+    <div class="sections-zone">
+      <Experience />
 
-    <section class="skills section-gap" id="skills" aria-label="Skills">
-      <div class="container">
-        <SectionHeader
-          title="Skills & Expertise"
-          subtitle="A generalist's toolkit spanning data, technology, and strategy"
-        />
-        <BentoSkills client:load />
+      <Projects />
+
+      <section class="skills section-gap" id="skills" aria-label="Skills">
+        <div class="container">
+          <SectionHeader
+            title="Skills & Expertise"
+            subtitle="A generalist's toolkit spanning data, technology, and strategy"
+          />
+          <BentoSkills client:load />
+        </div>
+      </section>
+    </div>
+
+    <section class="landing-marquee landing-marquee--reverse" aria-label="Portfolio highlights" aria-hidden="true">
+      <div class="landing-marquee__track">
+        <ul class="landing-marquee__list">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
+        <ul class="landing-marquee__list" aria-hidden="true">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
       </div>
     </section>
   </div>
@@ -160,7 +174,7 @@ const marqueeItems = [
     z-index: -1;
     background: radial-gradient(
       circle 480px at var(--landing-mouse-x) var(--landing-mouse-y),
-      rgba(59, 130, 246, 0.07),
+      rgba(200, 241, 53, 0.13),
       transparent 72%
     );
   }
@@ -230,140 +244,42 @@ const marqueeItems = [
   }
 
   @keyframes landing-marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  @keyframes landing-marquee-reverse {
+    from { transform: translateX(-50%); }
+    to   { transform: translateX(0); }
+  }
+
+  .landing-marquee--reverse .landing-marquee__track {
+    animation-name: landing-marquee-reverse;
+    animation-duration: 28s;
   }
 
   .landing-page :global(.section-gap) {
     padding-block: clamp(1.5rem, 3.8vw, 2.5rem);
   }
 
-
   .landing-page :global(.section-header) {
     margin-bottom: var(--space-lg);
   }
 
   /* ── Section color zones ── */
+  .landing-page .sections-zone {
+    background: rgba(200, 241, 53, 0.22);
+  }
+
+  :global([data-theme="dark"]) .landing-page .sections-zone {
+    background: rgba(200, 241, 53, 0.11);
+  }
+
   .landing-page :global(#projects),
   .landing-page :global(#experience),
   .landing-page :global(#skills) {
     position: relative;
-  }
-
-  .landing-page :global(#projects)  { background: rgba(180, 230, 20,  0.07); }
-  .landing-page :global(#experience){ background: rgba(255, 210,  0,  0.07); }
-  .landing-page :global(#skills)    { background: rgba(255,  80, 40,  0.06); }
-
-  :global([data-theme="dark"]) .landing-page :global(#projects)  { background: rgba(180, 230, 20,  0.06); }
-  :global([data-theme="dark"]) .landing-page :global(#experience){ background: rgba(255, 210,  0,  0.06); }
-  :global([data-theme="dark"]) .landing-page :global(#skills)    { background: rgba(255,  80, 40,  0.05); }
-
-  /* ── Animated wave edges via pseudo-elements ──
-     Only background-position is animated — GPU-composited, zero layout cost.
-     A bright spotlight travels along a 4px strip at top and bottom,
-     creating a slow shimmer that reads as a living border wave.           */
-
-  .landing-page :global(#projects)::before,
-  .landing-page :global(#projects)::after,
-  .landing-page :global(#experience)::before,
-  .landing-page :global(#experience)::after,
-  .landing-page :global(#skills)::before,
-  .landing-page :global(#skills)::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background-size: 300% 100%;
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  .landing-page :global(#projects)::before  { top: 0; }
-  .landing-page :global(#projects)::after   { bottom: 0; }
-  .landing-page :global(#experience)::before{ top: 0; }
-  .landing-page :global(#experience)::after { bottom: 0; }
-  .landing-page :global(#skills)::before    { top: 0; }
-  .landing-page :global(#skills)::after     { bottom: 0; }
-
-  /* Projects top — lime only (nothing above) */
-  .landing-page :global(#projects)::before {
-    background-image: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(180, 230, 20, 0.55) 20%,
-      rgba(220, 255, 60, 0.95) 50%,
-      rgba(180, 230, 20, 0.55) 80%,
-      transparent 100%
-    );
-    animation: wave-edge 7s ease-in-out infinite alternate;
-  }
-
-  /* Projects bottom + Experience top — lime → yellow blend */
-  .landing-page :global(#projects)::after,
-  .landing-page :global(#experience)::before {
-    background-image: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(195, 240, 10, 0.6) 15%,
-      rgba(215, 252, 20, 0.95) 35%,
-      rgba(255, 228, 0, 0.95) 65%,
-      rgba(255, 210, 0, 0.6) 85%,
-      transparent 100%
-    );
-    animation: wave-edge 7.5s ease-in-out infinite alternate;
-    animation-delay: -1.5s;
-  }
-
-  /* Experience bottom + Skills top — yellow → coral blend */
-  .landing-page :global(#experience)::after,
-  .landing-page :global(#skills)::before {
-    background-image: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(255, 220, 0, 0.6) 15%,
-      rgba(255, 235, 30, 0.95) 35%,
-      rgba(255, 100, 50, 0.95) 65%,
-      rgba(255, 80, 40, 0.6) 85%,
-      transparent 100%
-    );
-    animation: wave-edge 7s ease-in-out infinite alternate;
-    animation-delay: -2.5s;
-  }
-
-  /* Skills bottom — coral only */
-  .landing-page :global(#skills)::after {
-    background-image: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(255, 80, 40, 0.50) 20%,
-      rgba(255, 130, 90, 0.90) 50%,
-      rgba(255, 80, 40, 0.50) 80%,
-      transparent 100%
-    );
-    animation: wave-edge 6s ease-in-out infinite alternate;
-    animation-delay: -1.5s;
-  }
-
-  @keyframes wave-edge {
-    from { background-position:   0% 0; }
-    to   { background-position: 100% 0; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .landing-page :global(#projects)::before,
-    .landing-page :global(#projects)::after,
-    .landing-page :global(#experience)::before,
-    .landing-page :global(#experience)::after,
-    .landing-page :global(#skills)::before,
-    .landing-page :global(#skills)::after {
-      animation: none;
-      background-position: 50% 0;
-    }
+    background: transparent;
   }
 
   :global(body.landing-grid-mode)::before {
