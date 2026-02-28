@@ -81,7 +81,9 @@ export default function CanvasContainer({
     stopSession,
     handleSceneChange,
     handlePointerUpdate,
-  } = useCollaboration();
+  } = useCollaboration({
+    onError: (msg) => addToast(msg, "error"),
+  });
 
   const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
 

@@ -256,7 +256,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
           ...el,
           customData: { ...el.customData, content },
           version: (el.version || 0) + 1,
-          versionNonce: Date.now(),
+          versionNonce: Math.floor(Math.random() * 2 ** 31),
         };
       }
       return el;
@@ -274,7 +274,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
           ...el,
           customData: { ...el.customData, url },
           version: (el.version || 0) + 1,
-          versionNonce: Date.now(),
+          versionNonce: Math.floor(Math.random() * 2 ** 31),
         };
       }
       return el;
@@ -296,7 +296,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
           ...el,
           customData: newCustomData,
           version: (el.version || 0) + 1,
-          versionNonce: Date.now(),
+          versionNonce: Math.floor(Math.random() * 2 ** 31),
         };
       }
       return el;
@@ -327,7 +327,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
             ...el,
             ...elementMap.get(el.id),
             version: (el.version || 0) + 1,
-            versionNonce: Date.now(),
+            versionNonce: Math.floor(Math.random() * 2 ** 31),
           };
         }
         return el;

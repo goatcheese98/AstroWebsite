@@ -243,12 +243,12 @@
     ],
   };
   const WHAC_SLOTS = [
-    { id: 0, x: 121, y: 206 },
-    { id: 1, x: 150, y: 206 },
-    { id: 2, x: 179, y: 206 },
-    { id: 3, x: 121, y: 232 },
-    { id: 4, x: 150, y: 232 },
-    { id: 5, x: 179, y: 232 },
+    { id: 0, x: 119, y: 208, expression: "calm" },
+    { id: 1, x: 147, y: 205, expression: "grit" },
+    { id: 2, x: 176, y: 212, expression: "surprised" },
+    { id: 3, x: 128, y: 231, expression: "grit" },
+    { id: 4, x: 157, y: 226, expression: "calm" },
+    { id: 5, x: 181, y: 238, expression: "surprised" },
   ] as const;
   const WHAC_DIFFICULTY_CONFIG: Record<
     WhacDifficulty,
@@ -1523,15 +1523,32 @@
               {:else}
                 {#each WHAC_SLOTS as slot}
                   <g class="tetris-control-button" onclick={(event) => whackMole(slot.id, event)}>
-                    <ellipse cx={slot.x} cy={slot.y + 8} rx="10.5" ry="5.3" fill="#9a3412" />
-                    <ellipse cx={slot.x} cy={slot.y + 8} rx="10.5" ry="5.3" fill="none" stroke="#7c2d12" stroke-width="1" />
-                    <text x={slot.x} y={slot.y + 11} text-anchor="middle" fill="#fed7aa" font-size="4.2" font-family="monospace">
+                    <ellipse cx={slot.x} cy={slot.y + 5} rx="12" ry="6.8" fill="#b45309" />
+                    <ellipse cx={slot.x} cy={slot.y + 8} rx="9.4" ry="5.8" fill="#1e293b" />
+                    <ellipse cx={slot.x} cy={slot.y + 8} rx="9.4" ry="5.8" fill="none" stroke="#0f172a" stroke-width="0.9" />
+                    <text x={slot.x} y={slot.y + 10.6} text-anchor="middle" fill="#e2e8f0" font-size="4.1" font-family="monospace">
                       {slot.id + 1}
                     </text>
                     {#if whacActiveSlot === slot.id}
-                      <circle cx={slot.x} cy={slot.y + 1} r="7" fill="#a16207" />
-                      <circle cx={slot.x - 2} cy={slot.y - 1} r="1.5" fill="#fef3c7" opacity="0.7" />
-                      <circle cx={slot.x + 2.5} cy={slot.y + 1.2} r="1.2" fill="#fef3c7" opacity="0.45" />
+                      <path
+                        d={`M ${slot.x - 7.1} ${slot.y + 6.2} Q ${slot.x - 7.3} ${slot.y - 5.8} ${slot.x} ${slot.y - 6.8} Q ${slot.x + 7.3} ${slot.y - 5.8} ${slot.x + 7.1} ${slot.y + 6.2} Z`}
+                        fill="#a16207"
+                        stroke="#78350f"
+                        stroke-width="0.9"
+                      />
+                      <ellipse cx={slot.x - 2.4} cy={slot.y - 3} rx="1" ry="1.3" fill="#1f2937" />
+                      <ellipse cx={slot.x + 2.4} cy={slot.y - 3} rx="1" ry="1.3" fill="#1f2937" />
+                      <ellipse cx={slot.x} cy={slot.y} rx="1.9" ry="1.3" fill="#fda4af" stroke="#dc2626" stroke-width="0.35" />
+                      {#if slot.expression === "calm"}
+                        <path d={`M ${slot.x - 2.2} ${slot.y + 2.6} Q ${slot.x} ${slot.y + 4.4} ${slot.x + 2.2} ${slot.y + 2.6}`} fill="none" stroke="#7f1d1d" stroke-width="0.8" stroke-linecap="round" />
+                      {:else if slot.expression === "grit"}
+                        <path d={`M ${slot.x - 2.4} ${slot.y + 3.3} L ${slot.x + 2.4} ${slot.y + 3.3}`} fill="none" stroke="#7f1d1d" stroke-width="0.8" stroke-linecap="round" />
+                        <path d={`M ${slot.x - 4.1} ${slot.y - 4.4} L ${slot.x - 1.1} ${slot.y - 5.1}`} fill="none" stroke="#78350f" stroke-width="0.75" stroke-linecap="round" />
+                        <path d={`M ${slot.x + 1.1} ${slot.y - 5.1} L ${slot.x + 4.1} ${slot.y - 4.4}`} fill="none" stroke="#78350f" stroke-width="0.75" stroke-linecap="round" />
+                      {:else}
+                        <circle cx={slot.x} cy={slot.y + 3.2} r="1.35" fill="none" stroke="#7f1d1d" stroke-width="0.75" />
+                      {/if}
+                      <ellipse cx={slot.x - 1.9} cy={slot.y - 4.9} rx="1.7" ry="1.1" fill="#fef3c7" opacity="0.55" />
                     {/if}
                   </g>
                 {/each}

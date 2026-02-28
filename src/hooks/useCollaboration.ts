@@ -81,6 +81,10 @@ export interface CollaborationControls {
   }) => void;
 }
 
+export interface CollaborationOptions {
+  onError?: (message: string) => void;
+}
+
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
@@ -163,8 +167,10 @@ function useThrottledCallback<A extends unknown[]>(
 // Hook
 // --------------------------------------------------------------------------
 
-export function useCollaboration(): CollaborationControls {
+export function useCollaboration({ onError }: CollaborationOptions = {}): CollaborationControls {
   const api = useExcalidrawAPISafe();
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   const [isCollaborating, setIsCollaborating] = useState(false);
   const [collaborators, setCollaborators] = useState<Map<string, CollaboratorState>>(new Map());
@@ -185,6 +191,8 @@ export function useCollaboration(): CollaborationControls {
   const sentFileIdsRef = useRef<Set<string>>(new Set());
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
+  // Prevents echo: suppress outgoing broadcasts while applying a remote scene update.
+  const isApplyingRemoteRef = useRef(false);
 
   const setUsername = useCallback((name: string) => {
     setUsernameState(name);
@@ -286,6 +294,8 @@ export function useCollaboration(): CollaborationControls {
   const handleSceneChange = useCallback(
     (elements: readonly unknown[], _appState: unknown, files: unknown) => {
       if (!isCollaboratingRef.current) return;
+      // Suppress re-broadcast of updates we just applied from a remote peer.
+      if (isApplyingRemoteRef.current) return;
       broadcastSceneThrottled(elements, files as Record<string, unknown> | null);
     },
     [broadcastSceneThrottled],
@@ -397,7 +407,11 @@ export function useCollaboration(): CollaborationControls {
               decrypted.elements as unknown as Parameters<typeof reconcileElements>[1],
               localAppState as unknown as Parameters<typeof reconcileElements>[2],
             );
+            // Guard against echo: flag prevents handleSceneChange from re-broadcasting
+            // this update back to the room. Reset after the synchronous update flushes.
+            isApplyingRemoteRef.current = true;
             api.updateScene({ elements: reconciled });
+            queueMicrotask(() => { isApplyingRemoteRef.current = false; });
 
           } else if (decrypted.type === "cursor-update") {
             const { clientId, pointer, button, selectedElementIds, username: uname, color } = decrypted;
@@ -445,7 +459,8 @@ export function useCollaboration(): CollaborationControls {
       encKeyRef.current = key;
       keyBase64Ref.current = keyBase64;
       roomIdRef.current = roomId;
-      sentFileIdsRef.current = new Set();
+      // sentFileIdsRef is intentionally NOT reset here so files aren't re-sent on reconnect.
+      // It is only cleared in startSession() when starting a brand-new session.
       collaboratorsRef.current = new Map();
       setCollaborators(new Map());
       reconnectAttemptRef.current = 0;
@@ -492,6 +507,8 @@ export function useCollaboration(): CollaborationControls {
     const roomId = nanoid(20);
     const key = await generateEncryptionKey();
     const keyBase64 = await exportKeyToBase64(key);
+    // Reset sent files for a fresh session (not on reconnect).
+    sentFileIdsRef.current = new Set();
     // Write the room credentials into the URL hash so the link is shareable.
     // The hash is never sent to the server by browsers.
     history.pushState(null, "", `${window.location.pathname}${window.location.search}#room=${roomId},${keyBase64}`);
@@ -535,7 +552,14 @@ export function useCollaboration(): CollaborationControls {
     if (!parsed) return;
     importKeyFromBase64(parsed.keyBase64)
       .then((key) => connect(parsed.roomId, key, parsed.keyBase64))
-      .catch((err) => console.error("[Collab] Failed to import key from URL:", err));
+      .catch((err) => {
+        console.error("[Collab] Failed to import key from URL:", err);
+        onErrorRef.current?.(
+          "Could not join collaboration room — the link appears to be invalid or corrupted."
+        );
+        // Clear the broken hash so it doesn't confuse on refresh.
+        history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

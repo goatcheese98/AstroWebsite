@@ -1,15 +1,16 @@
 <script lang="ts">
   type WhacMode = "menu" | "playing" | "gameover";
   type WhacDifficulty = "easy" | "medium" | "hard";
-  type Slot = { id: number; label: string };
+  type SlotExpression = "calm" | "grit" | "surprised";
+  type Slot = { id: number; label: string; x: number; y: number; expression: SlotExpression };
 
   const SLOTS: Slot[] = [
-    { id: 0, label: "1" },
-    { id: 1, label: "2" },
-    { id: 2, label: "3" },
-    { id: 3, label: "4" },
-    { id: 4, label: "5" },
-    { id: 5, label: "6" },
+    { id: 0, label: "1", x: 17, y: 31, expression: "calm" },
+    { id: 1, label: "2", x: 50, y: 24, expression: "grit" },
+    { id: 2, label: "3", x: 81, y: 34, expression: "surprised" },
+    { id: 3, label: "4", x: 26, y: 65, expression: "grit" },
+    { id: 4, label: "5", x: 60, y: 59, expression: "calm" },
+    { id: 5, label: "6", x: 85, y: 73, expression: "surprised" },
   ];
   const DIFFICULTY_CONFIG: Record<
     WhacDifficulty,
@@ -178,11 +179,23 @@
 
   <div class="board">
     {#each SLOTS as slot}
-      <button class="hole" onclick={() => whack(slot.id)}>
+      <button
+        class="hole"
+        style={`--x:${slot.x}%; --y:${slot.y}%;`}
+        onclick={() => whack(slot.id)}
+        aria-label={`Whack Diglett at hole ${slot.label}`}
+      >
+        <span class="mound"></span>
         {#if activeSlot === slot.id}
-          <span class="mole">
+          <span class={`diglett mood-${slot.expression}`}>
+            <span class="brow left"></span>
+            <span class="brow right"></span>
             <span class="eye left"></span>
             <span class="eye right"></span>
+            <span class="nose"></span>
+            <span class="mouth"></span>
+            <span class="cheek left"></span>
+            <span class="cheek right"></span>
           </span>
         {/if}
         <span class="hole-shadow"></span>
@@ -303,78 +316,186 @@
 
   .board {
     position: relative;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    overflow: hidden;
     padding: 16px;
     border-radius: 14px;
     border: 2px solid #fdba74;
-    background: linear-gradient(180deg, #fed7aa 0%, #fdba74 100%);
-    min-height: 360px;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(255, 247, 237, 0.62) 0 18%, transparent 20%),
+      radial-gradient(circle at 80% 72%, rgba(120, 53, 15, 0.2) 0 19%, transparent 22%),
+      linear-gradient(180deg, #fcd6a8 0%, #f59e0b 58%, #b45309 100%);
+    min-height: 390px;
   }
 
   .hole {
-    position: relative;
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    transform: translate(-50%, -50%);
+    width: 112px;
+    height: 112px;
     border: 0;
-    border-radius: 12px;
-    background: rgba(120, 53, 15, 0.2);
-    min-height: 96px;
+    border-radius: 999px;
+    background: transparent;
     cursor: pointer;
   }
 
   .hole:active {
-    transform: translateY(1px);
+    margin-top: 1px;
+  }
+
+  .mound {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    width: 102%;
+    height: 46%;
+    border-radius: 999px;
+    background: radial-gradient(circle at 36% 32%, #f59e0b 0 20%, #b45309 68%, #78350f 100%);
+    box-shadow: inset 0 -3px 0 rgba(120, 53, 15, 0.6);
   }
 
   .hole-shadow {
     position: absolute;
     left: 50%;
-    bottom: 14px;
+    bottom: 18px;
     transform: translateX(-50%);
-    width: 72%;
-    height: 24px;
+    width: 76%;
+    height: 31%;
     border-radius: 999px;
-    background: #111827;
-    border: 2px solid #334155;
+    background:
+      radial-gradient(circle at 50% 45%, #020617 0 42%, #0f172a 70%, #1e293b 100%);
+    border: 2px solid rgba(30, 41, 59, 0.85);
   }
 
   .slot-key {
     position: absolute;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
-    color: #94a3b8;
-    font-size: 12px;
+    right: 6px;
+    top: 8px;
+    min-width: 18px;
+    border-radius: 8px;
+    padding: 2px 4px;
+    color: #334155;
+    font-size: 11px;
+    line-height: 1;
+    background: rgba(255, 247, 237, 0.82);
+    border: 1px solid rgba(120, 53, 15, 0.3);
   }
 
-  .mole {
+  .diglett {
     position: absolute;
     left: 50%;
-    bottom: 28px;
+    bottom: 29px;
     transform: translateX(-50%);
-    width: 48px;
-    height: 48px;
-    border-radius: 999px;
-    background: radial-gradient(circle at 35% 30%, #fef3c7 0 18%, #92400e 20% 100%);
+    width: 56px;
+    height: 65px;
+    border-radius: 55% 55% 40% 40%;
+    background: radial-gradient(circle at 35% 20%, #fef3c7 0 17%, #c0841a 24%, #854d0e 100%);
     border: 2px solid #78350f;
+    box-shadow: inset 0 -4px 0 rgba(120, 53, 15, 0.62);
     animation: pop 120ms ease-out;
+    z-index: 2;
   }
 
   .eye {
     position: absolute;
-    top: 19px;
-    width: 5px;
-    height: 5px;
-    border-radius: 999px;
+    top: 24px;
+    width: 6px;
+    height: 8px;
+    border-radius: 6px;
     background: #1f2937;
   }
 
   .eye.left {
-    left: 14px;
+    left: 15px;
   }
 
   .eye.right {
-    right: 14px;
+    right: 15px;
+  }
+
+  .brow {
+    position: absolute;
+    top: 18px;
+    width: 11px;
+    height: 2px;
+    border-radius: 999px;
+    background: #78350f;
+  }
+
+  .brow.left {
+    left: 12px;
+    transform: rotate(12deg);
+  }
+
+  .brow.right {
+    right: 12px;
+    transform: rotate(-12deg);
+  }
+
+  .nose {
+    position: absolute;
+    left: 50%;
+    top: 34px;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 10px;
+    border-radius: 999px;
+    background: #fca5a5;
+    border: 1px solid #dc2626;
+  }
+
+  .mouth {
+    position: absolute;
+    left: 50%;
+    top: 47px;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 8px;
+    border-bottom: 2px solid #7f1d1d;
+    border-radius: 0 0 999px 999px;
+  }
+
+  .cheek {
+    position: absolute;
+    top: 40px;
+    width: 9px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(248, 113, 113, 0.35);
+  }
+
+  .cheek.left {
+    left: 8px;
+  }
+
+  .cheek.right {
+    right: 8px;
+  }
+
+  .mood-grit .mouth {
+    width: 16px;
+    height: 0;
+    top: 50px;
+    border-bottom: 0;
+    border-top: 2px solid #7f1d1d;
+    border-radius: 999px 999px 0 0;
+  }
+
+  .mood-grit .brow.left {
+    transform: rotate(24deg);
+  }
+
+  .mood-grit .brow.right {
+    transform: rotate(-24deg);
+  }
+
+  .mood-surprised .mouth {
+    width: 8px;
+    height: 8px;
+    border: 2px solid #7f1d1d;
+    border-radius: 999px;
   }
 
   .overlay {
@@ -483,19 +604,47 @@
     }
 
     .board {
-      gap: 10px;
       padding: 10px;
-      min-height: 290px;
+      min-height: 320px;
     }
 
     .hole {
-      min-height: 78px;
+      width: 84px;
+      height: 84px;
     }
 
-    .mole {
-      width: 38px;
-      height: 38px;
-      bottom: 25px;
+    .diglett {
+      width: 42px;
+      height: 49px;
+      bottom: 24px;
+    }
+
+    .eye {
+      top: 18px;
+      width: 5px;
+      height: 6px;
+    }
+
+    .brow {
+      top: 14px;
+      width: 8px;
+    }
+
+    .nose {
+      top: 26px;
+      width: 12px;
+      height: 8px;
+    }
+
+    .mouth {
+      top: 35px;
+      width: 14px;
+      height: 6px;
+    }
+
+    .mood-surprised .mouth {
+      width: 6px;
+      height: 6px;
     }
   }
 </style>
