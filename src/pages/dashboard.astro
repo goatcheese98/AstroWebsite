@@ -1,11 +1,163 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageLayout from "@/layouts/PageLayout.astro";
 import DashboardRoot from "@/components/islands/DashboardRoot";
 ---
 
-<BaseLayout
-  title="My Canvases - AstroWeb"
+<PageLayout
+  title="Dashboard"
   description="Manage your saved canvases"
 >
-  <DashboardRoot client:only="react" />
-</BaseLayout>
+  <canvas id="dashboard-rough-bg-canvas" aria-hidden="true"></canvas>
+
+  <div class="dashboard-page" id="dashboard-page">
+    <div class="dashboard-glow" aria-hidden="true"></div>
+
+    <section class="dashboard-shell section-gap" aria-label="Canvas dashboard">
+      <div class="container">
+        <DashboardRoot client:only="react" />
+      </div>
+    </section>
+  </div>
+</PageLayout>
+
+<script>
+  async function initDashboardBackground() {
+    const canvas = document.getElementById(
+      "dashboard-rough-bg-canvas",
+    ) as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    let rough: typeof import("roughjs")["default"];
+    try {
+      ({ default: rough } = await import("roughjs"));
+    } catch {
+      return;
+    }
+
+    const GRID = 52;
+    const MAJOR_EVERY = 4;
+
+    function draw() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = w;
+      canvas.height = h;
+
+      const isDark = document.documentElement.dataset.theme === "dark";
+      const rgb = isDark ? "255,255,255" : "13,13,18";
+      const rc = rough.canvas(canvas);
+
+      for (let y = 0; y <= h; y += GRID) {
+        const isMajor = Math.round(y / GRID) % MAJOR_EVERY === 0;
+        rc.line(0, y, w, y, {
+          stroke: `rgba(${rgb},${isMajor ? 0.072 : 0.03})`,
+          roughness: 0.45,
+          strokeWidth: isMajor ? 1.1 : 0.65,
+          bowing: 0.4,
+        });
+      }
+
+      for (let x = 0; x <= w; x += GRID) {
+        const isMajor = Math.round(x / GRID) % MAJOR_EVERY === 0;
+        rc.line(x, 0, x, h, {
+          stroke: `rgba(${rgb},${isMajor ? 0.072 : 0.03})`,
+          roughness: 0.45,
+          strokeWidth: isMajor ? 1.1 : 0.65,
+          bowing: 0.4,
+        });
+      }
+    }
+
+    draw();
+
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(draw, 160);
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+
+    const observer = new MutationObserver(draw);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
+    (
+      window as Window & {
+        __dashboardBgCleanup?: () => void;
+      }
+    ).__dashboardBgCleanup?.();
+
+    (
+      window as Window & {
+        __dashboardBgCleanup?: () => void;
+      }
+    ).__dashboardBgCleanup = () => {
+      observer.disconnect();
+      clearTimeout(resizeTimer);
+      window.removeEventListener("resize", onResize);
+    };
+  }
+
+  function init() {
+    initDashboardBackground();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  document.addEventListener("astro:page-load", init);
+  document.addEventListener("astro:before-swap", () => {
+    (
+      window as Window & {
+        __dashboardBgCleanup?: () => void;
+      }
+    ).__dashboardBgCleanup?.();
+  });
+</script>
+
+<style>
+  #dashboard-rough-bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .dashboard-page {
+    position: relative;
+    min-height: calc(100dvh - 8rem);
+    isolation: isolate;
+  }
+
+  .dashboard-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+      radial-gradient(
+        42rem circle at 14% 14%,
+        rgba(59, 130, 246, 0.13),
+        transparent 62%
+      ),
+      radial-gradient(
+        34rem circle at 84% 6%,
+        rgba(20, 184, 166, 0.1),
+        transparent 64%
+      );
+  }
+
+  .dashboard-shell {
+    position: relative;
+    z-index: 1;
+    padding-top: var(--space-xl);
+    padding-bottom: var(--space-2xl);
+  }
+</style>

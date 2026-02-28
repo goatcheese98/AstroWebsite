@@ -40,7 +40,6 @@ const convertToSceneElements = (elements: CanvasElementInput[]): ExcalidrawEleme
 
 interface CanvasUIProps {
   isSharedMode: boolean;
-  isCollaborating: boolean;
 }
 
 const TOAST_EXIT_DURATION_MS = 220;
@@ -51,7 +50,6 @@ type RenderedToast = Toast & {
 
 export default function CanvasUI({
   isSharedMode,
-  isCollaborating,
 }: CanvasUIProps) {
   const store = useUnifiedCanvasStore();
   const api = useExcalidrawAPISafe();
@@ -724,7 +722,6 @@ export default function CanvasUI({
         isDirty={isDirty}
         lastSaved={lastSaved}
         isSharedMode={isSharedMode}
-        isCollaborating={isCollaborating}
       />
 
       {/* AI Chat Panel */}

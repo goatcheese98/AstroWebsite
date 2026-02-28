@@ -65,8 +65,11 @@ const marqueeItems = [
       if (!landingEl || reducedMotion) return;
       if (pointerFrame) cancelAnimationFrame(pointerFrame);
       pointerFrame = requestAnimationFrame(() => {
-        const x = (event.clientX / window.innerWidth) * 100;
-        const y = (event.clientY / window.innerHeight) * 100;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const x = (event.clientX / viewportWidth) * 100;
+        const y = (event.clientY / viewportHeight) * 100;
+
         landingEl.style.setProperty("--glow-x", `${x}%`);
         landingEl.style.setProperty("--glow-y", `${y}%`);
       });
@@ -186,6 +189,12 @@ const marqueeItems = [
   .landing-page {
     --glow-x: 50%;
     --glow-y: 20%;
+    --landing-glow-primary-rgb: 255, 214, 0;   /* yellow */
+    --landing-glow-secondary-rgb: 251, 191, 36; /* amber */
+    --landing-glow-tertiary-rgb: 245, 158, 11;  /* warm amber */
+    --landing-glow-primary-alpha: 0.2;
+    --landing-glow-secondary-alpha: 0.15;
+    --landing-glow-tertiary-alpha: 0.12;
     position: relative;
     background: transparent;
   }
@@ -194,16 +203,36 @@ const marqueeItems = [
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 1;
-    background: radial-gradient(
-      circle 520px at var(--glow-x) var(--glow-y),
-      rgba(255, 214, 0, 0.18),
-      transparent 70%
-    );
+    z-index: 12;
+    will-change: background;
+    mix-blend-mode: screen;
+    background:
+      radial-gradient(
+        circle 390px at var(--glow-x) var(--glow-y),
+        rgba(var(--landing-glow-primary-rgb), var(--landing-glow-primary-alpha)),
+        rgba(var(--landing-glow-secondary-rgb), calc(var(--landing-glow-secondary-alpha) * 0.75)) 52%,
+        transparent 72%
+      ),
+      radial-gradient(
+        circle 200px at var(--glow-x) var(--glow-y),
+        rgba(var(--landing-glow-tertiary-rgb), var(--landing-glow-tertiary-alpha)),
+        transparent 74%
+      );
+  }
+
+  :global([data-theme="dark"]) .landing-page {
+    --landing-glow-primary-rgb: 249, 115, 22;  /* orange */
+    --landing-glow-secondary-rgb: 190, 24, 93; /* rose red */
+    --landing-glow-tertiary-rgb: 147, 51, 234; /* purple */
+    --landing-glow-primary-alpha: 0.25;
+    --landing-glow-secondary-alpha: 0.18;
+    --landing-glow-tertiary-alpha: 0.15;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .landing-glow { display: none; }
+    .landing-glow {
+      display: none;
+    }
   }
 
   .landing-progress {

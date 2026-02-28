@@ -2,6 +2,7 @@
  * CanvasContainer
  *
  * Hosts the Excalidraw instance and composes canvas UI layers.
+ * Owns the collaboration session via useCollaboration.
  */
 
 import { useRef, useCallback, useMemo, useState } from 'react';
@@ -12,13 +13,15 @@ import {
   type ExcalidrawAPI,
 } from '@/stores';
 import { useCanvasPersistence } from './hooks/useCanvasPersistence';
-import { LiveCollaborationTrigger, MainMenu } from "@excalidraw/excalidraw";
+import { useCollaboration } from '@/hooks/useCollaboration';
+import { MainMenu, LiveCollaborationTrigger } from "@excalidraw/excalidraw";
 
 // Sub-components
 import CanvasCore from './CanvasCore';
 import CanvasUI from './CanvasUI';
 import CanvasNotesLayer from './CanvasNotesLayer';
 import CanvasAvatar from '../islands/CanvasAvatar';
+import CollabDialog from './CollabDialog';
 
 import "@excalidraw/excalidraw/index.css";
 
@@ -29,12 +32,8 @@ declare global {
 }
 
 interface CanvasContainerProps {
-  /** Enable collaboration mode on mount */
   isSharedMode?: boolean;
-  /** Force clear canvas on mount (new canvas mode) */
   shouldClearOnMount?: boolean;
-
-  // Auth props passed from Astro
   isSignedIn?: boolean;
   userId?: string | null;
   userName?: string | null;
@@ -51,15 +50,11 @@ export default function CanvasContainer({
 }: CanvasContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // === STORE CONNECTION ===
+  // === STORE ===
   const store = useUnifiedCanvasStore();
-  const {
-    canvasId,
-    addToast,
-  } = store;
-  const [isCollaborating, setIsCollaborating] = useState(isSharedMode);
+  const { canvasId, addToast } = store;
 
-  // === API MANAGEMENT ===
+  // === API ===
   const api = useExcalidrawAPISafe();
   const setApi = useSetExcalidrawAPI();
 
@@ -73,30 +68,34 @@ export default function CanvasContainer({
   useCanvasPersistence({
     canvasId,
     shouldClearOnMount,
-    onError: (err) => {
-      addToast(`Save failed: ${err.message}`, 'error');
-    },
+    onError: (err) => addToast(`Save failed: ${err.message}`, 'error'),
   });
 
-  const toggleCollaboration = useCallback(() => {
-    setIsCollaborating((prev) => {
-      const next = !prev;
-      addToast(
-        next
-          ? "Native collaboration mode enabled"
-          : "Native collaboration mode disabled",
-        "info"
-      );
-      return next;
-    });
-  }, [addToast]);
+  // === COLLABORATION ===
+  const {
+    isCollaborating,
+    roomLink,
+    username,
+    setUsername,
+    startSession,
+    stopSession,
+    handleSceneChange,
+    handlePointerUpdate,
+  } = useCollaboration();
+
+  const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
+
+  const openCollabDialog = useCallback(() => setIsCollabDialogOpen(true), []);
+  const closeCollabDialog = useCallback(() => setIsCollabDialogOpen(false), []);
+
+  // === EXCALIDRAW LAYOUT ===
 
   const renderTopRightUI = useMemo(
     () => (_isMobile: boolean, _appState: unknown) => (
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <LiveCollaborationTrigger
           isCollaborating={isCollaborating}
-          onSelect={toggleCollaboration}
+          onSelect={openCollabDialog}
         />
         <CanvasAvatar
           user={isSignedIn && userId ? {
@@ -110,7 +109,7 @@ export default function CanvasContainer({
         />
       </div>
     ),
-    [avatarUrl, isCollaborating, isSignedIn, toggleCollaboration, userId, userName]
+    [avatarUrl, isCollaborating, isSignedIn, openCollabDialog, userId, userName],
   );
 
   const renderMainMenu = useMemo(
@@ -122,7 +121,7 @@ export default function CanvasContainer({
         <MainMenu.DefaultItems.SaveAsImage />
         <MainMenu.DefaultItems.LiveCollaborationTrigger
           isCollaborating={isCollaborating}
-          onSelect={toggleCollaboration}
+          onSelect={openCollabDialog}
         />
         <MainMenu.DefaultItems.CommandPalette />
         <MainMenu.DefaultItems.SearchMenu />
@@ -138,7 +137,7 @@ export default function CanvasContainer({
         <MainMenu.DefaultItems.ChangeCanvasBackground />
       </MainMenu>
     ),
-    [isCollaborating, toggleCollaboration]
+    [isCollaborating, openCollabDialog],
   );
 
   return (
@@ -158,6 +157,8 @@ export default function CanvasContainer({
         onApiReady={handleApiReady}
         isSharedMode={isSharedMode}
         isCollaborating={isCollaborating}
+        onSceneChange={handleSceneChange}
+        onPointerUpdate={handlePointerUpdate}
         renderTopRightUI={renderTopRightUI}
       >
         {renderMainMenu}
@@ -167,9 +168,21 @@ export default function CanvasContainer({
       <CanvasNotesLayer api={api} />
 
       {/* UI Layer (controls, modals, chat) */}
-      <CanvasUI
-        isSharedMode={isSharedMode}
+      <CanvasUI isSharedMode={isSharedMode} />
+
+      {/* Live Collaboration Dialog */}
+      <CollabDialog
+        isOpen={isCollabDialogOpen}
+        onClose={closeCollabDialog}
         isCollaborating={isCollaborating}
+        roomLink={roomLink}
+        username={username}
+        onUsernameChange={setUsername}
+        onStartSession={startSession}
+        onStopSession={() => {
+          stopSession();
+          addToast("Collaboration session ended", "info");
+        }}
       />
     </div>
   );

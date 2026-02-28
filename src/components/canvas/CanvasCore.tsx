@@ -25,6 +25,11 @@ interface CanvasCoreProps {
     appState: Partial<ExcalidrawAppState>,
     files: SceneFiles
   ) => void;
+  onPointerUpdate?: (payload: {
+    pointer: { x: number; y: number };
+    button: "down" | "up";
+    pointersMap: Map<number, Readonly<{ x: number; y: number }>>;
+  }) => void;
   renderTopRightUI?: (isMobile: boolean, appState: unknown) => React.ReactElement | null;
   children?: React.ReactNode;
 }
@@ -73,6 +78,7 @@ export default function CanvasCore({
   isSharedMode,
   isCollaborating,
   onSceneChange,
+  onPointerUpdate,
   renderTopRightUI,
   children,
 }: CanvasCoreProps) {
@@ -180,6 +186,7 @@ export default function CanvasCore({
         excalidrawAPI={handleApiChange}
         initialData={initialData as React.ComponentProps<typeof Excalidraw>["initialData"]}
         onChange={handleChange}
+        onPointerUpdate={onPointerUpdate}
         isCollaborating={!!isCollaborating}
         theme="light"
         UIOptions={UIOptions}

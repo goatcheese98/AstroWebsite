@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "dev:canvas": "astro dev",
+    "dev:all": "bunx concurrently \"astro dev\" \"bunx partykit dev\"",
     "dev:preview": "bun run build && bunx wrangler pages dev dist --port=4321",
     "dev:party": "bunx partykit dev",
     "build": "astro build",
@@ -52,6 +53,7 @@
     "lexical": "^0.40.0",
     "nanoid": "^5.1.6",
     "partykit": "^0.0.115",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -66,8 +68,10 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.3.1",
     "vitest": "^4.0.18"
   },

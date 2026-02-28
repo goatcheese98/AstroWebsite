@@ -1,0 +1,7 @@
+{
+  "name": "astroweb-excalidraw",
+  "main": "partykit/server.ts",
+  "parties": {
+    "collab": "partykit/collab.ts"
+  }
+}

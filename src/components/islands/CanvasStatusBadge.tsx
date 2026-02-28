@@ -21,14 +21,12 @@ interface CanvasStatusBadgeProps {
   isDirty?: boolean;
   lastSaved?: Date | null;
   isSharedMode?: boolean;
-  isCollaborating?: boolean;
 }
 
 export default function CanvasStatusBadge({
   isDirty: propIsDirty,
   lastSaved: propLastSaved,
   isSharedMode,
-  isCollaborating,
 }: CanvasStatusBadgeProps) {
   const store = useUnifiedCanvasStore();
   const { lastSaved: storeLastSaved, isDirty: storeIsDirty } = store;
@@ -58,12 +56,10 @@ export default function CanvasStatusBadge({
     strokeColor = '#22c55e';
   }
 
-  // Add collaboration status
-  if (isCollaborating) {
-    statusText += ' • Collaboration on';
-  } else if (isSharedMode) {
+  if (isSharedMode) {
     statusText += ' • Shared view';
   }
+
 
   return (
     <div

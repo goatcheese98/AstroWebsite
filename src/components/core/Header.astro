@@ -56,10 +56,12 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     left: 0;
     width: 100%;
     z-index: 100;
-    background: rgba(var(--color-bg-rgb), 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--color-stroke-muted);
+    background: rgba(var(--color-bg-rgb), 0.46);
+    backdrop-filter: blur(14px) saturate(130%);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--color-stroke-muted) 55%, transparent);
+    box-shadow: 0 10px 24px -22px rgba(13, 13, 18, 0.32);
     transition:
       background 0.3s ease,
       box-shadow 0.3s ease;
@@ -116,10 +118,13 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
   .header__links {
     display: flex;
     gap: var(--space-xs);
-    background: var(--color-surface);
+    background: rgba(var(--color-bg-rgb), 0.5);
     padding: var(--space-xs);
     border-radius: var(--radius-lg);
-    border: 1px solid var(--color-stroke-muted);
+    border: 1px solid
+      color-mix(in srgb, var(--color-stroke-muted) 70%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .header__link {
@@ -136,12 +141,12 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
   .header__link:hover {
     color: var(--color-text);
     text-decoration: none;
-    background: var(--color-bg);
+    background: rgba(var(--color-bg-rgb), 0.58);
   }
 
   .header__link.active {
     color: var(--color-text);
-    background: var(--color-fill-1);
+    background: color-mix(in srgb, var(--color-fill-1) 74%, transparent);
     font-weight: 600;
   }
 
