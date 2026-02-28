@@ -306,7 +306,7 @@ export function CanvasLibraryPure() {
           </div>
           <h3>No canvases found</h3>
           <p>Create a new canvas to get started with your next big idea.</p>
-          <a href="/ai-canvas?new=true" className="btn-primary large">Create New Canvas</a>
+          <a href="/canvas?new=true" className="btn-primary large">Create New Canvas</a>
         </div>
       ) : (
         <div className={`canvas-grid ${viewMode}`}>
@@ -331,7 +331,7 @@ export function CanvasLibraryPure() {
               </div>
 
               {/* Thumbnail Area */}
-              <a href={`/ai-canvas?canvas=${canvas.id}`} className="card-thumb">
+              <a href={`/canvas?canvas=${canvas.id}`} className="card-thumb">
                 {canvas.thumbnailUrl ? (
                   <img src={canvas.thumbnailUrl} alt={canvas.title} loading="lazy" />
                 ) : (

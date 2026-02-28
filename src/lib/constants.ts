@@ -21,9 +21,8 @@ export const SITE: SiteMetadata = {
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Home", href: "/" },
-  { label: "AI Canvas", href: "/ai-canvas" },
+  { label: "AI Canvas", href: "/canvas" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Blog", href: "/blog" },
 ];
 
 // Canvas-only navigation (no home/blog)
@@ -33,7 +32,7 @@ export const PROJECTS: Project[] = [
   {
     title: "ALGS Esports Performance Dashboard",
     description:
-      "Interactive data visualization dashboard analyzing player and team performance in the Apex Legends Global Series championship. Built a Python data pipeline to scrape, clean, and structure complex tournament data into queryable format.",
+      "Interactive dashboard for ALGS player and team performance, powered by a Python data pipeline for clean, queryable tournament analytics.",
     tags: ["Python", "Data Visualization", "Web Scraping", "Analytics"],
     codeUrl: "https://github.com/goatcheese98/algs-championship-viz",
     featured: true,

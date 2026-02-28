@@ -11,15 +11,13 @@ const TITLES = [
 ---
 
 <section class="hero section-gap" aria-label="Introduction">
-  <div class="hero__bg-word" aria-hidden="true">ROHAN</div>
-
   <div class="container">
     <div class="hero__content">
       <div class="hero__text">
         <p class="hero__greeting">
           <span class="hero__greeting-line">Hi, I'm</span>
         </p>
-        <h1 class="hero__name">
+        <h1 class="hero__name" id="hero-name">
           <span class="gradient-text">{SITE.author}</span>
         </h1>
         <p class="hero__title">
@@ -27,13 +25,12 @@ const TITLES = [
             class="hero__title-text"
             id="hero-title"
             data-titles={JSON.stringify(TITLES)}></span>
-          <span class="hero__title-cursor" aria-hidden="true">|</span>
         </p>
         <p class="hero__pitch">
-          I transform complex data into actionable insights and drive strategic
-          decision-making. UBC MBAN candidate with experience in wealth
-          management analytics, data visualization, and cross-functional
-          collaboration.
+          I transform complex data into <strong>actionable insights</strong>
+          and drive strategic decision-making. UBC MBAN candidate with
+          experience in wealth management analytics, data visualization,
+          and cross-functional collaboration.
         </p>
 
         <div class="hero__sticker">Available for work ✦</div>
@@ -50,6 +47,10 @@ const TITLES = [
 <script>
   // Typewriter effect that cycles through titles with backspace
   function initTypewriter() {
+    const existingCleanup = (window as Window & { __heroTypeCleanup?: () => void })
+      .__heroTypeCleanup;
+    if (existingCleanup) existingCleanup();
+
     const el = document.querySelector("#hero-title") as HTMLElement;
     if (!el) return;
 
@@ -58,13 +59,20 @@ const TITLES = [
     let charIndex = 0;
     let isDeleting = false;
     let isPaused = false;
+    let timeoutId: number | undefined;
+
+    const longestTitleLength = titles.reduce(
+      (max: number, title: string) => Math.max(max, title.length),
+      0,
+    );
+    el.style.minWidth = `${longestTitleLength}ch`;
 
     const type = () => {
       const currentTitle = titles[titleIndex];
 
       if (isPaused) {
         isPaused = false;
-        setTimeout(() => {
+        timeoutId = window.setTimeout(() => {
           isDeleting = true;
           type();
         }, 2000);
@@ -78,9 +86,9 @@ const TITLES = [
         if (charIndex === 0) {
           isDeleting = false;
           titleIndex = (titleIndex + 1) % titles.length;
-          setTimeout(type, 300);
+          timeoutId = window.setTimeout(type, 300);
         } else {
-          setTimeout(type, 40);
+          timeoutId = window.setTimeout(type, 40);
         }
       } else {
         el.textContent = currentTitle.substring(0, charIndex + 1);
@@ -88,20 +96,35 @@ const TITLES = [
 
         if (charIndex === currentTitle.length) {
           isPaused = true;
-          setTimeout(type, 500);
+          timeoutId = window.setTimeout(type, 500);
         } else {
-          setTimeout(type, 80 + Math.random() * 40);
+          timeoutId = window.setTimeout(type, 80 + Math.random() * 40);
         }
       }
     };
 
-    setTimeout(type, 500);
+    timeoutId = window.setTimeout(type, 500);
+
+    (window as Window & { __heroTypeCleanup?: () => void }).__heroTypeCleanup = () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }
 
-  initTypewriter();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTypewriter);
+  } else {
+    initTypewriter();
+  }
+
+  document.addEventListener("astro:page-load", initTypewriter);
+  document.addEventListener("astro:before-swap", () => {
+    (window as Window & { __heroTypeCleanup?: () => void }).__heroTypeCleanup?.();
+  });
 </script>
 
 <style>
+  @import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&display=swap");
+
   .hero {
     position: relative;
     overflow: hidden;
@@ -109,28 +132,6 @@ const TITLES = [
     flex-direction: column;
     justify-content: flex-start;
     padding-block: clamp(0.5rem, 2vw, 1.25rem) clamp(0.75rem, 2vw, 1.5rem);
-  }
-
-  /* ── Watermark ── */
-  .hero__bg-word {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: clamp(10rem, 28vw, 22rem);
-    font-weight: 900;
-    font-family: var(--font-ui);
-    color: transparent;
-    -webkit-text-stroke: 2px rgba(13, 13, 18, 0.055);
-    white-space: nowrap;
-    pointer-events: none;
-    user-select: none;
-    letter-spacing: -0.04em;
-    z-index: 0;
-  }
-
-  :global([data-theme="dark"]) .hero__bg-word {
-    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.06);
   }
 
   /* ── Sticker ── */
@@ -143,7 +144,7 @@ const TITLES = [
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: 0.06em;
-    background: rgba(200, 241, 53, 0.85);
+    background: #ffd600;
     border: 2px solid #0d0d12;
     box-shadow: 3px 3px 0 #0d0d12;
     margin-top: var(--space-md);
@@ -152,7 +153,7 @@ const TITLES = [
   }
 
   :global([data-theme="dark"]) .hero__sticker {
-    background: rgba(200, 241, 53, 0.75);
+    background: #e6c000;
   }
 
   .hero__content {
@@ -171,49 +172,54 @@ const TITLES = [
   }
 
   .hero__greeting {
-    font-family: var(--font-hand);
-    font-size: var(--text-xl);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
-    margin-bottom: var(--space-xs);
+    margin-bottom: var(--space-sm);
   }
 
   .hero__name {
-    font-family: var(--font-ui);
-    font-size: var(--text-4xl);
-    font-weight: 700;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(2.8rem, 7vw, 5.6rem);
+    font-weight: 900;
     margin-bottom: var(--space-sm);
-    line-height: 1.1;
+    line-height: 0.96;
     letter-spacing: -0.03em;
   }
 
   .hero__title {
-    font-family: var(--font-hand);
-    font-size: var(--text-2xl);
+    font-family: var(--font-mono);
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--color-text);
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-md);
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-    min-height: 1.4em;
+    min-height: 1.7em;
   }
 
   .hero__title-text {
+    display: inline-block;
     position: relative;
-    background: linear-gradient(
-      135deg,
-      var(--color-accent),
-      var(--color-gradient-end)
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0d0d12;
     white-space: nowrap;
+    font-weight: 700;
   }
 
-  .hero__title-cursor {
-    color: var(--color-accent);
+  :global([data-theme="dark"]) .hero__title-text {
+    color: #f5f5f5;
+  }
+
+  .hero__title-text::after {
+    content: "|";
+    margin-left: 0.08em;
+    color: #ffd600;
+    font-weight: 600;
     animation: blink 1s step-end infinite;
-    font-weight: 300;
   }
 
   @keyframes blink {
@@ -223,11 +229,16 @@ const TITLES = [
 
   .hero__pitch {
     font-family: var(--font-body);
-    font-size: var(--text-lg);
+    font-size: clamp(1rem, 1.8vw, 1.18rem);
     color: var(--color-text-muted);
-    line-height: 1.8;
+    line-height: 1.7;
     margin-bottom: var(--space-md);
     max-width: 50ch;
+  }
+
+  .hero__pitch strong {
+    color: var(--color-text);
+    font-weight: 700;
   }
 
   .hero__deco {
@@ -246,12 +257,12 @@ const TITLES = [
     }
   }
 
-  /* Mobile: stacked with constellation below text */
+  /* Mobile: text-first layout, hide MarvinBot */
   @media (max-width: 900px) {
     .hero__content {
       flex-direction: column;
       text-align: center;
-      gap: var(--space-xl);
+      gap: var(--space-md);
       padding-block: var(--space-lg);
     }
 
@@ -265,10 +276,12 @@ const TITLES = [
       margin-inline: auto;
     }
 
+    .hero__title {
+      justify-content: center;
+    }
+
     .hero__deco {
-      order: 2;
-      min-width: auto;
-      padding-top: 10px;
+      display: none;
     }
 
     .hero__sticker {
@@ -277,17 +290,9 @@ const TITLES = [
   }
 
   @media (max-width: 640px) {
-    .hero__name {
-      font-size: var(--text-3xl);
-    }
-
     .hero__title {
-      font-size: var(--text-xl);
+      font-size: 0.92rem;
       justify-content: center;
-    }
-
-    .hero__bg-word {
-      display: none;
     }
   }
 </style>

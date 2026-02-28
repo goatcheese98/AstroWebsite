@@ -14,7 +14,9 @@
     | "jump";
   type TetrisMode = "closed" | "menu" | "playing" | "paused" | "gameover";
   type TetrisAction = "left" | "right" | "down" | "rotate" | "drop" | "pause";
-  type GameView = "list" | "tetris";
+  type WhacMode = "closed" | "menu" | "playing" | "gameover";
+  type WhacDifficulty = "easy" | "medium" | "hard";
+  type GameView = "list" | "tetris" | "whac";
   const TETRIS_PIECES = ["I", "O", "T", "S", "Z", "J", "L"] as const;
   type TetrisPieceType = (typeof TETRIS_PIECES)[number];
   type TetrisPiece = { type: TetrisPieceType; rotation: number; x: number; y: number };
@@ -240,6 +242,22 @@
       ],
     ],
   };
+  const WHAC_SLOTS = [
+    { id: 0, x: 121, y: 206 },
+    { id: 1, x: 150, y: 206 },
+    { id: 2, x: 179, y: 206 },
+    { id: 3, x: 121, y: 232 },
+    { id: 4, x: 150, y: 232 },
+    { id: 5, x: 179, y: 232 },
+  ] as const;
+  const WHAC_DIFFICULTY_CONFIG: Record<
+    WhacDifficulty,
+    { label: string; visibleBase: number; visibleVariance: number; gapBase: number; gapVariance: number }
+  > = {
+    easy: { label: "EASY", visibleBase: 620, visibleVariance: 420, gapBase: 300, gapVariance: 360 },
+    medium: { label: "MED", visibleBase: 470, visibleVariance: 360, gapBase: 220, gapVariance: 300 },
+    hard: { label: "HARD", visibleBase: 330, visibleVariance: 300, gapBase: 140, gapVariance: 220 },
+  };
 
   // State
   let robotState = $state<RobotState>("idle");
@@ -262,6 +280,12 @@
   let tetrisNextPiece = $state<TetrisPieceType>(randomTetrisPiece());
   let tetrisScore = $state(0);
   let tetrisLines = $state(0);
+  let whacMode = $state<WhacMode>("closed");
+  let whacScore = $state(0);
+  let whacTimeLeft = $state(30);
+  let whacActiveSlot = $state<number | null>(null);
+  let lastWhacSlot = $state<number | null>(null);
+  let whacDifficulty = $state<WhacDifficulty>("medium");
 
   // Refs for timers
   let waveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -270,6 +294,9 @@
   let breathInterval: ReturnType<typeof setInterval> | null = null;
   let idleTimer: ReturnType<typeof setInterval> | null = null;
   let tetrisDropTimer: ReturnType<typeof setInterval> | null = null;
+  let whacCountdownTimer: ReturnType<typeof setInterval> | null = null;
+  let whacSpawnTimer: ReturnType<typeof setTimeout> | null = null;
+  let whacHideTimer: ReturnType<typeof setTimeout> | null = null;
   const tetrisKeyListenerOptions: AddEventListenerOptions = { capture: true };
 
   function createEmptyTetrisBoard() {
@@ -362,6 +389,30 @@
     tetrisNextPiece = randomTetrisPiece();
   }
 
+  function clearWhacTimers() {
+    if (whacCountdownTimer) {
+      clearInterval(whacCountdownTimer);
+      whacCountdownTimer = null;
+    }
+    if (whacSpawnTimer) {
+      clearTimeout(whacSpawnTimer);
+      whacSpawnTimer = null;
+    }
+    if (whacHideTimer) {
+      clearTimeout(whacHideTimer);
+      whacHideTimer = null;
+    }
+  }
+
+  function resetWhacState() {
+    clearWhacTimers();
+    whacMode = "closed";
+    whacScore = 0;
+    whacTimeLeft = 30;
+    whacActiveSlot = null;
+    lastWhacSlot = null;
+  }
+
   function openGamesMenu(event?: Event) {
     stopEvent(event);
     idleTime = 0;
@@ -372,6 +423,7 @@
     screenMessage = "games";
     gameView = "list";
     resetTetrisState();
+    resetWhacState();
   }
 
   function closeGames(event?: Event) {
@@ -379,6 +431,7 @@
     expandedGameOpen = false;
     gameView = "list";
     resetTetrisState();
+    resetWhacState();
     robotState = "idle";
     screenMessage = "smile";
   }
@@ -411,8 +464,24 @@
     robotState = "happy";
     screenMessage = "games";
     gameView = "tetris";
+    resetWhacState();
     if (tetrisMode === "closed") {
       tetrisMode = "menu";
+    }
+  }
+
+  function openWhacGame(event?: Event) {
+    stopEvent(event);
+    idleTime = 0;
+    if (robotState === "sleeping") {
+      robotState = "idle";
+    }
+    robotState = "happy";
+    screenMessage = "games";
+    gameView = "whac";
+    resetTetrisState();
+    if (whacMode === "closed") {
+      whacMode = "menu";
     }
   }
 
@@ -422,6 +491,7 @@
     screenMessage = "games";
     gameView = "list";
     resetTetrisState();
+    resetWhacState();
   }
 
   function spawnNextTetrisPiece() {
@@ -441,6 +511,7 @@
     robotState = "happy";
     screenMessage = "games";
     gameView = "tetris";
+    resetWhacState();
     tetrisBoard = createEmptyTetrisBoard();
     tetrisScore = 0;
     tetrisLines = 0;
@@ -453,6 +524,75 @@
       return;
     }
     tetrisPiece = first;
+  }
+
+  function pickNextWhacSlot() {
+    const candidates = WHAC_SLOTS.map((slot) => slot.id).filter((id) => id !== lastWhacSlot);
+    const fromPool = candidates.length ? candidates : WHAC_SLOTS.map((slot) => slot.id);
+    return fromPool[Math.floor(Math.random() * fromPool.length)];
+  }
+
+  function scheduleWhacRound() {
+    if (whacMode !== "playing") return;
+    const nextSlot = pickNextWhacSlot();
+    lastWhacSlot = nextSlot;
+    whacActiveSlot = nextSlot;
+    const settings = WHAC_DIFFICULTY_CONFIG[whacDifficulty];
+    const paceScale = Math.max(0.6, whacTimeLeft / 30);
+    const visibleMs =
+      settings.visibleBase + Math.floor(Math.random() * settings.visibleVariance * paceScale);
+    const nextRoundMs = visibleMs + settings.gapBase + Math.floor(Math.random() * settings.gapVariance);
+
+    if (whacHideTimer) clearTimeout(whacHideTimer);
+    whacHideTimer = setTimeout(() => {
+      if (whacMode === "playing" && whacActiveSlot === nextSlot) {
+        whacActiveSlot = null;
+      }
+    }, visibleMs);
+
+    if (whacSpawnTimer) clearTimeout(whacSpawnTimer);
+    whacSpawnTimer = setTimeout(scheduleWhacRound, nextRoundMs);
+  }
+
+  function setWhacDifficulty(level: WhacDifficulty, event?: Event) {
+    stopEvent(event);
+    whacDifficulty = level;
+  }
+
+  function startWhac(event?: Event) {
+    stopEvent(event);
+    idleTime = 0;
+    robotState = "happy";
+    screenMessage = "games";
+    gameView = "whac";
+    resetTetrisState();
+    clearWhacTimers();
+    whacScore = 0;
+    whacTimeLeft = 30;
+    whacActiveSlot = null;
+    whacMode = "playing";
+    scheduleWhacRound();
+    whacCountdownTimer = setInterval(() => {
+      if (whacMode !== "playing") return;
+      whacTimeLeft -= 1;
+      if (whacTimeLeft <= 0) {
+        whacTimeLeft = 0;
+        whacMode = "gameover";
+        whacActiveSlot = null;
+        clearWhacTimers();
+      }
+    }, 1000);
+  }
+
+  function whackMole(slotId: number, event?: Event) {
+    stopEvent(event);
+    if (whacMode !== "playing") return;
+    if (whacActiveSlot === slotId) {
+      whacScore += 1;
+      whacActiveSlot = null;
+      if (whacSpawnTimer) clearTimeout(whacSpawnTimer);
+      whacSpawnTimer = setTimeout(scheduleWhacRound, 90);
+    }
   }
 
   function togglePauseTetris(event?: Event) {
@@ -557,7 +697,7 @@
   }
 
   function handleTetrisKeydown(event: KeyboardEvent) {
-    if (expandedGameOpen || screenMessage !== "games" || gameView !== "tetris") {
+    if (expandedGameOpen || screenMessage !== "games") {
       return;
     }
 
@@ -570,6 +710,45 @@
     ) {
       return;
     }
+
+    if (gameView === "whac") {
+      const whacControlKeys = ["1", "2", "3", "4", "5", "6", "Enter", " ", "Escape"];
+      if (whacMode !== "closed" && whacControlKeys.includes(event.key)) {
+        consumeTetrisKeyboardEvent(event);
+      }
+
+      if (whacMode === "menu") {
+        if (event.key === "Enter" || event.key === " ") {
+          startWhac(event);
+        } else if (event.key === "Escape") {
+          backToGameList(event);
+        }
+        return;
+      }
+
+      if (whacMode === "gameover") {
+        if (event.key === "Enter" || event.key === " ") {
+          startWhac(event);
+        } else if (event.key === "Escape") {
+          backToGameList(event);
+        }
+        return;
+      }
+
+      if (whacMode !== "playing") return;
+
+      if (event.key === "Escape") {
+        backToGameList(event);
+        return;
+      }
+
+      if (/^[1-6]$/.test(event.key)) {
+        whackMole(Number(event.key) - 1);
+      }
+      return;
+    }
+
+    if (gameView !== "tetris") return;
 
     if (
       tetrisMode !== "closed" &&
@@ -751,6 +930,7 @@
       if (breathInterval) clearInterval(breathInterval);
       if (idleTimer) clearInterval(idleTimer);
       if (tetrisDropTimer) clearInterval(tetrisDropTimer);
+      clearWhacTimers();
     };
   });
 
@@ -843,7 +1023,9 @@
   );
   const screenBg = $derived(
     isGamesOpen
-      ? "#0a0a14"
+      ? gameView === "whac"
+        ? "#ffedd5"
+        : "#0a0a14"
       : isExcited || isLove
       ? "#fca5a5"
       : isHappy
@@ -1081,14 +1263,19 @@
               </text>
 
               <g class="tetris-ui-button" onclick={(event) => openTetrisGame(event)}>
-                <rect x="112" y="203" width="76" height="16" rx="4" fill="#1d4ed8" />
-                <text x="150" y="213.4" text-anchor="middle" fill="#eff6ff" font-size="6.4" font-family="monospace">
+                <rect x="112" y="201" width="76" height="15" rx="4" fill="#1d4ed8" />
+                <text x="150" y="210.8" text-anchor="middle" fill="#eff6ff" font-size="6.2" font-family="monospace">
                   TETRIS
                 </text>
               </g>
-              <text x="150" y="226" text-anchor="middle" fill="#64748b" font-size="4.6" font-family="monospace">
-                MORE GAMES SOON
-              </text>
+
+              <g class="tetris-ui-button" onclick={(event) => openWhacGame(event)}>
+                <rect x="112" y="219" width="76" height="15" rx="4" fill="#ea580c" />
+                <text x="150" y="228.8" text-anchor="middle" fill="#fff7ed" font-size="5.8" font-family="monospace">
+                  WHAC-A-MOLE
+                </text>
+              </g>
+
               <g class="tetris-ui-button tetris-ui-secondary" onclick={(event) => openExpandedGame(event)}>
                 <rect x="111" y="233" width="37" height="10" rx="3" fill="#334155" />
                 <text x="129.5" y="239.8" text-anchor="middle" fill="#e2e8f0" font-size="4.6" font-family="monospace">
@@ -1101,7 +1288,7 @@
                   EXIT
                 </text>
               </g>
-            {:else}
+            {:else if gameView === "tetris"}
               <text x="107" y="190.5" fill="#a78bfa" font-size="6" font-family="monospace">TETRIS</text>
               <text x="196" y="190.5" text-anchor="end" fill="#c4b5fd" font-size="6" font-family="monospace">
                 {tetrisScore}
@@ -1260,6 +1447,117 @@
                     <rect x="172" y="256" width="12" height="9" rx="2" fill="#1e293b" />
                     <text x="178" y="262" text-anchor="middle" fill="#e2e8f0" font-size="5.5" font-family="monospace">
                       v
+                    </text>
+                  </g>
+                {/if}
+              {/if}
+            {:else if gameView === "whac"}
+              <text x="106" y="190.5" fill="#fb923c" font-size="5.4" font-family="monospace">WHAC-A-MOLE</text>
+              <text x="196" y="190.5" text-anchor="end" fill="#fdba74" font-size="6" font-family="monospace">
+                {whacScore}
+              </text>
+              <text x="160" y="190.5" fill="#94a3b8" font-size="4.7" font-family="monospace">
+                {whacTimeLeft}s
+              </text>
+              <text x="151" y="197.4" text-anchor="middle" fill="#cbd5e1" font-size="4" font-family="monospace">
+                {WHAC_DIFFICULTY_CONFIG[whacDifficulty].label}
+              </text>
+
+              <rect x="106" y="199" width="88" height="64" rx="4" fill="#ffedd5" stroke="#fdba74" stroke-width="0.9" />
+
+              <g class="tetris-control-button" onclick={(event) => backToGameList(event)}>
+                <rect x="166" y="194" width="10" height="8" rx="2" fill="#334155" />
+                <text x="171" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.4" font-family="monospace">
+                  M
+                </text>
+              </g>
+              <g class="tetris-control-button" onclick={(event) => openExpandedGame(event)}>
+                <rect x="178" y="194" width="10" height="8" rx="2" fill="#334155" />
+                <text x="183" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.8" font-family="monospace">
+                  +
+                </text>
+              </g>
+              <g class="tetris-control-button" onclick={(event) => closeGames(event)}>
+                <rect x="190" y="194" width="10" height="8" rx="2" fill="#334155" />
+                <text x="195" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.6" font-family="monospace">
+                  X
+                </text>
+              </g>
+
+              {#if whacMode === "menu"}
+                <text x="150" y="211" text-anchor="middle" fill="#fff7ed" font-size="6.6" font-family="monospace">
+                  WHACK 1-6
+                </text>
+                <text x="150" y="219" text-anchor="middle" fill="#cbd5e1" font-size="4.6" font-family="monospace">
+                  Click mole or press key
+                </text>
+                <text x="150" y="225.5" text-anchor="middle" fill="#cbd5e1" font-size="4.3" font-family="monospace">
+                  30 second round
+                </text>
+                <g class="tetris-ui-button" onclick={(event) => setWhacDifficulty("easy", event)}>
+                  <rect x="111" y="228" width="23" height="8" rx="2.2" fill={whacDifficulty === "easy" ? "#16a34a" : "#334155"} />
+                  <text x="122.5" y="233.5" text-anchor="middle" fill="#f8fafc" font-size="4.2" font-family="monospace">
+                    EASY
+                  </text>
+                </g>
+                <g class="tetris-ui-button" onclick={(event) => setWhacDifficulty("medium", event)}>
+                  <rect x="138" y="228" width="24" height="8" rx="2.2" fill={whacDifficulty === "medium" ? "#ea580c" : "#334155"} />
+                  <text x="150" y="233.5" text-anchor="middle" fill="#f8fafc" font-size="4.2" font-family="monospace">
+                    MED
+                  </text>
+                </g>
+                <g class="tetris-ui-button" onclick={(event) => setWhacDifficulty("hard", event)}>
+                  <rect x="166" y="228" width="23" height="8" rx="2.2" fill={whacDifficulty === "hard" ? "#dc2626" : "#334155"} />
+                  <text x="177.5" y="233.5" text-anchor="middle" fill="#f8fafc" font-size="4.2" font-family="monospace">
+                    HARD
+                  </text>
+                </g>
+                <g class="tetris-ui-button" onclick={(event) => startWhac(event)}>
+                  <rect x="117" y="238" width="66" height="10" rx="3.2" fill="#ea580c" />
+                  <text x="150" y="244.8" text-anchor="middle" fill="#fff7ed" font-size="5.6" font-family="monospace">
+                    START GAME
+                  </text>
+                </g>
+                <g class="tetris-ui-button tetris-ui-secondary" onclick={(event) => backToGameList(event)}>
+                  <rect x="117" y="250" width="66" height="7" rx="2.6" fill="#334155" />
+                  <text x="150" y="255.1" text-anchor="middle" fill="#e2e8f0" font-size="4.5" font-family="monospace">
+                    BACK TO GAMES
+                  </text>
+                </g>
+              {:else}
+                {#each WHAC_SLOTS as slot}
+                  <g class="tetris-control-button" onclick={(event) => whackMole(slot.id, event)}>
+                    <ellipse cx={slot.x} cy={slot.y + 8} rx="10.5" ry="5.3" fill="#9a3412" />
+                    <ellipse cx={slot.x} cy={slot.y + 8} rx="10.5" ry="5.3" fill="none" stroke="#7c2d12" stroke-width="1" />
+                    <text x={slot.x} y={slot.y + 11} text-anchor="middle" fill="#fed7aa" font-size="4.2" font-family="monospace">
+                      {slot.id + 1}
+                    </text>
+                    {#if whacActiveSlot === slot.id}
+                      <circle cx={slot.x} cy={slot.y + 1} r="7" fill="#a16207" />
+                      <circle cx={slot.x - 2} cy={slot.y - 1} r="1.5" fill="#fef3c7" opacity="0.7" />
+                      <circle cx={slot.x + 2.5} cy={slot.y + 1.2} r="1.2" fill="#fef3c7" opacity="0.45" />
+                    {/if}
+                  </g>
+                {/each}
+
+                {#if whacMode === "gameover"}
+                  <rect x="116" y="214" width="67" height="19" rx="3" fill="rgba(124,45,18,0.88)" />
+                  <text x="150" y="222" text-anchor="middle" fill="#fff7ed" font-size="6" font-family="monospace">
+                    GAME OVER
+                  </text>
+                  <text x="150" y="228.2" text-anchor="middle" fill="#fdba74" font-size="4.8" font-family="monospace">
+                    SCORE {whacScore}
+                  </text>
+                  <g class="tetris-ui-button" onclick={(event) => startWhac(event)}>
+                    <rect x="117" y="236" width="31" height="10" rx="2.8" fill="#ea580c" />
+                    <text x="132.5" y="242.6" text-anchor="middle" fill="#fff7ed" font-size="4.8" font-family="monospace">
+                      RETRY
+                    </text>
+                  </g>
+                  <g class="tetris-ui-button tetris-ui-secondary" onclick={(event) => backToGameList(event)}>
+                    <rect x="152" y="236" width="31" height="10" rx="2.8" fill="#334155" />
+                    <text x="167.5" y="242.6" text-anchor="middle" fill="#e2e8f0" font-size="4.8" font-family="monospace">
+                      MENU
                     </text>
                   </g>
                 {/if}
@@ -1539,7 +1837,11 @@
     </svg>
   </div>
 
-  <Screen isOpen={expandedGameOpen} onClose={closeExpandedGame} />
+  <Screen
+    isOpen={expandedGameOpen}
+    game={gameView === "whac" ? "whac" : "tetris"}
+    onClose={closeExpandedGame}
+  />
 </div>
 
 <style>

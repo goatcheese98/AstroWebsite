@@ -281,8 +281,21 @@
 
   /* Mobile */
   @media (max-width: 640px) {
+    .skills-grid {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(84%, 1fr);
+      grid-template-columns: none;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--space-xs);
+    }
+
     .skill-card {
       animation-duration: 0.4s;
+      scroll-snap-align: start;
     }
 
     .skill-card__content {

@@ -258,6 +258,10 @@ const totalCards = EXPERIENCES.length;
   }
 
   @media (max-width: 900px) {
+    .experience :global(.section-header) {
+      margin-bottom: var(--space-md);
+    }
+
     .experience-stack {
       height: auto;
       display: grid;
@@ -273,6 +277,11 @@ const totalCards = EXPERIENCES.length;
       z-index: auto;
       box-shadow: none;
       opacity: 1;
+    }
+
+    .experience-card,
+    .experience-card:hover {
+      cursor: default;
     }
 
     .experience-card__header {
@@ -297,14 +306,19 @@ const totalCards = EXPERIENCES.length;
 
 <script>
   function initExperienceStack() {
+    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup?.();
+
     const stack = document.querySelector("[data-experience-stack]") as HTMLElement | null;
     if (!stack) return;
 
     const cards = Array.from(stack.querySelectorAll("[data-stack-card]")) as HTMLElement[];
     if (cards.length === 0) return;
 
+    const mobileQuery = window.matchMedia("(max-width: 900px)");
     const PEEK_H = 140;
     const n = cards.length;
+    const clickHandlers = new Map<HTMLElement, () => void>();
+    let isDesktopBound = false;
 
     const activate = (target: HTMLElement) => {
       const targetIdx = cards.indexOf(target);
@@ -331,26 +345,56 @@ const totalCards = EXPERIENCES.length;
       });
     };
 
-    const reset = () => activate(cards[0]);
+    const clearDesktopInlineStyles = () => {
+      cards.forEach((card, index) => {
+        card.classList.toggle("is-focused", index === 0);
+        card.style.removeProperty("top");
+        card.style.removeProperty("left");
+        card.style.removeProperty("right");
+        card.style.removeProperty("z-index");
+        card.style.removeProperty("opacity");
+      });
+    };
 
-    const clickHandlers = new Map<HTMLElement, () => void>();
+    const bindDesktopInteractions = () => {
+      if (isDesktopBound) return;
+      cards.forEach((card) => {
+        const clickHandler = () => activate(card);
+        clickHandlers.set(card, clickHandler);
+        card.addEventListener("click", clickHandler);
+      });
+      isDesktopBound = true;
+    };
 
-    cards.forEach((card) => {
-      const clickHandler = () => activate(card);
-      clickHandlers.set(card, clickHandler);
-      card.addEventListener("click", clickHandler);
-    });
-    window.addEventListener("resize", reset);
-
-    reset();
-
-    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup?.();
-    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup = () => {
+    const unbindDesktopInteractions = () => {
+      if (!isDesktopBound) return;
       cards.forEach((card) => {
         const clickHandler = clickHandlers.get(card);
         if (clickHandler) card.removeEventListener("click", clickHandler);
       });
-      window.removeEventListener("resize", reset);
+      clickHandlers.clear();
+      isDesktopBound = false;
+    };
+
+    const syncForViewport = () => {
+      if (mobileQuery.matches) {
+        unbindDesktopInteractions();
+        clearDesktopInlineStyles();
+        return;
+      }
+
+      bindDesktopInteractions();
+      activate(cards[0]);
+    };
+
+    syncForViewport();
+    window.addEventListener("resize", syncForViewport);
+    mobileQuery.addEventListener("change", syncForViewport);
+
+    (window as Window & { __experienceStackCleanup?: () => void }).__experienceStackCleanup = () => {
+      unbindDesktopInteractions();
+      window.removeEventListener("resize", syncForViewport);
+      mobileQuery.removeEventListener("change", syncForViewport);
     };
   }
 

@@ -8,18 +8,8 @@ const canvasRouting = defineMiddleware(async (context, next) => {
   if (DEPLOY_TARGET === 'canvas') {
     const url = new URL(context.request.url);
 
-    // Redirect /ai-canvas to / (root) - we want canvas at root
-    if (url.pathname === '/ai-canvas') {
-      return new Response(null, {
-        status: 308, // Permanent Redirect
-        headers: {
-          'Location': '/',
-        },
-      });
-    }
-
     // Allowed routes for canvas-only mode
-    const allowedRoutes = ['/', '/login', '/signup', '/dashboard', '/api/', '/_image'];
+    const allowedRoutes = ['/', '/ai-canvas', '/canvas', '/login', '/signup', '/dashboard', '/api/', '/_image'];
     const isAllowed = allowedRoutes.some(route =>
       url.pathname === route || url.pathname.startsWith(route + '/')
     );

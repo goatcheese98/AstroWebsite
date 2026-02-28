@@ -1,7 +1,12 @@
 <script lang="ts">
   import Tetris from "./Tetris.svelte";
+  import WhacAMole from "./WhacAMole.svelte";
 
-  let { isOpen, onClose }: { isOpen: boolean; onClose: () => void } = $props();
+  let {
+    isOpen,
+    game = "tetris",
+    onClose,
+  }: { isOpen: boolean; game?: "tetris" | "whac"; onClose: () => void } = $props();
 </script>
 
 {#if isOpen}
@@ -16,7 +21,11 @@
       <div class="screw screw-bl"></div>
       <div class="screw screw-br"></div>
       <div class="panel-inner">
-        <Tetris {onClose} />
+        {#if game === "whac"}
+          <WhacAMole {onClose} />
+        {:else}
+          <Tetris {onClose} />
+        {/if}
       </div>
     </div>
   </div>

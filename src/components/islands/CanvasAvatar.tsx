@@ -30,6 +30,7 @@ export default function CanvasAvatar({
   openUserProfile,
 }: CanvasAvatarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showHomeOption, setShowHomeOption] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Click-away dismissal
@@ -53,6 +54,17 @@ export default function CanvasAvatar({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const pathname = window.location.pathname;
+    const hostname = window.location.hostname;
+    const isCanvasPage =
+      pathname === '/ai-canvas' ||
+      pathname === '/canvas' ||
+      hostname.includes('canvas.');
+    setShowHomeOption(isCanvasPage);
+  }, []);
 
   if (isLoading) return null;
 
@@ -155,6 +167,27 @@ export default function CanvasAvatar({
                 <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #f3f4f6' }}>
                   <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#1f2937' }}>Guest User</div>
                 </div>
+                {showHomeOption && (
+                  <div style={{ padding: '6px 0' }}>
+                    <a
+                      href="/"
+                      style={{
+                        display: 'block',
+                        padding: '8px 16px',
+                        fontSize: '0.82rem',
+                        fontWeight: 500,
+                        color: '#374151',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => { (e.target as HTMLElement).style.background = '#f9fafb'; }}
+                      onMouseLeave={e => { (e.target as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      Home
+                    </a>
+                  </div>
+                )}
                 <div style={{ borderTop: '1px solid #f3f4f6', padding: '8px' }}>
                   <button
                     onClick={() => { window.location.href = '/login'; }}
@@ -201,8 +234,27 @@ export default function CanvasAvatar({
                   )}
                 </div>
                 <div style={{ padding: '6px 0' }}>
+                  {showHomeOption && (
+                    <a
+                      href="/"
+                      style={{
+                        display: 'block',
+                        padding: '8px 16px',
+                        fontSize: '0.82rem',
+                        fontWeight: 500,
+                        color: '#374151',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => { (e.target as HTMLElement).style.background = '#f9fafb'; }}
+                      onMouseLeave={e => { (e.target as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      Home
+                    </a>
+                  )}
                   <a
-                    href="/ai-canvas?new=true"
+                    href="/canvas?new=true"
                     style={{
                       display: 'block',
                       padding: '8px 16px',

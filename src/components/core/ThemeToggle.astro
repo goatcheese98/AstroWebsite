@@ -1,28 +1,77 @@
 ---
 ---
-<button
-  class="theme-toggle"
-  aria-label="Toggle dark mode"
-  title="Toggle dark mode"
-  type="button"
->
-  <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" />
-    <line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </svg>
-  <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-</button>
+<div class="theme-toggle-wrap">
+  <button
+    class="theme-toggle"
+    aria-label="Toggle dark mode (long press for style options)"
+    title="Toggle dark mode (long press for style options)"
+    type="button"
+  >
+    <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+    <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  </button>
+
+  <div class="theme-style-panel" hidden>
+    <div class="theme-style-panel__header">
+      <h3>Style Settings</h3>
+      <button type="button" class="theme-style-panel__reset" data-style-reset title="Reset style settings">
+        Reset
+      </button>
+    </div>
+
+    <div class="theme-style-panel__section">
+      <h4>Typography</h4>
+      <div class="theme-style-panel__font-grid">
+        <button type="button" data-font-option="handwritten">Hand Drawn</button>
+        <button type="button" data-font-option="system">System</button>
+        <button type="button" data-font-option="cascadia">Cascadia</button>
+        <button type="button" data-font-option="inter">Clean (Inter)</button>
+      </div>
+    </div>
+
+    <div class="theme-style-panel__section">
+      <h4>Sketch Effect</h4>
+
+      <label class="theme-style-panel__control">
+        <span>Roughness</span>
+        <input type="range" data-style-control="baseFrequency" min="0" max="0.1" step="0.005" />
+        <output data-style-value="baseFrequency"></output>
+      </label>
+
+      <label class="theme-style-panel__control">
+        <span>Wobble</span>
+        <input type="range" data-style-control="displacementScale" min="0" max="10" step="0.5" />
+        <output data-style-value="displacementScale"></output>
+      </label>
+
+      <label class="theme-style-panel__control">
+        <span>Roundness</span>
+        <input type="range" data-style-control="borderRadius" min="0" max="24" step="1" />
+        <output data-style-value="borderRadius"></output>
+      </label>
+    </div>
+  </div>
+</div>
 
 <style>
+  .theme-toggle-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
   .theme-toggle {
     background: none;
     border: 2px solid var(--color-stroke);
@@ -44,16 +93,126 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
-  
+
   /* Canvas pages - hide theme toggle since it's always light */
-  :global([data-theme-forced="light"]) .theme-toggle {
+  :global([data-theme-forced="light"]) .theme-toggle-wrap {
     display: none;
   }
-  
+
   [data-theme="light"] .icon-sun { display: none; }
   [data-theme="light"] .icon-moon { display: block; }
   [data-theme="dark"] .icon-sun { display: block; }
   [data-theme="dark"] .icon-moon { display: none; }
+
+  .theme-style-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(260px, calc(100vw - 24px));
+    padding: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 250;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .theme-style-panel[hidden] {
+    display: none;
+  }
+
+  .theme-style-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .theme-style-panel__header h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    font-family: var(--font-hand);
+  }
+
+  .theme-style-panel__reset {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .theme-style-panel__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .theme-style-panel__section h4 {
+    margin: 0;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+  }
+
+  .theme-style-panel__font-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .theme-style-panel__font-grid button {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .theme-style-panel__font-grid button.is-active {
+    border-color: var(--color-accent);
+    background: var(--color-accent-light);
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .theme-style-panel__control {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+  }
+
+  .theme-style-panel__control span {
+    grid-column: 1;
+    font-size: var(--text-xs);
+    color: var(--color-text);
+  }
+
+  .theme-style-panel__control input[type="range"] {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .theme-style-panel__control output {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    min-width: 40px;
+    text-align: right;
+  }
 
   /* Mobile/Touch: Disable expensive filter */
   @media (hover: none) and (pointer: coarse) {
@@ -66,37 +225,232 @@
 
 <script is:inline>
   (function() {
-    var hostname = window.location.hostname;
-    var isCanvas = hostname.includes('canvas.');
-    
-    // On canvas pages, hide the theme toggle entirely
-    if (isCanvas) {
-      var toggle = document.querySelector('.theme-toggle');
-      if (toggle) {
-        toggle.style.display = 'none';
+    var LONG_PRESS_MS = 520;
+    var STYLE_STORAGE_KEY = "themeStyleSettings";
+    var DEFAULT_STYLE = {
+      baseFrequency: 0.01,
+      displacementScale: 0.5,
+      borderRadius: 6,
+      fontId: "handwritten"
+    };
+    var FONTS = {
+      handwritten: '"Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif',
+      system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      cascadia: '"Cascadia Code", "Fira Code", "SF Mono", monospace',
+      inter: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'
+    };
+
+    function parseStyleSettings() {
+      try {
+        var raw = localStorage.getItem(STYLE_STORAGE_KEY);
+        if (!raw) return { ...DEFAULT_STYLE };
+        var parsed = JSON.parse(raw);
+        return {
+          baseFrequency: Number.isFinite(parsed.baseFrequency) ? Math.min(0.1, Math.max(0, Number(parsed.baseFrequency))) : DEFAULT_STYLE.baseFrequency,
+          displacementScale: Number.isFinite(parsed.displacementScale) ? Math.min(10, Math.max(0, Number(parsed.displacementScale))) : DEFAULT_STYLE.displacementScale,
+          borderRadius: Number.isFinite(parsed.borderRadius) ? Math.min(24, Math.max(0, Number(parsed.borderRadius))) : DEFAULT_STYLE.borderRadius,
+          fontId: Object.prototype.hasOwnProperty.call(FONTS, parsed.fontId) ? parsed.fontId : DEFAULT_STYLE.fontId
+        };
+      } catch {
+        return { ...DEFAULT_STYLE };
       }
-      return;
     }
-    
-    // On main site, enable theme toggle with ripple animation
-    document.querySelector('.theme-toggle').addEventListener('click', function(e) {
-      var html = document.documentElement;
-      var current = html.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', next);
-      localStorage.setItem('theme', next);
-      
-      // Full-page sun/moon ripple effect
-      var ripple = document.createElement('span');
-      ripple.className = 'theme-page-ripple';
-      ripple.style.left = e.clientX + 'px';
-      ripple.style.top = e.clientY + 'px';
-      
-      document.body.appendChild(ripple);
-      
-      setTimeout(function() {
-        ripple.remove();
-      }, 1000);
+
+    function persistStyleSettings(styleSettings) {
+      localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(styleSettings));
+    }
+
+    function applyStyleSettings(styleSettings) {
+      var root = document.documentElement;
+      var turbulence = document.getElementById("sketch-turbulence");
+      var displacement = document.getElementById("sketch-displacement");
+
+      if (turbulence) turbulence.setAttribute("baseFrequency", String(styleSettings.baseFrequency));
+      if (displacement) displacement.setAttribute("scale", String(styleSettings.displacementScale));
+
+      root.style.setProperty("--radius-md", styleSettings.borderRadius + "px");
+
+      var fontValue = FONTS[styleSettings.fontId] || FONTS.handwritten;
+      root.style.setProperty("--font-ui", fontValue);
+      root.style.setProperty("--font-mono", fontValue);
+      root.style.setProperty("--font-body", fontValue);
+      root.style.setProperty("--font-hand", fontValue);
+    }
+
+    function syncPanelUI(panel, styleSettings) {
+      panel.querySelectorAll("[data-font-option]").forEach(function(button) {
+        var isActive = button.getAttribute("data-font-option") === styleSettings.fontId;
+        button.classList.toggle("is-active", isActive);
+      });
+
+      var baseFrequencyInput = panel.querySelector('[data-style-control="baseFrequency"]');
+      var displacementInput = panel.querySelector('[data-style-control="displacementScale"]');
+      var borderRadiusInput = panel.querySelector('[data-style-control="borderRadius"]');
+
+      if (baseFrequencyInput) baseFrequencyInput.value = String(styleSettings.baseFrequency);
+      if (displacementInput) displacementInput.value = String(styleSettings.displacementScale);
+      if (borderRadiusInput) borderRadiusInput.value = String(styleSettings.borderRadius);
+
+      var baseFrequencyValue = panel.querySelector('[data-style-value="baseFrequency"]');
+      var displacementValue = panel.querySelector('[data-style-value="displacementScale"]');
+      var borderRadiusValue = panel.querySelector('[data-style-value="borderRadius"]');
+
+      if (baseFrequencyValue) baseFrequencyValue.textContent = Number(styleSettings.baseFrequency).toFixed(3);
+      if (displacementValue) displacementValue.textContent = String(styleSettings.displacementScale);
+      if (borderRadiusValue) borderRadiusValue.textContent = styleSettings.borderRadius + "px";
+    }
+
+    function initThemeToggle() {
+      var toggleWrap = document.querySelector(".theme-toggle-wrap");
+      if (!toggleWrap) return;
+
+      var toggle = toggleWrap.querySelector(".theme-toggle");
+      var panel = toggleWrap.querySelector(".theme-style-panel");
+      if (!toggle || !panel) return;
+
+      if (toggle.dataset.initialized === "true") return;
+      toggle.dataset.initialized = "true";
+
+      var hostname = window.location.hostname;
+      var isCanvas = hostname.includes("canvas.");
+
+      if (isCanvas) {
+        toggleWrap.style.display = "none";
+        return;
+      }
+
+      var styleSettings = parseStyleSettings();
+      applyStyleSettings(styleSettings);
+      syncPanelUI(panel, styleSettings);
+
+      var longPressTimer = null;
+      var suppressNextClick = false;
+
+      function openPanel() {
+        panel.hidden = false;
+      }
+
+      function closePanel() {
+        panel.hidden = true;
+      }
+
+      function togglePanel() {
+        if (panel.hidden) {
+          openPanel();
+        } else {
+          closePanel();
+        }
+      }
+
+      function startLongPress(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(function() {
+          suppressNextClick = true;
+          togglePanel();
+          if (navigator.vibrate) navigator.vibrate(10);
+        }, LONG_PRESS_MS);
+      }
+
+      function cancelLongPress() {
+        clearTimeout(longPressTimer);
+      }
+
+      function onDocumentPointerDown(event) {
+        if (toggleWrap.contains(event.target)) return;
+        closePanel();
+      }
+
+      function onToggleClick(event) {
+        if (suppressNextClick) {
+          suppressNextClick = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        var html = document.documentElement;
+        var current = html.getAttribute("data-theme");
+        var next = current === "dark" ? "light" : "dark";
+        html.setAttribute("data-theme", next);
+        localStorage.setItem("theme", next);
+
+        var ripple = document.createElement("span");
+        ripple.className = "theme-page-ripple";
+        ripple.style.left = event.clientX + "px";
+        ripple.style.top = event.clientY + "px";
+        document.body.appendChild(ripple);
+        setTimeout(function() {
+          ripple.remove();
+        }, 1000);
+      }
+
+      function updateStyle(partial) {
+        styleSettings = {
+          ...styleSettings,
+          ...partial
+        };
+        applyStyleSettings(styleSettings);
+        syncPanelUI(panel, styleSettings);
+        persistStyleSettings(styleSettings);
+      }
+
+      panel.querySelectorAll("[data-font-option]").forEach(function(button) {
+        button.addEventListener("click", function() {
+          var fontId = button.getAttribute("data-font-option");
+          if (!fontId) return;
+          updateStyle({ fontId: fontId });
+        });
+      });
+
+      panel.querySelectorAll("[data-style-control]").forEach(function(control) {
+        control.addEventListener("input", function() {
+          var controlKey = control.getAttribute("data-style-control");
+          if (!controlKey) return;
+
+          var value = Number(control.value);
+          if (controlKey === "baseFrequency") updateStyle({ baseFrequency: value });
+          if (controlKey === "displacementScale") updateStyle({ displacementScale: value });
+          if (controlKey === "borderRadius") updateStyle({ borderRadius: value });
+        });
+      });
+
+      var resetButton = panel.querySelector("[data-style-reset]");
+      if (resetButton) {
+        resetButton.addEventListener("click", function() {
+          updateStyle({ ...DEFAULT_STYLE });
+        });
+      }
+
+      toggle.addEventListener("pointerdown", startLongPress);
+      toggle.addEventListener("pointerup", cancelLongPress);
+      toggle.addEventListener("pointerleave", cancelLongPress);
+      toggle.addEventListener("pointercancel", cancelLongPress);
+      toggle.addEventListener("click", onToggleClick);
+      document.addEventListener("pointerdown", onDocumentPointerDown);
+
+      (window.__themeToggleCleanup || function() {})();
+      window.__themeToggleCleanup = function() {
+        clearTimeout(longPressTimer);
+        toggle.removeEventListener("pointerdown", startLongPress);
+        toggle.removeEventListener("pointerup", cancelLongPress);
+        toggle.removeEventListener("pointerleave", cancelLongPress);
+        toggle.removeEventListener("pointercancel", cancelLongPress);
+        toggle.removeEventListener("click", onToggleClick);
+        document.removeEventListener("pointerdown", onDocumentPointerDown);
+      };
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initThemeToggle);
+    } else {
+      initThemeToggle();
+    }
+
+    document.addEventListener("astro:page-load", initThemeToggle);
+    document.addEventListener("astro:before-swap", function() {
+      if (window.__themeToggleCleanup) window.__themeToggleCleanup();
     });
+
   })();
 </script>

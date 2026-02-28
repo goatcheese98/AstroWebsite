@@ -67,7 +67,9 @@ const canonicalURL = new URL(
         var hostname = window.location.hostname;
         var pathname = window.location.pathname;
         var isCanvas =
-          hostname.includes("canvas.") || pathname === "/ai-canvas";
+          hostname.includes("canvas.") ||
+          pathname === "/ai-canvas" ||
+          pathname === "/canvas";
 
         if (isCanvas) {
           // Force light mode on canvas pages

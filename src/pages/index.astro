@@ -16,40 +16,27 @@ const marqueeItems = [
 ---
 
 <PageLayout title="Home">
+  <canvas id="rough-bg-canvas" aria-hidden="true"></canvas>
   <div class="landing-page" id="landing-page">
     <div class="landing-progress" id="landing-progress" aria-hidden="true"></div>
     <div class="landing-glow" aria-hidden="true"></div>
 
     <Hero />
 
-    <section class="landing-marquee" aria-label="Portfolio highlights">
-      <div class="landing-marquee__track">
-        <ul class="landing-marquee__list">
-          {marqueeItems.map((item) => <li>{item}</li>)}
-        </ul>
-        <ul class="landing-marquee__list" aria-hidden="true">
-          {marqueeItems.map((item) => <li>{item}</li>)}
-        </ul>
+    <Experience />
+    <Projects />
+
+    <section class="skills section-gap" id="skills" aria-label="Skills">
+      <div class="container">
+        <SectionHeader
+          title="Skills & Expertise"
+          subtitle="A generalist's toolkit spanning data, technology, and strategy"
+        />
+        <BentoSkills client:load />
       </div>
     </section>
 
-    <div class="sections-zone">
-      <Experience />
-
-      <Projects />
-
-      <section class="skills section-gap" id="skills" aria-label="Skills">
-        <div class="container">
-          <SectionHeader
-            title="Skills & Expertise"
-            subtitle="A generalist's toolkit spanning data, technology, and strategy"
-          />
-          <BentoSkills client:load />
-        </div>
-      </section>
-    </div>
-
-    <section class="landing-marquee landing-marquee--reverse" aria-label="Portfolio highlights" aria-hidden="true">
+    <section class="landing-marquee" aria-label="Portfolio highlights" aria-hidden="true">
       <div class="landing-marquee__track">
         <ul class="landing-marquee__list">
           {marqueeItems.map((item) => <li>{item}</li>)}
@@ -63,34 +50,28 @@ const marqueeItems = [
 </PageLayout>
 
 <script>
-  import { annotate } from "rough-notation";
-
   function initLandingPage() {
     const existingCleanup = (window as Window & { __landingCleanup?: () => void })
       .__landingCleanup;
     if (existingCleanup) existingCleanup();
 
-    document.body.classList.add("landing-grid-mode");
-
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    const style = getComputedStyle(document.documentElement);
-    const accentColor = style.getPropertyValue("--color-accent").trim();
-
-    const el = document.querySelector("#hero-title");
-    if (el && !reducedMotion) {
-      const annotation = annotate(el as HTMLElement, {
-        type: "underline",
-        color: accentColor,
-        strokeWidth: 2,
-        padding: 4,
-      });
-      annotation.show();
-    }
+    const progressEl = document.querySelector("#landing-progress") as HTMLElement | null;
 
     const landingEl = document.querySelector("#landing-page") as HTMLElement | null;
-    const progressEl = document.querySelector("#landing-progress") as HTMLElement | null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    let pointerFrame = 0;
+    const updateGlow = (event: PointerEvent) => {
+      if (!landingEl || reducedMotion) return;
+      if (pointerFrame) cancelAnimationFrame(pointerFrame);
+      pointerFrame = requestAnimationFrame(() => {
+        const x = (event.clientX / window.innerWidth) * 100;
+        const y = (event.clientY / window.innerHeight) * 100;
+        landingEl.style.setProperty("--glow-x", `${x}%`);
+        landingEl.style.setProperty("--glow-y", `${y}%`);
+      });
+    };
+    window.addEventListener("pointermove", updateGlow, { passive: true });
 
     const updateProgress = () => {
       if (!progressEl) return;
@@ -100,54 +81,129 @@ const marqueeItems = [
       progressEl.style.transform = `scaleX(${ratio})`;
     };
 
-    let pointerFrame = 0;
-    const updateGlow = (event: PointerEvent) => {
-      if (!landingEl || reducedMotion) return;
-      if (pointerFrame) cancelAnimationFrame(pointerFrame);
-      pointerFrame = requestAnimationFrame(() => {
-        const x = (event.clientX / window.innerWidth) * 100;
-        const y = (event.clientY / window.innerHeight) * 100;
-        landingEl.style.setProperty("--landing-mouse-x", `${x}%`);
-        landingEl.style.setProperty("--landing-mouse-y", `${y}%`);
-      });
-    };
-
     updateProgress();
     window.addEventListener("scroll", updateProgress, { passive: true });
-    window.addEventListener("resize", updateProgress);
-    window.addEventListener("pointermove", updateGlow, { passive: true });
+    window.addEventListener("resize", updateProgress, { passive: true });
 
-    const cleanup = () => {
+    (window as Window & { __landingCleanup?: () => void }).__landingCleanup = () => {
       window.removeEventListener("scroll", updateProgress);
       window.removeEventListener("resize", updateProgress);
       window.removeEventListener("pointermove", updateGlow);
-      document.body.classList.remove("landing-grid-mode");
     };
-
-    (window as Window & { __landingCleanup?: () => void }).__landingCleanup =
-      cleanup;
   }
 
-  // Run on page load
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initLandingPage);
-  } else {
+  // ── Rough.js graph-paper background ───────────────────────────────────────
+  async function initRoughBg() {
+    const canvas = document.getElementById("rough-bg-canvas") as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    let rough: typeof import("roughjs")["default"];
+    try {
+      ({ default: rough } = await import("roughjs"));
+    } catch {
+      return;
+    }
+
+    const GRID = 52;
+    const MAJOR_EVERY = 4;
+
+    function draw() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas!.width = w;
+      canvas!.height = h;
+
+      const isDark = document.documentElement.dataset.theme === "dark";
+      const rgb = isDark ? "255,255,255" : "13,13,18";
+      const rc = rough.canvas(canvas!);
+
+      for (let y = 0; y <= h; y += GRID) {
+        const isMajor = Math.round(y / GRID) % MAJOR_EVERY === 0;
+        rc.line(0, y, w, y, {
+          stroke: `rgba(${rgb},${isMajor ? 0.072 : 0.030})`,
+          roughness: 0.45,
+          strokeWidth: isMajor ? 1.1 : 0.65,
+          bowing: 0.4,
+        });
+      }
+
+      for (let x = 0; x <= w; x += GRID) {
+        const isMajor = Math.round(x / GRID) % MAJOR_EVERY === 0;
+        rc.line(x, 0, x, h, {
+          stroke: `rgba(${rgb},${isMajor ? 0.072 : 0.030})`,
+          roughness: 0.45,
+          strokeWidth: isMajor ? 1.1 : 0.65,
+          bowing: 0.4,
+        });
+      }
+    }
+
+    draw();
+
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    const onResize = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 160); };
+    window.addEventListener("resize", onResize, { passive: true });
+
+    const mo = new MutationObserver(draw);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+    (window as Window & { __roughBgCleanup?: () => void }).__roughBgCleanup?.();
+    (window as Window & { __roughBgCleanup?: () => void }).__roughBgCleanup = () => {
+      mo.disconnect();
+      clearTimeout(resizeTimer);
+      window.removeEventListener("resize", onResize);
+    };
+  }
+
+  function init() {
     initLandingPage();
+    initRoughBg();
   }
 
-  document.addEventListener("astro:page-load", initLandingPage);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  document.addEventListener("astro:page-load", init);
   document.addEventListener("astro:before-swap", () => {
-    const cleanup = (window as Window & { __landingCleanup?: () => void })
-      .__landingCleanup;
-    if (cleanup) cleanup();
+    (window as Window & { __landingCleanup?: () => void }).__landingCleanup?.();
+    (window as Window & { __roughBgCleanup?: () => void }).__roughBgCleanup?.();
   });
 </script>
 
 <style>
+  #rough-bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
   .landing-page {
-    --landing-mouse-x: 48%;
-    --landing-mouse-y: 16%;
+    --glow-x: 50%;
+    --glow-y: 20%;
     position: relative;
+    background: transparent;
+  }
+
+  .landing-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(
+      circle 520px at var(--glow-x) var(--glow-y),
+      rgba(255, 214, 0, 0.18),
+      transparent 70%
+    );
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-glow { display: none; }
   }
 
   .landing-progress {
@@ -167,20 +223,38 @@ const marqueeItems = [
     );
   }
 
-  .landing-glow {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-    background: radial-gradient(
-      circle 480px at var(--landing-mouse-x) var(--landing-mouse-y),
-      rgba(200, 241, 53, 0.13),
-      transparent 72%
-    );
+  /* ── Match footer aesthetic: dark headings, yellow accent ── */
+
+  /* Section headers: dark instead of blue gradient */
+  .landing-page :global(.gradient-text) {
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    -webkit-text-fill-color: #0d0d12;
+    color: #0d0d12;
   }
 
+  :global([data-theme="dark"]) .landing-page :global(.gradient-text) {
+    -webkit-text-fill-color: #f5f5f5;
+    color: #f5f5f5;
+  }
+
+  /* Section header underline bar: yellow instead of blue */
+  .landing-page :global(.section-header__line) {
+    background: #ffd600;
+    filter: none;
+  }
+
+  .landing-page :global(.section-gap) {
+    padding-block: clamp(1.5rem, 3.8vw, 2.5rem);
+  }
+
+  .landing-page :global(.section-header) {
+    margin-bottom: var(--space-lg);
+  }
+
+  /* ── Marquee ticker (bottom) ── */
   .landing-marquee {
-    margin-block: var(--space-sm) 0;
     background: #0d0d12;
     overflow: hidden;
     position: relative;
@@ -210,7 +284,6 @@ const marqueeItems = [
   .landing-marquee__track {
     display: flex;
     align-items: center;
-    gap: 0;
     width: max-content;
     animation: landing-marquee 32s linear infinite;
   }
@@ -219,7 +292,6 @@ const marqueeItems = [
     list-style: none;
     display: flex;
     align-items: center;
-    gap: 0;
     padding: 0.72rem 0.5rem;
   }
 
@@ -231,8 +303,6 @@ const marqueeItems = [
     letter-spacing: 0.1em;
     text-transform: uppercase;
     padding: 0.26rem 1rem;
-    border: none;
-    border-radius: 0;
     background: transparent;
   }
 
@@ -248,65 +318,15 @@ const marqueeItems = [
     to   { transform: translateX(-50%); }
   }
 
-  @keyframes landing-marquee-reverse {
-    from { transform: translateX(-50%); }
-    to   { transform: translateX(0); }
-  }
-
-  .landing-marquee--reverse .landing-marquee__track {
-    animation-name: landing-marquee-reverse;
-    animation-duration: 28s;
-  }
-
-  .landing-page :global(.section-gap) {
-    padding-block: clamp(1.5rem, 3.8vw, 2.5rem);
-  }
-
-  .landing-page :global(.section-header) {
-    margin-bottom: var(--space-lg);
-  }
-
-  /* ── Section color zones ── */
-  .landing-page .sections-zone {
-    background: rgba(200, 241, 53, 0.22);
-  }
-
-  :global([data-theme="dark"]) .landing-page .sections-zone {
-    background: rgba(200, 241, 53, 0.11);
-  }
-
-  .landing-page :global(#projects),
-  .landing-page :global(#experience),
-  .landing-page :global(#skills) {
-    position: relative;
-    background: transparent;
-  }
-
-  :global(body.landing-grid-mode)::before {
-    background-image:
-      linear-gradient(
-        to right,
-        rgba(var(--dot-color-rgb), 0.22) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        to bottom,
-        rgba(var(--dot-color-rgb), 0.22) 1px,
-        transparent 1px
-      );
-    background-size: 34px 34px;
-    opacity: 0.35;
-  }
-
   @media (max-width: 900px) {
-    .landing-marquee__list {
-      padding: 0.62rem 0.45rem;
-      gap: 0.45rem;
-    }
-
     .landing-page :global(.section-gap) {
       padding-block: clamp(1.25rem, 5vw, 1.8rem);
     }
+  }
+
+  /* Suppress the global CSS dot grid — rough canvas replaces it */
+  :global(body)::before {
+    content: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -315,7 +335,7 @@ const marqueeItems = [
       transform: translateX(0);
     }
 
-    .landing-glow {
+    #rough-bg-canvas {
       display: none;
     }
   }

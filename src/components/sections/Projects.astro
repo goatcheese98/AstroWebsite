@@ -137,6 +137,8 @@ const getRealIndex = (loopIndex: number) => {
   }
 
   .projects-carousel {
+    --carousel-gap: clamp(var(--space-sm), 1.8vw, var(--space-md));
+    --slides-per-view: 3;
     max-width: 1040px;
     margin-inline: auto;
   }
@@ -151,13 +153,21 @@ const getRealIndex = (loopIndex: number) => {
   .projects-carousel__track {
     display: flex;
     align-items: stretch;
-    gap: var(--space-md);
+    gap: var(--carousel-gap);
     width: max-content;
     will-change: transform;
   }
 
   .project-slide {
-    width: clamp(250px, 25vw, 320px);
+    width: min(
+      320px,
+      calc((100% - (var(--slides-per-view) - 1) * var(--carousel-gap)) / var(--slides-per-view))
+    );
+    flex: 0 0
+      min(
+        320px,
+        calc((100% - (var(--slides-per-view) - 1) * var(--carousel-gap)) / var(--slides-per-view))
+      );
     transform-origin: center center;
     transition:
       transform 420ms ease,
@@ -328,6 +338,7 @@ const getRealIndex = (loopIndex: number) => {
   @media (max-width: 900px) {
     .projects-carousel {
       max-width: 100%;
+      --slides-per-view: 2;
     }
 
     .projects-carousel__viewport {
@@ -336,7 +347,6 @@ const getRealIndex = (loopIndex: number) => {
     }
 
     .project-slide {
-      width: clamp(250px, 70vw, 340px);
       opacity: 0.9;
       filter: none;
     }
@@ -353,6 +363,12 @@ const getRealIndex = (loopIndex: number) => {
     .project-card__content {
       padding: var(--space-md);
       gap: var(--space-sm);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .projects-carousel {
+      --slides-per-view: 1;
     }
   }
 
@@ -447,7 +463,14 @@ const getRealIndex = (loopIndex: number) => {
       transitioning = false;
     };
 
-    const onResize = () => moveTo(index, false);
+    let resizeRaf = 0;
+    const onResize = () => {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = window.requestAnimationFrame(() => {
+        moveTo(index, false);
+        resizeRaf = 0;
+      });
+    };
 
     const onKeydown = (event: KeyboardEvent) => {
       if (event.key === "ArrowRight") onNext();
@@ -472,6 +495,8 @@ const getRealIndex = (loopIndex: number) => {
     track.addEventListener("keydown", onKeydown);
     track.addEventListener("click", onSlideClick);
     window.addEventListener("resize", onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(viewport);
 
     moveTo(index, false);
 
@@ -483,6 +508,8 @@ const getRealIndex = (loopIndex: number) => {
       track.removeEventListener("keydown", onKeydown);
       track.removeEventListener("click", onSlideClick);
       window.removeEventListener("resize", onResize);
+      resizeObserver.disconnect();
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
     };
   }
 
