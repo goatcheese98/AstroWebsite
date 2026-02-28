@@ -18,7 +18,7 @@
     "deploy:web": "bun run build && bunx wrangler pages deploy dist --project-name=astroweb",
     "deploy:canvas": "bun run build:canvas && bunx wrangler pages deploy dist --project-name=ai-canvas",
     "astro": "astro",
-    "test": "bunx vitest run"
+    "test": "bunx vitest run --passWithNoTests"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
