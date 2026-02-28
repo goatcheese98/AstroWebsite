@@ -52,7 +52,7 @@ function getPartykitHost(): string {
   const isDev = window.location.hostname === "localhost";
   return isDev
     ? "localhost:1999"
-    : (import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev");
+    : (import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.goatcheese98.partykit.dev");
 }
 
 // --------------------------------------------------------------------------

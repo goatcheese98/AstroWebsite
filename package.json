@@ -17,6 +17,7 @@
     "preview:canvas": "DEPLOY_TARGET=canvas astro preview",
     "deploy": "bun run deploy:web",
     "deploy:web": "bun run build && bunx wrangler pages deploy dist --project-name=astroweb",
+    "deploy:party": "bunx partykit deploy",
     "deploy:canvas": "bun run build:canvas && bunx wrangler pages deploy dist --project-name=ai-canvas",
     "astro": "astro",
     "test": "bunx vitest run --passWithNoTests"
