@@ -190,6 +190,20 @@
     transform: translateY(30px);
     animation: card-enter 0.6s ease forwards;
     animation-delay: var(--delay);
+    /* Keep filter off container so card text does not get warped. */
+    filter: none;
+    border: 0;
+  }
+
+  .skill-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    filter: url(#sketch-filter);
+    pointer-events: none;
+    z-index: 0;
   }
 
   @keyframes card-enter {
@@ -200,6 +214,8 @@
   }
 
   .skill-card__content {
+    position: relative;
+    z-index: 2;
     padding: var(--space-lg);
   }
 

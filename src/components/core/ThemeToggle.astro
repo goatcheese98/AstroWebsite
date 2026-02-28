@@ -6,6 +6,8 @@
     aria-label="Toggle dark mode (long press for style options)"
     title="Toggle dark mode (long press for style options)"
     type="button"
+    aria-haspopup="menu"
+    aria-expanded="false"
   >
     <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <circle cx="12" cy="12" r="5" />
@@ -23,45 +25,55 @@
     </svg>
   </button>
 
-  <div class="theme-style-panel" hidden>
-    <div class="theme-style-panel__header">
-      <h3>Style Settings</h3>
-      <button type="button" class="theme-style-panel__reset" data-style-reset title="Reset style settings">
+  <div class="theme-style-dropdown" role="menu" hidden>
+    <div class="theme-style-dropdown__header">
+      <span>Style Settings</span>
+      <button type="button" class="theme-style-dropdown__reset" data-style-reset>
         Reset
       </button>
     </div>
 
-    <div class="theme-style-panel__section">
-      <h4>Typography</h4>
-      <div class="theme-style-panel__font-grid">
-        <button type="button" data-font-option="handwritten">Hand Drawn</button>
-        <button type="button" data-font-option="system">System</button>
-        <button type="button" data-font-option="cascadia">Cascadia</button>
-        <button type="button" data-font-option="inter">Clean (Inter)</button>
-      </div>
+    <div class="theme-style-dropdown__row">
+      <span class="theme-style-dropdown__label">Roughness</span>
+      <output data-style-value="baseFrequency" class="theme-style-dropdown__value"></output>
     </div>
+    <input
+      class="theme-style-dropdown__range"
+      type="range"
+      data-style-control="baseFrequency"
+      min="0"
+      max="0.1"
+      step="0.005"
+      aria-label="Outline roughness"
+    />
 
-    <div class="theme-style-panel__section">
-      <h4>Sketch Effect</h4>
-
-      <label class="theme-style-panel__control">
-        <span>Roughness</span>
-        <input type="range" data-style-control="baseFrequency" min="0" max="0.1" step="0.005" />
-        <output data-style-value="baseFrequency"></output>
-      </label>
-
-      <label class="theme-style-panel__control">
-        <span>Wobble</span>
-        <input type="range" data-style-control="displacementScale" min="0" max="10" step="0.5" />
-        <output data-style-value="displacementScale"></output>
-      </label>
-
-      <label class="theme-style-panel__control">
-        <span>Roundness</span>
-        <input type="range" data-style-control="borderRadius" min="0" max="24" step="1" />
-        <output data-style-value="borderRadius"></output>
-      </label>
+    <div class="theme-style-dropdown__row">
+      <span class="theme-style-dropdown__label">Wobble</span>
+      <output data-style-value="displacementScale" class="theme-style-dropdown__value"></output>
     </div>
+    <input
+      class="theme-style-dropdown__range"
+      type="range"
+      data-style-control="displacementScale"
+      min="0"
+      max="10"
+      step="0.5"
+      aria-label="Outline wobble"
+    />
+
+    <div class="theme-style-dropdown__row">
+      <span class="theme-style-dropdown__label">Roundness</span>
+      <output data-style-value="borderRadius" class="theme-style-dropdown__value"></output>
+    </div>
+    <input
+      class="theme-style-dropdown__range"
+      type="range"
+      data-style-control="borderRadius"
+      min="2"
+      max="20"
+      step="1"
+      aria-label="Corner roundness"
+    />
   </div>
 </div>
 
@@ -85,16 +97,18 @@
     filter: url(#sketch-filter);
     transition: transform 0.15s ease;
     position: relative;
+    box-shadow: var(--shadow-sm);
   }
+
   .theme-toggle:hover {
-    transform: rotate(15deg);
+    transform: rotate(10deg);
   }
+
   .theme-toggle:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
-  /* Canvas pages - hide theme toggle since it's always light */
   :global([data-theme-forced="light"]) .theme-toggle-wrap {
     display: none;
   }
@@ -104,121 +118,81 @@
   [data-theme="dark"] .icon-sun { display: block; }
   [data-theme="dark"] .icon-moon { display: none; }
 
-  .theme-style-panel {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    width: min(260px, calc(100vw - 24px));
-    padding: 12px;
-    background: var(--color-surface);
+  .theme-style-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    max-width: calc(100vw - 24px);
+    background: var(--color-surface-elevated);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    z-index: 250;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    padding: 10px;
+    z-index: 240;
+    display: grid;
+    gap: 8px;
+    transform: translate3d(var(--overlay-x, -9999px), var(--overlay-y, -9999px), 0);
   }
 
-  .theme-style-panel[hidden] {
+  .theme-style-dropdown[hidden] {
     display: none;
   }
 
-  .theme-style-panel__header {
+  .theme-style-dropdown__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .theme-style-dropdown__row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
 
-  .theme-style-panel__header h3 {
-    margin: 0;
-    font-size: var(--text-sm);
-    font-weight: 700;
-    font-family: var(--font-hand);
-  }
-
-  .theme-style-panel__reset {
-    border: 1px solid var(--color-border);
-    background: var(--color-bg);
-    color: var(--color-text);
-    border-radius: var(--radius-sm);
-    padding: 4px 8px;
+  .theme-style-dropdown__label {
     font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .theme-style-panel__section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .theme-style-panel__section h4 {
-    margin: 0;
-    font-size: var(--text-xs);
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--color-text-muted);
   }
 
-  .theme-style-panel__font-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+  .theme-style-dropdown__value {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--color-text);
   }
 
-  .theme-style-panel__font-grid button {
+  .theme-style-dropdown__range {
+    width: 100%;
+    margin: 0;
+  }
+
+  .theme-style-dropdown__reset {
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
     background: var(--color-bg);
     color: var(--color-text);
-    border-radius: var(--radius-sm);
     padding: 6px 8px;
     font-size: var(--text-xs);
     cursor: pointer;
   }
 
-  .theme-style-panel__font-grid button.is-active {
-    border-color: var(--color-accent);
-    background: var(--color-accent-light);
-    color: var(--color-accent);
-    font-weight: 700;
+  .theme-style-dropdown__reset:hover {
+    background: var(--color-surface-hover);
   }
 
-  .theme-style-panel__control {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    column-gap: 8px;
-    row-gap: 4px;
-  }
-
-  .theme-style-panel__control span {
-    grid-column: 1;
-    font-size: var(--text-xs);
-    color: var(--color-text);
-  }
-
-  .theme-style-panel__control input[type="range"] {
-    grid-column: 1;
-    width: 100%;
-  }
-
-  .theme-style-panel__control output {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    min-width: 40px;
-    text-align: right;
-  }
-
-  /* Mobile/Touch: Disable expensive filter */
   @media (hover: none) and (pointer: coarse) {
     .theme-toggle {
       filter: none;
-      border-radius: var(--radius-md) var(--radius-sm) var(--radius-md) var(--radius-sm);
     }
   }
 </style>
@@ -228,16 +202,9 @@
     var LONG_PRESS_MS = 520;
     var STYLE_STORAGE_KEY = "themeStyleSettings";
     var DEFAULT_STYLE = {
-      baseFrequency: 0.01,
-      displacementScale: 0.5,
-      borderRadius: 6,
-      fontId: "handwritten"
-    };
-    var FONTS = {
-      handwritten: '"Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif',
-      system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      cascadia: '"Cascadia Code", "Fira Code", "SF Mono", monospace',
-      inter: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'
+      baseFrequency: 0.07,
+      displacementScale: 2.5,
+      borderRadius: 12
     };
 
     function parseStyleSettings() {
@@ -246,10 +213,15 @@
         if (!raw) return { ...DEFAULT_STYLE };
         var parsed = JSON.parse(raw);
         return {
-          baseFrequency: Number.isFinite(parsed.baseFrequency) ? Math.min(0.1, Math.max(0, Number(parsed.baseFrequency))) : DEFAULT_STYLE.baseFrequency,
-          displacementScale: Number.isFinite(parsed.displacementScale) ? Math.min(10, Math.max(0, Number(parsed.displacementScale))) : DEFAULT_STYLE.displacementScale,
-          borderRadius: Number.isFinite(parsed.borderRadius) ? Math.min(24, Math.max(0, Number(parsed.borderRadius))) : DEFAULT_STYLE.borderRadius,
-          fontId: Object.prototype.hasOwnProperty.call(FONTS, parsed.fontId) ? parsed.fontId : DEFAULT_STYLE.fontId
+          baseFrequency: Number.isFinite(parsed.baseFrequency)
+            ? Math.min(0.1, Math.max(0, Number(parsed.baseFrequency)))
+            : DEFAULT_STYLE.baseFrequency,
+          displacementScale: Number.isFinite(parsed.displacementScale)
+            ? Math.min(10, Math.max(0, Number(parsed.displacementScale)))
+            : DEFAULT_STYLE.displacementScale,
+          borderRadius: Number.isFinite(parsed.borderRadius)
+            ? Math.min(20, Math.max(2, Number(parsed.borderRadius)))
+            : DEFAULT_STYLE.borderRadius
         };
       } catch {
         return { ...DEFAULT_STYLE };
@@ -268,33 +240,24 @@
       if (turbulence) turbulence.setAttribute("baseFrequency", String(styleSettings.baseFrequency));
       if (displacement) displacement.setAttribute("scale", String(styleSettings.displacementScale));
 
-      root.style.setProperty("--radius-md", styleSettings.borderRadius + "px");
-
-      var fontValue = FONTS[styleSettings.fontId] || FONTS.handwritten;
-      root.style.setProperty("--font-ui", fontValue);
-      root.style.setProperty("--font-mono", fontValue);
-      root.style.setProperty("--font-body", fontValue);
-      root.style.setProperty("--font-hand", fontValue);
+      var base = Number(styleSettings.borderRadius);
+      root.style.setProperty("--radius-sm", Math.max(2, base - 2) + "px");
+      root.style.setProperty("--radius-md", base + "px");
+      root.style.setProperty("--radius-lg", base + 2 + "px");
+      root.style.setProperty("--radius-xl", base + 6 + "px");
     }
 
-    function syncPanelUI(panel, styleSettings) {
-      panel.querySelectorAll("[data-font-option]").forEach(function(button) {
-        var isActive = button.getAttribute("data-font-option") === styleSettings.fontId;
-        button.classList.toggle("is-active", isActive);
-      });
-
-      var baseFrequencyInput = panel.querySelector('[data-style-control="baseFrequency"]');
-      var displacementInput = panel.querySelector('[data-style-control="displacementScale"]');
-      var borderRadiusInput = panel.querySelector('[data-style-control="borderRadius"]');
+    function syncDropdownUI(dropdown, styleSettings) {
+      var baseFrequencyInput = dropdown.querySelector('[data-style-control="baseFrequency"]');
+      var displacementInput = dropdown.querySelector('[data-style-control="displacementScale"]');
+      var borderRadiusInput = dropdown.querySelector('[data-style-control="borderRadius"]');
+      var baseFrequencyValue = dropdown.querySelector('[data-style-value="baseFrequency"]');
+      var displacementValue = dropdown.querySelector('[data-style-value="displacementScale"]');
+      var borderRadiusValue = dropdown.querySelector('[data-style-value="borderRadius"]');
 
       if (baseFrequencyInput) baseFrequencyInput.value = String(styleSettings.baseFrequency);
       if (displacementInput) displacementInput.value = String(styleSettings.displacementScale);
       if (borderRadiusInput) borderRadiusInput.value = String(styleSettings.borderRadius);
-
-      var baseFrequencyValue = panel.querySelector('[data-style-value="baseFrequency"]');
-      var displacementValue = panel.querySelector('[data-style-value="displacementScale"]');
-      var borderRadiusValue = panel.querySelector('[data-style-value="borderRadius"]');
-
       if (baseFrequencyValue) baseFrequencyValue.textContent = Number(styleSettings.baseFrequency).toFixed(3);
       if (displacementValue) displacementValue.textContent = String(styleSettings.displacementScale);
       if (borderRadiusValue) borderRadiusValue.textContent = styleSettings.borderRadius + "px";
@@ -304,16 +267,15 @@
       var toggleWrap = document.querySelector(".theme-toggle-wrap");
       if (!toggleWrap) return;
 
-      var toggle = toggleWrap.querySelector(".theme-toggle");
-      var panel = toggleWrap.querySelector(".theme-style-panel");
-      if (!toggle || !panel) return;
+      var themeToggle = toggleWrap.querySelector(".theme-toggle");
+      var dropdown = toggleWrap.querySelector(".theme-style-dropdown");
+      if (!themeToggle || !dropdown) return;
 
-      if (toggle.dataset.initialized === "true") return;
-      toggle.dataset.initialized = "true";
+      if (themeToggle.dataset.initialized === "true") return;
+      themeToggle.dataset.initialized = "true";
 
       var hostname = window.location.hostname;
       var isCanvas = hostname.includes("canvas.");
-
       if (isCanvas) {
         toggleWrap.style.display = "none";
         return;
@@ -321,25 +283,34 @@
 
       var styleSettings = parseStyleSettings();
       applyStyleSettings(styleSettings);
-      syncPanelUI(panel, styleSettings);
+      syncDropdownUI(dropdown, styleSettings);
 
       var longPressTimer = null;
       var suppressNextClick = false;
+      var resizeRaf = 0;
 
-      function openPanel() {
-        panel.hidden = false;
+      function positionDropdown() {
+        var rect = themeToggle.getBoundingClientRect();
+        var dropdownWidth = Math.min(240, window.innerWidth - 24);
+        var x = Math.round(rect.right - dropdownWidth);
+        var y = Math.round(rect.bottom + 8);
+
+        x = Math.max(12, Math.min(x, window.innerWidth - dropdownWidth - 12));
+        y = Math.max(12, Math.min(y, window.innerHeight - 220));
+
+        dropdown.style.setProperty("--overlay-x", x + "px");
+        dropdown.style.setProperty("--overlay-y", y + "px");
       }
 
-      function closePanel() {
-        panel.hidden = true;
+      function openDropdown() {
+        positionDropdown();
+        dropdown.hidden = false;
+        themeToggle.setAttribute("aria-expanded", "true");
       }
 
-      function togglePanel() {
-        if (panel.hidden) {
-          openPanel();
-        } else {
-          closePanel();
-        }
+      function closeDropdown() {
+        dropdown.hidden = true;
+        themeToggle.setAttribute("aria-expanded", "false");
       }
 
       function startLongPress(event) {
@@ -347,7 +318,7 @@
         clearTimeout(longPressTimer);
         longPressTimer = setTimeout(function() {
           suppressNextClick = true;
-          togglePanel();
+          openDropdown();
           if (navigator.vibrate) navigator.vibrate(10);
         }, LONG_PRESS_MS);
       }
@@ -358,10 +329,19 @@
 
       function onDocumentPointerDown(event) {
         if (toggleWrap.contains(event.target)) return;
-        closePanel();
+        closeDropdown();
       }
 
-      function onToggleClick(event) {
+      function onWindowResize() {
+        if (dropdown.hidden) return;
+        if (resizeRaf) cancelAnimationFrame(resizeRaf);
+        resizeRaf = window.requestAnimationFrame(function() {
+          positionDropdown();
+          resizeRaf = 0;
+        });
+      }
+
+      function onThemeToggleClick(event) {
         if (suppressNextClick) {
           suppressNextClick = false;
           event.preventDefault();
@@ -391,53 +371,48 @@
           ...partial
         };
         applyStyleSettings(styleSettings);
-        syncPanelUI(panel, styleSettings);
+        syncDropdownUI(dropdown, styleSettings);
         persistStyleSettings(styleSettings);
       }
 
-      panel.querySelectorAll("[data-font-option]").forEach(function(button) {
-        button.addEventListener("click", function() {
-          var fontId = button.getAttribute("data-font-option");
-          if (!fontId) return;
-          updateStyle({ fontId: fontId });
-        });
-      });
-
-      panel.querySelectorAll("[data-style-control]").forEach(function(control) {
+      dropdown.querySelectorAll("[data-style-control]").forEach(function(control) {
         control.addEventListener("input", function() {
-          var controlKey = control.getAttribute("data-style-control");
-          if (!controlKey) return;
-
+          var key = control.getAttribute("data-style-control");
           var value = Number(control.value);
-          if (controlKey === "baseFrequency") updateStyle({ baseFrequency: value });
-          if (controlKey === "displacementScale") updateStyle({ displacementScale: value });
-          if (controlKey === "borderRadius") updateStyle({ borderRadius: value });
+          if (key === "baseFrequency") updateStyle({ baseFrequency: value });
+          if (key === "displacementScale") updateStyle({ displacementScale: value });
+          if (key === "borderRadius") updateStyle({ borderRadius: value });
         });
       });
 
-      var resetButton = panel.querySelector("[data-style-reset]");
+      var resetButton = dropdown.querySelector("[data-style-reset]");
       if (resetButton) {
         resetButton.addEventListener("click", function() {
           updateStyle({ ...DEFAULT_STYLE });
         });
       }
 
-      toggle.addEventListener("pointerdown", startLongPress);
-      toggle.addEventListener("pointerup", cancelLongPress);
-      toggle.addEventListener("pointerleave", cancelLongPress);
-      toggle.addEventListener("pointercancel", cancelLongPress);
-      toggle.addEventListener("click", onToggleClick);
+      themeToggle.addEventListener("pointerdown", startLongPress);
+      themeToggle.addEventListener("pointerup", cancelLongPress);
+      themeToggle.addEventListener("pointerleave", cancelLongPress);
+      themeToggle.addEventListener("pointercancel", cancelLongPress);
+      themeToggle.addEventListener("click", onThemeToggleClick);
       document.addEventListener("pointerdown", onDocumentPointerDown);
+      window.addEventListener("resize", onWindowResize);
+      window.addEventListener("scroll", onWindowResize, true);
 
       (window.__themeToggleCleanup || function() {})();
       window.__themeToggleCleanup = function() {
         clearTimeout(longPressTimer);
-        toggle.removeEventListener("pointerdown", startLongPress);
-        toggle.removeEventListener("pointerup", cancelLongPress);
-        toggle.removeEventListener("pointerleave", cancelLongPress);
-        toggle.removeEventListener("pointercancel", cancelLongPress);
-        toggle.removeEventListener("click", onToggleClick);
+        themeToggle.removeEventListener("pointerdown", startLongPress);
+        themeToggle.removeEventListener("pointerup", cancelLongPress);
+        themeToggle.removeEventListener("pointerleave", cancelLongPress);
+        themeToggle.removeEventListener("pointercancel", cancelLongPress);
+        themeToggle.removeEventListener("click", onThemeToggleClick);
         document.removeEventListener("pointerdown", onDocumentPointerDown);
+        window.removeEventListener("resize", onWindowResize);
+        window.removeEventListener("scroll", onWindowResize, true);
+        if (resizeRaf) cancelAnimationFrame(resizeRaf);
       };
     }
 
@@ -451,6 +426,5 @@
     document.addEventListener("astro:before-swap", function() {
       if (window.__themeToggleCleanup) window.__themeToggleCleanup();
     });
-
   })();
 </script>

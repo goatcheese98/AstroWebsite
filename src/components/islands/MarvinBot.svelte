@@ -1023,9 +1023,7 @@
   );
   const screenBg = $derived(
     isGamesOpen
-      ? gameView === "whac"
-        ? "#ffedd5"
-        : "#0a0a14"
+      ? "#fef3c7"
       : isExcited || isLove
       ? "#fca5a5"
       : isHappy
@@ -1303,28 +1301,27 @@
                 width={TETRIS_COLS * TETRIS_CELL_SIZE + 2}
                 height={TETRIS_ROWS * TETRIS_CELL_SIZE + 2}
                 rx="2"
-                fill="#020617"
-                stroke="#312e81"
+                fill="#fef3c7"
+                stroke="#d97706"
                 stroke-width="0.8"
               />
 
               <g class="tetris-control-button" onclick={(event) => backToGameList(event)}>
                 <rect x="166" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="171" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.4" font-family="monospace">
-                  M
-                </text>
+                <line x1="168.5" y1="196.2" x2="173.5" y2="196.2" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="168.5" y1="198" x2="173.5" y2="198" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="168.5" y1="199.8" x2="173.5" y2="199.8" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
               </g>
               <g class="tetris-control-button" onclick={(event) => openExpandedGame(event)}>
                 <rect x="178" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="183" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.8" font-family="monospace">
-                  +
-                </text>
+                <path d="M 180.7 200.1 L 180.7 198.2 L 182.1 198.2" fill="none" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M 185.3 195.9 L 185.3 197.8 L 183.9 197.8" fill="none" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" />
+                <line x1="181.1" y1="199.7" x2="184.9" y2="196.3" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" />
               </g>
               <g class="tetris-control-button" onclick={(event) => closeGames(event)}>
                 <rect x="190" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="195" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.6" font-family="monospace">
-                  X
-                </text>
+                <line x1="192.3" y1="196.1" x2="197.7" y2="199.9" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="197.7" y1="196.1" x2="192.3" y2="199.9" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
               </g>
 
               {#if tetrisMode === "menu"}
@@ -1358,7 +1355,7 @@
                       width={TETRIS_CELL_SIZE - 0.8}
                       height={TETRIS_CELL_SIZE - 0.8}
                       rx="0.8"
-                      fill={cell === 0 ? "rgba(148, 163, 184, 0.12)" : TETRIS_COLOR_BY_ID[cell]}
+                      fill={cell === 0 ? "rgba(120, 53, 15, 0.14)" : TETRIS_COLOR_BY_ID[cell]}
                     />
                   {/each}
                 {/each}
@@ -1366,7 +1363,7 @@
                 <text x="178" y="207" text-anchor="middle" fill="#a5b4fc" font-size="5" font-family="monospace">
                   NEXT
                 </text>
-                <rect x="167" y="208" width="23" height="21" rx="2.5" fill="#0f172a" stroke="#334155" stroke-width="0.7" />
+                <rect x="167" y="208" width="23" height="21" rx="2.5" fill="#ffedd5" stroke="#d97706" stroke-width="0.7" />
                 {#each nextPiecePreviewCells as previewCell}
                   <rect
                     x={previewCell.x}
@@ -1463,25 +1460,24 @@
                 {WHAC_DIFFICULTY_CONFIG[whacDifficulty].label}
               </text>
 
-              <rect x="106" y="199" width="88" height="64" rx="4" fill="#ffedd5" stroke="#fdba74" stroke-width="0.9" />
+              <rect x="106" y="199" width="88" height="64" rx="4" fill="#fef3c7" stroke="#fdba74" stroke-width="0.9" />
 
               <g class="tetris-control-button" onclick={(event) => backToGameList(event)}>
                 <rect x="166" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="171" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.4" font-family="monospace">
-                  M
-                </text>
+                <line x1="168.5" y1="196.2" x2="173.5" y2="196.2" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="168.5" y1="198" x2="173.5" y2="198" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="168.5" y1="199.8" x2="173.5" y2="199.8" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
               </g>
               <g class="tetris-control-button" onclick={(event) => openExpandedGame(event)}>
                 <rect x="178" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="183" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.8" font-family="monospace">
-                  +
-                </text>
+                <path d="M 180.7 200.1 L 180.7 198.2 L 182.1 198.2" fill="none" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M 185.3 195.9 L 185.3 197.8 L 183.9 197.8" fill="none" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" />
+                <line x1="181.1" y1="199.7" x2="184.9" y2="196.3" stroke="#e2e8f0" stroke-width="0.8" stroke-linecap="round" />
               </g>
               <g class="tetris-control-button" onclick={(event) => closeGames(event)}>
                 <rect x="190" y="194" width="10" height="8" rx="2" fill="#334155" />
-                <text x="195" y="199.5" text-anchor="middle" fill="#e2e8f0" font-size="4.6" font-family="monospace">
-                  X
-                </text>
+                <line x1="192.3" y1="196.1" x2="197.7" y2="199.9" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
+                <line x1="197.7" y1="196.1" x2="192.3" y2="199.9" stroke="#e2e8f0" stroke-width="0.9" stroke-linecap="round" />
               </g>
 
               {#if whacMode === "menu"}

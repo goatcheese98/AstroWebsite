@@ -210,6 +210,20 @@ const getRealIndex = (loopIndex: number) => {
 
   .project-card {
     height: 100%;
+    /* Keep filter off container so card text does not get warped. */
+    filter: none;
+    border: 0;
+  }
+
+  .project-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    filter: url(#sketch-filter);
+    pointer-events: none;
+    z-index: 0;
   }
 
   .project-slide .project-card:hover {
@@ -218,6 +232,8 @@ const getRealIndex = (loopIndex: number) => {
   }
 
   .project-card__content {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     height: 100%;
