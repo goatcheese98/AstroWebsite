@@ -7,13 +7,25 @@ import { useUser } from '@clerk/clerk-react';
 import CanvasAvatar from '../islands/CanvasAvatar';
 import { ClerkWrapper } from './ClerkWrapper';
 
+function UserMenuFallback() {
+  return (
+    <div className="user-menu">
+      <CanvasAvatar
+        user={null}
+        isAuthenticated={false}
+        isLoading={false}
+      />
+    </div>
+  );
+}
+
 /**
  * Standard UserMenu - self-contained with ClerkProvider
  * Use this in Astro files or standalone islands
  */
 export function UserMenu() {
   return (
-    <ClerkWrapper>
+    <ClerkWrapper fallback={<UserMenuFallback />}>
       <UserMenuPure />
     </ClerkWrapper>
   );

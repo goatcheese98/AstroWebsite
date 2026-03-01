@@ -22,11 +22,12 @@ function uint8ToBase64(buf: Uint8Array): string {
   return btoa(binary);
 }
 
-function base64ToUint8(b64: string): Uint8Array {
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return buffer;
 }
 
 // --------------------------------------------------------------------------
@@ -81,9 +82,9 @@ export async function decryptData<T>(
   key: CryptoKey,
 ): Promise<T> {
   const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: base64ToUint8(iv) },
+    { name: "AES-GCM", iv: base64ToArrayBuffer(iv) },
     key,
-    base64ToUint8(payload),
+    base64ToArrayBuffer(payload),
   );
   return JSON.parse(new TextDecoder().decode(decrypted)) as T;
 }

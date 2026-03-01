@@ -20,7 +20,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         const [hasError, setHasError] = useState(false);
         const [urlInput, setUrlInput] = useState(element.customData?.url || '');
         const [isEditing, setIsEditing] = useState(!element.customData?.url);
-        const [isEditingActive, setIsEditingActive] = useState(false);
         const [isDragging, setIsDragging] = useState(false);
         const [isInteracting, setIsInteracting] = useState(false);
         const [showFallback, setShowFallback] = useState(false);
@@ -30,7 +29,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         const iframeRef = useRef<HTMLIFrameElement>(null);
         const urlInputRef = useRef<HTMLInputElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
-        const contentAreaRef = useRef<HTMLDivElement>(null);
         const dragStartRef = useRef<{ x: number; y: number; elementX: number; elementY: number } | null>(null);
         const historyRef = useRef<string[]>([]);
         const historyIndexRef = useRef(-1);
@@ -57,11 +55,24 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         // Get embed-friendly URL
         const hasConfiguredUrl = rawUrl.trim().length > 0;
         const { url: processedUrl, isSearch, embedUrl, warning } = rawUrl ? enhanceUrl(rawUrl) : { url: '', isSearch: false };
-        const displayUrl = embedUrl || processedUrl;
+        const ensureEmbedIdOnProxyUrl = useCallback((candidateUrl: string) => {
+            try {
+                const parsed = new URL(candidateUrl);
+                if (parsed.pathname.includes('/parties/main/proxy')) {
+                    parsed.searchParams.set('embedId', element.id);
+                    return parsed.toString();
+                }
+                return candidateUrl;
+            } catch {
+                return candidateUrl;
+            }
+        }, [element.id]);
+
+        const displayUrl = ensureEmbedIdOnProxyUrl(embedUrl || processedUrl);
         const isReliableEmbed = isKnownEmbeddable(processedUrl);
         const hasWarning = !!warning;
         const isLiveEmbedMode = !isEditing && hasConfiguredUrl && !hasWarning && !showFallback && !!displayUrl;
-        const isPassiveEmbedMode = !isInteracting && !isEditingActive;
+        const isPassiveEmbedMode = !isInteracting && !isEditing;
         const canGoBack = historyIndex > 0;
         const canGoForward = historyIndex >= 0 && historyIndex < navigationHistory.length - 1;
 
@@ -199,7 +210,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
             onChange(element.id, urlInput.trim());
             setIsEditing(false);
-            setIsEditingActive(false);
             setIsInteracting(false);
             setIsLoading(true);
             setHasError(false);
@@ -208,20 +218,9 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
         const handleEdit = useCallback(() => {
             setIsEditing(true);
-            setIsEditingActive(true);
             setIsInteracting(false);
             setUrlInput(rawUrl);
         }, [rawUrl]);
-
-        const handleActivateEditing = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectElement();
-            setIsEditing(true);
-            setIsEditingActive(true);
-            setIsInteracting(false);
-            window.setTimeout(() => urlInputRef.current?.focus(), 0);
-        }, [selectElement]);
 
         // Close button: Delete the element
         const handleClose = useCallback(() => {
@@ -249,8 +248,8 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
         const resolveEmbedSrc = useCallback((url: string) => {
             const next = enhanceUrl(url);
-            return next.embedUrl || next.url;
-        }, []);
+            return ensureEmbedIdOnProxyUrl(next.embedUrl || next.url);
+        }, [ensureEmbedIdOnProxyUrl]);
 
         const navigateHistory = useCallback((direction: 'back' | 'forward') => {
             const currentHistory = historyRef.current;
@@ -285,12 +284,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         }, [isSelected, isEditing, processedUrl]);
 
         useEffect(() => {
-            if (!isSelected) {
-                setIsEditingActive(false);
-            }
-        }, [isSelected]);
-
-        useEffect(() => {
             if (!isInteracting) return;
 
             const handleKeyDown = (event: KeyboardEvent) => {
@@ -305,22 +298,22 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         }, [isInteracting]);
 
         // In passive mode, let wheel/pan events pass through, but allow click-anywhere
-        // activation inside the content rectangle (native-style click-to-interact).
+        // activation inside the full embed rectangle (native-style click-to-interact).
         useEffect(() => {
             if (!isLiveEmbedMode || !isPassiveEmbedMode || !isSelected) return;
 
             const handlePointerDownCapture = (event: PointerEvent) => {
                 if (event.button !== 0) return;
-                if (!contentAreaRef.current) return;
+                if (!containerRef.current) return;
 
-                const rect = contentAreaRef.current.getBoundingClientRect();
-                const insideContent =
+                const rect = containerRef.current.getBoundingClientRect();
+                const insideEmbed =
                     event.clientX >= rect.left &&
                     event.clientX <= rect.right &&
                     event.clientY >= rect.top &&
                     event.clientY <= rect.bottom;
 
-                if (!insideContent) return;
+                if (!insideEmbed) return;
 
                 event.preventDefault();
                 event.stopPropagation();
@@ -427,20 +420,30 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
         // Listen for URL changes in iframe (via postMessage when available)
         useEffect(() => {
             const handleMessage = (event: MessageEvent) => {
+                const data =
+                    event.data && typeof event.data === 'object'
+                        ? (event.data as { type?: string; url?: string; embedId?: string })
+                        : null;
+                if (!data || data.type !== 'iframe-navigation' || !data.url) return;
+
+                if (data.embedId) {
+                    if (data.embedId !== element.id) return;
+                    observeNavigationUrl(data.url);
+                    return;
+                }
+
                 const iframeWindow = iframeRef.current?.contentWindow;
                 if (!iframeWindow) return;
 
                 // Isolation: handle navigation events only from this embed's iframe.
                 if (event.source !== iframeWindow) return;
 
-                if (event.data && typeof event.data === 'object' && event.data.type === 'iframe-navigation' && event.data.url) {
-                    observeNavigationUrl(event.data.url);
-                }
+                observeNavigationUrl(data.url);
             };
 
             window.addEventListener('message', handleMessage);
             return () => window.removeEventListener('message', handleMessage);
-        }, [observeNavigationUrl]);
+        }, [observeNavigationUrl, element.id]);
 
         // Try to track URL changes via iframe (limited by CORS)
         useEffect(() => {
@@ -541,7 +544,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                             if (hasConfiguredUrl) {
                                                 setIsEditing(false);
                                             }
-                                            setIsEditingActive(false);
                                         }
                                     }}
                                     placeholder="Paste a full embeddable URL..."
@@ -554,7 +556,7 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         outline: 'none',
                                         minWidth: 0,
                                     }}
-                                    autoFocus={isEditingActive}
+                                    autoFocus={true}
                                 />
                                 <button onClick={handleSubmit} onMouseDown={(e) => e.stopPropagation()} style={{
                                     padding: '4px 12px',
@@ -572,7 +574,7 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                         ) : (
                             <>
                                 <div
-                                    onDoubleClick={handleEdit}
+                                    onClick={handleEdit}
                                     style={{
                                         flex: 1,
                                         fontSize: '12px',
@@ -583,10 +585,10 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '6px',
-                                        cursor: 'text',
+                                        cursor: 'pointer',
                                         minWidth: 0,
                                     }}
-                                    title={`Double-click to edit - Current URL: ${currentUrl || processedUrl}`}
+                                    title={`Click to edit - Current URL: ${currentUrl || processedUrl}`}
                                 >
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -694,7 +696,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                         overflow: 'hidden',
                         pointerEvents: isPassiveEmbedMode ? 'none' : 'auto',
                     }}
-                    ref={contentAreaRef}
                     >
 
                         {isEditing ? (
@@ -721,36 +722,11 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                     Example: youtube.com/watch?v=... or docs.google.com/.../preview
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#4b5563', textAlign: 'center', lineHeight: 1.5 }}>
-                                    Click the centered <strong>Click to edit URL</strong> button to type a link. After the page loads, click anywhere inside the rectangle to interact, then press <strong>Esc</strong> to return to canvas pan/zoom.
+                                    Paste a URL, then click anywhere inside the rectangle to interact with the page. Press <strong>Esc</strong> to return to canvas pan/zoom.
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#92400e', textAlign: 'center', lineHeight: 1.5, maxWidth: 360 }}>
                                     Some sites block web embedding via security policy (X-Frame-Options/CSP). Those links can only open in a new tab.
                                 </div>
-                                {!isEditingActive && isSelected && (
-                                    <button
-                                        onClick={handleActivateEditing}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%)',
-                                            zIndex: 2,
-                                            padding: '10px 14px',
-                                            background: 'rgba(17, 24, 39, 0.82)',
-                                            color: '#fff',
-                                            border: '1px solid rgba(255, 255, 255, 0.28)',
-                                            borderRadius: '8px',
-                                            fontSize: '12px',
-                                            cursor: 'pointer',
-                                            backdropFilter: 'blur(2px)',
-                                            pointerEvents: 'auto',
-                                        }}
-                                        title="Click to enter a URL"
-                                    >
-                                        Click to edit URL
-                                    </button>
-                                )}
                             </div>
                         ) : hasWarning ? (
                             <div style={{

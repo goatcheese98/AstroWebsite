@@ -45,20 +45,26 @@ export default class ProxyParty implements Party.Server {
                 function notifyParent(url) {
                   try {
                     if (window.parent && window.parent !== window) {
-                      window.parent.postMessage({ type: "iframe-navigation", url: url }, "*");
+                      window.parent.postMessage({ type: "iframe-navigation", url: url, embedId: embedId || undefined }, "*");
                     }
                   } catch (e) {
                     console.error("Failed to notify parent:", e);
                   }
                 }
 
-                const currentUrl = new URLSearchParams(window.location.search).get("url");
+                const params = new URLSearchParams(window.location.search);
+                const currentUrl = params.get("url");
+                const embedId = params.get("embedId");
                 if (currentUrl) notifyParent(currentUrl);
 
-                function wrapUrl(targetUrl) {
+                function wrapUrl(targetUrl, baseUrl) {
                   try {
-                    const base = currentUrl || BASE_TARGET;
-                    return PROXY_BASE + "?url=" + encodeURIComponent(new URL(targetUrl, base).href);
+                    const base = baseUrl || currentUrl || BASE_TARGET;
+                    const absolute = new URL(targetUrl, base).href;
+                    const next = new URL(PROXY_BASE);
+                    next.searchParams.set("url", absolute);
+                    if (embedId) next.searchParams.set("embedId", embedId);
+                    return next.toString();
                   } catch (e) {
                     return targetUrl;
                   }
@@ -71,7 +77,7 @@ export default class ProxyParty implements Party.Server {
                     const href = link.getAttribute("href");
                     const absoluteUrl = new URL(href, currentUrl || BASE_TARGET).href;
                     notifyParent(absoluteUrl);
-                    window.location.href = wrapUrl(href);
+                    window.location.href = wrapUrl(href, absoluteUrl);
                   }
                 }, true);
 
@@ -83,13 +89,14 @@ export default class ProxyParty implements Party.Server {
                     const formData = new FormData(form);
                     for (let [k, v] of formData.entries()) targetUrl.searchParams.append(k, v);
                     notifyParent(targetUrl.href);
-                    window.location.href = PROXY_BASE + "?url=" + encodeURIComponent(targetUrl.href);
+                    window.location.href = wrapUrl(targetUrl.href, targetUrl.href);
                   }
                 }, true);
 
                 function notifyCurrentLocation() {
                   try {
-                    notifyParent(window.location.href);
+                    const liveParams = new URLSearchParams(window.location.search);
+                    notifyParent(liveParams.get("url") || window.location.href);
                   } catch (e) {}
                 }
 

@@ -13,6 +13,16 @@ import { ClerkWrapper } from '../auth/ClerkWrapper';
 import CanvasAvatar from '../islands/CanvasAvatar';
 import { useUnifiedCanvasStore } from '@/stores';
 
+function CanvasAvatarFallback() {
+  return (
+    <CanvasAvatar
+      user={null}
+      isAuthenticated={false}
+      isLoading={false}
+    />
+  );
+}
+
 function CanvasAvatarInner() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut, openUserProfile } = useClerk();
@@ -80,7 +90,7 @@ function CanvasAvatarInner() {
 
 export default function CanvasAvatarConnected() {
   return (
-    <ClerkWrapper>
+    <ClerkWrapper fallback={<CanvasAvatarFallback />}>
       <CanvasAvatarInner />
     </ClerkWrapper>
   );
