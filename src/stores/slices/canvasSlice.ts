@@ -61,7 +61,6 @@ export const createCanvasSlice: StateCreator<
       elements: data.elements || [],
       appState: { ...get().appState, ...data.appState },
       files: data.files || null,
-      isDirty: true,
     });
   },
 

@@ -49,7 +49,7 @@ export default function CanvasStatusBadge({
   let strokeColor = '#22c55e';
   
   if (isDirty) {
-    statusText = 'Unsaved changes';
+    statusText = 'Saving';
     strokeColor = '#f59f00';
   } else if (lastSaved) {
     statusText = `Saved ${getTimeAgo(lastSaved)}`;
@@ -84,10 +84,31 @@ export default function CanvasStatusBadge({
       }}
     >
       {/* Status dot */}
-      <svg width="10" height="10" viewBox="0 0 10 10">
-        <circle cx="5" cy="5" r="4" fill={strokeColor} />
-      </svg>
+      {isDirty ? (
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          style={{ animation: 'aw-spin 0.9s linear infinite' }}
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="8"
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray="36 22"
+          />
+        </svg>
+      ) : (
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <circle cx="5" cy="5" r="4" fill={strokeColor} />
+        </svg>
+      )}
       <span>{statusText}</span>
+      <style>{`@keyframes aw-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

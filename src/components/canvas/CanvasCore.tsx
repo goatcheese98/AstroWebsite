@@ -15,6 +15,26 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 
 type SceneFiles = Record<string, unknown>;
 
+const buildSceneMutationSignature = (
+  elements: readonly ExcalidrawElement[],
+  files: SceneFiles
+) => {
+  const elementPart = elements
+    .map((el) => `${el.id}:${el.version ?? 0}:${el.versionNonce ?? 0}:${el.isDeleted ? 1 : 0}`)
+    .join("|");
+
+  const fileKeys = Object.keys(files).sort();
+  const filePart = fileKeys
+    .map((key) => {
+      const file = (files as Record<string, Record<string, unknown>>)[key] || {};
+      const version = typeof file.version === "number" ? file.version : 0;
+      return `${key}:${version}`;
+    })
+    .join("|");
+
+  return `${elements.length}::${elementPart}::${fileKeys.length}::${filePart}`;
+};
+
 interface CanvasCoreProps {
   isLoading?: boolean;
   onApiReady: (api: unknown) => void;
@@ -87,6 +107,7 @@ export default function CanvasCore({
   const { canvasData, setCanvasData, setDirty } = useUnifiedCanvasStore();
   const apiRef = useRef<unknown>(null);
   const hasInitializedRef = useRef(false);
+  const lastMutationSignatureRef = useRef("");
   
   // Load initial data
   useEffect(() => {
@@ -111,7 +132,12 @@ export default function CanvasCore({
     }
     
     // Sanitize before setting
-    setInitialData(sanitizeInitialData(dataToLoad));
+    const sanitized = sanitizeInitialData(dataToLoad);
+    setInitialData(sanitized);
+    lastMutationSignatureRef.current = buildSceneMutationSignature(
+      sanitized?.elements || [],
+      (sanitized?.files || {}) as SceneFiles
+    );
     setIsReady(true);
     hasInitializedRef.current = true;
   }, [canvasData]);
@@ -132,13 +158,18 @@ export default function CanvasCore({
       files && typeof files === "object"
         ? ({ ...files } as SceneFiles)
         : {};
+    const mutationSignature = buildSceneMutationSignature(safeElements, safeFiles);
+    const hasMutation = mutationSignature !== lastMutationSignatureRef.current;
+    lastMutationSignatureRef.current = mutationSignature;
 
     setCanvasData({
       elements: [...safeElements],
       appState: { ...safeAppState },
       files: { ...safeFiles },
     });
-    setDirty(true);
+    if (hasMutation) {
+      setDirty(true);
+    }
     onSceneChange?.(safeElements, safeAppState, safeFiles);
   }, [setCanvasData, setDirty, onSceneChange]);
   

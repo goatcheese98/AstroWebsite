@@ -56,11 +56,19 @@ export default function CanvasContainer({
     window.excalidrawAPI = excalidrawApi;
   }, [setApi]);
 
+  const handlePersistenceError = useCallback((err: Error) => {
+    addToast(`Save failed: ${err.message}`, 'error');
+  }, [addToast]);
+
+  const handleCollaborationError = useCallback((msg: string) => {
+    addToast(msg, "error");
+  }, [addToast]);
+
   // === PERSISTENCE ===
   useCanvasPersistence({
     canvasId,
     shouldClearOnMount,
-    onError: (err) => addToast(`Save failed: ${err.message}`, 'error'),
+    onError: handlePersistenceError,
   });
 
   // === COLLABORATION ===
@@ -74,7 +82,7 @@ export default function CanvasContainer({
     handleSceneChange,
     handlePointerUpdate,
   } = useCollaboration({
-    onError: (msg) => addToast(msg, "error"),
+    onError: handleCollaborationError,
   });
 
   const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
