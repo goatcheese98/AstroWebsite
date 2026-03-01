@@ -180,6 +180,17 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
             updateTransform
         }), [exportAsImage, updateTransform]);
 
+        useEffect(() => {
+            const handleEscapeToDeselect = (event: KeyboardEvent) => {
+                if (event.key !== 'Escape') return;
+                if (!isSelected) return;
+                onDeselect?.();
+            };
+
+            window.addEventListener('keydown', handleEscapeToDeselect, true);
+            return () => window.removeEventListener('keydown', handleEscapeToDeselect, true);
+        }, [isSelected, onDeselect]);
+
         return (
             <div
                 ref={containerRef}
@@ -226,4 +237,3 @@ export const LexicalNote = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
 ));
 
 LexicalNote.displayName = 'LexicalNote';
-

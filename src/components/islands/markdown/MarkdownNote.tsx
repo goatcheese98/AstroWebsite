@@ -106,6 +106,12 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             setIsEditing(true);
         }, []);
 
+        const deselectAll = useCallback(() => {
+            const excalidrawAPI = (window as any).excalidrawAPI;
+            if (!excalidrawAPI) return;
+            excalidrawAPI.updateScene({ appState: { selectedElementIds: {} } });
+        }, []);
+
         // Exit edit mode and save
         const exitEditMode = useCallback(() => {
             setIsEditing(false);
@@ -124,8 +130,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
             if (e.key === 'Escape') {
                 exitEditMode();
+                deselectAll();
             }
-        }, [exitEditMode]);
+        }, [exitEditMode, deselectAll]);
 
         // Listen for edit command from store
         useCommandSubscriber({
@@ -241,6 +248,22 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 document.removeEventListener('click', handleClickOutside, true);
             };
         }, [isEditing, isScrollMode, isPointInNote, exitEditMode]);
+
+        useEffect(() => {
+            const handleEscapeToDeselect = (event: KeyboardEvent) => {
+                if (event.key !== 'Escape') return;
+                if (!isSelected) return;
+
+                if (isEditing) {
+                    exitEditMode();
+                }
+                setIsScrollMode(false);
+                deselectAll();
+            };
+
+            window.addEventListener('keydown', handleEscapeToDeselect, true);
+            return () => window.removeEventListener('keydown', handleEscapeToDeselect, true);
+        }, [isSelected, isEditing, exitEditMode, deselectAll]);
 
         // Touch handlers for pinch zoom pass-through
         const handleTouchStart = useCallback((e: React.TouchEvent) => {

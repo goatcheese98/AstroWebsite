@@ -1,6 +1,24 @@
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useState, useRef, useEffect } from 'react';
 import { enhanceUrl, isKnownEmbeddable } from '@/lib/web-embed-utils';
 
+type EmbedViewMode = 'inline' | 'pip' | 'expanded';
+type PipPosition = { x: number; y: number };
+
+const PIP_MIN_WIDTH = 260;
+const PIP_MAX_WIDTH = 420;
+const PIP_WIDTH_RATIO = 0.28;
+const PIP_ASPECT_RATIO = 16 / 10;
+const PIP_MARGIN = 20;
+const PIP_TOP_OFFSET = 88;
+
+const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getPipDimensions = (viewportWidth: number) => {
+    const width = Math.min(PIP_MAX_WIDTH, Math.max(PIP_MIN_WIDTH, viewportWidth * PIP_WIDTH_RATIO));
+    const height = width / PIP_ASPECT_RATIO;
+    return { width, height };
+};
+
 export interface WebEmbedProps {
     element: any;
     appState: any;
@@ -11,70 +29,119 @@ export interface WebEmbedProps {
 
 export interface WebEmbedRef {
     exportAsImage: () => Promise<{ imageData: string; position: any }>;
-    updateTransform: (x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => void;
+    updateTransform: (
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        angle: number,
+        zoom: number,
+        scrollX: number,
+        scrollY: number
+    ) => void;
 }
 
-const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
-    ({ element, appState, onChange, onPositionChange, onDelete }, ref) => {
+const WebEmbedInner = memo(
+    forwardRef<WebEmbedRef, WebEmbedProps>(({ element, appState, onChange, onDelete }, ref) => {
         const [isLoading, setIsLoading] = useState(true);
         const [hasError, setHasError] = useState(false);
         const [urlInput, setUrlInput] = useState(element.customData?.url || '');
         const [isEditing, setIsEditing] = useState(!element.customData?.url);
-        const [isDragging, setIsDragging] = useState(false);
-        const [isInteracting, setIsInteracting] = useState(false);
         const [showFallback, setShowFallback] = useState(false);
         const [currentUrl, setCurrentUrl] = useState('');
         const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
         const [historyIndex, setHistoryIndex] = useState(-1);
+        const [viewMode, setViewMode] = useState<EmbedViewMode>('inline');
+        const [isPipDragging, setIsPipDragging] = useState(false);
+        const [viewportSize, setViewportSize] = useState(() => ({
+            width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+            height: typeof window !== 'undefined' ? window.innerHeight : 900,
+        }));
+        const [pipPosition, setPipPosition] = useState<PipPosition | null>(null);
+
         const iframeRef = useRef<HTMLIFrameElement>(null);
         const urlInputRef = useRef<HTMLInputElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
-        const dragStartRef = useRef<{ x: number; y: number; elementX: number; elementY: number } | null>(null);
         const historyRef = useRef<string[]>([]);
         const historyIndexRef = useRef(-1);
         const suppressHistoryUrlRef = useRef<string | null>(null);
+        const viewModeRef = useRef<EmbedViewMode>('inline');
+        const pipDragRef = useRef<{
+            startX: number;
+            startY: number;
+            initialX: number;
+            initialY: number;
+        } | null>(null);
 
         const rawUrl = element.customData?.url || '';
         const isSelected = appState.selectedElementIds?.[element.id] === true;
 
-        // Helper to select this element in Excalidraw
-        const selectElement = useCallback(() => {
-            if (isSelected) return;
-            const excalidrawAPI = (window as any).excalidrawAPI;
-            if (excalidrawAPI) {
-                const currentElements = excalidrawAPI.getSceneElements();
-                excalidrawAPI.updateScene({
-                    elements: currentElements,
-                    appState: {
-                        selectedElementIds: { [element.id]: true },
-                    },
-                });
-            }
-        }, [isSelected, element.id]);
-
-        // Get embed-friendly URL
         const hasConfiguredUrl = rawUrl.trim().length > 0;
-        const { url: processedUrl, isSearch, embedUrl, warning } = rawUrl ? enhanceUrl(rawUrl) : { url: '', isSearch: false };
-        const ensureEmbedIdOnProxyUrl = useCallback((candidateUrl: string) => {
-            try {
-                const parsed = new URL(candidateUrl);
-                if (parsed.pathname.includes('/parties/main/proxy')) {
-                    parsed.searchParams.set('embedId', element.id);
-                    return parsed.toString();
+        const { url: processedUrl, isSearch, embedUrl, warning } = rawUrl
+            ? enhanceUrl(rawUrl)
+            : { url: '', isSearch: false };
+
+        const ensureEmbedIdOnProxyUrl = useCallback(
+            (candidateUrl: string) => {
+                try {
+                    const parsed = new URL(candidateUrl);
+                    if (parsed.pathname.includes('/parties/main/proxy')) {
+                        parsed.searchParams.set('embedId', element.id);
+                        return parsed.toString();
+                    }
+                    return candidateUrl;
+                } catch {
+                    return candidateUrl;
                 }
-                return candidateUrl;
-            } catch {
-                return candidateUrl;
-            }
-        }, [element.id]);
+            },
+            [element.id]
+        );
 
         const displayUrl = ensureEmbedIdOnProxyUrl(embedUrl || processedUrl);
         const isReliableEmbed = isKnownEmbeddable(processedUrl);
         const hasWarning = !!warning;
         const isLiveEmbedMode = !isEditing && hasConfiguredUrl && !hasWarning && !showFallback && !!displayUrl;
-        const isPassiveEmbedMode = !isInteracting && !isEditing;
+        const isInlineFocused = viewMode === 'inline' && isSelected;
+        const isInteractive = viewMode !== 'inline' || isInlineFocused;
+        const shouldPassThroughSetupSurface =
+            viewMode === 'inline' && isEditing && !hasConfiguredUrl;
         const canGoBack = historyIndex > 0;
         const canGoForward = historyIndex >= 0 && historyIndex < navigationHistory.length - 1;
+        const pipDimensions = getPipDimensions(viewportSize.width);
+
+        useEffect(() => {
+            viewModeRef.current = viewMode;
+        }, [viewMode]);
+
+        useEffect(() => {
+            const handleResize = () => {
+                setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+            };
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+        }, []);
+
+        useEffect(() => {
+            if (isEditing) {
+                setTimeout(() => urlInputRef.current?.focus(), 0);
+            }
+        }, [isEditing]);
+
+        useEffect(() => {
+            const { width, height } = getPipDimensions(viewportSize.width);
+            const maxX = Math.max(PIP_MARGIN, viewportSize.width - width - PIP_MARGIN);
+            const maxY = Math.max(PIP_TOP_OFFSET, viewportSize.height - height - PIP_MARGIN);
+
+            setPipPosition((prev) => {
+                if (!prev) {
+                    return { x: maxX, y: PIP_TOP_OFFSET };
+                }
+                return {
+                    x: clampValue(prev.x, PIP_MARGIN, maxX),
+                    y: clampValue(prev.y, PIP_TOP_OFFSET, maxY),
+                };
+            });
+        }, [viewportSize.width, viewportSize.height]);
 
         const normalizeTrackedUrl = useCallback((url: string) => {
             try {
@@ -91,34 +158,36 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             setHistoryIndex(index);
         }, []);
 
-        const observeNavigationUrl = useCallback((nextUrl: string) => {
-            const normalized = normalizeTrackedUrl(nextUrl);
-            if (!normalized || normalized.startsWith('about:')) return;
+        const observeNavigationUrl = useCallback(
+            (nextUrl: string) => {
+                const normalized = normalizeTrackedUrl(nextUrl);
+                if (!normalized || normalized.startsWith('about:')) return;
 
-            setCurrentUrl(normalized);
+                setCurrentUrl(normalized);
 
-            if (suppressHistoryUrlRef.current === normalized) {
-                suppressHistoryUrlRef.current = null;
-                return;
-            }
+                if (suppressHistoryUrlRef.current === normalized) {
+                    suppressHistoryUrlRef.current = null;
+                    return;
+                }
 
-            const currentHistory = historyRef.current;
-            const currentIndex = historyIndexRef.current;
+                const currentHistory = historyRef.current;
+                const currentIndex = historyIndexRef.current;
 
-            if (currentIndex >= 0 && currentHistory[currentIndex] === normalized) return;
+                if (currentIndex >= 0 && currentHistory[currentIndex] === normalized) return;
 
-            const truncated = currentHistory.slice(0, Math.max(currentIndex + 1, 0));
-            const last = truncated[truncated.length - 1];
-            if (last === normalized) {
-                syncHistoryState(truncated, truncated.length - 1);
-                return;
-            }
+                const truncated = currentHistory.slice(0, Math.max(currentIndex + 1, 0));
+                const last = truncated[truncated.length - 1];
+                if (last === normalized) {
+                    syncHistoryState(truncated, truncated.length - 1);
+                    return;
+                }
 
-            const nextHistory = [...truncated, normalized];
-            syncHistoryState(nextHistory, nextHistory.length - 1);
-        }, [normalizeTrackedUrl, syncHistoryState]);
+                const nextHistory = [...truncated, normalized];
+                syncHistoryState(nextHistory, nextHistory.length - 1);
+            },
+            [normalizeTrackedUrl, syncHistoryState]
+        );
 
-        // Initialize URL and history when embed URL changes via user input.
         useEffect(() => {
             if (!processedUrl) {
                 setCurrentUrl('');
@@ -133,54 +202,95 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             suppressHistoryUrlRef.current = null;
         }, [processedUrl, rawUrl, normalizeTrackedUrl, syncHistoryState]);
 
-        // Reset loading state when URL changes and set timeout for sites that block embedding
         useEffect(() => {
             if (!displayUrl) {
                 setIsLoading(false);
                 return;
             }
-            
+
             setIsLoading(true);
             setHasError(false);
             setShowFallback(false);
-            
-            // Timeout for sites that block embedding via X-Frame-Options
-            // If iframe doesn't load within 8 seconds, show content anyway
+
             const timeout = setTimeout(() => {
                 setIsLoading(false);
             }, 8000);
-            
+
             return () => clearTimeout(timeout);
         }, [displayUrl]);
 
-        // Calculate screen position
         const zoom = appState.zoom.value;
         const screenCenterX = (element.x + element.width / 2 + appState.scrollX) * zoom;
         const screenCenterY = (element.y + element.height / 2 + appState.scrollY) * zoom;
 
-        const containerStyle: React.CSSProperties = {
+        const inlineContainerStyle: React.CSSProperties = {
             position: 'absolute',
             top: `${screenCenterY - element.height / 2}px`,
             left: `${screenCenterX - element.width / 2}px`,
             width: `${element.width}px`,
             height: `${element.height}px`,
-            transform: `scale(${zoom})`,
+            transform: `scale(${zoom}) rotate(${element.angle || 0}rad)`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: isDragging ? 100 : (isEditing ? 10 : (isSelected ? 3 : 2)),
+            zIndex: isEditing ? 10 : isSelected ? 3 : 2,
         };
+
+        const pipContainerStyle: React.CSSProperties = {
+            position: 'fixed',
+            top: `${pipPosition?.y ?? PIP_TOP_OFFSET}px`,
+            left: `${pipPosition?.x ?? Math.max(PIP_MARGIN, viewportSize.width - pipDimensions.width - PIP_MARGIN)}px`,
+            width: `${pipDimensions.width}px`,
+            height: `${pipDimensions.height}px`,
+            transform: 'none',
+            transformOrigin: 'center center',
+            pointerEvents: 'auto',
+            zIndex: 1100,
+        };
+
+        const expandedContainerStyle: React.CSSProperties = {
+            position: 'fixed',
+            top: '5vh',
+            left: '5vw',
+            width: '90vw',
+            height: '90vh',
+            transform: 'none',
+            transformOrigin: 'center center',
+            pointerEvents: 'auto',
+            zIndex: 1201,
+        };
+
+        const containerStyle: React.CSSProperties =
+            viewMode === 'expanded'
+                ? expandedContainerStyle
+                : viewMode === 'pip'
+                  ? pipContainerStyle
+                  : inlineContainerStyle;
+        const pipInlinePlaceholderStyle: React.CSSProperties = {
+            ...inlineContainerStyle,
+            pointerEvents: 'none',
+            zIndex: 2,
+        };
+
+        const cardPointerEvents =
+            shouldPassThroughSetupSurface ? 'none' : isInteractive ? 'auto' : 'none';
+        const bodyPointerEvents =
+            shouldPassThroughSetupSurface ? 'none' : isInteractive ? 'auto' : 'none';
 
         const contentStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
             backgroundColor: '#ffffff',
-            borderRadius: '8px',
+            borderRadius: viewMode === 'expanded' ? '14px' : '10px',
             overflow: 'hidden',
-            boxShadow: isSelected
-                ? '0 0 0 2px #6366f1, 0 10px 20px -3px rgba(0, 0, 0, 0.2)'
-                : '0 4px 12px -1px rgba(0, 0, 0, 0.15)',
-            // Native-style behavior: when not interacting, this should behave like a passive canvas element.
-            pointerEvents: isPassiveEmbedMode ? 'none' : 'auto',
+            boxShadow:
+                viewMode === 'expanded'
+                    ? '0 28px 72px rgba(15, 23, 42, 0.35)'
+                    : viewMode === 'pip'
+                      ? '0 20px 40px rgba(15, 23, 42, 0.3)'
+                      : isSelected
+                        ? '0 0 0 2px #6366f1, 0 10px 20px -3px rgba(0, 0, 0, 0.2)'
+                        : '0 4px 12px -1px rgba(0, 0, 0, 0.15)',
+            pointerEvents: cardPointerEvents,
             display: 'flex',
             flexDirection: 'column',
         };
@@ -202,7 +312,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
         const handleSubmit = useCallback(() => {
             const result = enhanceUrl(urlInput);
-
             if (!result.url) {
                 alert('Invalid URL');
                 return;
@@ -210,7 +319,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
             onChange(element.id, urlInput.trim());
             setIsEditing(false);
-            setIsInteracting(false);
             setIsLoading(true);
             setHasError(false);
             setShowFallback(false);
@@ -218,161 +326,129 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
         const handleEdit = useCallback(() => {
             setIsEditing(true);
-            setIsInteracting(false);
             setUrlInput(rawUrl);
         }, [rawUrl]);
 
-        // Close button: Delete the element
-        const handleClose = useCallback(() => {
+        const handleCloseElement = useCallback(() => {
             if (onDelete) {
                 onDelete(element.id);
-            } else {
-                const excalidrawAPI = (window as any).excalidrawAPI;
-                if (excalidrawAPI) {
-                    const currentElements = excalidrawAPI.getSceneElements();
-                    excalidrawAPI.updateScene({
-                        elements: currentElements.filter((el: any) => el.id !== element.id),
-                    });
-                }
-            }
-        }, [element.id, onDelete]);
-
-        const handleRefresh = useCallback(() => {
-            if (iframeRef.current) {
-                setIsLoading(true);
-                setHasError(false);
-                setShowFallback(false);
-                iframeRef.current.src = iframeRef.current.src;
-            }
-        }, []);
-
-        const resolveEmbedSrc = useCallback((url: string) => {
-            const next = enhanceUrl(url);
-            return ensureEmbedIdOnProxyUrl(next.embedUrl || next.url);
-        }, [ensureEmbedIdOnProxyUrl]);
-
-        const navigateHistory = useCallback((direction: 'back' | 'forward') => {
-            const currentHistory = historyRef.current;
-            const currentIndex = historyIndexRef.current;
-            if (!currentHistory.length || currentIndex < 0) return;
-
-            const targetIndex = direction === 'back' ? currentIndex - 1 : currentIndex + 1;
-            if (targetIndex < 0 || targetIndex >= currentHistory.length) return;
-
-            const targetUrl = currentHistory[targetIndex];
-            syncHistoryState(currentHistory, targetIndex);
-            suppressHistoryUrlRef.current = targetUrl;
-
-            setCurrentUrl(targetUrl);
-            setIsLoading(true);
-            setHasError(false);
-            setShowFallback(false);
-
-            const targetSrc = resolveEmbedSrc(targetUrl);
-            if (!targetSrc || !iframeRef.current) {
-                setIsLoading(false);
                 return;
             }
 
-            iframeRef.current.src = targetSrc;
-        }, [resolveEmbedSrc, syncHistoryState]);
+            const excalidrawAPI = (window as any).excalidrawAPI;
+            if (!excalidrawAPI) return;
+            const currentElements = excalidrawAPI.getSceneElements();
+            excalidrawAPI.updateScene({
+                elements: currentElements.filter((el: any) => el.id !== element.id),
+            });
+        }, [element.id, onDelete]);
 
-        useEffect(() => {
-            if (!isSelected || isEditing || !processedUrl) {
-                setIsInteracting(false);
-            }
-        }, [isSelected, isEditing, processedUrl]);
+        const handleRefresh = useCallback(() => {
+            if (!iframeRef.current) return;
+            setIsLoading(true);
+            setHasError(false);
+            setShowFallback(false);
+            iframeRef.current.src = iframeRef.current.src;
+        }, []);
 
-        useEffect(() => {
-            if (!isInteracting) return;
+        const resolveEmbedSrc = useCallback(
+            (url: string) => {
+                const next = enhanceUrl(url);
+                return ensureEmbedIdOnProxyUrl(next.embedUrl || next.url);
+            },
+            [ensureEmbedIdOnProxyUrl]
+        );
 
-            const handleKeyDown = (event: KeyboardEvent) => {
-                if (event.key === 'Escape') {
-                    setIsInteracting(false);
-                    iframeRef.current?.blur();
+        const navigateHistory = useCallback(
+            (direction: 'back' | 'forward') => {
+                const currentHistory = historyRef.current;
+                const currentIndex = historyIndexRef.current;
+                if (!currentHistory.length || currentIndex < 0) return;
+
+                const targetIndex = direction === 'back' ? currentIndex - 1 : currentIndex + 1;
+                if (targetIndex < 0 || targetIndex >= currentHistory.length) return;
+
+                const targetUrl = currentHistory[targetIndex];
+                syncHistoryState(currentHistory, targetIndex);
+                suppressHistoryUrlRef.current = targetUrl;
+
+                setCurrentUrl(targetUrl);
+                setIsLoading(true);
+                setHasError(false);
+                setShowFallback(false);
+
+                const targetSrc = resolveEmbedSrc(targetUrl);
+                if (!targetSrc || !iframeRef.current) {
+                    setIsLoading(false);
+                    return;
                 }
-            };
 
-            window.addEventListener('keydown', handleKeyDown);
-            return () => window.removeEventListener('keydown', handleKeyDown);
-        }, [isInteracting]);
+                iframeRef.current.src = targetSrc;
+            },
+            [resolveEmbedSrc, syncHistoryState]
+        );
 
-        // In passive mode, let wheel/pan events pass through, but allow click-anywhere
-        // activation inside the full embed rectangle (native-style click-to-interact).
-        useEffect(() => {
-            if (!isLiveEmbedMode || !isPassiveEmbedMode || !isSelected) return;
+        const setModeAndCloseEditor = useCallback((mode: EmbedViewMode) => {
+            pipDragRef.current = null;
+            setIsPipDragging(false);
+            setViewMode(mode);
+            setIsEditing(false);
+        }, []);
 
-            const handlePointerDownCapture = (event: PointerEvent) => {
-                if (event.button !== 0) return;
-                if (!containerRef.current) return;
+        const deselectAll = useCallback(() => {
+            const excalidrawAPI = (window as any).excalidrawAPI;
+            if (!excalidrawAPI) return;
+            excalidrawAPI.updateScene({ appState: { selectedElementIds: {} } });
+        }, []);
 
-                const rect = containerRef.current.getBoundingClientRect();
-                const insideEmbed =
-                    event.clientX >= rect.left &&
-                    event.clientX <= rect.right &&
-                    event.clientY >= rect.top &&
-                    event.clientY <= rect.bottom;
+        const beginPipDrag = useCallback(
+            (event: React.MouseEvent<HTMLDivElement>) => {
+                if (viewMode !== 'pip' || !pipPosition) return;
 
-                if (!insideEmbed) return;
+                const target = event.target as HTMLElement;
+                if (target.closest('button, input, a, textarea, select')) return;
 
+                pipDragRef.current = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    initialX: pipPosition.x,
+                    initialY: pipPosition.y,
+                };
+                setIsPipDragging(true);
                 event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
-                setIsInteracting(true);
-                window.setTimeout(() => iframeRef.current?.focus(), 0);
-            };
+            },
+            [viewMode, pipPosition]
+        );
 
-            window.addEventListener('pointerdown', handlePointerDownCapture, true);
-            return () => window.removeEventListener('pointerdown', handlePointerDownCapture, true);
-        }, [isLiveEmbedMode, isPassiveEmbedMode, isSelected]);
-
-        // Drag handlers
-        const handleMouseDown = useCallback((e: React.MouseEvent) => {
-            if (isEditing) return;
-
-            setIsDragging(true);
-            dragStartRef.current = {
-                x: e.clientX,
-                y: e.clientY,
-                elementX: element.x,
-                elementY: element.y,
-            };
-
-            e.preventDefault();
-            e.stopPropagation();
-        }, [isEditing, element.x, element.y]);
-
-        // Global drag handling
         useEffect(() => {
-            if (!isDragging) return;
+            const handleMouseMove = (event: MouseEvent) => {
+                if (!pipDragRef.current) return;
 
-            const handleMouseMove = (e: MouseEvent) => {
-                if (!dragStartRef.current) return;
+                const dx = event.clientX - pipDragRef.current.startX;
+                const dy = event.clientY - pipDragRef.current.startY;
+                const { width, height } = getPipDimensions(viewportSize.width);
+                const maxX = Math.max(PIP_MARGIN, viewportSize.width - width - PIP_MARGIN);
+                const maxY = Math.max(PIP_TOP_OFFSET, viewportSize.height - height - PIP_MARGIN);
 
-                const dx = (e.clientX - dragStartRef.current.x) / zoom;
-                const dy = (e.clientY - dragStartRef.current.y) / zoom;
-
-                const newX = dragStartRef.current.elementX + dx;
-                const newY = dragStartRef.current.elementY + dy;
-
-                if (onPositionChange) {
-                    onPositionChange(element.id, newX, newY);
-                }
+                setPipPosition({
+                    x: clampValue(pipDragRef.current.initialX + dx, PIP_MARGIN, maxX),
+                    y: clampValue(pipDragRef.current.initialY + dy, PIP_TOP_OFFSET, maxY),
+                });
             };
 
             const handleMouseUp = () => {
-                setIsDragging(false);
-                dragStartRef.current = null;
+                if (!pipDragRef.current) return;
+                pipDragRef.current = null;
+                setIsPipDragging(false);
             };
 
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
             return () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
             };
-        }, [isDragging, zoom, element.id, onPositionChange]);
+        }, [viewportSize.width, viewportSize.height]);
 
         const exportAsImage = useCallback(async () => {
             return {
@@ -387,27 +463,41 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             };
         }, [element]);
 
-        // Update transform directly on DOM (bypasses React for smooth sync)
-        const updateTransform = useCallback((x: number, y: number, width: number, height: number, angle: number, zoom: number, scrollX: number, scrollY: number) => {
-            if (!containerRef.current) return;
+        const updateTransform = useCallback(
+            (
+                x: number,
+                y: number,
+                width: number,
+                height: number,
+                angle: number,
+                nextZoom: number,
+                scrollX: number,
+                scrollY: number
+            ) => {
+                if (!containerRef.current) return;
+                if (viewModeRef.current !== 'inline') return;
 
-            // Calculate screen center position using passed-in values (all from same frame)
-            const screenCenterX = (x + width / 2 + scrollX) * zoom;
-            const screenCenterY = (y + height / 2 + scrollY) * zoom;
+                const screenX = (x + width / 2 + scrollX) * nextZoom;
+                const screenY = (y + height / 2 + scrollY) * nextZoom;
 
-            // Apply transform directly to DOM
-            const container = containerRef.current;
-            container.style.top = `${screenCenterY - height / 2}px`;
-            container.style.left = `${screenCenterX - width / 2}px`;
-            container.style.width = `${width}px`;
-            container.style.height = `${height}px`;
-            container.style.transform = `scale(${zoom})`;
-        }, []); // No dependencies - uses only passed parameters
+                const container = containerRef.current;
+                container.style.top = `${screenY - height / 2}px`;
+                container.style.left = `${screenX - width / 2}px`;
+                container.style.width = `${width}px`;
+                container.style.height = `${height}px`;
+                container.style.transform = `scale(${nextZoom}) rotate(${angle || 0}rad)`;
+            },
+            []
+        );
 
-        useImperativeHandle(ref, () => ({
-            exportAsImage,
-            updateTransform
-        }), [exportAsImage, updateTransform]);
+        useImperativeHandle(
+            ref,
+            () => ({
+                exportAsImage,
+                updateTransform,
+            }),
+            [exportAsImage, updateTransform]
+        );
 
         const getDomain = (url: string) => {
             try {
@@ -417,7 +507,6 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             }
         };
 
-        // Listen for URL changes in iframe (via postMessage when available)
         useEffect(() => {
             const handleMessage = (event: MessageEvent) => {
                 const data =
@@ -434,10 +523,7 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
 
                 const iframeWindow = iframeRef.current?.contentWindow;
                 if (!iframeWindow) return;
-
-                // Isolation: handle navigation events only from this embed's iframe.
                 if (event.source !== iframeWindow) return;
-
                 observeNavigationUrl(data.url);
             };
 
@@ -445,317 +531,430 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
             return () => window.removeEventListener('message', handleMessage);
         }, [observeNavigationUrl, element.id]);
 
-        // Try to track URL changes via iframe (limited by CORS)
         useEffect(() => {
             if (!iframeRef.current) return;
 
             const checkUrl = setInterval(() => {
                 try {
-                    // This will fail for cross-origin iframes due to CORS
                     const iframeWindow = iframeRef.current?.contentWindow;
                     if (iframeWindow && iframeWindow.location.href) {
-                        const newUrl = iframeWindow.location.href;
-                        if (!newUrl.startsWith('about:')) {
-                            observeNavigationUrl(newUrl);
+                        const nextUrl = iframeWindow.location.href;
+                        if (!nextUrl.startsWith('about:')) {
+                            observeNavigationUrl(nextUrl);
                         }
                     }
-                } catch (e) {
-                    // Expected error for cross-origin iframes - silently ignore
+                } catch {
+                    // Expected for cross-origin iframes.
                 }
             }, 1000);
 
             return () => clearInterval(checkUrl);
         }, [observeNavigationUrl]);
 
-        // Selection event for AI
         useEffect(() => {
             if (isSelected && processedUrl) {
-                window.dispatchEvent(new CustomEvent('webembed:selected', {
-                    detail: { elementId: element.id, url: currentUrl || processedUrl, title: rawUrl },
-                }));
+                window.dispatchEvent(
+                    new CustomEvent('webembed:selected', {
+                        detail: { elementId: element.id, url: currentUrl || processedUrl, title: rawUrl },
+                    })
+                );
             }
         }, [isSelected, currentUrl, processedUrl, rawUrl, element.id]);
 
+        useEffect(() => {
+            const handleEscapeToDeselect = (event: KeyboardEvent) => {
+                if (event.key !== 'Escape') return;
+                if (!isSelected) return;
+
+                // If setup has no URL yet, keep setup UI visible after deselect.
+                if (isEditing && hasConfiguredUrl) {
+                    setIsEditing(false);
+                }
+                pipDragRef.current = null;
+                setIsPipDragging(false);
+                deselectAll();
+            };
+
+            window.addEventListener('keydown', handleEscapeToDeselect, true);
+            return () => window.removeEventListener('keydown', handleEscapeToDeselect, true);
+        }, [isSelected, isEditing, hasConfiguredUrl, deselectAll]);
+
         return (
-            <div
-                ref={containerRef}
-                style={containerStyle}
-                className="web-embed-container"
-                data-embed-id={element.id}
-            >
-                <div style={contentStyle}>
-                    {/* Header bar - draggable */}
+            <>
+                {viewMode === 'expanded' && (
                     <div
-                        onMouseDown={handleMouseDown}
-                        onClick={selectElement}
                         style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '8px 12px',
-                            background: isDragging ? '#e0e7ff' : '#f8f9fa',
-                            borderBottom: '1px solid #e5e7eb',
-                            gap: '8px',
-                            cursor: isDragging ? 'grabbing' : (isSelected ? 'grab' : 'default'),
-                            userSelect: 'none',
-                            // Keep the full embed passive until explicitly activated.
-                            pointerEvents: isPassiveEmbedMode ? 'none' : 'auto',
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(15, 23, 42, 0.35)',
+                            backdropFilter: 'blur(2px)',
+                            WebkitBackdropFilter: 'blur(2px)',
+                            zIndex: 1200,
                         }}
-                    >
-                        {/* Close button */}
-                        <button
-                            onClick={handleClose}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            title="Close embed"
+                        onClick={() => setModeAndCloseEditor('inline')}
+                    />
+                )}
+                {viewMode === 'pip' && (
+                    <div style={pipInlinePlaceholderStyle}>
+                        <div
                             style={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                background: '#ef4444',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
+                                width: '100%',
+                                height: '100%',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                flexShrink: 0,
+                                background: 'rgba(248, 250, 252, 0.84)',
+                                borderRadius: 10,
+                                border: '1px dashed rgba(100, 116, 139, 0.6)',
+                                color: '#334155',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                letterSpacing: 0.2,
+                                textAlign: 'center',
+                                padding: '10px 16px',
+                                boxSizing: 'border-box',
                             }}
                         >
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="3">
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                                <line x1="6" y1="18" x2="18" y2="6" />
-                            </svg>
-                        </button>
+                            Picture-in-picture active
+                            <br />
+                            Use the PiP X button to restore
+                        </div>
+                    </div>
+                )}
+                <div
+                    ref={containerRef}
+                    style={containerStyle}
+                    className="web-embed-container"
+                    data-embed-id={element.id}
+                >
+                    <div style={contentStyle}>
+                        <div
+                            onMouseDown={beginPipDrag}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '8px 12px',
+                                background: '#f8fafc',
+                                borderBottom: '1px solid rgba(148, 163, 184, 0.22)',
+                                gap: '8px',
+                                userSelect: 'none',
+                                minHeight: 38,
+                                pointerEvents: isInteractive ? 'auto' : 'none',
+                                cursor: viewMode === 'pip' ? (isPipDragging ? 'grabbing' : 'grab') : 'default',
+                            }}
+                        >
+                            <button
+                                onClick={handleCloseElement}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                title="Delete embed"
+                                style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: '#ef4444',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="3">
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                    <line x1="6" y1="18" x2="18" y2="6" />
+                                </svg>
+                            </button>
 
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                            <button
+                                onClick={() => setModeAndCloseEditor('pip')}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                title="Minimize to picture-in-picture"
+                                style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: '#f59e0b',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            />
+                            <button
+                                onClick={() => setModeAndCloseEditor('expanded')}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                title="Expand embed"
+                                style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: '#10b981',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            />
 
-                        {/* URL display or input */}
-                        {isEditing ? (
-                            <div style={{ flex: 1, display: 'flex', gap: '8px', minWidth: 0 }}>
-                                <input
-                                    ref={urlInputRef}
-                                    type="text"
-                                    value={urlInput}
-                                    onChange={(e) => setUrlInput(e.target.value)}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSubmit();
-                                        if (e.key === 'Escape') {
-                                            if (hasConfiguredUrl) {
+                            {isEditing ? (
+                                <div style={{ flex: 1, display: 'flex', gap: '8px', minWidth: 0 }}>
+                                    <input
+                                        ref={urlInputRef}
+                                        type="text"
+                                        value={urlInput}
+                                        onChange={(e) => setUrlInput(e.target.value)}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSubmit();
+                                            if (e.key === 'Escape' && hasConfiguredUrl) {
                                                 setIsEditing(false);
                                             }
-                                        }
-                                    }}
-                                    placeholder="Paste a full embeddable URL..."
+                                        }}
+                                        placeholder="Paste a full embeddable URL..."
+                                        style={{
+                                            flex: 1,
+                                            padding: '4px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            outline: 'none',
+                                            minWidth: 0,
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handleSubmit}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        style={{
+                                            padding: '4px 12px',
+                                            background: '#6366f1',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        Go
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleEdit}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        style={{
+                                            flex: 1,
+                                            fontSize: '12px',
+                                            color: '#6b7280',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            minWidth: 0,
+                                            background: 'transparent',
+                                            border: 'none',
+                                            textAlign: 'left',
+                                            padding: 0,
+                                        }}
+                                        title={`Edit URL - ${currentUrl || processedUrl}`}
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                                        </svg>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {isSearch ? `🔍 ${rawUrl}` : currentUrl || processedUrl}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={handleRefresh}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        title="Refresh"
+                                        style={{
+                                            padding: '4px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#6b7280',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="23 4 23 10 17 10" />
+                                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => navigateHistory('back')}
+                                        disabled={!canGoBack}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        title="Back"
+                                        style={{
+                                            padding: '4px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: canGoBack ? 'pointer' : 'not-allowed',
+                                            color: '#6b7280',
+                                            flexShrink: 0,
+                                            opacity: canGoBack ? 1 : 0.35,
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="15 18 9 12 15 6" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => navigateHistory('forward')}
+                                        disabled={!canGoForward}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        title="Forward"
+                                        style={{
+                                            padding: '4px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: canGoForward ? 'pointer' : 'not-allowed',
+                                            color: '#6b7280',
+                                            flexShrink: 0,
+                                            opacity: canGoForward ? 1 : 0.35,
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="9 18 15 12 9 6" />
+                                        </svg>
+                                    </button>
+                                    <a
+                                        href={currentUrl || processedUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        title="Open in new tab"
+                                        style={{
+                                            padding: '4px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#6b7280',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M14 3h7v7" />
+                                            <path d="M10 14L21 3" />
+                                            <path d="M21 14v7h-7" />
+                                            <path d="M3 10V3h7" />
+                                            <path d="M3 21l7-7" />
+                                        </svg>
+                                    </a>
+                                </>
+                            )}
+
+                            {viewMode !== 'inline' && (
+                                <button
+                                    onClick={() => setModeAndCloseEditor('inline')}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    title={viewMode === 'expanded' ? 'Close expanded view' : 'Remove from picture-in-picture'}
                                     style={{
-                                        flex: 1,
-                                        padding: '4px 8px',
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: '4px',
-                                        fontSize: '12px',
-                                        outline: 'none',
-                                        minWidth: 0,
-                                    }}
-                                    autoFocus={true}
-                                />
-                                <button onClick={handleSubmit} onMouseDown={(e) => e.stopPropagation()} style={{
-                                    padding: '4px 12px',
-                                    background: '#6366f1',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    cursor: 'pointer',
-                                    flexShrink: 0,
-                                }}>
-                                    Go
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <div
-                                    onClick={handleEdit}
-                                    style={{
-                                        flex: 1,
-                                        fontSize: '12px',
-                                        color: '#6b7280',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
+                                        marginLeft: '2px',
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: '6px',
+                                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                                        background: 'white',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                        color: '#334155',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        cursor: 'pointer',
-                                        minWidth: 0,
-                                    }}
-                                    title={`Click to edit - Current URL: ${currentUrl || processedUrl}`}
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                                    </svg>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {isSearch ? `🔍 ${rawUrl}` : (currentUrl || processedUrl)}
-                                    </span>
-                                </div>
-                                <button onClick={handleRefresh} onMouseDown={(e) => e.stopPropagation()} title="Refresh" style={{
-                                    padding: '4px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: '#6b7280',
-                                    flexShrink: 0,
-                                }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <polyline points="23 4 23 10 17 10" />
-                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={() => navigateHistory('back')}
-                                    disabled={!canGoBack}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    title="Back"
-                                    style={{
-                                        padding: '4px',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        cursor: canGoBack ? 'pointer' : 'not-allowed',
-                                        color: '#6b7280',
-                                        flexShrink: 0,
-                                        opacity: canGoBack ? 1 : 0.35,
+                                        justifyContent: 'center',
                                     }}
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <polyline points="15 18 9 12 15 6" />
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                        <line x1="6" y1="18" x2="18" y2="6" />
                                     </svg>
                                 </button>
-                                <button
-                                    onClick={() => navigateHistory('forward')}
-                                    disabled={!canGoForward}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    title="Forward"
+                            )}
+                        </div>
+
+                        <div
+                            style={{
+                                flex: 1,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                background: '#ffffff',
+                                pointerEvents: bodyPointerEvents,
+                            }}
+                        >
+                            {isEditing ? (
+                                <div
                                     style={{
-                                        padding: '4px',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        cursor: canGoForward ? 'pointer' : 'not-allowed',
-                                        color: '#6b7280',
-                                        flexShrink: 0,
-                                        opacity: canGoForward ? 1 : 0.35,
-                                    }}
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <polyline points="9 18 15 12 9 6" />
-                                    </svg>
-                                </button>
-                                <a
-                                    href={currentUrl || processedUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    title="Open current page in new tab"
-                                    style={{
-                                        padding: '4px',
-                                        display: 'inline-flex',
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#6b7280',
-                                        flexShrink: 0,
+                                        background: '#f9fafb',
+                                        color: '#9ca3af',
+                                        gap: '12px',
+                                        padding: '20px',
                                     }}
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M14 3h7v7" />
-                                        <path d="M10 14L21 3" />
-                                        <path d="M21 14v7h-7" />
-                                        <path d="M3 10V3h7" />
-                                        <path d="M3 21l7-7" />
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                        <line x1="8" y1="21" x2="16" y2="21" />
+                                        <line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
-                                </a>
-                                <button onClick={handleEdit} onMouseDown={(e) => e.stopPropagation()} title="Edit URL" style={{
-                                    padding: '4px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: '#6b7280',
-                                    flexShrink: 0,
-                                }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                    </svg>
-                                </button>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Content area */}
-                    <div style={{
-                        flex: 1,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        pointerEvents: isPassiveEmbedMode ? 'none' : 'auto',
-                    }}
-                    >
-
-                        {isEditing ? (
-                            <div style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#f9fafb',
-                                color: '#9ca3af',
-                                gap: '12px',
-                                padding: '20px',
-                            }}>
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                                    <line x1="8" y1="21" x2="16" y2="21" />
-                                    <line x1="12" y1="17" x2="12" y2="21" />
-                                </svg>
-                                <div style={{ fontSize: '14px' }}>Enter a website URL</div>
-                                <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', lineHeight: 1.5 }}>
-                                    Paste a full page URL (not a homepage/search query).<br />
-                                    Example: youtube.com/watch?v=... or docs.google.com/.../preview
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#4b5563', textAlign: 'center', lineHeight: 1.5 }}>
-                                    Paste a URL, then click anywhere inside the rectangle to interact with the page. Press <strong>Esc</strong> to return to canvas pan/zoom.
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#92400e', textAlign: 'center', lineHeight: 1.5, maxWidth: 360 }}>
-                                    Some sites block web embedding via security policy (X-Frame-Options/CSP). Those links can only open in a new tab.
-                                </div>
-                            </div>
-                        ) : hasWarning ? (
-                            <div style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                gap: '16px',
-                                padding: '24px',
-                                textAlign: 'center',
-                            }}>
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="8" x2="12" y2="12" />
-                                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                                </svg>
-                                <div>
-                                    <div style={{ fontSize: '15px', fontWeight: 600, color: '#78350f', marginBottom: '8px' }}>
-                                        This site can't be embedded
+                                    <div style={{ fontSize: '14px' }}>Enter a website URL</div>
+                                    <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', lineHeight: 1.5 }}>
+                                        Paste a full page URL (not a homepage/search query).<br />
+                                        Example: youtube.com/watch?v=... or docs.google.com/.../preview
                                     </div>
-                                    <div style={{ fontSize: '13px', color: '#92400e', maxWidth: '320px', lineHeight: 1.6 }}>
-                                        {warning}
+                                    <div style={{ fontSize: '11px', color: '#92400e', textAlign: 'center', lineHeight: 1.5, maxWidth: 360 }}>
+                                        Some sites block web embedding via security policy (X-Frame-Options/CSP). Those links can only open in a new tab.
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            ) : hasWarning ? (
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: '#fef3c7',
+                                        color: '#92400e',
+                                        gap: '16px',
+                                        padding: '24px',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                    <div>
+                                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#78350f', marginBottom: '8px' }}>
+                                            This site can't be embedded
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: '#92400e', maxWidth: '320px', lineHeight: 1.6 }}>
+                                            {warning}
+                                        </div>
+                                    </div>
                                     <a
                                         href={processedUrl}
                                         target="_blank"
@@ -773,55 +972,38 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                     >
                                         Open in New Tab
                                     </a>
-                                    <button
-                                        onClick={handleEdit}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        style={{
-                                            padding: '8px 16px',
-                                            background: 'white',
-                                            color: '#92400e',
-                                            border: '1px solid #fbbf24',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: 500,
-                                            cursor: 'pointer',
-                                            pointerEvents: 'auto',
-                                        }}
-                                    >
-                                        Try Different URL
-                                    </button>
                                 </div>
-                            </div>
-                        ) : showFallback ? (
-                            <div style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#f9fafb',
-                                color: '#6b7280',
-                                gap: '16px',
-                                padding: '24px',
-                                textAlign: 'center',
-                            }}>
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                                    <line x1="8" y1="21" x2="16" y2="21" />
-                                    <line x1="12" y1="17" x2="12" y2="21" />
-                                    <line x1="2" y1="9" x2="22" y2="9" />
-                                </svg>
-                                <div>
-                                    <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                        This website blocks embedding
+                            ) : showFallback ? (
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: '#f9fafb',
+                                        color: '#6b7280',
+                                        gap: '16px',
+                                        padding: '24px',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                        <line x1="8" y1="21" x2="16" y2="21" />
+                                        <line x1="12" y1="17" x2="12" y2="21" />
+                                        <line x1="2" y1="9" x2="22" y2="9" />
+                                    </svg>
+                                    <div>
+                                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                                            This website blocks embedding
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: '#6b7280', maxWidth: '300px', lineHeight: 1.5 }}>
+                                            <strong>{getDomain(processedUrl)}</strong> has set X-Frame-Options to prevent embedding.
+                                            This is a security feature that cannot be bypassed in web browsers.
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '13px', color: '#6b7280', maxWidth: '300px', lineHeight: 1.5 }}>
-                                        <strong>{getDomain(processedUrl)}</strong> has set X-Frame-Options to prevent embedding.
-                                        This is a security feature that cannot be bypassed in web browsers.
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                                     <a
                                         href={processedUrl}
                                         target="_blank"
@@ -840,104 +1022,99 @@ const WebEmbedInner = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
                                         Open in New Tab
                                     </a>
                                 </div>
-                            </div>
-                        ) : (
-                            <>
-                                {isLoading && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        inset: 0,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        background: '#f9fafb',
-                                        zIndex: 1,
-                                    }}>
-                                        <div style={{
-                                            width: 32,
-                                            height: 32,
-                                            border: '3px solid #e5e7eb',
-                                            borderTopColor: '#6366f1',
-                                            borderRadius: '50%',
-                                            animation: 'spin 1s linear infinite',
-                                        }} />
-                                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                                    </div>
-                                )}
-                                {!isLoading && isLiveEmbedMode && isPassiveEmbedMode && isSelected && (
-                                    <div
+                            ) : (
+                                <>
+                                    {isLoading && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                inset: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: '#f9fafb',
+                                                zIndex: 1,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    border: '3px solid #e5e7eb',
+                                                    borderTopColor: '#6366f1',
+                                                    borderRadius: '50%',
+                                                    animation: 'spin 1s linear infinite',
+                                                }}
+                                            />
+                                            <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+                                        </div>
+                                    )}
+                                    <iframe
+                                        ref={iframeRef}
+                                        src={displayUrl}
+                                        onLoad={handleLoad}
+                                        onError={handleError}
                                         style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%)',
-                                            zIndex: 2,
-                                            padding: '10px 14px',
-                                            background: 'rgba(17, 24, 39, 0.82)',
-                                            color: '#fff',
-                                            border: '1px solid rgba(255, 255, 255, 0.28)',
-                                            borderRadius: '8px',
-                                            fontSize: '12px',
-                                            cursor: 'default',
-                                            backdropFilter: 'blur(2px)',
-                                            pointerEvents: 'none',
+                                            width: '100%',
+                                            height: '100%',
+                                            border: 'none',
+                                            opacity: isLoading ? 0 : 1,
+                                            pointerEvents: isInteractive ? 'auto' : 'none',
                                         }}
-                                    >
-                                        Click anywhere to interact
-                                    </div>
-                                )}
-                                {isInteracting && (
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            right: 10,
-                                            bottom: 10,
-                                            zIndex: 2,
-                                            background: 'rgba(17, 24, 39, 0.75)',
-                                            color: '#fff',
-                                            padding: '4px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '11px',
-                                            pointerEvents: 'none',
-                                        }}
-                                    >
-                                        Press Esc to return to canvas
-                                    </div>
-                                )}
-
-                                <iframe
-                                    ref={iframeRef}
-                                    src={displayUrl}
-                                    onLoad={handleLoad}
-                                    onError={handleError}
-                                    onMouseDown={selectElement}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        border: 'none',
-                                        opacity: isLoading ? 0 : 1,
-                                        pointerEvents: isInteracting ? 'auto' : 'none',
-                                    }}
-                                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation-by-user-activation allow-modals allow-popups-to-escape-sandbox allow-downloads"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                                    autoFocus={true}
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    title="Web embed"
-                                />
-                            </>
-                        )}
+                                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation-by-user-activation allow-modals allow-popups-to-escape-sandbox allow-downloads"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        title="Web embed"
+                                    />
+                                    {hasError && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                inset: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: 'rgba(255,255,255,0.9)',
+                                                color: '#b91c1c',
+                                                fontSize: 13,
+                                                fontWeight: 500,
+                                            }}
+                                        >
+                                            Failed to load this embed.
+                                        </div>
+                                    )}
+                                    {viewMode === 'pip' && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                right: 10,
+                                                bottom: 10,
+                                                background: 'rgba(15, 23, 42, 0.75)',
+                                                color: '#fff',
+                                                padding: '4px 8px',
+                                                borderRadius: 6,
+                                                fontSize: 11,
+                                                pointerEvents: 'none',
+                                            }}
+                                        >
+                                            Picture-in-picture
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            </>
         );
-    }
-));
+    })
+);
 
 WebEmbedInner.displayName = 'WebEmbedInner';
 
-export const WebEmbed = memo(forwardRef<WebEmbedRef, WebEmbedProps>(
-    (props, ref) => <WebEmbedInner {...props} ref={ref} />
-));
+export const WebEmbed = memo(
+    forwardRef<WebEmbedRef, WebEmbedProps>((props, ref) => <WebEmbedInner {...props} ref={ref} />)
+);
 
 WebEmbed.displayName = 'WebEmbed';
 
