@@ -7,6 +7,14 @@
     game = "tetris",
     onClose,
   }: { isOpen: boolean; game?: "tetris" | "whac"; onClose: () => void } = $props();
+
+  $effect(() => {
+    if (!isOpen) return;
+    document.body.classList.add("marvin-game-overlay-open");
+    return () => {
+      document.body.classList.remove("marvin-game-overlay-open");
+    };
+  });
 </script>
 
 {#if isOpen}
@@ -35,7 +43,7 @@
   .overlay {
     position: fixed;
     inset: 0;
-    z-index: 50;
+    z-index: 1300;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -98,5 +106,9 @@
   .panel-inner {
     position: relative;
     z-index: 1;
+  }
+
+  :global(body.marvin-game-overlay-open .hero__content) {
+    z-index: 1200;
   }
 </style>

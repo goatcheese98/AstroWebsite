@@ -18,15 +18,16 @@ import type * as Party from "partykit/server";
 // --------------------------------------------------------------------------
 
 type ClientToServer =
-  | { type: "server-broadcast"; payload: number[]; iv: number[] }
-  | { type: "server-volatile-broadcast"; payload: number[]; iv: number[] };
+  | { type: "server-broadcast"; payload: string; iv: string }
+  | { type: "server-volatile-broadcast"; payload: string; iv: string }
+  | { type: "resync-request" };
 
 type ServerToClient =
   | { type: "init-room" }
   | { type: "first-in-room" }
   | { type: "new-user"; socketId: string }
   | { type: "room-user-change"; socketIds: string[] }
-  | { type: "client-broadcast"; payload: number[]; iv: number[] };
+  | { type: "client-broadcast"; payload: string; iv: string };
 
 // --------------------------------------------------------------------------
 // Helpers
@@ -57,9 +58,15 @@ export default class CollabRoom implements Party.Server {
     if (others.length === 0) {
       // This user may be the first in the room, or rejoining an empty room
       // that still has persisted state from a previous session.
-      const stored = await this.room.storage.get<{ payload: number[]; iv: number[] }>("scene");
-      if (stored) {
-        send(conn, { type: "client-broadcast", ...stored });
+      const stored = await this.room.storage.get<{ payload: string; iv: string } | { payload: number[]; iv: number[] }>("scene");
+      if (stored && typeof stored.payload === "string") {
+        // Current Base64 format — send as-is.
+        send(conn, { type: "client-broadcast", payload: stored.payload, iv: stored.iv as string });
+      } else if (stored) {
+        // Old number-array format: drop it so the room starts fresh rather than
+        // crashing. The host will re-broadcast the current scene once they reconnect.
+        await this.room.storage.delete("scene");
+        send(conn, { type: "first-in-room" });
       } else {
         send(conn, { type: "first-in-room" });
       }
@@ -90,6 +97,13 @@ export default class CollabRoom implements Party.Server {
     } else if (data.type === "server-volatile-broadcast") {
       // Cursor / pointer updates — relay without persisting.
       broadcast(this.room, { type: "client-broadcast", payload: data.payload, iv: data.iv }, [sender.id]);
+    } else if (data.type === "resync-request") {
+      // Client requests the latest stored scene (e.g. API was not ready when initial
+      // broadcasts arrived). Respond only to the requester.
+      const stored = await this.room.storage.get<{ payload: string; iv: string } | { payload: number[]; iv: number[] }>("scene");
+      if (stored && typeof stored.payload === "string") {
+        send(sender, { type: "client-broadcast", payload: stored.payload, iv: stored.iv as string });
+      }
     }
   }
 

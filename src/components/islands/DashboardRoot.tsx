@@ -1,16 +1,8 @@
-import { ClerkProvider } from "@clerk/clerk-react";
 import { CanvasLibraryPure } from "../auth/CanvasLibrary";
-
-// Load key from environment (Vite automatically replaces import.meta.env)
-const PUBLISHABLE_KEY = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-if (!PUBLISHABLE_KEY) {
-  throw new Error("Missing Publishable Key");
-}
 
 export default function DashboardRoot() {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <>
       <div className="canvases-page">
         <section className="dashboard-hero" aria-label="Dashboard intro">
           <p className="dashboard-kicker">Canvas Workspace</p>
@@ -86,6 +78,6 @@ export default function DashboardRoot() {
           }
         }
       `}</style>
-    </ClerkProvider>
+    </>
   );
 }

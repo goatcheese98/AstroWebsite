@@ -20,14 +20,18 @@ interface CanvasAvatarProps {
   isLoading: boolean;
   signOut?: (callback?: () => void) => void;
   openUserProfile?: () => void;
+  onSaveToCloud?: () => Promise<void>;
+  isSavingToCloud?: boolean;
 }
 
-export default function CanvasAvatar({ 
-  user, 
-  isAuthenticated, 
+export default function CanvasAvatar({
+  user,
+  isAuthenticated,
   isLoading,
   signOut,
   openUserProfile,
+  onSaveToCloud,
+  isSavingToCloud = false,
 }: CanvasAvatarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showHomeOption, setShowHomeOption] = useState(false);
@@ -145,6 +149,10 @@ export default function CanvasAvatar({
               from { opacity: 0; transform: translateY(-4px); }
               to { opacity: 1; transform: translateY(0); }
             }
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
           `}</style>
           <div
             style={{
@@ -233,7 +241,51 @@ export default function CanvasAvatar({
                     </div>
                   )}
                 </div>
-                <div style={{ padding: '6px 0' }}>
+                {/* Save to Cloud action */}
+                {onSaveToCloud && (
+                  <div style={{ padding: '8px' }}>
+                    <button
+                      onClick={() => { onSaveToCloud(); setIsOpen(false); }}
+                      disabled={isSavingToCloud}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        width: '100%',
+                        padding: '9px 14px',
+                        background: isSavingToCloud ? '#ede9fe' : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: isSavingToCloud ? '#7c3aed' : 'white',
+                        cursor: isSavingToCloud ? 'not-allowed' : 'pointer',
+                        transition: 'opacity 0.2s',
+                        opacity: isSavingToCloud ? 0.7 : 1,
+                      }}
+                    >
+                      {isSavingToCloud ? (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="16 16 12 12 8 16" />
+                            <line x1="12" y1="12" x2="12" y2="21" />
+                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                          </svg>
+                          Save to Cloud
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+                <div style={{ padding: '6px 0', borderTop: onSaveToCloud ? '1px solid #f3f4f6' : undefined }}>
                   {showHomeOption && (
                     <a
                       href="/"

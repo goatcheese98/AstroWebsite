@@ -193,6 +193,9 @@ export function useCollaboration({ onError }: CollaborationOptions = {}): Collab
   const reconnectAttemptRef = useRef(0);
   // Prevents echo: suppress outgoing broadcasts while applying a remote scene update.
   const isApplyingRemoteRef = useRef(false);
+  // Buffers the most recent remote scene payload received while the Excalidraw API
+  // was not yet initialized. Applied (and then discarded) once the API becomes ready.
+  const pendingSceneRef = useRef<{ elements: RemoteElement[]; files?: Record<string, import("@/lib/collab/protocol").CollabFile> } | null>(null);
 
   const setUsername = useCallback((name: string) => {
     setUsernameState(name);
@@ -320,6 +323,45 @@ export function useCollaboration({ onError }: CollaborationOptions = {}): Collab
   );
 
   // -------------------------------------------------------------------------
+  // Core scene-application helper (shared between live messages + API-ready effect)
+  // -------------------------------------------------------------------------
+
+  const applyRemoteScene = useCallback(
+    (
+      targetApi: NonNullable<typeof api>,
+      elements: RemoteElement[],
+      files?: Record<string, import("@/lib/collab/protocol").CollabFile>,
+    ) => {
+      // Add any new files before updating elements so image elements resolve.
+      if (files) {
+        const toAdd = Object.values(files).map((f) => ({
+          id: f.id,
+          mimeType: f.mimeType,
+          dataURL: f.dataURL,
+          created: f.created,
+        }));
+        if (toAdd.length) {
+          targetApi.addFiles(toAdd as Parameters<typeof targetApi.addFiles>[0]);
+          for (const f of toAdd) sentFileIdsRef.current.add(f.id);
+        }
+      }
+
+      const localElements = targetApi.getSceneElements();
+      const localAppState = targetApi.getAppState();
+      const reconciled = reconcileElements(
+        localElements as unknown as Parameters<typeof reconcileElements>[0],
+        elements as unknown as Parameters<typeof reconcileElements>[1],
+        localAppState as unknown as Parameters<typeof reconcileElements>[2],
+      );
+
+      isApplyingRemoteRef.current = true;
+      targetApi.updateScene({ elements: reconciled });
+      queueMicrotask(() => { isApplyingRemoteRef.current = false; });
+    },
+    [],
+  );
+
+  // -------------------------------------------------------------------------
   // Incoming message handler
   // -------------------------------------------------------------------------
 
@@ -382,36 +424,17 @@ export function useCollaboration({ onError }: CollaborationOptions = {}): Collab
             break; // wrong key or corrupted — ignore
           }
 
-          if (decrypted.type === "scene-update" && api) {
-            // 1. Add new files before updating the scene so image elements resolve.
-            if (decrypted.files) {
-              const toAdd = Object.values(decrypted.files).map((f) => ({
-                id: f.id,
-                mimeType: f.mimeType,
-                dataURL: f.dataURL,
-                created: f.created,
-              }));
-              if (toAdd.length) {
-                api.addFiles(toAdd as Parameters<typeof api.addFiles>[0]);
-                for (const f of toAdd) sentFileIdsRef.current.add(f.id);
-              }
+          if (decrypted.type === "scene-update") {
+            if (!api) {
+              // Excalidraw not initialized yet — buffer the latest incoming scene.
+              // The API-ready effect below will apply it (and request a resync) once
+              // the API becomes available.
+              pendingSceneRef.current = { elements: decrypted.elements, files: decrypted.files };
+              break;
             }
-
-            // 2. Reconcile remote elements against local state.
-            //    reconcileElements handles version vectors and versionNonce tie-breaking,
-            //    exactly matching excalidraw.com's conflict resolution.
-            const localElements = api.getSceneElements();
-            const localAppState = api.getAppState();
-            const reconciled = reconcileElements(
-              localElements as unknown as Parameters<typeof reconcileElements>[0],
-              decrypted.elements as unknown as Parameters<typeof reconcileElements>[1],
-              localAppState as unknown as Parameters<typeof reconcileElements>[2],
-            );
-            // Guard against echo: flag prevents handleSceneChange from re-broadcasting
-            // this update back to the room. Reset after the synchronous update flushes.
-            isApplyingRemoteRef.current = true;
-            api.updateScene({ elements: reconciled });
-            queueMicrotask(() => { isApplyingRemoteRef.current = false; });
+            // Reconcile remote elements — applyRemoteScene handles files, reconciliation,
+            // and the echo-loop guard (isApplyingRemoteRef).
+            applyRemoteScene(api, decrypted.elements, decrypted.files);
 
           } else if (decrypted.type === "cursor-update") {
             const { clientId, pointer, button, selectedElementIds, username: uname, color } = decrypted;
@@ -436,8 +459,33 @@ export function useCollaboration({ onError }: CollaborationOptions = {}): Collab
         }
       }
     },
-    [broadcastSceneRaw],
+    [broadcastSceneRaw, applyRemoteScene],
   );
+
+  // -------------------------------------------------------------------------
+  // API-ready effect: apply buffered scene + request resync from server
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    // Only act when the API transitions from null to a live instance.
+    if (!api) return;
+    // Only relevant while a collaboration session is active.
+    if (!isCollaboratingRef.current) return;
+
+    // 1. Apply any scene that arrived before the API was initialized.
+    const pending = pendingSceneRef.current;
+    if (pending) {
+      pendingSceneRef.current = null;
+      applyRemoteScene(api, pending.elements, pending.files);
+    }
+
+    // 2. Ask the server to resend the latest stored scene so we don't miss
+    //    any updates that were broadcast and dropped during API init.
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "resync-request" }));
+    }
+  }, [api, applyRemoteScene]);
 
   // -------------------------------------------------------------------------
   // WebSocket connection lifecycle

@@ -4,8 +4,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useUser, SignInButton } from '@clerk/clerk-react';
-import { ClerkWrapper } from './ClerkWrapper';
 
 interface Canvas {
   id: string;
@@ -28,15 +26,10 @@ type SortOption = 'recent' | 'alphabetical' | 'favorites';
 type ViewMode = 'grid' | 'list';
 
 export function CanvasLibrary() {
-  return (
-    <ClerkWrapper>
-      <CanvasLibraryPure />
-    </ClerkWrapper>
-  );
+  return <CanvasLibraryPure />;
 }
 
 export function CanvasLibraryPure() {
-  const { isSignedIn, isLoaded } = useUser();
   const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,22 +59,19 @@ export function CanvasLibraryPure() {
   }, []);
 
   useEffect(() => {
-    if (isLoaded) {
-      if (isSignedIn) {
-        loadCanvases();
-      } else {
-        setLoading(false);
-        setError('Please sign in to view your dashboard');
-      }
-    }
-  }, [isLoaded, isSignedIn]);
+    void loadCanvases();
+  }, []);
 
   async function loadCanvases() {
+    setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/canvas/list?limit=100', { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         setCanvases(data.canvases);
+      } else if (response.status === 401) {
+        setError('Please sign in to view your dashboard');
       } else {
         setError('Failed to load canvases');
       }
@@ -234,12 +224,26 @@ export function CanvasLibraryPure() {
     });
 
   if (loading) return <div className="loading-state"><div className="spinner" /></div>;
-  if (error) return (
-    <div className="error-center">
-      <h3>{error}</h3>
-      <SignInButton mode="modal"><button className="btn-primary">Sign In</button></SignInButton>
-    </div>
-  );
+  if (error) {
+    const requiresSignIn = error === 'Please sign in to view your dashboard';
+    return (
+      <div className="error-center">
+        <h3>{error}</h3>
+        {requiresSignIn ? (
+          <a href="/login" className="btn-primary">Sign In</a>
+        ) : (
+          <button
+            className="btn-primary"
+            onClick={() => {
+              void loadCanvases();
+            }}
+          >
+            Try Again
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">

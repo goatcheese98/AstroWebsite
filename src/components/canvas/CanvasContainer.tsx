@@ -20,7 +20,7 @@ import { MainMenu, LiveCollaborationTrigger } from "@excalidraw/excalidraw";
 import CanvasCore from './CanvasCore';
 import CanvasUI from './CanvasUI';
 import CanvasNotesLayer from './CanvasNotesLayer';
-import CanvasAvatar from '../islands/CanvasAvatar';
+import CanvasAvatarConnected from './CanvasAvatarConnected';
 import CollabDialog from './CollabDialog';
 
 import "@excalidraw/excalidraw/index.css";
@@ -34,19 +34,11 @@ declare global {
 interface CanvasContainerProps {
   isSharedMode?: boolean;
   shouldClearOnMount?: boolean;
-  isSignedIn?: boolean;
-  userId?: string | null;
-  userName?: string | null;
-  avatarUrl?: string | null;
 }
 
 export default function CanvasContainer({
   isSharedMode = false,
   shouldClearOnMount = false,
-  isSignedIn = false,
-  userId = null,
-  userName = null,
-  avatarUrl = null,
 }: CanvasContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -99,19 +91,10 @@ export default function CanvasContainer({
           isCollaborating={isCollaborating}
           onSelect={openCollabDialog}
         />
-        <CanvasAvatar
-          user={isSignedIn && userId ? {
-            id: userId,
-            name: userName || undefined,
-            email: undefined,
-            avatarUrl: avatarUrl || undefined,
-          } : null}
-          isAuthenticated={!!isSignedIn}
-          isLoading={false}
-        />
+        <CanvasAvatarConnected />
       </div>
     ),
-    [avatarUrl, isCollaborating, isSignedIn, openCollabDialog, userId, userName],
+    [isCollaborating, openCollabDialog],
   );
 
   const renderMainMenu = useMemo(

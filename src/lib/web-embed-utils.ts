@@ -117,7 +117,7 @@ export function isKnownEmbeddable(url: string): boolean {
  * Sites that are known to NOT work in iframes
  */
 const BLOCKED_SITES = [
-    { domain: 'google.com', message: 'Google doesn\'t allow embedding. Click "Open in New Tab" to visit the site.' },
+    { domain: 'google.com', message: 'Google homepage doesn\'t allow embedding. Use a direct embeddable page URL or open in a new tab.' },
     { domain: 'youtube.com', message: 'YouTube homepage doesn\'t work in embeds. Try pasting a specific video URL (e.g., youtube.com/watch?v=...)' },
     { domain: 'facebook.com', message: 'Facebook doesn\'t allow embedding due to security policies.' },
     { domain: 'twitter.com', message: 'Twitter/X doesn\'t allow embedding. Try using Twitter\'s embed tools instead.' },
@@ -145,7 +145,7 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
         return {
             url: googleUrl,
             isSearch: true,
-            warning: 'Search engines don\'t allow embedding. Click "Open in New Tab" to search in your browser.'
+            warning: 'Search queries don\'t embed in iframes. Paste a direct page URL, or open search in a new tab.'
         };
     }
 

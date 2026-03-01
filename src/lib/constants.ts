@@ -26,7 +26,10 @@ export const NAV_LINKS: NavLink[] = [
 ];
 
 // Canvas-only navigation (no home/blog)
-export const CANVAS_NAV_LINKS: NavLink[] = [{ label: "AI Canvas", href: "/" }];
+export const CANVAS_NAV_LINKS: NavLink[] = [
+  { label: "AI Canvas", href: "/" },
+  { label: "Dashboard", href: "/dashboard" },
+];
 
 export const PROJECTS: Project[] = [
   {

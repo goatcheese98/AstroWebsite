@@ -70,11 +70,12 @@ export type ServerToClient =
   | { type: "first-in-room" }
   | { type: "new-user"; socketId: string }
   | { type: "room-user-change"; socketIds: string[] }
-  | { type: "client-broadcast"; payload: number[]; iv: number[] };
+  | { type: "client-broadcast"; payload: string; iv: string };
 
 export type ClientToServer =
-  | { type: "server-broadcast"; payload: number[]; iv: number[] }
-  | { type: "server-volatile-broadcast"; payload: number[]; iv: number[] };
+  | { type: "server-broadcast"; payload: string; iv: string }
+  | { type: "server-volatile-broadcast"; payload: string; iv: string }
+  | { type: "resync-request" };
 
 // --------------------------------------------------------------------------
 // Collaborator colours (matches excalidraw.com)
