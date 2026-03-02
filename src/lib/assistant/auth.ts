@@ -49,6 +49,26 @@ export function resolveAnthropicApiKey(context: APIContext): string | undefined 
   return env?.ANTHROPIC_API_KEY || import.meta.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 }
 
+export function resolveGeminiApiKey(context: APIContext): string | undefined {
+  const env = runtimeEnv(context);
+  return env?.GOOGLE_GEMINI_API_KEY || import.meta.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+}
+
+export function resolveGeminiModels(context: APIContext): { imageModel: string; promptModel: string } {
+  const env = runtimeEnv(context);
+  const imageModel =
+    env?.GEMINI_IMAGE_MODEL ||
+    import.meta.env.GEMINI_IMAGE_MODEL ||
+    process.env.GEMINI_IMAGE_MODEL ||
+    "gemini-2.5-flash-preview-04-17";
+  const promptModel =
+    env?.GEMINI_PROMPT_MODEL ||
+    import.meta.env.GEMINI_PROMPT_MODEL ||
+    process.env.GEMINI_PROMPT_MODEL ||
+    "gemini-2.0-flash";
+  return { imageModel, promptModel };
+}
+
 export function resolveAssistantBackendConfig(context: APIContext): {
   baseUrl?: string;
   apiKey?: string;

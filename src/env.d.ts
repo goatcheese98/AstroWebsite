@@ -23,8 +23,11 @@ interface Env {
   // R2 Bucket
   CANVAS_STORAGE: import('@cloudflare/workers-types').R2Bucket;
 
-  // API Keys (already defined in .env)
+  // API Keys
   ANTHROPIC_API_KEY: string;
+  GOOGLE_GEMINI_API_KEY?: string;
+  GEMINI_IMAGE_MODEL?: string;
+  GEMINI_PROMPT_MODEL?: string;
   // Optional independent backend boundary config
   AI_BACKEND_BASE_URL?: string;
   AI_BACKEND_API_KEY?: string;

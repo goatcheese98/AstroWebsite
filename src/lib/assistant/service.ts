@@ -30,8 +30,9 @@ import { generateTextWithClaude } from "./claude";
 export interface LocalAssistantRuntimeConfig {
   anthropicApiKey?: string;
   textModel?: string;
+  geminiApiKey?: string;
+  geminiImageModel?: string;
   background?: (promise: Promise<void>) => void;
-  allowLocalWorkerGeneration?: boolean;
 }
 
 function trimForPreview(text: string): string {
@@ -138,6 +139,178 @@ async function generateDiagramArtifacts(
   return [{ type: "code", language: "mermaid", code: mermaidCode }];
 }
 
+// --- Gemini image generation ---
+
+async function geminiGenerateContent(
+  apiKey: string,
+  model: string,
+  contents: unknown[],
+  generationConfig: Record<string, unknown>,
+): Promise<unknown> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contents, generationConfig }),
+    },
+  );
+
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    const err = (data?.error as Record<string, unknown>)?.message || `Gemini HTTP ${response.status}`;
+    throw new Error(typeof err === "string" ? err : "Gemini request failed");
+  }
+  return data;
+}
+
+function firstGeminiInlineImage(data: unknown): { mimeType: string; base64: string } | null {
+  const candidates = Array.isArray((data as Record<string, unknown>)?.candidates)
+    ? ((data as Record<string, unknown>).candidates as unknown[])
+    : [];
+  for (const candidate of candidates) {
+    const content = (candidate as Record<string, unknown>)?.content as Record<string, unknown> | undefined;
+    const parts = Array.isArray(content?.parts) ? (content.parts as unknown[]) : [];
+    for (const part of parts) {
+      const p = part as Record<string, unknown>;
+      const inlineData = (p?.inlineData ?? p?.inline_data) as Record<string, string> | undefined;
+      const mimeType = inlineData?.mimeType ?? inlineData?.mime_type;
+      const base64 = inlineData?.data;
+      if (typeof mimeType === "string" && typeof base64 === "string" && base64.length > 0) {
+        return { mimeType, base64 };
+      }
+    }
+  }
+  return null;
+}
+
+function inferImageDimensions(mimeType: string, base64: string): { width: number; height: number } {
+  try {
+    const buffer = Buffer.from(base64, "base64");
+    if (
+      mimeType === "image/png" &&
+      buffer.length >= 24 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50
+    ) {
+      return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    }
+    if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+      let offset = 2;
+      while (offset + 9 < buffer.length) {
+        if (buffer[offset] !== 0xff) { offset++; continue; }
+        const marker = buffer[offset + 1];
+        const segLen = buffer.readUInt16BE(offset + 2);
+        const isSOF = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+        if (isSOF) return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+        if (!segLen || segLen < 2) break;
+        offset += 2 + segLen;
+      }
+    }
+  } catch { /* fall through */ }
+  return { width: 1024, height: 1024 };
+}
+
+function parseDataUrl(dataUrl: unknown): { mimeType: string; base64: string } | null {
+  if (typeof dataUrl !== "string") return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
+function buildImagePrompt(input: AssistantSendMessageInput, mode: string): string {
+  const visual = input.generation?.visual;
+  const sketch = input.generation?.sketch;
+  const colorHint = visual?.colorMode === "bw" ? "black and white only (neutral grayscale)" : "full color";
+
+  const lines = [
+    "Generate a single whiteboard-friendly visual asset for composition inside Excalidraw.",
+    "MANDATORY composition rules:",
+    "- use a square 1:1 composition",
+    "- keep subject centered and sized to occupy roughly 70-85% of the frame",
+    "- preserve full subject silhouette within frame (no cut-off parts)",
+    "MANDATORY background rules:",
+    "- solid pure white background (#FFFFFF)",
+    "- no checkerboard pattern, no transparency grid, no paper texture",
+    "- no background objects, no sky, no room",
+    "- no shadow plane, no glow halo, no border frame",
+    "- keep the subject isolated and centered with consistent white padding",
+    "MANDATORY rendering rules:",
+    "- crisp silhouette and edges",
+    "- high subject/background separation",
+    "- no watermark, no text overlay unless explicitly requested",
+    `- color mode: ${colorHint}`,
+    `User request: ${input.text}`,
+  ];
+
+  if (mode === "sketch") {
+    const style = sketch?.style || "clean";
+    lines.push("Sketch-specific rules:");
+    lines.push(
+      `- style: ${style === "hand-drawn" ? "hand-drawn marker strokes, gentle wobble, human sketch character" : style === "technical" ? "technical drafting look, straight controlled lines" : "clean whiteboard illustration style with precise boundaries"}`,
+    );
+    const complexity = sketch?.complexity || "medium";
+    lines.push(
+      `- complexity: ${complexity === "low" ? "minimal detail, large simple shapes" : complexity === "high" ? "high detail, rich structure" : "balanced detail with clear hierarchy"}`,
+    );
+    lines.push("- strong dark linework for outer and inner contours");
+    lines.push("- shapes should be segmentable for later vector conversion");
+  } else {
+    lines.push("Image-specific rules:");
+    lines.push("- deliver a clean standalone subject for direct canvas placement");
+    lines.push("- keep empty white margins around the subject");
+  }
+
+  const sourceImage = parseDataUrl(input.generation?.sourceImageDataUrl);
+  if (sourceImage && Math.floor((sourceImage.base64.replace(/\s+/g, "").length * 3) / 4) <= 2_500_000) {
+    lines.push(
+      "Use the provided reference image for composition/content guidance while preserving all white-background constraints.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+async function generateImageWithGemini(
+  apiKey: string,
+  imageModel: string,
+  input: AssistantSendMessageInput,
+  mode: string,
+): Promise<{ mimeType: string; dataUrl: string; width: number; height: number }> {
+  const sourceImage = parseDataUrl(input.generation?.sourceImageDataUrl);
+  const includeReference =
+    sourceImage &&
+    Math.floor((sourceImage.base64.replace(/\s+/g, "").length * 3) / 4) <= 2_500_000;
+
+  const prompt = buildImagePrompt(input, mode);
+  const parts: unknown[] = [{ text: prompt }];
+  if (includeReference) {
+    parts.push({ inline_data: { mime_type: sourceImage.mimeType, data: sourceImage.base64 } });
+  }
+
+  const response = await geminiGenerateContent(
+    apiKey,
+    imageModel,
+    [{ role: "user", parts }],
+    { temperature: 0.35, responseModalities: ["TEXT", "IMAGE"] },
+  );
+
+  const image = firstGeminiInlineImage(response);
+  if (!image) {
+    throw new Error("Gemini did not return an image");
+  }
+
+  const size = inferImageDimensions(image.mimeType, image.base64);
+  return {
+    mimeType: image.mimeType,
+    dataUrl: `data:${image.mimeType};base64,${image.base64}`,
+    width: size.width,
+    height: size.height,
+  };
+}
+
+// --- End Gemini image generation ---
+
 async function processJob(
   ownerId: string,
   job: AssistantJob,
@@ -160,13 +333,31 @@ async function processJob(
     } else {
       updateJob(ownerId, job.id, { progress: 30 });
 
-      if (!config.allowLocalWorkerGeneration) {
-        throw new Error(
-          "Image/sketch generation is handled by the independent worker backend. Configure AI_BACKEND_BASE_URL.",
-        );
+      if (!config.geminiApiKey) {
+        throw new Error("Image/sketch generation requires GOOGLE_GEMINI_API_KEY to be configured.");
       }
 
-      throw new Error("Local worker generation scaffold exists but no local worker is configured.");
+      const imageModel = config.geminiImageModel || "gemini-2.5-flash-preview-04-17";
+      const generated = await generateImageWithGemini(config.geminiApiKey, imageModel, input, mode);
+
+      updateJob(ownerId, job.id, { progress: 90 });
+
+      artifacts = [
+        {
+          type: "image-data",
+          mimeType: generated.mimeType,
+          dataUrl: generated.dataUrl,
+          width: generated.width,
+          height: generated.height,
+          source: mode === "sketch" ? "sketch" : "image",
+          ...(input.generation?.visual ? { visual: input.generation.visual } : {}),
+          ...(mode === "sketch" && input.generation?.sketch
+            ? { sketchControls: input.generation.sketch }
+            : {}),
+        } as AssistantArtifact,
+      ];
+      text = "Image asset is ready. Add it directly, or vectorize it into editable canvas shapes.";
+      updateJob(ownerId, job.id, { progress: 100, status: "completed" });
     }
 
     updateMessage(ownerId, job.chatId, job.assistantMessageId, {

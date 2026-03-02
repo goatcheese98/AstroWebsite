@@ -21,6 +21,8 @@ import {
   resolveAssistantBackendConfig,
   resolveAssistantIdentity,
   resolveAssistantOwnerId,
+  resolveGeminiApiKey,
+  resolveGeminiModels,
 } from "./auth";
 
 export interface AssistantGateway {
@@ -266,9 +268,13 @@ function createLocalGateway(context: APIContext): AssistantGateway {
       const ownerId = await resolveAssistantOwnerId(context, clientId);
       await ensureHydrated(ownerId);
       const anthropicApiKey = resolveAnthropicApiKey(context);
+      const geminiApiKey = resolveGeminiApiKey(context);
+      const { imageModel } = resolveGeminiModels(context);
       const result = await sendAssistantMessage(ownerId, chatId, payload, {
         anthropicApiKey,
         textModel: "claude-sonnet-4-20250514",
+        geminiApiKey,
+        geminiImageModel: imageModel,
         background: (promise) => {
           const withPersist = promise.then(() => persist(ownerId));
           runtime?.ctx?.waitUntil?.(withPersist);
