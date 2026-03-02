@@ -38,6 +38,7 @@ export const PROJECTS: Project[] = [
       "Interactive dashboard for ALGS player and team performance, powered by a Python data pipeline for clean, queryable tournament analytics.",
     tags: ["Python", "Data Visualization", "Web Scraping", "Analytics"],
     codeUrl: "https://github.com/goatcheese98/algs-championship-viz",
+    demoUrl: "/projects/esportsdashboard",
     featured: true,
     fillColor: "var(--color-fill-1)",
     accentColor: "#3b82f6",

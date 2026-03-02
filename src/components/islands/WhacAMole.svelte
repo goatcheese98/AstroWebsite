@@ -308,8 +308,8 @@
     height: 34px;
     border: 0;
     border-radius: 9px;
-    background: #1e293b;
-    color: #f8fafc;
+    background: #92400e;
+    color: #fef3c7;
     font-size: 24px;
     cursor: pointer;
   }
@@ -319,11 +319,10 @@
     overflow: hidden;
     padding: 16px;
     border-radius: 14px;
-    border: 2px solid #fdba74;
+    border: 2px solid #d97706;
     background:
-      radial-gradient(circle at 20% 20%, rgba(255, 247, 237, 0.62) 0 18%, transparent 20%),
-      radial-gradient(circle at 80% 72%, rgba(120, 53, 15, 0.2) 0 19%, transparent 22%),
-      linear-gradient(180deg, #fcd6a8 0%, #f59e0b 58%, #b45309 100%);
+      radial-gradient(ellipse at 20% 22%, rgba(255, 252, 228, 0.28) 0%, transparent 44%),
+      linear-gradient(170deg, #fef9d4 0%, #fde68a 28%, #fbbf24 58%, #d97706 82%, #b45309 100%);
     min-height: 390px;
   }
 

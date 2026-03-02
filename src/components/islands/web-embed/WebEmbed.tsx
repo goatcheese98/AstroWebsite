@@ -1000,8 +1000,8 @@ const WebEmbedInner = memo(
                                             This website blocks embedding
                                         </div>
                                         <div style={{ fontSize: '13px', color: '#6b7280', maxWidth: '300px', lineHeight: 1.5 }}>
-                                            <strong>{getDomain(processedUrl)}</strong> has set X-Frame-Options to prevent embedding.
-                                            This is a security feature that cannot be bypassed in web browsers.
+                                            <strong>{getDomain(processedUrl)}</strong> doesn't allow its pages to be previewed here.
+                                            You can still open it in a new tab.
                                         </div>
                                     </div>
                                     <a

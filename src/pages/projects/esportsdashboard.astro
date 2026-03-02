@@ -1,9 +1,9 @@
 ---
 import PageLayout from "../../layouts/PageLayout.astro";
 
-const title = "Methanex HR Dashboard";
-const description = "An interactive HR dashboard built for the MBAN Hackathon to analyze and visualize employee data, helping drive strategic workforce decisions.";
-const DEST = "https://career-constellation.pages.dev/dashboard";
+const title = "ALGS Esports Performance Dashboard";
+const description = "Interactive dashboard for ALGS player and team performance, powered by a Python data pipeline for clean, queryable tournament analytics.";
+const DEST = "https://algs-championship-viz.pages.dev/";
 ---
 
 <PageLayout title={title} description={description}>
@@ -18,7 +18,7 @@ const DEST = "https://career-constellation.pages.dev/dashboard";
           </svg>
           <span class="ring-number" id="countdown-number">5</span>
         </div>
-        <h1 class="redirect-title">Redirecting to Methanex HR Dashboard…</h1>
+        <h1 class="redirect-title">Redirecting to ALGS Esports Dashboard…</h1>
         <p class="redirect-sub">You'll be taken to the live project in <strong id="countdown-label">5</strong> seconds.</p>
         <p class="redirect-fallback">
           Not redirected? <a href={DEST}>Click here</a>.
@@ -118,7 +118,6 @@ const DEST = "https://career-constellation.pages.dev/dashboard";
 
   let remaining = DURATION;
 
-  // Trigger the ring sweep on next paint
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       if (progress) progress.style.strokeDashoffset = String(CIRCUMFERENCE);

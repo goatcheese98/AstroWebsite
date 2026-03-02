@@ -117,14 +117,20 @@ export function isKnownEmbeddable(url: string): boolean {
  * Sites that are known to NOT work in iframes
  */
 const BLOCKED_SITES = [
-    { domain: 'google.com', message: 'Google homepage doesn\'t allow embedding. Use a direct embeddable page URL or open in a new tab.' },
-    { domain: 'youtube.com', message: 'YouTube homepage doesn\'t work in embeds. Try pasting a specific video URL (e.g., youtube.com/watch?v=...)' },
-    { domain: 'facebook.com', message: 'Facebook doesn\'t allow embedding due to security policies.' },
-    { domain: 'twitter.com', message: 'Twitter/X doesn\'t allow embedding. Try using Twitter\'s embed tools instead.' },
-    { domain: 'instagram.com', message: 'Instagram doesn\'t allow embedding due to security policies.' },
-    { domain: 'gmail.com', message: 'Gmail doesn\'t allow embedding due to security policies.' },
-    { domain: 'drive.google.com', message: 'Google Drive files don\'t work in embeds. Try using Google Docs/Sheets/Slides publish links instead.' },
-    { domain: 'search.brave.com', message: 'Search engines don\'t allow embedding. Click "Open in New Tab" to search.' },
+    { domain: 'google.com', message: 'Google doesn\'t allow its pages to be previewed here. Use a direct embeddable page URL or open in a new tab.' },
+    { domain: 'youtube.com', message: 'YouTube homepages can\'t be previewed here. Try pasting a specific video URL (e.g., youtube.com/watch?v=...)' },
+    { domain: 'facebook.com', message: 'Facebook doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'twitter.com', message: 'X (Twitter) doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'x.com', message: 'X (Twitter) doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'instagram.com', message: 'Instagram doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'linkedin.com', message: 'LinkedIn doesn\'t allow its pages to be previewed here. Open it in a new tab to view this profile or post.' },
+    { domain: 'pinterest.com', message: 'Pinterest doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'tiktok.com', message: 'TikTok doesn\'t allow its pages to be previewed here. Open it in a new tab to view the video.' },
+    { domain: 'reddit.com', message: 'Reddit doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'snapchat.com', message: 'Snapchat doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'gmail.com', message: 'Gmail doesn\'t allow its pages to be previewed here. Open it in a new tab instead.' },
+    { domain: 'drive.google.com', message: 'Google Drive files can\'t be previewed here directly. Try a Google Docs/Sheets/Slides share link instead.' },
+    { domain: 'search.brave.com', message: 'Search results can\'t be previewed here. Open it in a new tab to search.' },
 ];
 
 /**
@@ -182,22 +188,9 @@ export function enhanceUrl(input: string): { url: string; isSearch: boolean; emb
     }
 
     // Try to convert to embed-friendly URL
-    let embedUrl = convertToEmbedUrl(url);
+    const embedUrl = convertToEmbedUrl(url);
 
-    // If no native embed URL found, use the CORS proxy
-    if (!embedUrl) {
-        // Determine PartyKit host
-        const isDev = import.meta.env.DEV;
-        const host = isDev
-            ? "localhost:1999"
-            : (import.meta.env.PUBLIC_PARTYKIT_HOST || "astroweb-excalidraw.rohanjasani.partykit.dev");
-        const protocol = isDev ? "http" : "https";
-
-        // Construct proxy URL
-        embedUrl = `${protocol}://${host}/parties/main/proxy?url=${encodeURIComponent(url)}`;
-    }
-
-    return { url, isSearch: false, embedUrl };
+    return { url, isSearch: false, embedUrl: embedUrl ?? undefined };
 }
 
 /**
