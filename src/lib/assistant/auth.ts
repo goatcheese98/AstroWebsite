@@ -60,7 +60,7 @@ export function resolveGeminiModels(context: APIContext): { imageModel: string; 
     env?.GEMINI_IMAGE_MODEL ||
     import.meta.env.GEMINI_IMAGE_MODEL ||
     process.env.GEMINI_IMAGE_MODEL ||
-    "gemini-2.5-flash-preview-04-17";
+    "gemini-3.1-flash-image-preview";
   const promptModel =
     env?.GEMINI_PROMPT_MODEL ||
     import.meta.env.GEMINI_PROMPT_MODEL ||

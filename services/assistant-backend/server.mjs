@@ -68,7 +68,7 @@ const BACKEND_API_KEY = process.env.AI_BACKEND_API_KEY || "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 const GOOGLE_GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || "";
-const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const GEMINI_PROMPT_MODEL = process.env.GEMINI_PROMPT_MODEL || process.env.GEMINI_TEXT_MODEL || "gemini-3-flash-preview";
 const ENABLE_PROMPT_REFINER = process.env.ASSISTANT_ENABLE_PROMPT_REFINER === "true";
 const MAX_REQUEST_BODY_BYTES = Number(process.env.ASSISTANT_MAX_BODY_BYTES || 15_000_000);

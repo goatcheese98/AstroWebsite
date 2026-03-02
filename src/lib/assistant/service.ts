@@ -337,7 +337,7 @@ async function processJob(
         throw new Error("Image/sketch generation requires GOOGLE_GEMINI_API_KEY to be configured.");
       }
 
-      const imageModel = config.geminiImageModel || "gemini-2.5-flash-preview-04-17";
+      const imageModel = config.geminiImageModel || "gemini-3.1-flash-image-preview";
       const generated = await generateImageWithGemini(config.geminiApiKey, imageModel, input, mode);
 
       updateJob(ownerId, job.id, { progress: 90 });
