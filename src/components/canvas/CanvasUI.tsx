@@ -20,6 +20,7 @@ import { AIChatContainer } from '../ai-chat';
 import IconLibrary from '../islands/IconLibrary';
 import CanvasStatusBadge from '../islands/CanvasStatusBadge';
 import ToastNotification from '../islands/ToastNotification';
+import CanvasSearch from './CanvasSearch';
 
 type CanvasElementInput = Partial<ExcalidrawElement> & {
   type?: string;
@@ -68,6 +69,7 @@ export default function CanvasUI({
     addToast,
   } = store;
   const [renderedToasts, setRenderedToasts] = useState<RenderedToast[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     setRenderedToasts((current) => {
@@ -611,6 +613,19 @@ export default function CanvasUI({
     return () => window.removeEventListener('aw:canvas-menu-action', handleMenuAction);
   }, [runCanvasAction]);
 
+  // Intercept Ctrl+F / Cmd+F to open our search overlay instead of the browser default
+  useEffect(() => {
+    const handleSearchShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleSearchShortcut, true);
+    return () => window.removeEventListener('keydown', handleSearchShortcut, true);
+  }, []);
+
   const handleAssistantLauncherClick = useCallback(() => {
     if (isChatOpen && !isChatMinimized) {
       setChatMinimized(true);
@@ -715,6 +730,19 @@ export default function CanvasUI({
           </svg>
           <span className="aw-label">Open file</span>
         </button>
+        <div className="aw-divider" />
+        <button
+          className={`aw-control-btn${isChatOpen && !isChatMinimized ? ' active' : ''}`}
+          onClick={handleAssistantLauncherClick}
+          onDoubleClick={handleAssistantLauncherDoubleClick}
+          title={isChatOpen && !isChatMinimized ? "Click to minimize, double-click to close" : "Open AI assistant"}
+          aria-label={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="aw-label">AI assistant</span>
+        </button>
       </div>
 
       {/* Status Badge */}
@@ -731,22 +759,16 @@ export default function CanvasUI({
         />
       )}
 
-      <button
-        className={`aw-assistant-launcher${isChatOpen && !isChatMinimized ? ' active' : ''}`}
-        onClick={handleAssistantLauncherClick}
-        onDoubleClick={handleAssistantLauncherDoubleClick}
-        aria-label={isChatOpen && !isChatMinimized ? "Minimize assistant" : "Open assistant"}
-        title={isChatOpen && !isChatMinimized ? "Click to minimize, double-click to close" : "Open assistant"}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-        </svg>
-      </button>
-
       {/* Icon Library Panel */}
       <IconLibrary
         isOpen={isAssetsOpen}
         onClose={() => setAssetsOpen(false)}
+      />
+
+      {/* Search overlay (Ctrl+F) */}
+      <CanvasSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
       />
 
       {/* Toast Notifications */}
@@ -767,8 +789,12 @@ export default function CanvasUI({
         .aw-canvas-controls {
           position: fixed;
           right: 8px;
-          top: 50%;
-          transform: translateY(-50%);
+          /* Position control panel so divider above AI button aligns with chat panel top */
+          /* AI chat: bottom: 20px, height: 744px, top = 100vh - 764px */
+          /* Control panel items from bottom: AI btn (32px) + gap (6px) + divider (1px) + gap (6px) ~45px */
+          /* So control panel bottom = chat_top + 45px + padding adjustment (~16px) */
+          bottom: calc(100vh - 744px - 20px + 110px);
+          transform: none;
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -867,48 +893,12 @@ export default function CanvasUI({
           pointer-events: auto;
         }
 
-        .aw-assistant-launcher {
-          position: fixed;
-          right: 16px;
-          bottom: 16px;
-          z-index: 1002;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border: 1px solid rgba(203, 213, 225, 0.9);
-          background: rgba(255, 255, 255, 0.84);
-          color: #0f172a;
-          border-radius: 12px;
-          width: 40px;
-          height: 40px;
-          padding: 0;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: 700;
-          cursor: pointer;
-          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-          backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
-          -webkit-backdrop-filter: blur(10px) saturate(1.05) brightness(1.06);
-          overflow: hidden;
-          transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-        }
-
-        .aw-assistant-launcher:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 13px 28px rgba(15, 23, 42, 0.16);
-        }
-
-        .aw-assistant-launcher.active {
-          border-color: #93c5fd;
-          background: rgba(239, 246, 255, 0.9);
-          color: #1e40af;
-        }
-
         @media (max-width: 768px) {
           .aw-canvas-controls {
             right: 8px;
             top: auto;
             bottom: 80px;
+            transform: none;
             padding: 2px;
           }
 
@@ -926,10 +916,6 @@ export default function CanvasUI({
             display: none;
           }
 
-          .aw-assistant-launcher {
-            right: 12px;
-            bottom: 10px;
-          }
         }
       `}</style>
     </>

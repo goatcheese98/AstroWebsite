@@ -16,6 +16,7 @@ import type {
   AssistantExpert,
   AssistantGenerationConfig,
   AssistantJob,
+  AssistantMessage,
   AssistantSendMessageInput,
   AssistantSendMessageResult,
 } from "./types";
@@ -380,6 +381,76 @@ async function processJob(
       artifacts: [],
     });
   }
+}
+
+export interface ChatStreamSession {
+  userMessage: AssistantMessage;
+  prompt: string;
+  system: string;
+  textModel: string;
+  complete: (text: string) => AssistantMessage;
+  fail: (errorText: string) => void;
+}
+
+export function prepareChatStreamSession(
+  ownerId: string,
+  chatId: string,
+  input: AssistantSendMessageInput,
+  config: Pick<LocalAssistantRuntimeConfig, "textModel">,
+): ChatStreamSession {
+  const expert = expertFromGeneration(input.generation);
+  const chat = getChat(ownerId, chatId);
+  if (!chat) {
+    throw new Error("Chat not found");
+  }
+
+  const userMessage = addMessage(ownerId, {
+    chatId,
+    role: "user",
+    text: trimForPreview(input.text),
+    status: "complete",
+    artifacts: [],
+  });
+
+  const history = listMessages(ownerId, chatId).slice(-20);
+  const systemPrompt = buildSystemPrompt(input.generation);
+  const prompt = [
+    "Conversation:",
+    buildConversationPrompt(history.map((item) => ({ role: item.role, text: item.text }))),
+    "ASSISTANT:",
+  ].join("\n\n");
+
+  return {
+    userMessage,
+    prompt,
+    system: systemPrompt,
+    textModel: config.textModel || "claude-sonnet-4-20250514",
+    complete(text: string): AssistantMessage {
+      const artifacts: AssistantArtifact[] = [];
+      const mermaidCode = extractCodeBlock(text, "mermaid");
+      if (mermaidCode) artifacts.push({ type: "code", language: "mermaid", code: mermaidCode });
+      const d2Code = extractCodeBlock(text, "d2");
+      if (d2Code) artifacts.push({ type: "code", language: "d2", code: d2Code });
+      return addMessage(ownerId, {
+        chatId,
+        role: "assistant",
+        expert,
+        text: trimForPreview(text),
+        status: "complete",
+        artifacts,
+      });
+    },
+    fail(errorText: string) {
+      addMessage(ownerId, {
+        chatId,
+        role: "assistant",
+        expert,
+        text: errorText,
+        status: "failed",
+        artifacts: [],
+      });
+    },
+  };
 }
 
 export function listAssistantChats(ownerId: string) {

@@ -1,4 +1,5 @@
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
+import { applyLexicalHighlight, clearLexicalHighlight } from '@/components/canvas/noteSearchHighlight';
 import type { LexicalNoteProps, LexicalNoteRef } from './types';
 import { RichTextEditor } from './RichTextEditor';
 import { getLexicalEditorStyles } from './themes/lexicalTheme';
@@ -8,6 +9,7 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
     ({ element, appState, onChange, onDeselect }, ref) => {
         const [lexicalState, setLexicalState] = useState(element.customData?.lexicalState || '');
         const [isDragging, setIsDragging] = useState(false);
+        const searchRafRef = useRef<number | null>(null);
         const [backgroundOpacity, setBackgroundOpacity] = useState(element.customData?.backgroundOpacity ?? 1);
         const [blurAmount, setBlurAmount] = useState(element.customData?.blurAmount ?? 5);
         const contentRef = useRef<HTMLDivElement>(null);
@@ -136,6 +138,48 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
 
             return { inNote, isNearEdge };
         }, [element.x, element.y, element.width, element.height, element.angle, appState.scrollX, appState.scrollY, zoom]);
+
+        // Listen for search highlight events.
+        // Uses CSS Custom Highlight API — zero DOM mutations, so Lexical's
+        // MutationObserver never fires and won't revert the highlights.
+        useEffect(() => {
+            const handleHighlight = (e: Event) => {
+                const { elementId, query, matchIndex = 0 } = (e as CustomEvent<{ elementId: string; query: string; matchIndex?: number }>).detail;
+                if (elementId !== element.id) return;
+                if (searchRafRef.current !== null) cancelAnimationFrame(searchRafRef.current);
+                // One rAF to let Lexical finish its current paint cycle
+                searchRafRef.current = requestAnimationFrame(() => {
+                    searchRafRef.current = null;
+                    if (!contentRef.current) return;
+                    const editorContent = (contentRef.current.querySelector('.editor-content-wrapper') as HTMLElement | null)
+                        ?? contentRef.current;
+                    const targetRange = applyLexicalHighlight(editorContent, query, matchIndex);
+                    // Scroll to target match inside the editor content wrapper
+                    if (targetRange) {
+                        const rect = targetRange.getBoundingClientRect();
+                        const wrapperRect = editorContent.getBoundingClientRect();
+                        if (rect.top < wrapperRect.top || rect.bottom > wrapperRect.bottom) {
+                            editorContent.scrollTop += rect.top - wrapperRect.top - editorContent.clientHeight / 2;
+                        }
+                    }
+                });
+            };
+            const handleClear = () => {
+                if (searchRafRef.current !== null) {
+                    cancelAnimationFrame(searchRafRef.current);
+                    searchRafRef.current = null;
+                }
+                clearLexicalHighlight();
+            };
+            window.addEventListener('canvas:note-search-highlight', handleHighlight);
+            window.addEventListener('canvas:note-search-clear', handleClear);
+            return () => {
+                window.removeEventListener('canvas:note-search-highlight', handleHighlight);
+                window.removeEventListener('canvas:note-search-clear', handleClear);
+                if (searchRafRef.current !== null) cancelAnimationFrame(searchRafRef.current);
+                clearLexicalHighlight();
+            };
+        }, [element.id]);
 
         // Export as image
         const exportAsImage = useCallback(async () => {

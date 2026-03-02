@@ -59,6 +59,10 @@ interface IconLibraryProps {
 export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [iconStyle, setIconStyle] = useState<IconStyle>('outline');
+  const [strokeWidth, setStrokeWidth] = useState(1.5);
+  const [iconColor, setIconColor] = useState('#000000');
+  const [insertSize, setInsertSize] = useState(160);
+  const [roughness, setRoughness] = useState(0);
   const [icons, setIcons] = useState<string[]>(CORE_ICONS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,9 +133,8 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
       setSearchQuery('');
       setIcons(CORE_ICONS);
       setError(null);
-      svgCacheRef.current = { ...svgCache };
     }
-  }, [isOpen, svgCache]);
+  }, [isOpen]);
 
   // Search functionality
   useEffect(() => {
@@ -209,8 +212,20 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         throw new Error(`Icon not found: ${fullName}`);
       }
 
-      const svgText = await response.text();
-      
+      let svgText = await response.text();
+      if (iconStyle === 'outline') {
+        svgText = svgText.replace(/stroke-width="[^"]*"/, `stroke-width="${strokeWidth}"`);
+        svgText = svgText.replace(/stroke="currentColor"/g, `stroke="${iconColor}"`);
+      } else {
+        svgText = svgText.replace(/fill="currentColor"/g, `fill="${iconColor}"`);
+      }
+      if (roughness > 0) {
+        const scale = roughness * 3;
+        const seed = Math.floor(Math.random() * 100);
+        const filterDef = `<defs><filter id="ril-rough" x="-15%" y="-15%" width="130%" height="130%"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" seed="${seed}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${scale}" xChannelSelector="R" yChannelSelector="G"/></filter></defs>`;
+        svgText = svgText.replace(/(<svg[^>]*)(>)/, `$1 filter="url(#ril-rough)"$2${filterDef}`);
+      }
+
       const appState = api.getAppState();
       const viewportCenterX = (appState.width || 800) / 2;
       const viewportCenterY = (appState.height || 600) / 2;
@@ -219,14 +234,15 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
 
       const fileId = nanoid();
       const elementId = nanoid();
-      
+      const half = insertSize / 2;
+
       const newElement = {
         id: elementId,
         type: 'image',
-        x: sceneX - 100,
-        y: sceneY - 100,
-        width: 200,
-        height: 200,
+        x: sceneX - half,
+        y: sceneY - half,
+        width: insertSize,
+        height: insertSize,
         angle: 0,
         strokeColor: 'transparent',
         backgroundColor: 'transparent',
@@ -271,7 +287,7 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
     } finally {
       setIsInserting(false);
     }
-  }, [api, addToast, getFullIconName]);
+  }, [api, addToast, getFullIconName, iconStyle, strokeWidth, iconColor, insertSize, roughness]);
 
   const handleStyleChange = useCallback((newStyle: IconStyle) => {
     setIconStyle(newStyle);
@@ -285,7 +301,7 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
     <div 
       style={{
         position: 'fixed',
-        right: 80,
+        right: 54,
         top: 80,
         width: 340,
         maxHeight: 'calc(100vh - 100px)',
@@ -359,8 +375,119 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
           ))}
         </div>
 
+        {iconStyle === 'outline' && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Stroke
+              </label>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', minWidth: 28, textAlign: 'right' }}>
+                {strokeWidth}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.25"
+              value={strokeWidth}
+              onChange={(e) => setStrokeWidth(parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer' }}
+            />
+          </div>
+        )}
+
+        {/* Color */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Color
+            </label>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', fontFamily: 'monospace' }}>
+              {iconColor.toUpperCase()}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {['#000000', '#374151', '#6b7280', '#ef4444', '#f97316', '#3b82f6', '#10b981', '#8b5cf6'].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setIconColor(preset)}
+                title={preset}
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  background: preset,
+                  border: iconColor === preset ? '2px solid #6366f1' : '2px solid transparent',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  outline: iconColor === preset ? '2px solid #e0e7ff' : 'none',
+                  outlineOffset: 1,
+                }}
+              />
+            ))}
+            <input
+              type="color"
+              value={iconColor}
+              onChange={(e) => setIconColor(e.target.value)}
+              title="Custom color"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                border: '1px solid #e5e7eb',
+                padding: 1,
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Size */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Size
+            </label>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', minWidth: 40, textAlign: 'right' }}>
+              {insertSize}px
+            </span>
+          </div>
+          <input
+            type="range"
+            min="48"
+            max="400"
+            step="8"
+            value={insertSize}
+            onChange={(e) => setInsertSize(parseInt(e.target.value))}
+            style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer' }}
+          />
+        </div>
+
+        {/* Rough */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Rough
+            </label>
+            <span style={{ fontSize: 12, fontWeight: 600, color: roughness > 0 ? '#6366f1' : '#9ca3af', minWidth: 28, textAlign: 'right' }}>
+              {roughness === 0 ? 'Off' : roughness}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="0.5"
+            value={roughness}
+            onChange={(e) => setRoughness(parseFloat(e.target.value))}
+            style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer' }}
+          />
+        </div>
+
         <div style={{ position: 'relative' }}>
-          <svg 
+          <svg
             style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }}
             width="16" height="16" viewBox="0 0 20 20" fill="currentColor"
           >
@@ -459,15 +586,16 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
                   }}
                 >
                   {svgHtml ? (
-                    <div 
+                    <div
+                      className="icon-svg-preview"
                       dangerouslySetInnerHTML={{ __html: svgHtml }}
-                      style={{ 
-                        width: 24, 
-                        height: 24, 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      style={{
+                        width: 24,
+                        height: 24,
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        color: isHovered ? '#6366f1' : '#374151',
+                        color: isHovered ? '#6366f1' : iconColor,
                       }}
                     />
                   ) : hasFailed ? (
@@ -521,9 +649,23 @@ export default function IconLibrary({ isOpen, onClose }: IconLibraryProps) {
         <span style={{ color: '#6366f1', fontWeight: 500 }}>Heroicons v2</span>
       </div>
 
+      {/* Hidden filter definition for live preview */}
+      <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+        <defs>
+          <filter id="icon-rough-preview" x="-15%" y="-15%" width="130%" height="130%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" seed="7" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale={roughness * 3} xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
+
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        .icon-svg-preview svg {
+          stroke-width: ${iconStyle === 'outline' ? strokeWidth : undefined} !important;
+          filter: ${roughness > 0 ? 'url(#icon-rough-preview)' : 'none'};
         }
       `}</style>
     </div>

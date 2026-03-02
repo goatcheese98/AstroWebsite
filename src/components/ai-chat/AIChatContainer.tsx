@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { captureScreenshot, useUnifiedCanvasStore } from "@/stores";
 import type {
@@ -64,9 +64,10 @@ function sketchControlsFromVectorizeControls(
   return {
     style: "clean",
     complexity: controls.complexity,
-    colorPalette: visual.colorMode === "bw"
-      ? Math.max(2, Math.min(12, controls.paletteDepth))
-      : controls.paletteDepth,
+    colorPalette:
+      visual.colorMode === "bw"
+        ? Math.max(2, Math.min(12, controls.paletteDepth))
+        : controls.paletteDepth,
     detailLevel: detailByComplexity[controls.complexity],
     edgeSensitivity: controls.edgeFidelity,
   };
@@ -223,8 +224,14 @@ async function resolveImageDimensions(
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const naturalWidth = Math.max(1, Math.round(img.naturalWidth || img.width || fallback.width));
-      const naturalHeight = Math.max(1, Math.round(img.naturalHeight || img.height || fallback.height));
+      const naturalWidth = Math.max(
+        1,
+        Math.round(img.naturalWidth || img.width || fallback.width),
+      );
+      const naturalHeight = Math.max(
+        1,
+        Math.round(img.naturalHeight || img.height || fallback.height),
+      );
       resolve({ width: naturalWidth, height: naturalHeight });
     };
     img.onerror = () => {
@@ -237,9 +244,35 @@ async function resolveImageDimensions(
   });
 }
 
+function TypingDots() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 5,
+        alignItems: "center",
+        padding: "4px 2px",
+      }}
+    >
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "#94a3b8",
+            animation: `typingBounce 1.4s ease-in-out ${i * 0.18}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function AIChatContainer({
   isOpen,
-  initialWidth = 660,
+  initialWidth = 352,
 }: AIChatContainerProps) {
   const store = useUnifiedCanvasStore();
   const {
@@ -255,51 +288,73 @@ export default function AIChatContainer({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState("");
-  const [selectedExpert, setSelectedExpert] = useState<AssistantExpert>("general");
-  const [visualGenerationControls, setVisualGenerationControls] = useState<VisualGenerationControls>(
-    DEFAULT_VISUAL_GENERATION_CONTROLS,
-  );
+  const [selectedExpert, setSelectedExpert] =
+    useState<AssistantExpert>("general");
+  const [visualGenerationControls, setVisualGenerationControls] =
+    useState<VisualGenerationControls>(DEFAULT_VISUAL_GENERATION_CONTROLS);
   const [vectorizeControls, setVectorizeControls] = useState<VectorizeControls>(
     DEFAULT_VECTORIZER_CONTROLS,
   );
   const [sending, setSending] = useState(false);
+  const [optimisticInput, setOptimisticInput] = useState<string>("");
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingJobs, setPendingJobs] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [includeCanvasReference, setIncludeCanvasReference] = useState(true);
-  const [sketchMetadataByArtifact, setSketchMetadataByArtifact] = useState<Record<string, {
-    sourceWidth: number;
-    sourceHeight: number;
-    workingWidth: number;
-    workingHeight: number;
-    numColorsRequested: number;
-    numColorsUsed: number;
-    backgroundLabel: number;
-    morphologyKernelSize: number;
-    epsilon: number;
-    minArea: number;
-    componentsFound: number;
-    componentsFiltered: number;
-    elementsCreated: number;
-    elementsEmitted: number;
-    outlineComponentsFound?: number;
-    outlineElementsCreated?: number;
-    processingMs: number;
-  }>>({});
-  const [sketchLogsByArtifact, setSketchLogsByArtifact] = useState<Record<string, string[]>>({});
-  const [vectorizeSettingsByArtifact, setVectorizeSettingsByArtifact] = useState<Record<string, {
-    paletteDepth: number;
-    complexity: VectorizeComplexity;
-    edgeFidelity: number;
-  }>>({});
-  const [vectorizeSummaryByArtifact, setVectorizeSummaryByArtifact] = useState<Record<string, string>>({});
-  const [d2RenderVariantByArtifact, setD2RenderVariantByArtifact] = useState<Record<string, D2RenderVariant>>({});
+  const [sketchMetadataByArtifact, setSketchMetadataByArtifact] = useState<
+    Record<
+      string,
+      {
+        sourceWidth: number;
+        sourceHeight: number;
+        workingWidth: number;
+        workingHeight: number;
+        numColorsRequested: number;
+        numColorsUsed: number;
+        backgroundLabel: number;
+        morphologyKernelSize: number;
+        epsilon: number;
+        minArea: number;
+        componentsFound: number;
+        componentsFiltered: number;
+        elementsCreated: number;
+        elementsEmitted: number;
+        outlineComponentsFound?: number;
+        outlineElementsCreated?: number;
+        processingMs: number;
+      }
+    >
+  >({});
+  const [sketchLogsByArtifact, setSketchLogsByArtifact] = useState<
+    Record<string, string[]>
+  >({});
+  const [vectorizeSettingsByArtifact, setVectorizeSettingsByArtifact] =
+    useState<
+      Record<
+        string,
+        {
+          paletteDepth: number;
+          complexity: VectorizeComplexity;
+          edgeFidelity: number;
+        }
+      >
+    >({});
+  const [vectorizeSummaryByArtifact, setVectorizeSummaryByArtifact] = useState<
+    Record<string, string>
+  >({});
+  const [d2RenderVariantByArtifact, setD2RenderVariantByArtifact] = useState<
+    Record<string, D2RenderVariant>
+  >({});
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const historyExpandedWidth = 268;
   const historyCollapsedWidth = 74;
-  const chatContentWidth = Math.max(520, Math.min(initialWidth, 740));
-  const historyWidth = isHistoryCollapsed ? historyCollapsedWidth : historyExpandedWidth;
+  const chatContentWidth = Math.max(300, Math.min(initialWidth, 494));
+  const historyWidth = isHistoryCollapsed
+    ? historyCollapsedWidth
+    : historyExpandedWidth;
   const panelWidth = `min(${chatContentWidth + historyWidth}px, calc(100vw - 96px))`;
   const historyTextDelay = isHistoryCollapsed ? "0ms" : "92ms";
   const historyTextTransition = `opacity 180ms ease ${historyTextDelay}, transform 180ms ease ${historyTextDelay}`;
@@ -361,12 +416,14 @@ export default function AIChatContainer({
               headers: requestHeaders,
             },
           );
-          const data = await response.json().catch(() => ({} as Record<string, unknown>));
+          const data = await response
+            .json()
+            .catch(() => ({}) as Record<string, unknown>);
           if (!response.ok) {
             throw new Error(
-              (typeof data.details === "string" && data.details)
-                || (typeof data.error === "string" && data.error)
-                || "Failed to delete chat",
+              (typeof data.details === "string" && data.details) ||
+                (typeof data.error === "string" && data.error) ||
+                "Failed to delete chat",
             );
           }
 
@@ -384,7 +441,11 @@ export default function AIChatContainer({
             setActiveChatId(newChatId);
           }
         } catch (deleteError) {
-          setError(deleteError instanceof Error ? deleteError.message : "Failed to delete chat");
+          setError(
+            deleteError instanceof Error
+              ? deleteError.message
+              : "Failed to delete chat",
+          );
         }
       })();
     },
@@ -402,17 +463,22 @@ export default function AIChatContainer({
     void (async () => {
       try {
         setError(null);
-        const response = await fetch(`/api/assistant/chats?clientId=${encodeURIComponent(clientId)}`, {
-          method: "DELETE",
-          headers: requestHeaders,
-          body: JSON.stringify({ clientId }),
-        });
-        const data = await response.json().catch(() => ({} as Record<string, unknown>));
+        const response = await fetch(
+          `/api/assistant/chats?clientId=${encodeURIComponent(clientId)}`,
+          {
+            method: "DELETE",
+            headers: requestHeaders,
+            body: JSON.stringify({ clientId }),
+          },
+        );
+        const data = await response
+          .json()
+          .catch(() => ({}) as Record<string, unknown>);
         if (!response.ok) {
           throw new Error(
-            (typeof data.details === "string" && data.details)
-              || (typeof data.error === "string" && data.error)
-              || "Failed to clear chat history",
+            (typeof data.details === "string" && data.details) ||
+              (typeof data.error === "string" && data.error) ||
+              "Failed to clear chat history",
           );
         }
 
@@ -424,7 +490,11 @@ export default function AIChatContainer({
         setActiveChatId(newChatId);
         addToast("Chat history cleared", "success");
       } catch (clearError) {
-        setError(clearError instanceof Error ? clearError.message : "Failed to clear chat history");
+        setError(
+          clearError instanceof Error
+            ? clearError.message
+            : "Failed to clear chat history",
+        );
       }
     })();
   }, [addToast, clientId, createChat, requestHeaders]);
@@ -448,11 +518,16 @@ export default function AIChatContainer({
       if (nextChats.length === 0) {
         const newChatId = await createChat();
         setActiveChatId(newChatId);
-      } else if (!activeChatId || !nextChats.find((chat) => chat.id === activeChatId)) {
+      } else if (
+        !activeChatId ||
+        !nextChats.find((chat) => chat.id === activeChatId)
+      ) {
         setActiveChatId(nextChats[0].id);
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load chats");
+      setError(
+        loadError instanceof Error ? loadError.message : "Failed to load chats",
+      );
     }
   }, [activeChatId, clientId, createChat, requestHeaders]);
 
@@ -468,12 +543,18 @@ export default function AIChatContainer({
         );
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.details || data.error || "Failed to load messages");
+          throw new Error(
+            data.details || data.error || "Failed to load messages",
+          );
         }
 
         setMessages((data.messages || []) as AssistantMessage[]);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Failed to load messages");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load messages",
+        );
       } finally {
         setLoadingMessages(false);
       }
@@ -496,6 +577,20 @@ export default function AIChatContainer({
     void loadMessages(activeChatId);
   }, [activeChatId, isOpen, isChatMinimized, loadMessages]);
 
+  // Auto-scroll to bottom when messages load or sending state changes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, sending]);
+
+  // Auto-scroll while streaming text arrives
+  useEffect(() => {
+    if (streamingText !== null) {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "instant" as ScrollBehavior,
+      });
+    }
+  }, [streamingText]);
+
   useEffect(() => {
     const handleSetMode = (event: Event) => {
       const customEvent = event as CustomEvent<{ mode?: string }>;
@@ -513,7 +608,10 @@ export default function AIChatContainer({
         return;
       }
 
-      if (customEvent.detail.mode === "image" || customEvent.detail.mode === "sketch") {
+      if (
+        customEvent.detail.mode === "image" ||
+        customEvent.detail.mode === "sketch"
+      ) {
         setSelectedExpert("visual");
         return;
       }
@@ -524,7 +622,12 @@ export default function AIChatContainer({
     const handleSetExpert = (event: Event) => {
       const customEvent = event as CustomEvent<{ expert?: AssistantExpert }>;
       const expert = customEvent.detail?.expert;
-      if (expert === "general" || expert === "mermaid" || expert === "d2" || expert === "visual") {
+      if (
+        expert === "general" ||
+        expert === "mermaid" ||
+        expert === "d2" ||
+        expert === "visual"
+      ) {
         setSelectedExpert(expert);
       }
     };
@@ -562,7 +665,9 @@ export default function AIChatContainer({
       );
 
       const unresolved = statuses
-        .filter((entry) => entry.status === "queued" || entry.status === "running")
+        .filter(
+          (entry) => entry.status === "queued" || entry.status === "running",
+        )
         .map((entry) => entry.jobId);
 
       if (unresolved.length !== pendingJobs.length && activeChatId) {
@@ -585,7 +690,9 @@ export default function AIChatContainer({
       return undefined;
     }
 
-    const selectedIds = Object.entries(api.getAppState().selectedElementIds || {})
+    const selectedIds = Object.entries(
+      api.getAppState().selectedElementIds || {},
+    )
       .filter(([, selected]) => Boolean(selected))
       .map(([id]) => id);
 
@@ -598,7 +705,11 @@ export default function AIChatContainer({
       const base64Payload = screenshot.dataUrl.split(",")[1] || "";
       const approxBytes = Math.floor((base64Payload.length * 3) / 4);
       if (approxBytes > MAX_REFERENCE_IMAGE_BYTES) {
-        addToast("Canvas reference skipped because selection is too large. Select fewer elements or disable reference.", "info", 4500);
+        addToast(
+          "Canvas reference skipped because selection is too large. Select fewer elements or disable reference.",
+          "info",
+          4500,
+        );
         return undefined;
       }
 
@@ -613,9 +724,13 @@ export default function AIChatContainer({
       return;
     }
 
+    const messageText = input.trim();
     let chatId = activeChatId;
+
     try {
       setSending(true);
+      setOptimisticInput(messageText);
+      setInput("");
       setError(null);
 
       if (!chatId) {
@@ -623,35 +738,117 @@ export default function AIChatContainer({
         setActiveChatId(chatId);
       }
 
-      const sourceImageDataUrl = await buildSourceImage();
+      if (selectedExpert === "general") {
+        setStreamingText("");
 
-      const response = await fetch(`/api/assistant/chats/${chatId}/messages`, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify({
-          clientId,
-          text: input,
-          generation: {
-            expert: selectedExpert,
-            sourceImageDataUrl,
-            visual: visualGenerationControls,
+        const response = await fetch(
+          `/api/assistant/chats/${chatId}/messages?stream=true`,
+          {
+            method: "POST",
+            headers: requestHeaders,
+            body: JSON.stringify({
+              clientId,
+              text: messageText,
+              generation: { expert: selectedExpert },
+            }),
           },
-        }),
-      });
+        );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.details || data.error || "Failed to send message");
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(
+            (data as any).details ||
+              (data as any).error ||
+              "Failed to send message",
+          );
+        }
+
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("text/event-stream") && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const parts = buffer.split("\n\n");
+              buffer = parts.pop() ?? "";
+              for (const part of parts) {
+                for (const line of part.split("\n")) {
+                  if (!line.startsWith("data: ")) continue;
+                  let event: { type: string; text?: string; error?: string };
+                  try {
+                    event = JSON.parse(line.slice(6));
+                  } catch {
+                    continue;
+                  }
+                  if (
+                    event.type === "text_delta" &&
+                    typeof event.text === "string"
+                  ) {
+                    setStreamingText((prev) => (prev ?? "") + event.text!);
+                  } else if (event.type === "error") {
+                    throw new Error(event.error || "Stream error");
+                  }
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        } else {
+          // JSON fallback (remote backend doesn't stream)
+          const data = await response.json();
+          setPendingJobs((prev) => [
+            ...new Set([...prev, ...(data.pendingJobIds || [])]),
+          ]);
+        }
+      } else {
+        const sourceImageDataUrl = await buildSourceImage();
+
+        const response = await fetch(
+          `/api/assistant/chats/${chatId}/messages`,
+          {
+            method: "POST",
+            headers: requestHeaders,
+            body: JSON.stringify({
+              clientId,
+              text: messageText,
+              generation: {
+                expert: selectedExpert,
+                sourceImageDataUrl,
+                visual: visualGenerationControls,
+              },
+            }),
+          },
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            data.details || data.error || "Failed to send message",
+          );
+        }
+
+        setPendingJobs((prev) => [
+          ...new Set([...prev, ...(data.pendingJobIds || [])]),
+        ]);
       }
 
-      setInput("");
-      setPendingJobs((prev) => [...new Set([...prev, ...(data.pendingJobIds || [])])]);
       await loadMessages(chatId);
       await loadChats();
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : "Failed to send message");
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message",
+      );
     } finally {
       setSending(false);
+      setOptimisticInput("");
+      setStreamingText(null);
     }
   }, [
     activeChatId,
@@ -704,7 +901,10 @@ export default function AIChatContainer({
           `<image href="${safeHref}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet"/>`,
           "</svg>",
         ].join("");
-        downloadBlob(new Blob([svgMarkup], { type: "image/svg+xml" }), "visual-asset.svg");
+        downloadBlob(
+          new Blob([svgMarkup], { type: "image/svg+xml" }),
+          "visual-asset.svg",
+        );
         addToast("SVG downloaded", "success");
       } catch (error) {
         addToast(
@@ -728,8 +928,18 @@ export default function AIChatContainer({
           img.src = imageData;
         });
 
-        const width = Math.max(1, Math.round(artifact.width || image.naturalWidth || image.width || 1024));
-        const height = Math.max(1, Math.round(artifact.height || image.naturalHeight || image.height || 1024));
+        const width = Math.max(
+          1,
+          Math.round(
+            artifact.width || image.naturalWidth || image.width || 1024,
+          ),
+        );
+        const height = Math.max(
+          1,
+          Math.round(
+            artifact.height || image.naturalHeight || image.height || 1024,
+          ),
+        );
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
@@ -772,7 +982,8 @@ export default function AIChatContainer({
       }));
       try {
         const effectiveVisual: VisualGenerationControls = {
-          colorMode: artifact.visual?.colorMode || visualGenerationControls.colorMode,
+          colorMode:
+            artifact.visual?.colorMode || visualGenerationControls.colorMode,
         };
         const effectiveSketchControls = sketchControlsFromVectorizeControls(
           vectorizeControls,
@@ -792,7 +1003,10 @@ export default function AIChatContainer({
         try {
           await dispatchCommand("drawElements", drawPayload);
         } catch (dispatchError) {
-          const message = dispatchError instanceof Error ? dispatchError.message : String(dispatchError);
+          const message =
+            dispatchError instanceof Error
+              ? dispatchError.message
+              : String(dispatchError);
           if (!message.includes("Another command is already pending")) {
             throw dispatchError;
           }
@@ -821,7 +1035,11 @@ export default function AIChatContainer({
           [artifactKey]: `${elements.length} shapes created`,
         }));
 
-        addToast(`Vectorized to canvas: ${elements.length} shapes`, "success", 4500);
+        addToast(
+          `Vectorized to canvas: ${elements.length} shapes`,
+          "success",
+          4500,
+        );
       } catch (vectorizeError) {
         setVectorizeSummaryByArtifact((prev) => ({
           ...prev,
@@ -841,10 +1059,15 @@ export default function AIChatContainer({
     async (artifact: Extract<AssistantArtifact, { type: "code" }>) => {
       try {
         if (artifact.language !== "mermaid") {
-          addToast("Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.", "info", 4500);
+          addToast(
+            "Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.",
+            "info",
+            4500,
+          );
           return;
         }
-        const elements = (await fetchMermaidRenderPayload(artifact.code)).elements;
+        const elements = (await fetchMermaidRenderPayload(artifact.code))
+          .elements;
 
         if (!elements || elements.length === 0) {
           addToast("No drawable elements were generated", "info");
@@ -939,12 +1162,19 @@ export default function AIChatContainer({
       artifactKey: string,
     ) => {
       try {
-        const d2Variant = artifact.language === "d2"
-          ? (d2RenderVariantByArtifact[artifactKey] || "default")
-          : "default";
-        const { svgMarkup, width, height } = await buildCodeArtifactSvg(artifact, d2Variant);
+        const d2Variant =
+          artifact.language === "d2"
+            ? d2RenderVariantByArtifact[artifactKey] || "default"
+            : "default";
+        const { svgMarkup, width, height } = await buildCodeArtifactSvg(
+          artifact,
+          d2Variant,
+        );
         const imageData = svgToDataUrl(svgMarkup);
-        const naturalDimensions = await resolveImageDimensions(imageData, { width, height });
+        const naturalDimensions = await resolveImageDimensions(imageData, {
+          width,
+          height,
+        });
 
         await dispatchCommand("insertImage", {
           imageData,
@@ -962,7 +1192,12 @@ export default function AIChatContainer({
         );
       }
     },
-    [addToast, buildCodeArtifactSvg, d2RenderVariantByArtifact, dispatchCommand],
+    [
+      addToast,
+      buildCodeArtifactSvg,
+      d2RenderVariantByArtifact,
+      dispatchCommand,
+    ],
   );
 
   const handleDownloadCodeArtifactSvg = useCallback(
@@ -971,12 +1206,16 @@ export default function AIChatContainer({
       artifactKey: string,
     ) => {
       try {
-        const d2Variant = artifact.language === "d2"
-          ? (d2RenderVariantByArtifact[artifactKey] || "default")
-          : "default";
+        const d2Variant =
+          artifact.language === "d2"
+            ? d2RenderVariantByArtifact[artifactKey] || "default"
+            : "default";
         const { svgMarkup } = await buildCodeArtifactSvg(artifact, d2Variant);
         const variantSuffix = artifact.language === "d2" ? `-${d2Variant}` : "";
-        downloadBlob(new Blob([svgMarkup], { type: "image/svg+xml" }), `${artifact.language}-diagram${variantSuffix}.svg`);
+        downloadBlob(
+          new Blob([svgMarkup], { type: "image/svg+xml" }),
+          `${artifact.language}-diagram${variantSuffix}.svg`,
+        );
         addToast("SVG downloaded", "success");
       } catch (error) {
         addToast(
@@ -995,10 +1234,14 @@ export default function AIChatContainer({
       artifactKey: string,
     ) => {
       try {
-        const d2Variant = artifact.language === "d2"
-          ? (d2RenderVariantByArtifact[artifactKey] || "default")
-          : "default";
-        const { svgMarkup, width, height } = await buildCodeArtifactSvg(artifact, d2Variant);
+        const d2Variant =
+          artifact.language === "d2"
+            ? d2RenderVariantByArtifact[artifactKey] || "default"
+            : "default";
+        const { svgMarkup, width, height } = await buildCodeArtifactSvg(
+          artifact,
+          d2Variant,
+        );
         const png = await svgToPngBlob(svgMarkup, width, height);
         const variantSuffix = artifact.language === "d2" ? `-${d2Variant}` : "";
         downloadBlob(png, `${artifact.language}-diagram${variantSuffix}.png`);
@@ -1015,10 +1258,16 @@ export default function AIChatContainer({
   );
 
   const handleApplyElementArtifact = useCallback(
-    async (artifact: Extract<AssistantArtifact, { type: "canvas-elements" }>) => {
+    async (
+      artifact: Extract<AssistantArtifact, { type: "canvas-elements" }>,
+    ) => {
       try {
         if (artifact.source === "d2") {
-          addToast("Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.", "info", 4500);
+          addToast(
+            "Editable D2 diagrams are disabled for now. Use Add SVG to Canvas instead.",
+            "info",
+            4500,
+          );
           return;
         }
         await dispatchCommand("drawElements", {
@@ -1048,11 +1297,12 @@ export default function AIChatContainer({
     <div
       style={{
         position: "fixed",
-        right: 88,
+        right: 54,
         bottom: 20,
         width: panelWidth,
         height: "min(744px, calc(100vh - 34px))",
-        background: "linear-gradient(130deg, rgba(255,255,255,0.52), rgba(248,250,252,0.4))",
+        background:
+          "linear-gradient(130deg, rgba(255,255,255,0.52), rgba(248,250,252,0.4))",
         border: "1px solid rgba(203,213,225,0.58)",
         borderRadius: 16,
         boxShadow: "0 18px 42px rgba(15,23,42,0.13)",
@@ -1062,7 +1312,8 @@ export default function AIChatContainer({
         display: "grid",
         gridTemplateColumns: `${historyWidth}px minmax(0, 1fr)`,
         overflow: "hidden",
-        transition: "width 0.3s cubic-bezier(0.22, 1, 0.36, 1), grid-template-columns 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+        transition:
+          "width 0.3s cubic-bezier(0.22, 1, 0.36, 1), grid-template-columns 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
         willChange: "width, grid-template-columns",
         fontFamily: "var(--font-body, var(--font-ui, sans-serif))",
         color: "#0f172a",
@@ -1078,15 +1329,22 @@ export default function AIChatContainer({
           background: "rgba(255,255,255,0.44)",
         }}
       >
-        <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minHeight: 0, height: "100%" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateRows: "auto 1fr",
+            minHeight: 0,
+            height: "100%",
+          }}
+        >
           <div
             style={{
-              padding: 8,
+              padding: "13px 8px",
               borderBottom: "1px solid rgba(226,232,240,0.78)",
               display: "flex",
               alignItems: "center",
               gap: 8,
-              justifyContent: "space-between",
+              justifyContent: isHistoryCollapsed ? "center" : "space-between",
             }}
           >
             <span
@@ -1098,7 +1356,9 @@ export default function AIChatContainer({
                 overflow: "hidden",
                 maxWidth: isHistoryCollapsed ? 0 : 120,
                 opacity: isHistoryCollapsed ? 0 : 1,
-                transform: isHistoryCollapsed ? "translateX(-6px)" : "translateX(0)",
+                transform: isHistoryCollapsed
+                  ? "translateX(-6px)"
+                  : "translateX(0)",
                 transition: `max-width 220ms ease ${historyTextDelay}, ${historyTextTransition}`,
                 pointerEvents: "none",
               }}
@@ -1107,23 +1367,38 @@ export default function AIChatContainer({
             </span>
             <button
               onClick={() => setIsHistoryCollapsed((prev) => !prev)}
-              title={isHistoryCollapsed ? "Expand chat history" : "Collapse chat history"}
+              title={
+                isHistoryCollapsed
+                  ? "Expand chat history"
+                  : "Collapse chat history"
+              }
               style={{
-                border: "1px solid rgba(203,213,225,0.95)",
-                background: "rgba(255,255,255,0.88)",
+                border: "none",
+                background: "transparent",
                 color: "#334155",
                 borderRadius: 10,
-                width: 32,
-                height: 32,
+                width: 40,
+                height: 40,
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                transition: "background 0.16s ease, border-color 0.16s ease",
+                transition: "color 0.16s ease",
               }}
-              aria-label={isHistoryCollapsed ? "Expand chat history" : "Collapse chat history"}
+              aria-label={
+                isHistoryCollapsed
+                  ? "Expand chat history"
+                  : "Collapse chat history"
+              }
             >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2.2" />
                 <line x1="6.1" y1="2.8" x2="6.1" y2="13.2" />
               </svg>
@@ -1133,7 +1408,7 @@ export default function AIChatContainer({
           <div
             style={{
               overflowY: "auto",
-              padding: isHistoryCollapsed ? "8px 6px" : "8px",
+              padding: "8px",
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -1156,23 +1431,62 @@ export default function AIChatContainer({
               >
                 <button
                   onClick={() => setActiveChatId(chat.id)}
-                  title={isHistoryCollapsed ? (chat.title || "Untitled") : undefined}
+                  title={
+                    isHistoryCollapsed ? chat.title || "Untitled" : undefined
+                  }
                   style={{
-                    width: isHistoryCollapsed ? 48 : "100%",
-                    minHeight: 46,
+                    width: isHistoryCollapsed ? 44 : "100%",
+                    minHeight: isHistoryCollapsed ? 44 : 56,
                     textAlign: "left",
-                    borderRadius: 11,
-                    border: activeChatId === chat.id ? "1px solid #60a5fa" : "1px solid rgba(226,232,240,0.95)",
-                    background: activeChatId === chat.id ? "rgba(219,234,254,0.9)" : "rgba(255,255,255,0.88)",
-                    padding: isHistoryCollapsed ? "4px" : "11px 34px 11px 10px",
+                    borderRadius: isHistoryCollapsed ? "50%" : 10,
+                    border: isHistoryCollapsed
+                      ? activeChatId === chat.id
+                        ? "2px solid #60a5fa"
+                        : "1px solid rgba(226,232,240,0.95)"
+                      : "none",
+                    background:
+                      activeChatId === chat.id
+                        ? isHistoryCollapsed
+                          ? "rgba(219,234,254,0.9)"
+                          : "rgba(219,234,254,0.6)"
+                        : isHistoryCollapsed
+                          ? "rgba(255,255,255,0.88)"
+                          : "transparent",
+                    padding: isHistoryCollapsed ? 0 : "10px 34px 10px 14px",
                     cursor: "pointer",
                     display: "inline-flex",
                     flexDirection: "column",
                     alignItems: isHistoryCollapsed ? "center" : "flex-start",
                     justifyContent: "center",
-                    transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease, border-color 140ms ease, background 140ms ease",
+                    position: "relative",
+                    overflow: "hidden",
+                    boxShadow:
+                      isHistoryCollapsed && activeChatId === chat.id
+                        ? "0 0 0 2px rgba(96,165,250,0.25)"
+                        : "none",
+                    transition:
+                      "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease, background 140ms ease, border-radius 220ms ease, border-color 140ms ease, box-shadow 140ms ease",
                   }}
                 >
+                  {/* Left accent bar for active state - only in expanded view */}
+                  {!isHistoryCollapsed && (
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "20%",
+                        bottom: "20%",
+                        width: 3,
+                        borderRadius: "0 4px 4px 0",
+                        background: "#3b82f6",
+                        opacity: activeChatId === chat.id ? 1 : 0,
+                        transform:
+                          activeChatId === chat.id ? "scaleY(1)" : "scaleY(0)",
+                        transition: "opacity 140ms ease, transform 140ms ease",
+                      }}
+                    />
+                  )}
                   <div
                     style={{
                       position: "relative",
@@ -1180,19 +1494,23 @@ export default function AIChatContainer({
                       minHeight: 18,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: isHistoryCollapsed ? "center" : "flex-start",
+                      justifyContent: isHistoryCollapsed
+                        ? "center"
+                        : "flex-start",
                     }}
                   >
                     <span
                       style={{
                         fontSize: 13,
-                        fontWeight: 600,
-                        color: "#0f172a",
+                        fontWeight: activeChatId === chat.id ? 600 : 400,
+                        color: activeChatId === chat.id ? "#1d4ed8" : "#475569",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         opacity: isHistoryCollapsed ? 0 : 1,
-                        transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                        transform: isHistoryCollapsed
+                          ? "translateY(-3px)"
+                          : "translateY(0)",
                         transition: historyTextTransition,
                       }}
                     >
@@ -1206,11 +1524,13 @@ export default function AIChatContainer({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: "#0f172a",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: activeChatId === chat.id ? "#2563eb" : "#94a3b8",
                         opacity: isHistoryCollapsed ? 1 : 0,
-                        transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                        transform: isHistoryCollapsed
+                          ? "translateY(0)"
+                          : "translateY(3px)",
                         transition: historyIconTransition,
                       }}
                     >
@@ -1221,11 +1541,11 @@ export default function AIChatContainer({
                     <div
                       style={{
                         fontSize: 12,
-                        color: "#64748b",
+                        color: activeChatId === chat.id ? "#64748b" : "#94a3b8",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        marginTop: isHistoryCollapsed ? 0 : 4,
+                        marginTop: isHistoryCollapsed ? 0 : 3,
                         maxHeight: isHistoryCollapsed ? 0 : 18,
                         opacity: isHistoryCollapsed ? 0 : 1,
                         transition: `max-height 180ms ease ${historyTextDelay}, margin-top 180ms ease ${historyTextDelay}, opacity 160ms ease ${historyTextDelay}`,
@@ -1254,8 +1574,12 @@ export default function AIChatContainer({
                     right: 8,
                     top: "50%",
                     transform: `translateY(-50%) ${!isHistoryCollapsed && hoveredChatId === chat.id ? "scale(1)" : "scale(0.9)"}`,
-                    opacity: !isHistoryCollapsed && hoveredChatId === chat.id ? 1 : 0,
-                    pointerEvents: !isHistoryCollapsed && hoveredChatId === chat.id ? "auto" : "none",
+                    opacity:
+                      !isHistoryCollapsed && hoveredChatId === chat.id ? 1 : 0,
+                    pointerEvents:
+                      !isHistoryCollapsed && hoveredChatId === chat.id
+                        ? "auto"
+                        : "none",
                     transition: "opacity 0.16s ease, transform 0.16s ease",
                   }}
                 >
@@ -1266,23 +1590,27 @@ export default function AIChatContainer({
 
             <div
               style={{
-                width: "100%",
+                width: "calc(100% + 16px)",
+                marginLeft: "-8px",
                 marginTop: 2,
                 paddingTop: 8,
+                paddingLeft: 8,
+                paddingRight: 8,
                 borderTop: "1px solid rgba(226,232,240,0.66)",
                 display: "grid",
                 gap: 6,
-                justifyItems: "stretch",
+                justifyItems: isHistoryCollapsed ? "center" : "stretch",
+                boxSizing: "border-box",
               }}
             >
               <button
                 onClick={handleCreateNewChat}
                 title="New chat"
                 style={{
-                  width: isHistoryCollapsed ? 48 : "100%",
-                  height: 36,
-                  border: "1px solid rgba(148,163,184,0.5)",
-                  background: "rgba(241,245,249,0.9)",
+                  width: isHistoryCollapsed ? 40 : "100%",
+                  height: 40,
+                  border: "none",
+                  background: "transparent",
                   borderRadius: 10,
                   padding: isHistoryCollapsed ? 0 : "0 12px",
                   lineHeight: 1,
@@ -1295,7 +1623,8 @@ export default function AIChatContainer({
                   justifyContent: isHistoryCollapsed ? "center" : "flex-start",
                   position: "relative",
                   overflow: "hidden",
-                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease",
+                  transition:
+                    "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease, color 0.16s ease",
                 }}
               >
                 <span
@@ -1306,9 +1635,11 @@ export default function AIChatContainer({
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 18,
+                    fontSize: 24,
                     opacity: isHistoryCollapsed ? 1 : 0,
-                    transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                    transform: isHistoryCollapsed
+                      ? "translateY(0)"
+                      : "translateY(3px)",
                     transition: historyIconTransition,
                   }}
                 >
@@ -1319,7 +1650,9 @@ export default function AIChatContainer({
                     fontSize: 13,
                     whiteSpace: "nowrap",
                     opacity: isHistoryCollapsed ? 0 : 1,
-                    transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                    transform: isHistoryCollapsed
+                      ? "translateY(-3px)"
+                      : "translateY(0)",
                     transition: historyTextTransition,
                   }}
                 >
@@ -1331,10 +1664,10 @@ export default function AIChatContainer({
                 title="Clear chat history"
                 aria-label="Clear chat history"
                 style={{
-                  width: isHistoryCollapsed ? 48 : "100%",
-                  height: 28,
-                  border: "1px solid rgba(203,213,225,0.95)",
-                  background: "rgba(255,255,255,0.86)",
+                  width: isHistoryCollapsed ? 40 : "100%",
+                  height: 40,
+                  border: "none",
+                  background: "transparent",
                   borderRadius: 10,
                   padding: isHistoryCollapsed ? 0 : "0 10px",
                   fontWeight: 600,
@@ -1345,7 +1678,8 @@ export default function AIChatContainer({
                   justifyContent: "center",
                   position: "relative",
                   overflow: "hidden",
-                  transition: "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease",
+                  transition:
+                    "width 240ms cubic-bezier(0.22, 1, 0.36, 1), padding 220ms ease, color 0.16s ease",
                 }}
               >
                 <span
@@ -1357,11 +1691,20 @@ export default function AIChatContainer({
                     alignItems: "center",
                     justifyContent: "center",
                     opacity: isHistoryCollapsed ? 1 : 0,
-                    transform: isHistoryCollapsed ? "translateY(0)" : "translateY(3px)",
+                    transform: isHistoryCollapsed
+                      ? "translateY(0)"
+                      : "translateY(3px)",
                     transition: historyIconTransition,
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
                     <path d="M2.8 4.4h10.4" />
                     <path d="M6 4.4V3.2h4v1.2" />
                     <path d="M4.8 4.4l.6 8h5.2l.6-8" />
@@ -1372,7 +1715,9 @@ export default function AIChatContainer({
                     fontSize: 12,
                     whiteSpace: "nowrap",
                     opacity: isHistoryCollapsed ? 0 : 1,
-                    transform: isHistoryCollapsed ? "translateY(-3px)" : "translateY(0)",
+                    transform: isHistoryCollapsed
+                      ? "translateY(-3px)"
+                      : "translateY(0)",
                     transition: historyTextTransition,
                   }}
                 >
@@ -1384,11 +1729,30 @@ export default function AIChatContainer({
         </div>
       </aside>
 
-      <section style={{ display: "grid", gridTemplateRows: "auto 1fr auto", minHeight: 0, background: "rgba(255,255,255,0.22)" }}>
-        <header style={{ padding: "13px 16px", borderBottom: "1px solid rgba(226,232,240,0.9)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <section
+        style={{
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto",
+          minHeight: 0,
+          background: "rgba(255,255,255,0.22)",
+        }}
+      >
+        <header
+          style={{
+            padding: "13px 16px",
+            borderBottom: "1px solid rgba(226,232,240,0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ display: "grid", gap: 1 }}>
-              <strong style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Canvas Assistant</strong>
+              <strong
+                style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}
+              >
+                Canvas Assistant
+              </strong>
             </div>
           </div>
           <button
@@ -1396,17 +1760,17 @@ export default function AIChatContainer({
             title="Close assistant"
             aria-label="Close assistant"
             style={{
-              border: "1px solid rgba(203,213,225,0.95)",
-              background: "rgba(255,255,255,0.9)",
+              border: "none",
+              background: "transparent",
               borderRadius: 10,
-              width: 30,
-              height: 30,
+              width: 40,
+              height: 40,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               color: "#475569",
               cursor: "pointer",
-              fontSize: 16,
+              fontSize: 22,
               lineHeight: 1,
             }}
           >
@@ -1414,11 +1778,25 @@ export default function AIChatContainer({
           </button>
         </header>
 
-        <div style={{ overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
-          {loadingMessages ? <div style={{ fontSize: 12, color: "#64748b" }}>Loading messages...</div> : null}
+        <div
+          style={{
+            overflowY: "auto",
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            minHeight: 0,
+          }}
+        >
+          {loadingMessages ? (
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Loading messages...
+            </div>
+          ) : null}
           {!loadingMessages && messages.length === 0 ? (
             <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
-              Start a new chat and generate diagrams and visual assets directly in this window.
+              Start a new chat and generate diagrams and visual assets directly
+              in this window.
             </div>
           ) : null}
 
@@ -1444,7 +1822,13 @@ export default function AIChatContainer({
                   {isUser ? (
                     `You • ${formatTime(message.createdAt)}`
                   ) : (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
                       <span
                         style={{
                           display: "inline-flex",
@@ -1459,17 +1843,37 @@ export default function AIChatContainer({
                       >
                         {expertLabel(messageExpert)}
                       </span>
-                      <span>{formatTime(message.createdAt)} • {message.status}</span>
+                      <span>
+                        {formatTime(message.createdAt)} • {message.status}
+                      </span>
                     </span>
                   )}
                 </div>
 
-                <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{message.text}</div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {message.text}
+                </div>
                 {!isUser && messageExpert === "general" ? (
-                  <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <button
                       onClick={() => {
-                        void copyToClipboard(markdownToPlainText(message.text), "Copied plain text");
+                        void copyToClipboard(
+                          markdownToPlainText(message.text),
+                          "Copied plain text",
+                        );
                       }}
                       style={{
                         border: "1px solid #cbd5e1",
@@ -1517,312 +1921,428 @@ export default function AIChatContainer({
                 ) : null}
 
                 {message.artifacts?.map((artifact, artifactIndex) => (
-                  <div key={`${message.id}-${artifactIndex}`} style={{ marginTop: 10 }}>
+                  <div
+                    key={`${message.id}-${artifactIndex}`}
+                    style={{ marginTop: 10 }}
+                  >
                     {(() => {
                       const artifactKey = `${message.id}-${artifactIndex}`;
-                      const sketchMetadata = sketchMetadataByArtifact[artifactKey];
-                      const sketchLogs = sketchLogsByArtifact[artifactKey] || [];
-                      const vectorizedWith = vectorizeSettingsByArtifact[artifactKey];
-                      const vectorizeSummary = vectorizeSummaryByArtifact[artifactKey];
+                      const sketchMetadata =
+                        sketchMetadataByArtifact[artifactKey];
+                      const sketchLogs =
+                        sketchLogsByArtifact[artifactKey] || [];
+                      const vectorizedWith =
+                        vectorizeSettingsByArtifact[artifactKey];
+                      const vectorizeSummary =
+                        vectorizeSummaryByArtifact[artifactKey];
 
                       return (
                         <>
-                    {artifact.type === "code" ? (
-                      <div
-                        style={{
-                          border: "1px solid rgba(203,213,225,0.9)",
-                          borderRadius: 10,
-                          background: "rgba(255,255,255,0.75)",
-                          padding: 8,
-                          display: "grid",
-                          gap: 8,
-                        }}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>
-                          {artifact.language.toUpperCase()} Artifact
-                        </div>
-
-                        {artifact.language === "d2" ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                            <label style={{ fontSize: 11, color: "#475569" }}>Render</label>
-                            <select
-                              value={d2RenderVariantByArtifact[artifactKey] || "default"}
-                              onChange={(event) => {
-                                setD2RenderVariantByArtifact((prev) => ({
-                                  ...prev,
-                                  [artifactKey]: event.target.value as D2RenderVariant,
-                                }));
+                          {artifact.type === "code" ? (
+                            <div
+                              style={{
+                                border: "1px solid rgba(203,213,225,0.9)",
+                                borderRadius: 10,
+                                background: "rgba(255,255,255,0.75)",
+                                padding: 8,
+                                display: "grid",
+                                gap: 8,
                               }}
-                              style={{ border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 11, padding: "4px 6px" }}
                             >
-                              <option value="default">Default</option>
-                              <option value="sketch">Sketch</option>
-                              <option value="ascii">ASCII</option>
-                            </select>
-                          </div>
-                        ) : null}
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: "#334155",
+                                }}
+                              >
+                                {artifact.language.toUpperCase()} Artifact
+                              </div>
 
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => {
-                              void copyToClipboard(artifact.code, "Copied source code");
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "5px 9px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Copy Code
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleAddCodeArtifactSvgToCanvas(artifact, artifactKey);
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "5px 9px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Add SVG to Canvas
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleDownloadCodeArtifactSvg(artifact, artifactKey);
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "5px 9px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Download SVG
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleDownloadCodeArtifactPng(artifact, artifactKey);
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "5px 9px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Download PNG
-                          </button>
-                          {artifact.language === "mermaid" ? (
+                              {artifact.language === "d2" ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <label
+                                    style={{ fontSize: 11, color: "#475569" }}
+                                  >
+                                    Render
+                                  </label>
+                                  <select
+                                    value={
+                                      d2RenderVariantByArtifact[artifactKey] ||
+                                      "default"
+                                    }
+                                    onChange={(event) => {
+                                      setD2RenderVariantByArtifact((prev) => ({
+                                        ...prev,
+                                        [artifactKey]: event.target
+                                          .value as D2RenderVariant,
+                                      }));
+                                    }}
+                                    style={{
+                                      border: "1px solid #cbd5e1",
+                                      borderRadius: 8,
+                                      fontSize: 11,
+                                      padding: "4px 6px",
+                                    }}
+                                  >
+                                    <option value="default">Default</option>
+                                    <option value="sketch">Sketch</option>
+                                    <option value="ascii">ASCII</option>
+                                  </select>
+                                </div>
+                              ) : null}
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 6,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  onClick={() => {
+                                    void copyToClipboard(
+                                      artifact.code,
+                                      "Copied source code",
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "5px 9px",
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Copy Code
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleAddCodeArtifactSvgToCanvas(
+                                      artifact,
+                                      artifactKey,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "5px 9px",
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Add SVG to Canvas
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleDownloadCodeArtifactSvg(
+                                      artifact,
+                                      artifactKey,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "5px 9px",
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Download SVG
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleDownloadCodeArtifactPng(
+                                      artifact,
+                                      artifactKey,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "5px 9px",
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Download PNG
+                                </button>
+                                {artifact.language === "mermaid" ? (
+                                  <button
+                                    onClick={() => {
+                                      void handleApplyCodeArtifact(artifact);
+                                    }}
+                                    style={{
+                                      border: "1px solid #0f766e",
+                                      background: "#0f766e",
+                                      color: "#ffffff",
+                                      borderRadius: 8,
+                                      padding: "5px 9px",
+                                      fontSize: 11,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Add Native Sketch
+                                  </button>
+                                ) : null}
+                              </div>
+
+                              <details>
+                                <summary
+                                  style={{
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                    color: "#2563eb",
+                                  }}
+                                >
+                                  Show source code
+                                </summary>
+                                <pre
+                                  style={{
+                                    marginTop: 8,
+                                    fontSize: 11,
+                                    background: "#111827",
+                                    color: "#e5e7eb",
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    overflowX: "auto",
+                                    maxHeight: 220,
+                                  }}
+                                >
+                                  {artifact.code}
+                                </pre>
+                              </details>
+                            </div>
+                          ) : null}
+
+                          {artifact.type === "image-data" ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 8,
+                              }}
+                            >
+                              <ArtifactPreviewImage artifact={artifact} />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  onClick={() => {
+                                    void handleAddImageToCanvas(artifact);
+                                  }}
+                                  style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Add Image
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleVectorizeImage(
+                                      artifact,
+                                      artifactKey,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #0f766e",
+                                    background: "#14b8a6",
+                                    color: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Vectorize to Canvas
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleDownloadImageArtifactSvg(
+                                      artifact,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Download SVG
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleDownloadImageArtifactPng(
+                                      artifact,
+                                    );
+                                  }}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontSize: 12,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Download PNG
+                                </button>
+                              </div>
+                              {vectorizeSummary ? (
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    color:
+                                      vectorizeSummary ===
+                                      "Vectorization failed"
+                                        ? "#b91c1c"
+                                        : vectorizeSummary === "Vectorizing..."
+                                          ? "#475569"
+                                          : "#065f46",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {vectorizeSummary}
+                                </div>
+                              ) : null}
+                              {sketchMetadata ? (
+                                <details>
+                                  <summary
+                                    style={{
+                                      fontSize: 12,
+                                      cursor: "pointer",
+                                      color: "#2563eb",
+                                    }}
+                                  >
+                                    Vectorization metadata
+                                  </summary>
+                                  <div
+                                    style={{
+                                      marginTop: 8,
+                                      fontSize: 11,
+                                      lineHeight: 1.5,
+                                    }}
+                                  >
+                                    <div>
+                                      Source: {sketchMetadata.sourceWidth}x
+                                      {sketchMetadata.sourceHeight}
+                                      {" • "}Working:{" "}
+                                      {sketchMetadata.workingWidth}x
+                                      {sketchMetadata.workingHeight}
+                                    </div>
+                                    <div>
+                                      Colors: requested{" "}
+                                      {sketchMetadata.numColorsRequested}, used{" "}
+                                      {sketchMetadata.numColorsUsed}
+                                      {" • "}Background label:{" "}
+                                      {sketchMetadata.backgroundLabel}
+                                    </div>
+                                    <div>
+                                      Vector settings: palette{" "}
+                                      {vectorizedWith?.paletteDepth ??
+                                        vectorizeControls.paletteDepth}
+                                      {" • "}complexity{" "}
+                                      {vectorizedWith?.complexity ??
+                                        vectorizeControls.complexity}
+                                      {" • "}edge{" "}
+                                      {vectorizedWith?.edgeFidelity ??
+                                        vectorizeControls.edgeFidelity}
+                                    </div>
+                                    <div>
+                                      Epsilon:{" "}
+                                      {sketchMetadata.epsilon.toFixed(2)}
+                                      {" • "}Kernel:{" "}
+                                      {sketchMetadata.morphologyKernelSize}x
+                                      {sketchMetadata.morphologyKernelSize}
+                                      {" • "}Min area: {sketchMetadata.minArea}
+                                    </div>
+                                    <div>
+                                      Components:{" "}
+                                      {sketchMetadata.componentsFound}
+                                      {" • "}Filtered:{" "}
+                                      {sketchMetadata.componentsFiltered}
+                                      {" • "}Elements:{" "}
+                                      {sketchMetadata.elementsCreated} (emitted{" "}
+                                      {sketchMetadata.elementsEmitted})
+                                    </div>
+                                    {typeof sketchMetadata.outlineComponentsFound ===
+                                      "number" ||
+                                    typeof sketchMetadata.outlineElementsCreated ===
+                                      "number" ? (
+                                      <div>
+                                        Outline components:{" "}
+                                        {sketchMetadata.outlineComponentsFound ??
+                                          0}
+                                        {" • "}Outline elements:{" "}
+                                        {sketchMetadata.outlineElementsCreated ??
+                                          0}
+                                      </div>
+                                    ) : null}
+                                    <div>
+                                      Runtime: {sketchMetadata.processingMs} ms
+                                    </div>
+                                  </div>
+                                  {sketchLogs.length > 0 ? (
+                                    <pre
+                                      style={{
+                                        marginTop: 8,
+                                        fontSize: 11,
+                                        background: "#111827",
+                                        color: "#e5e7eb",
+                                        padding: 10,
+                                        borderRadius: 8,
+                                        overflowX: "auto",
+                                      }}
+                                    >
+                                      {sketchLogs.join("\n")}
+                                    </pre>
+                                  ) : null}
+                                </details>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {artifact.type === "canvas-elements" &&
+                          artifact.source !== "d2" ? (
                             <button
                               onClick={() => {
-                                void handleApplyCodeArtifact(artifact);
+                                void handleApplyElementArtifact(artifact);
                               }}
                               style={{
-                                border: "1px solid #0f766e",
-                                background: "#0f766e",
-                                color: "#ffffff",
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
                                 borderRadius: 8,
-                                padding: "5px 9px",
-                                fontSize: 11,
+                                padding: "6px 10px",
+                                fontSize: 12,
                                 cursor: "pointer",
                               }}
                             >
-                              Add Native Sketch
+                              Add Generated Elements
                             </button>
                           ) : null}
-                        </div>
-
-                        <details>
-                          <summary style={{ fontSize: 11, cursor: "pointer", color: "#2563eb" }}>
-                            Show source code
-                          </summary>
-                          <pre
-                            style={{
-                              marginTop: 8,
-                              fontSize: 11,
-                              background: "#111827",
-                              color: "#e5e7eb",
-                              padding: 10,
-                              borderRadius: 8,
-                              overflowX: "auto",
-                              maxHeight: 220,
-                            }}
-                          >
-                            {artifact.code}
-                          </pre>
-                        </details>
-                      </div>
-                    ) : null}
-
-                    {artifact.type === "image-data" ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <ArtifactPreviewImage artifact={artifact} />
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => {
-                              void handleAddImageToCanvas(artifact);
-                            }}
-                            style={{
-                              border: "1px solid #d1d5db",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Add Image
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleVectorizeImage(artifact, artifactKey);
-                            }}
-                            style={{
-                              border: "1px solid #0f766e",
-                              background: "#14b8a6",
-                              color: "#ffffff",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Vectorize to Canvas
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleDownloadImageArtifactSvg(artifact);
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Download SVG
-                          </button>
-                          <button
-                            onClick={() => {
-                              void handleDownloadImageArtifactPng(artifact);
-                            }}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              background: "#ffffff",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Download PNG
-                          </button>
-                        </div>
-                        {vectorizeSummary ? (
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: vectorizeSummary === "Vectorization failed"
-                                ? "#b91c1c"
-                                : vectorizeSummary === "Vectorizing..."
-                                ? "#475569"
-                                : "#065f46",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {vectorizeSummary}
-                          </div>
-                        ) : null}
-                        {sketchMetadata ? (
-                          <details>
-                            <summary style={{ fontSize: 12, cursor: "pointer", color: "#2563eb" }}>
-                              Vectorization metadata
-                            </summary>
-                            <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5 }}>
-                              <div>
-                                Source: {sketchMetadata.sourceWidth}x{sketchMetadata.sourceHeight}
-                                {" • "}Working: {sketchMetadata.workingWidth}x{sketchMetadata.workingHeight}
-                              </div>
-                              <div>
-                                Colors: requested {sketchMetadata.numColorsRequested}, used {sketchMetadata.numColorsUsed}
-                                {" • "}Background label: {sketchMetadata.backgroundLabel}
-                              </div>
-                              <div>
-                                Vector settings: palette {vectorizedWith?.paletteDepth ?? vectorizeControls.paletteDepth}
-                                {" • "}complexity {vectorizedWith?.complexity ?? vectorizeControls.complexity}
-                                {" • "}edge {vectorizedWith?.edgeFidelity ?? vectorizeControls.edgeFidelity}
-                              </div>
-                              <div>
-                                Epsilon: {sketchMetadata.epsilon.toFixed(2)}
-                                {" • "}Kernel: {sketchMetadata.morphologyKernelSize}x{sketchMetadata.morphologyKernelSize}
-                                {" • "}Min area: {sketchMetadata.minArea}
-                              </div>
-                              <div>
-                                Components: {sketchMetadata.componentsFound}
-                                {" • "}Filtered: {sketchMetadata.componentsFiltered}
-                                {" • "}Elements: {sketchMetadata.elementsCreated} (emitted {sketchMetadata.elementsEmitted})
-                              </div>
-                              {(typeof sketchMetadata.outlineComponentsFound === "number"
-                                || typeof sketchMetadata.outlineElementsCreated === "number") ? (
-                                <div>
-                                  Outline components: {sketchMetadata.outlineComponentsFound ?? 0}
-                                  {" • "}Outline elements: {sketchMetadata.outlineElementsCreated ?? 0}
-                                </div>
-                              ) : null}
-                              <div>
-                                Runtime: {sketchMetadata.processingMs} ms
-                              </div>
-                            </div>
-                            {sketchLogs.length > 0 ? (
-                              <pre
-                                style={{
-                                  marginTop: 8,
-                                  fontSize: 11,
-                                  background: "#111827",
-                                  color: "#e5e7eb",
-                                  padding: 10,
-                                  borderRadius: 8,
-                                  overflowX: "auto",
-                                }}
-                              >
-                                {sketchLogs.join("\n")}
-                              </pre>
-                            ) : null}
-                          </details>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {artifact.type === "canvas-elements" && artifact.source !== "d2" ? (
-                      <button
-                        onClick={() => {
-                          void handleApplyElementArtifact(artifact);
-                        }}
-                        style={{
-                          border: "1px solid #d1d5db",
-                          background: "#ffffff",
-                          borderRadius: 8,
-                          padding: "6px 10px",
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Add Generated Elements
-                      </button>
-                    ) : null}
                         </>
                       );
                     })()}
@@ -1832,21 +2352,137 @@ export default function AIChatContainer({
             );
           })}
 
+          {sending && optimisticInput ? (
+            <>
+              {/* Optimistic user message */}
+              <div
+                style={{
+                  alignSelf: "flex-end",
+                  maxWidth: "90%",
+                  background: "#0f172a",
+                  color: "#ffffff",
+                  borderRadius: 14,
+                  padding: "10px 12px",
+                }}
+              >
+                <div style={{ fontSize: 11, opacity: 0.84, marginBottom: 6 }}>
+                  You • now
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {optimisticInput}
+                </div>
+              </div>
+
+              {/* AI typing / streaming bubble */}
+              <div
+                style={{
+                  alignSelf: "flex-start",
+                  maxWidth: "90%",
+                  background: expertTheme(selectedExpert).background,
+                  border: expertTheme(selectedExpert).border,
+                  borderRadius: 14,
+                  padding: "10px 12px",
+                  boxShadow: "0 2px 12px rgba(15,23,42,0.06)",
+                }}
+              >
+                <div style={{ fontSize: 11, opacity: 0.84, marginBottom: 6 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        background: expertTheme(selectedExpert).badgeBg,
+                        color: expertTheme(selectedExpert).badgeFg,
+                      }}
+                    >
+                      {expertLabel(selectedExpert)}
+                    </span>
+                  </span>
+                </div>
+                {streamingText !== null && streamingText.length > 0 ? (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {streamingText}
+                    <span
+                      style={{
+                        animation: "blink 0.9s ease-in-out infinite",
+                        display: "inline-block",
+                        marginLeft: 1,
+                      }}
+                    >
+                      ▊
+                    </span>
+                  </div>
+                ) : (
+                  <TypingDots />
+                )}
+              </div>
+            </>
+          ) : null}
+
+          <div ref={messagesEndRef} />
+
           {pendingJobs.length > 0 ? (
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              {pendingJobs.length} background job{pendingJobs.length === 1 ? "" : "s"} running...
+              {pendingJobs.length} background job
+              {pendingJobs.length === 1 ? "" : "s"} running...
             </div>
           ) : null}
 
           {error ? (
-            <div style={{ fontSize: 12, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 10px" }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#b91c1c",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: 8,
+                padding: "8px 10px",
+              }}
+            >
               {error}
             </div>
           ) : null}
         </div>
 
-        <footer style={{ borderTop: "1px solid rgba(226,232,240,0.9)", padding: 12, display: "grid", gap: 10, background: "rgba(255,255,255,0.24)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <footer
+          style={{
+            borderTop: "1px solid rgba(226,232,240,0.9)",
+            padding: 12,
+            display: "grid",
+            gap: 10,
+            background: "rgba(255,255,255,0.24)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
             <label style={{ fontSize: 11, color: "#475569" }}>Expert</label>
             <select
               value={selectedExpert}
@@ -1870,12 +2506,29 @@ export default function AIChatContainer({
           </div>
           {selectedExpert === "visual" ? (
             <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <label style={{ fontSize: 11, color: "#475569", display: "flex", alignItems: "center", gap: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "#475569",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={includeCanvasReference}
-                    onChange={(event) => setIncludeCanvasReference(event.target.checked)}
+                    onChange={(event) =>
+                      setIncludeCanvasReference(event.target.checked)
+                    }
                   />
                   Use selected canvas content as reference
                 </label>
@@ -1912,13 +2565,28 @@ export default function AIChatContainer({
                       lineHeight: 1.45,
                     }}
                   >
-                    `Color` controls the generated image mode (`Color` or `Black & White`). `Palette` controls how many dominant colors are kept during vectorization. `Complexity` trades speed for detail (`Low` simpler, `High` richer). `Edge fidelity` increases contour retention but can add extra small shapes.
+                    `Color` controls the generated image mode (`Color` or `Black
+                    & White`). `Palette` controls how many dominant colors are
+                    kept during vectorization. `Complexity` trades speed for
+                    detail (`Low` simpler, `High` richer). `Edge fidelity`
+                    increases contour retention but can add extra small shapes.
                   </div>
                 </details>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Generation</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}
+                >
+                  Generation
+                </span>
 
                 <label style={{ fontSize: 11, color: "#475569" }}>Color</label>
                 <select
@@ -1929,18 +2597,35 @@ export default function AIChatContainer({
                       colorMode: event.target.value as VisualColorMode,
                     }));
                   }}
-                  style={{ border: "1px solid rgba(203,213,225,0.95)", borderRadius: 8, fontSize: 12, padding: "4px 8px" }}
+                  style={{
+                    border: "1px solid rgba(203,213,225,0.95)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: "4px 8px",
+                  }}
                 >
                   <option value="color">Color</option>
                   <option value="bw">Black & White</option>
                 </select>
-
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Vectorization</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}
+                >
+                  Vectorization
+                </span>
 
-                <label style={{ fontSize: 11, color: "#475569" }}>Palette</label>
+                <label style={{ fontSize: 11, color: "#475569" }}>
+                  Palette
+                </label>
                 <select
                   value={vectorizeControls.paletteDepth}
                   onChange={(event) => {
@@ -1949,7 +2634,12 @@ export default function AIChatContainer({
                       paletteDepth: Number(event.target.value),
                     }));
                   }}
-                  style={{ border: "1px solid rgba(203,213,225,0.95)", borderRadius: 8, fontSize: 12, padding: "4px 8px" }}
+                  style={{
+                    border: "1px solid rgba(203,213,225,0.95)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: "4px 8px",
+                  }}
                 >
                   <option value={2}>2</option>
                   <option value={4}>4</option>
@@ -1960,7 +2650,9 @@ export default function AIChatContainer({
                   <option value={32}>32</option>
                 </select>
 
-                <label style={{ fontSize: 11, color: "#475569" }}>Complexity</label>
+                <label style={{ fontSize: 11, color: "#475569" }}>
+                  Complexity
+                </label>
                 <select
                   value={vectorizeControls.complexity}
                   onChange={(event) => {
@@ -1969,14 +2661,27 @@ export default function AIChatContainer({
                       complexity: event.target.value as VectorizeComplexity,
                     }));
                   }}
-                  style={{ border: "1px solid rgba(203,213,225,0.95)", borderRadius: 8, fontSize: 12, padding: "4px 8px" }}
+                  style={{
+                    border: "1px solid rgba(203,213,225,0.95)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: "4px 8px",
+                  }}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
 
-                <label style={{ fontSize: 11, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "#475569",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
                   Edge fidelity
                   <input
                     type="range"
@@ -2039,7 +2744,14 @@ export default function AIChatContainer({
               {sending ? (
                 <span style={{ fontSize: 16, lineHeight: 1 }}>…</span>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
                   <path d="M2 8h9" />
                   <path d="M8.5 4.8L12 8l-3.5 3.2" />
                 </svg>
@@ -2051,6 +2763,16 @@ export default function AIChatContainer({
           </div>
         </footer>
       </section>
+      <style>{`
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+          30% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
+import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
+import { applySearchHighlights, clearSearchHighlights } from '@/components/canvas/noteSearchHighlight';
 import { useCommandSubscriber } from '@/stores';
 import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
@@ -15,6 +16,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const [isNearEdge, setIsNearEdge] = useState(false);
         const [isDragging, setIsDragging] = useState(false);
         const [isScrollMode, setIsScrollMode] = useState(false); // Click-to-interact scroll mode
+        const [searchHighlight, setSearchHighlight] = useState<{ query: string; matchIndex: number } | null>(null);
+        const hasMarksRef = useRef(false);
         const contentRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
 
@@ -272,6 +275,37 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 return;
             }
         }, [isEditing]);
+
+        // Listen for search highlight events
+        useEffect(() => {
+            const handleHighlight = (e: Event) => {
+                const { elementId, query, matchIndex = 0 } = (e as CustomEvent<{ elementId: string; query: string; matchIndex?: number }>).detail;
+                if (elementId !== element.id) return;
+                setSearchHighlight({ query, matchIndex });
+                setIsScrollMode(true);
+            };
+            const handleClear = () => setSearchHighlight(null);
+            window.addEventListener('canvas:note-search-highlight', handleHighlight);
+            window.addEventListener('canvas:note-search-clear', handleClear);
+            return () => {
+                window.removeEventListener('canvas:note-search-highlight', handleHighlight);
+                window.removeEventListener('canvas:note-search-clear', handleClear);
+            };
+        }, [element.id]);
+
+        // Re-apply search highlights when content or search query changes.
+        // MarkdownPreview is React.memo so its DOM is only rebuilt when content/isDark/toggle changes.
+        useLayoutEffect(() => {
+            if (!contentRef.current) return;
+            if (hasMarksRef.current) {
+                clearSearchHighlights(contentRef.current);
+                hasMarksRef.current = false;
+            }
+            if (searchHighlight) {
+                applySearchHighlights(contentRef.current, searchHighlight.query, searchHighlight.matchIndex);
+                hasMarksRef.current = true;
+            }
+        }, [searchHighlight, content, isEditing]);
 
         // Export as image
         const exportAsImage = useCallback(async () => {

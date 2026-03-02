@@ -8,6 +8,21 @@ import type {
   SketchStyle,
 } from "@/lib/assistant/types";
 import { createAssistantGateway } from "@/lib/assistant/backend-boundary";
+import {
+  resolveAssistantOwnerId,
+  resolveAnthropicApiKey,
+  resolveAssistantBackendConfig,
+} from "@/lib/assistant/auth";
+import {
+  hydrateOwnerState,
+  exportOwnerState,
+  type OwnerRuntimeSnapshot,
+} from "@/lib/assistant/runtime-store";
+import {
+  prepareChatStreamSession,
+  type ChatStreamSession,
+} from "@/lib/assistant/service";
+import { streamTextWithClaude } from "@/lib/assistant/claude";
 
 export const prerender = false;
 
@@ -192,6 +207,106 @@ export const POST: APIRoute = async (context) => {
           : {}),
       },
     };
+
+    // Streaming path for general expert on local backend
+    const url = new URL(context.request.url);
+    if (url.searchParams.get("stream") === "true" && expert === "general") {
+      const backendConfig = resolveAssistantBackendConfig(context);
+      if (!backendConfig.baseUrl) {
+        const anthropicApiKey = resolveAnthropicApiKey(context);
+        if (!anthropicApiKey) {
+          return new Response(
+            JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        let ownerId: string;
+        try {
+          ownerId = await resolveAssistantOwnerId(context, clientId);
+        } catch (ownerError) {
+          return new Response(
+            JSON.stringify({ error: ownerError instanceof Error ? ownerError.message : "Failed to resolve owner" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        const runtime = (context.locals as any).runtime;
+        const kv = runtime?.env?.CANVAS_KV as
+          | { get: (k: string) => Promise<string | null>; put: (k: string, v: string) => Promise<void> }
+          | undefined;
+        const kvKey = `assistant-state:${ownerId}`;
+
+        if (kv) {
+          const raw = await kv.get(kvKey).catch(() => null);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw) as OwnerRuntimeSnapshot;
+              if (parsed && Array.isArray(parsed.chats) && typeof parsed.messagesByChat === "object") {
+                hydrateOwnerState(ownerId, parsed);
+              }
+            } catch { /* ignore */ }
+          }
+        }
+
+        let session: ChatStreamSession;
+        try {
+          session = prepareChatStreamSession(ownerId, chatId, payload, {
+            textModel: "claude-sonnet-4-20250514",
+          });
+        } catch (sessionError) {
+          return new Response(
+            JSON.stringify({ error: sessionError instanceof Error ? sessionError.message : "Failed to prepare session" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        const encoder = new TextEncoder();
+        const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+        const writer = writable.getWriter();
+        const sendEvent = (data: object) =>
+          writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+        const streamPromise = (async () => {
+          try {
+            await sendEvent({ type: "user_message", message: session.userMessage });
+            let fullText = "";
+            for await (const chunk of streamTextWithClaude({
+              apiKey: anthropicApiKey,
+              prompt: session.prompt,
+              system: session.system,
+              model: session.textModel,
+            })) {
+              fullText += chunk;
+              await sendEvent({ type: "text_delta", text: chunk });
+            }
+            const assistantMessage = session.complete(fullText);
+            await sendEvent({ type: "done", message: assistantMessage });
+            if (kv) {
+              const snapshot = exportOwnerState(ownerId);
+              await kv.put(kvKey, JSON.stringify(snapshot)).catch(() => { /* ignore */ });
+            }
+          } catch (streamError) {
+            const errMsg = streamError instanceof Error ? streamError.message : "Stream failed";
+            session.fail(`Generation failed: ${errMsg}`);
+            await sendEvent({ type: "error", error: errMsg }).catch(() => { /* ignore */ });
+          } finally {
+            await writer.close().catch(() => { /* ignore */ });
+          }
+        })();
+
+        runtime?.ctx?.waitUntil?.(streamPromise);
+
+        return new Response(readable as unknown as ReadableStream, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+    }
 
     const gateway = createAssistantGateway(context);
     const result = await gateway.sendMessage({ clientId, chatId, payload });
