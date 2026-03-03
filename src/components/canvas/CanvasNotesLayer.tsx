@@ -16,10 +16,16 @@ import { useCommandSubscriber, type ExcalidrawAPI, type ExcalidrawElement } from
 import type { MarkdownNoteProps, MarkdownNoteRef, MarkdownElement, AppState as OverlayAppState } from '@/components/islands/markdown';
 import type { WebEmbedProps, WebEmbedRef } from '@/components/islands/web-embed';
 import type { LexicalNoteProps, LexicalNoteRef, LexicalElement } from '@/components/islands/rich-text';
+import type { KanbanNoteRef, KanbanElement, KanbanBoardData } from '@/components/islands/kanban';
 
 type MarkdownNoteComponent = ForwardRefExoticComponent<MarkdownNoteProps & RefAttributes<MarkdownNoteRef>>;
 type WebEmbedComponent = ForwardRefExoticComponent<WebEmbedProps & RefAttributes<WebEmbedRef>>;
 type LexicalNoteComponent = ForwardRefExoticComponent<LexicalNoteProps & RefAttributes<LexicalNoteRef>>;
+type KanbanBoardComponent = ForwardRefExoticComponent<{
+  element: KanbanElement;
+  appState: OverlayAppState;
+  onChange: (elementId: string, data: KanbanBoardData) => void;
+} & RefAttributes<KanbanNoteRef>>;
 
 type ElementPatch = Partial<ExcalidrawElement> & { id: string };
 type LexicalUpdates = {
@@ -117,6 +123,7 @@ const toLexicalElement = (element: ExcalidrawElement): LexicalElement | null => 
 let MarkdownNoteComp: MarkdownNoteComponent | null = null;
 let WebEmbedComp: WebEmbedComponent | null = null;
 let LexicalNoteComp: LexicalNoteComponent | null = null;
+let KanbanBoardComp: KanbanBoardComponent | null = null;
 
 const loadComponents = async () => {
   if (!MarkdownNoteComp) {
@@ -131,23 +138,53 @@ const loadComponents = async () => {
     const mod = await import('@/components/islands/rich-text');
     LexicalNoteComp = mod.LexicalNote;
   }
-  return { MarkdownNoteComp, WebEmbedComp, LexicalNoteComp };
+  if (!KanbanBoardComp) {
+    const mod = await import('@/components/islands/kanban');
+    KanbanBoardComp = mod.KanbanBoard as KanbanBoardComponent;
+  }
+  return { MarkdownNoteComp, WebEmbedComp, LexicalNoteComp, KanbanBoardComp };
 };
 
 interface CanvasNotesLayerProps {
   api: ExcalidrawAPI | null;
 }
 
+const toKanbanElement = (element: ExcalidrawElement): KanbanElement | null => {
+  const customData = element.customData as Record<string, unknown> | undefined;
+  if (
+    element.isDeleted ||
+    customData?.type !== 'kanban' ||
+    !Array.isArray(customData.columns)
+  ) {
+    return null;
+  }
+  return {
+    id: element.id,
+    x: element.x,
+    y: element.y,
+    width: element.width,
+    height: element.height,
+    angle: element.angle,
+    isDeleted: element.isDeleted,
+    version: element.version,
+    versionNonce: element.versionNonce,
+    locked: element.locked,
+    customData: customData as unknown as KanbanBoardData,
+  };
+};
+
 export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
   const [componentsLoaded, setComponentsLoaded] = useState(false);
   const [markdownElements, setMarkdownElements] = useState<MarkdownElement[]>([]);
   const [webEmbedElements, setWebEmbedElements] = useState<ExcalidrawElement[]>([]);
   const [lexicalElements, setLexicalElements] = useState<LexicalElement[]>([]);
-  
+  const [kanbanElements, setKanbanElements] = useState<KanbanElement[]>([]);
+
   // Refs for direct transform updates (bypass React for 60fps)
   const markdownRefs = useRef<Map<string, MarkdownNoteRef>>(new Map());
   const webEmbedRefs = useRef<Map<string, WebEmbedRef>>(new Map());
   const lexicalRefs = useRef<Map<string, LexicalNoteRef>>(new Map());
+  const kanbanRefs = useRef<Map<string, KanbanNoteRef>>(new Map());
   const viewStateRef = useRef<OverlayAppState>({
     scrollX: 0,
     scrollY: 0,
@@ -190,13 +227,16 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
         const md = elements
           .map(toMarkdownElement)
           .filter((el): el is MarkdownElement => el !== null);
-        const embeds = elements.filter((el: ExcalidrawElement) => 
+        const embeds = elements.filter((el: ExcalidrawElement) =>
           el.customData?.type === 'web-embed' && !el.isDeleted
         );
         const lex = elements
           .map(toLexicalElement)
           .filter((el): el is LexicalElement => el !== null);
-        
+        const kanban = elements
+          .map(toKanbanElement)
+          .filter((el): el is KanbanElement => el !== null);
+
         // UNIFIED CLOCK: Update transforms directly on refs (every frame, no React)
         md.forEach((el) => {
           const ref = markdownRefs.current.get(el.id);
@@ -207,7 +247,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
             );
           }
         });
-        
+
         embeds.forEach((el: ExcalidrawElement) => {
           const ref = webEmbedRefs.current.get(el.id);
           if (ref?.updateTransform) {
@@ -217,7 +257,7 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
             );
           }
         });
-        
+
         lex.forEach((el) => {
           const ref = lexicalRefs.current.get(el.id);
           if (ref?.updateTransform) {
@@ -227,12 +267,23 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
             );
           }
         });
-        
+
+        kanban.forEach((el) => {
+          const ref = kanbanRefs.current.get(el.id);
+          if (ref?.updateTransform) {
+            ref.updateTransform(
+              el.x, el.y, el.width, el.height, el.angle || 0,
+              appState.zoom.value, appState.scrollX, appState.scrollY
+            );
+          }
+        });
+
         // React state updates ONLY for mounting/unmounting
         if (timestamp - lastUpdateTime > UPDATE_INTERVAL) {
           setMarkdownElements(md);
           setWebEmbedElements(embeds);
           setLexicalElements(lex);
+          setKanbanElements(kanban);
           lastUpdateTime = timestamp;
         }
       } catch (err) {
@@ -304,6 +355,24 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
     api.updateScene({ elements: updated });
   }, [api]);
   
+  // Handle kanban update
+  const handleKanbanUpdate = useCallback((elementId: string, data: KanbanBoardData) => {
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const updated = elements.map((el: ExcalidrawElement) => {
+      if (el.id === elementId) {
+        return {
+          ...el,
+          customData: { ...data },
+          version: (el.version || 0) + 1,
+          versionNonce: Math.floor(Math.random() * 2 ** 31),
+        };
+      }
+      return el;
+    });
+    api.updateScene({ elements: updated });
+  }, [api]);
+
   // Deselect all elements
   const handleDeselect = useCallback(() => {
     if (!api) return;
@@ -350,14 +419,19 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
     if (ref) lexicalRefs.current.set(id, ref);
     else lexicalRefs.current.delete(id);
   };
-  
-  if (!componentsLoaded || !MarkdownNoteComp || !WebEmbedComp || !LexicalNoteComp) {
+  const registerKanbanRef = (id: string, ref: KanbanNoteRef | null) => {
+    if (ref) kanbanRefs.current.set(id, ref);
+    else kanbanRefs.current.delete(id);
+  };
+
+  if (!componentsLoaded || !MarkdownNoteComp || !WebEmbedComp || !LexicalNoteComp || !KanbanBoardComp) {
     return null;
   }
-  
+
   const MarkdownNote = MarkdownNoteComp;
   const WebEmbed = WebEmbedComp;
   const LexicalNote = LexicalNoteComp;
+  const KanbanBoardRendered = KanbanBoardComp;
   
   return (
     <>
@@ -392,6 +466,17 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
           onChange={handleLexicalUpdate}
           onDeselect={handleDeselect}
           ref={(ref) => registerLexicalRef(element.id, ref)}
+        />
+      ))}
+
+      {/* Kanban Boards */}
+      {kanbanElements.map((element) => (
+        <KanbanBoardRendered
+          key={element.id}
+          element={element}
+          appState={viewStateRef.current}
+          onChange={handleKanbanUpdate}
+          ref={(ref) => registerKanbanRef(element.id, ref)}
         />
       ))}
     </>

@@ -1,7 +1,7 @@
 export type AssistantRole = "user" | "assistant" | "system";
 
 export type AssistantMode = "chat" | "mermaid" | "d2" | "image" | "sketch";
-export type AssistantExpert = "general" | "mermaid" | "d2" | "visual";
+export type AssistantExpert = "general" | "mermaid" | "d2" | "visual" | "kanban";
 
 export type VisualColorMode = "color" | "bw";
 
@@ -28,6 +28,16 @@ export interface AssistantGenerationConfig {
   sketch?: SketchControls;
 }
 
+export type KanbanOperation =
+  | { op: 'add_card'; columnId: string; card: Record<string, unknown> }
+  | { op: 'update_card'; cardId: string; changes: Record<string, unknown> }
+  | { op: 'delete_card'; cardId: string }
+  | { op: 'move_card'; cardId: string; toColumnId: string; toIndex?: number }
+  | { op: 'add_column'; column: Record<string, unknown> }
+  | { op: 'update_column'; columnId: string; changes: Record<string, unknown> }
+  | { op: 'delete_column'; columnId: string }
+  | { op: 'reorder_cards'; columnId: string; cardIds: string[] };
+
 export type AssistantArtifact =
   | {
       type: "code";
@@ -48,6 +58,11 @@ export type AssistantArtifact =
       type: "canvas-elements";
       source: "mermaid" | "d2" | "sketch";
       elements: unknown[];
+    }
+  | {
+      type: "kanban-ops";
+      source: "kanban";
+      ops: KanbanOperation[];
     };
 
 export interface AssistantMessage {

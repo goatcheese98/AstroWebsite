@@ -1,5 +1,8 @@
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useState, useRef, useEffect } from 'react';
 import { enhanceUrl, isKnownEmbeddable } from '@/lib/web-embed-utils';
+import { getOverlayZIndex } from '@/components/islands/overlay-utils';
+import { ZoomHint } from '@/components/islands/ZoomHint';
+import { useZoomHint } from '@/components/islands/useZoomHint';
 
 type EmbedViewMode = 'inline' | 'pip' | 'expanded';
 type PipPosition = { x: number; y: number };
@@ -75,6 +78,7 @@ const WebEmbedInner = memo(
 
         const rawUrl = element.customData?.url || '';
         const isSelected = appState.selectedElementIds?.[element.id] === true;
+        const { visible: zoomHintVisible } = useZoomHint(containerRef, isSelected && viewMode === 'inline');
 
         const hasConfiguredUrl = rawUrl.trim().length > 0;
         const { url: processedUrl, isSearch, embedUrl, warning } = rawUrl
@@ -232,7 +236,7 @@ const WebEmbedInner = memo(
             transform: `scale(${zoom}) rotate(${element.angle || 0}rad)`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: isEditing ? 10 : isSelected ? 3 : 2,
+            zIndex: getOverlayZIndex(isSelected),
         };
 
         const pipContainerStyle: React.CSSProperties = {
@@ -1104,6 +1108,7 @@ const WebEmbedInner = memo(
                             )}
                         </div>
                     </div>
+                    <ZoomHint visible={zoomHintVisible} />
                 </div>
             </>
         );

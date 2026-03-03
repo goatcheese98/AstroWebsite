@@ -5,6 +5,9 @@ import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
 import { getMarkdownStyles } from './styles/markdownStyles';
 import type { MarkdownNoteProps, MarkdownNoteRef } from './types';
+import { getOverlayZIndex } from '@/components/islands/overlay-utils';
+import { ZoomHint } from '@/components/islands/ZoomHint';
+import { useZoomHint } from '@/components/islands/useZoomHint';
 import html2canvas from 'html2canvas';
 
 const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
@@ -12,10 +15,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const [isEditing, setIsEditing] = useState(false);
         const [editMode, setEditMode] = useState<'raw' | 'hybrid'>('raw');
         const [content, setContent] = useState(element.customData?.content || '');
-        const [isHovered, setIsHovered] = useState(false);
         const [isNearEdge, setIsNearEdge] = useState(false);
         const [isDragging, setIsDragging] = useState(false);
-        const [isScrollMode, setIsScrollMode] = useState(false); // Click-to-interact scroll mode
         const [searchHighlight, setSearchHighlight] = useState<{ query: string; matchIndex: number } | null>(null);
         const hasMarksRef = useRef(false);
         const contentRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,11 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
+        const { visible: zoomHintVisible } = useZoomHint(
+          containerRef,
+          isSelected && !isEditing,
+          isSelected,
+        );
 
         // Calculate screen center position
         const zoom = appState.zoom.value;
@@ -54,7 +60,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             transform: `scale(${zoom}) rotate(${angle}rad)`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: isEditing ? 5 : (isSelected ? 2 : 1),
+            zIndex: getOverlayZIndex(isSelected, isEditing),
         };
 
         // Content card style - visual layer
@@ -65,7 +71,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             color: isDark ? '#e5e5e5' : '#1a1a1a',
             borderRadius: '0px',
             padding: 0, // Remove default padding - each mode handles its own
-            overflow: isScrollMode || isEditing ? 'auto' : 'hidden',
+            overflow: 'auto',
             overscrollBehavior: 'contain',
             boxShadow: isSelected
                 ? '0 0 0 2px transparent, 0 10px 20px -3px rgba(129, 140, 248, 0.4)'
@@ -75,8 +81,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             // Always enable pointer events for hover detection and button clicks
             pointerEvents: 'auto',
             // Prevent text selection and interaction when not editing/scrolling
-            userSelect: (isEditing || isScrollMode) ? 'auto' : 'none',
-            WebkitUserSelect: (isEditing || isScrollMode) ? 'auto' : 'none',
+            userSelect: isEditing ? 'auto' : 'none',
+            WebkitUserSelect: isEditing ? 'auto' : 'none',
             cursor: isEditing ? 'text' : 'default',
             outline: 'none',
             backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
@@ -205,10 +211,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             };
 
             const handleGlobalMouseMove = (e: MouseEvent) => {
-                const { inNote, isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
-                if (inNote !== isHovered) {
-                    setIsHovered(inNote);
-                }
+                const { isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
                 if (edge !== isNearEdge) {
                     setIsNearEdge(edge);
                 }
@@ -221,7 +224,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 document.removeEventListener('dblclick', handleGlobalDblClick, true);
                 document.removeEventListener('mousemove', handleGlobalMouseMove, true);
             };
-        }, [isEditing, isHovered, isNearEdge, isSelected, enterEditMode, isPointInNote]);
+        }, [isEditing, isNearEdge, isSelected, enterEditMode, isPointInNote]);
 
         // Click outside handler - exit edit mode and disable scroll mode
         useEffect(() => {
@@ -239,9 +242,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                     if (isEditing) {
                         exitEditMode();
                     }
-                    if (isScrollMode) {
-                        setIsScrollMode(false);
-                    }
                 }
             };
 
@@ -250,7 +250,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             return () => {
                 document.removeEventListener('click', handleClickOutside, true);
             };
-        }, [isEditing, isScrollMode, isPointInNote, exitEditMode]);
+        }, [isEditing, isPointInNote, exitEditMode]);
 
         useEffect(() => {
             const handleEscapeToDeselect = (event: KeyboardEvent) => {
@@ -260,7 +260,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 if (isEditing) {
                     exitEditMode();
                 }
-                setIsScrollMode(false);
                 deselectAll();
             };
 
@@ -282,7 +281,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 const { elementId, query, matchIndex = 0 } = (e as CustomEvent<{ elementId: string; query: string; matchIndex?: number }>).detail;
                 if (elementId !== element.id) return;
                 setSearchHighlight({ query, matchIndex });
-                setIsScrollMode(true);
             };
             const handleClear = () => setSearchHighlight(null);
             window.addEventListener('canvas:note-search-highlight', handleHighlight);
@@ -376,71 +374,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 data-note-id={element.id}
                 onTouchStart={handleTouchStart}
             >
-                {/* Scroll Mode Toggle Button - Center Bottom (hover-triggered) */}
-                {!isEditing && isHovered && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsScrollMode(!isScrollMode);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        style={{
-                            position: 'absolute',
-                            bottom: '12px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            zIndex: 10,
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: isScrollMode
-                                ? (isDark ? 'rgba(99, 102, 241, 0.9)' : 'rgba(99, 102, 241, 0.85)')
-                                : (isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.9)'),
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease',
-                            pointerEvents: 'auto',
-                            boxShadow: isScrollMode
-                                ? '0 4px 12px rgba(99, 102, 241, 0.4), 0 0 0 2px rgba(99, 102, 241, 0.3)'
-                                : (isDark ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.15)'),
-                            backdropFilter: 'blur(8px)',
-                            WebkitBackdropFilter: 'blur(8px)',
-                        }}
-                        title={isScrollMode ? 'Disable scrolling (affects canvas)' : 'Enable scrolling (within note)'}
-                        onMouseEnter={(e) => {
-                            if (!isScrollMode) {
-                                e.currentTarget.style.background = isDark
-                                    ? 'rgba(40, 40, 40, 0.9)'
-                                    : 'rgba(245, 245, 245, 1)';
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            if (!isScrollMode) {
-                                e.currentTarget.style.background = isDark
-                                    ? 'rgba(30, 30, 30, 0.85)'
-                                    : 'rgba(255, 255, 255, 0.9)';
-                            }
-                        }}
-                    >
-                        {/* Scroll Icon SVG */}
-                        <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke={isScrollMode ? '#fff' : (isDark ? '#e5e5e5' : '#1a1a1a')}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <path d="M12 5v14M19 12l-7 7-7-7" />
-                        </svg>
-                    </button>
-                )}
-
                 {/* Content card - visual layer */}
                 <div
                     ref={contentRef}
@@ -503,11 +436,13 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                             style={{
                                 padding: '18px 22px',
                                 paddingTop: '38px',
+                                paddingBottom: '18px',
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
                                 width: '100%',
-                                height: '100%',
-                                overflow: isScrollMode ? 'auto' : 'hidden',
+                                height: 'auto',
+                                minHeight: '100%',
+                                boxSizing: 'border-box',
                             }}
                         >
                             <MarkdownPreview
@@ -521,6 +456,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
                 {/* Scoped styles */}
                 <style>{getMarkdownStyles()}</style>
+                <ZoomHint visible={zoomHintVisible} />
             </div>
         );
     }

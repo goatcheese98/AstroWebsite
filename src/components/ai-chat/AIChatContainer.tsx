@@ -100,6 +100,7 @@ function expertLabel(expert: AssistantExpert): string {
   if (expert === "mermaid") return "Mermaid Expert";
   if (expert === "d2") return "D2 Expert";
   if (expert === "visual") return "Visual Expert";
+  if (expert === "kanban") return "Kanban Expert";
   return "General Expert";
 }
 
@@ -123,6 +124,15 @@ function expertFromMessage(message: AssistantMessage): AssistantExpert {
 }
 
 function expertTheme(expert: AssistantExpert) {
+  if (expert === "kanban") {
+    return {
+      background: "rgba(238,242,255,0.9)",
+      border: "1px solid rgba(165,180,252,0.95)",
+      badgeBg: "#e0e7ff",
+      badgeFg: "#3730a3",
+    };
+  }
+
   if (expert === "mermaid") {
     return {
       background: "rgba(239,246,255,0.9)",
@@ -347,6 +357,8 @@ export default function AIChatContainer({
   const [d2RenderVariantByArtifact, setD2RenderVariantByArtifact] = useState<
     Record<string, D2RenderVariant>
   >({});
+  const [selectedKanbanElementId, setSelectedKanbanElementId] = useState<string | null>(null);
+  const [kanbanElementsOnCanvas, setKanbanElementsOnCanvas] = useState<Array<{ id: string; title: string }>>([]);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const historyExpandedWidth = 268;
@@ -373,6 +385,24 @@ export default function AIChatContainer({
       setHoveredChatId(null);
     }
   }, [isHistoryCollapsed]);
+
+  // Refresh kanban boards list when switching to kanban expert
+  useEffect(() => {
+    if (selectedExpert !== "kanban") return;
+    const api = getExcalidrawAPI();
+    if (!api) return;
+    const elements = api.getSceneElements();
+    const boards = elements
+      .filter((el: any) => el.customData?.type === 'kanban' && !el.isDeleted)
+      .map((el: any) => ({
+        id: el.id,
+        title: (el.customData?.title as string) || 'Kanban Board',
+      }));
+    setKanbanElementsOnCanvas(boards);
+    if (boards.length > 0 && !selectedKanbanElementId) {
+      setSelectedKanbanElementId(boards[0].id);
+    }
+  }, [selectedExpert, getExcalidrawAPI, selectedKanbanElementId]);
 
   const createChat = useCallback(async (): Promise<string> => {
     const response = await fetch("/api/assistant/chats", {
@@ -626,7 +656,8 @@ export default function AIChatContainer({
         expert === "general" ||
         expert === "mermaid" ||
         expert === "d2" ||
-        expert === "visual"
+        expert === "visual" ||
+        expert === "kanban"
       ) {
         setSelectedExpert(expert);
       }
@@ -724,12 +755,25 @@ export default function AIChatContainer({
       return;
     }
 
-    const messageText = input.trim();
+    let messageText = input.trim();
+
+    // Prepend kanban board context when using kanban expert
+    if (selectedExpert === "kanban" && selectedKanbanElementId) {
+      const api = getExcalidrawAPI();
+      if (api) {
+        const elements = api.getSceneElements();
+        const kanbanEl = elements.find((el: any) => el.id === selectedKanbanElementId && el.customData?.type === 'kanban');
+        if (kanbanEl?.customData) {
+          messageText = `[KANBAN BOARD CONTEXT]\n${JSON.stringify(kanbanEl.customData, null, 2)}\n\n[USER REQUEST]\n${messageText}`;
+        }
+      }
+    }
+
     let chatId = activeChatId;
 
     try {
       setSending(true);
-      setOptimisticInput(messageText);
+      setOptimisticInput(input.trim());
       setInput("");
       setError(null);
 
@@ -855,10 +899,12 @@ export default function AIChatContainer({
     buildSourceImage,
     clientId,
     createChat,
+    getExcalidrawAPI,
     input,
     loadChats,
     loadMessages,
     selectedExpert,
+    selectedKanbanElementId,
     requestHeaders,
     sending,
     visualGenerationControls,
@@ -1255,6 +1301,23 @@ export default function AIChatContainer({
       }
     },
     [addToast, buildCodeArtifactSvg, d2RenderVariantByArtifact],
+  );
+
+  const handleApplyKanbanOps = useCallback(
+    (artifact: Extract<AssistantArtifact, { type: "kanban-ops" }>) => {
+      const elementId = selectedKanbanElementId;
+      if (!elementId) {
+        addToast("No kanban board selected as context", "error");
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent('canvas:kanban-update', {
+          detail: { elementId, ops: artifact.ops },
+        }),
+      );
+      addToast(`Applied ${artifact.ops.length} operation(s) to board`, "success");
+    },
+    [selectedKanbanElementId, addToast],
   );
 
   const handleApplyElementArtifact = useCallback(
@@ -1938,6 +2001,66 @@ export default function AIChatContainer({
 
                       return (
                         <>
+                          {artifact.type === "kanban-ops" ? (
+                            <div
+                              style={{
+                                border: "1px solid rgba(165,180,252,0.9)",
+                                borderRadius: 10,
+                                background: "rgba(238,242,255,0.6)",
+                                padding: 10,
+                                display: "grid",
+                                gap: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: "#3730a3",
+                                }}
+                              >
+                                Kanban Operations ({artifact.ops.length})
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#4b5563",
+                                  display: "grid",
+                                  gap: 2,
+                                }}
+                              >
+                                {artifact.ops.slice(0, 5).map((op, i) => (
+                                  <div key={i} style={{ fontFamily: "monospace" }}>
+                                    • {op.op}
+                                    {'cardId' in op ? ` ${(op as any).cardId}` : ''}
+                                    {'columnId' in op ? ` → col:${(op as any).columnId}` : ''}
+                                    {'toColumnId' in op ? ` → col:${(op as any).toColumnId}` : ''}
+                                  </div>
+                                ))}
+                                {artifact.ops.length > 5 && (
+                                  <div style={{ color: "#9ca3af" }}>
+                                    +{artifact.ops.length - 5} more...
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleApplyKanbanOps(artifact)}
+                                style={{
+                                  border: "none",
+                                  background: "#6366f1",
+                                  color: "white",
+                                  borderRadius: 8,
+                                  padding: "6px 12px",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  alignSelf: "flex-start",
+                                }}
+                              >
+                                Apply to Board
+                              </button>
+                            </div>
+                          ) : null}
                           {artifact.type === "code" ? (
                             <div
                               style={{
@@ -2502,6 +2625,7 @@ export default function AIChatContainer({
               <option value="mermaid">Mermaid Expert</option>
               <option value="d2">D2 Expert</option>
               <option value="visual">Visual Expert</option>
+              <option value="kanban">Kanban Expert</option>
             </select>
           </div>
           {selectedExpert === "visual" ? (
@@ -2698,6 +2822,72 @@ export default function AIChatContainer({
                   />
                 </label>
               </div>
+            </div>
+          ) : null}
+
+          {selectedExpert === "kanban" ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <label style={{ fontSize: 11, color: "#475569" }}>Board</label>
+              {kanbanElementsOnCanvas.length === 0 ? (
+                <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+                  No kanban boards on canvas — add one first
+                </span>
+              ) : (
+                <select
+                  value={selectedKanbanElementId || ""}
+                  onChange={(e) => setSelectedKanbanElementId(e.target.value)}
+                  style={{
+                    border: "1px solid rgba(203,213,225,0.9)",
+                    background: "rgba(255,255,255,0.8)",
+                    color: "#0f172a",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: "5px 8px",
+                  }}
+                >
+                  {kanbanElementsOnCanvas.map((board) => (
+                    <option key={board.id} value={board.id}>
+                      {board.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => {
+                  const api = getExcalidrawAPI();
+                  if (!api) return;
+                  const elements = api.getSceneElements();
+                  const boards = elements
+                    .filter((el: any) => el.customData?.type === 'kanban' && !el.isDeleted)
+                    .map((el: any) => ({
+                      id: el.id,
+                      title: (el.customData?.title as string) || 'Kanban Board',
+                    }));
+                  setKanbanElementsOnCanvas(boards);
+                  if (boards.length > 0 && !selectedKanbanElementId) {
+                    setSelectedKanbanElementId(boards[0].id);
+                  }
+                }}
+                title="Refresh board list"
+                style={{
+                  border: "1px solid rgba(203,213,225,0.9)",
+                  background: "white",
+                  borderRadius: 8,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  color: "#475569",
+                }}
+              >
+                ↻
+              </button>
             </div>
           ) : null}
 

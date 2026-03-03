@@ -1,5 +1,8 @@
 import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useState, useRef } from 'react';
 import { applyLexicalHighlight, clearLexicalHighlight } from '@/components/canvas/noteSearchHighlight';
+import { getOverlayZIndex } from '@/components/islands/overlay-utils';
+import { ZoomHint } from '@/components/islands/ZoomHint';
+import { useZoomHint } from '@/components/islands/useZoomHint';
 import type { LexicalNoteProps, LexicalNoteRef } from './types';
 import { RichTextEditor } from './RichTextEditor';
 import { getLexicalEditorStyles } from './themes/lexicalTheme';
@@ -34,6 +37,7 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
+        const { visible: zoomHintVisible } = useZoomHint(containerRef, isSelected);
 
         // Calculate screen center position
         const zoom = appState.zoom.value;
@@ -50,7 +54,7 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
             transform: `scale(${zoom})`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: isSelected ? 3 : 2,
+            zIndex: getOverlayZIndex(isSelected),
         };
 
         // Content card style - visual layer
@@ -269,6 +273,7 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
                         strokeStyle={element.strokeStyle}
                     />
                 </div>
+                <ZoomHint visible={zoomHintVisible} />
             </div>
         );
     }

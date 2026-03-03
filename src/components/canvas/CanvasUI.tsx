@@ -494,6 +494,51 @@ export default function CanvasUI({
     }
   }, [api]);
 
+  // Create kanban board element
+  const handleCreateKanban = useCallback(async () => {
+    if (!api) {
+      addToast('Canvas not ready', 'error');
+      return;
+    }
+
+    try {
+      const { DEFAULT_BOARD } = await import('@/components/islands/kanban/kanban-types');
+
+      const appState = api.getAppState();
+      const viewportCenterX = (appState.width as number) / 2 || 400;
+      const viewportCenterY = (appState.height as number) / 2 || 300;
+
+      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
+      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+
+      const newElement = {
+        type: 'rectangle',
+        x: sceneX - 700,
+        y: sceneY - 400,
+        width: 1400,
+        height: 800,
+        backgroundColor: '#faf8f2',
+        strokeColor: 'rgba(0,0,0,0.12)',
+        strokeWidth: 1,
+        roughness: 0,
+        opacity: 100,
+        fillStyle: 'solid',
+        id: nanoid(),
+        locked: false,
+        customData: {
+          ...DEFAULT_BOARD,
+          title: 'Kanban Board',
+        },
+      };
+
+      const converted = convertToSceneElements([newElement]);
+      const currentElements = api.getSceneElements();
+      api.updateScene({ elements: [...currentElements, ...converted] });
+    } catch (err) {
+      console.error('Error creating kanban board:', err);
+    }
+  }, [api, addToast]);
+
   // Create web embed element - without prompt, with correct 700x500 size
   const handleCreateWebEmbed = useCallback(async () => {
     if (!api) {
@@ -577,6 +622,9 @@ export default function CanvasUI({
       case 'create-web-embed':
         void handleCreateWebEmbed();
         break;
+      case 'create-kanban':
+        void handleCreateKanban();
+        break;
       case 'generate-image':
         handleGenerateImage();
         break;
@@ -593,6 +641,7 @@ export default function CanvasUI({
     handleCreateMarkdown,
     handleCreateRichText,
     handleCreateWebEmbed,
+    handleCreateKanban,
     handleGenerateImage,
     handleLoad,
     handleSave,
@@ -702,6 +751,19 @@ export default function CanvasUI({
             <line x1="12" y1="17" x2="12" y2="21" />
           </svg>
           <span className="aw-label">Web embed</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('create-kanban')}
+          title="Add Kanban board"
+          aria-label="Add Kanban board"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <rect x="3" y="3" width="5" height="18" rx="1" />
+            <rect x="10" y="3" width="5" height="12" rx="1" />
+            <rect x="17" y="3" width="5" height="16" rx="1" />
+          </svg>
+          <span className="aw-label">Kanban board</span>
         </button>
         <div className="aw-divider" />
         <button

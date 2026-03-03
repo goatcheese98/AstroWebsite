@@ -45,7 +45,8 @@ function expertFromGeneration(generation: AssistantGenerationConfig): AssistantE
     generation.expert === "general" ||
     generation.expert === "mermaid" ||
     generation.expert === "d2" ||
-    generation.expert === "visual"
+    generation.expert === "visual" ||
+    generation.expert === "kanban"
   ) {
     return generation.expert;
   }
@@ -69,7 +70,31 @@ function modeFromGeneration(generation: AssistantGenerationConfig) {
   return "chat";
 }
 
+function buildKanbanSystemPrompt(): string {
+  return [
+    "You are a Kanban board assistant embedded in a visual canvas tool.",
+    "When asked to manipulate a Kanban board, respond with a JSON block wrapped in ```kanban-ops ... ``` fences.",
+    "The JSON must be an array of operations. Supported operations:",
+    '- {"op":"add_card","columnId":"<id>","card":{"title":"...","description":"...","priority":"low|medium|high","labels":["..."]}}',
+    '- {"op":"update_card","cardId":"<id>","changes":{"title":"...","description":"...","priority":"..."}}',
+    '- {"op":"delete_card","cardId":"<id>"}',
+    '- {"op":"move_card","cardId":"<id>","toColumnId":"<id>","toIndex":0}',
+    '- {"op":"add_column","column":{"title":"...","color":"#hexcolor"}}',
+    '- {"op":"update_column","columnId":"<id>","changes":{"title":"..."}}',
+    '- {"op":"delete_column","columnId":"<id>"}',
+    '- {"op":"reorder_cards","columnId":"<id>","cardIds":["id1","id2",...]}',
+    "Always use the exact IDs from the board context provided.",
+    "After the JSON block, you may add a brief plain-text explanation.",
+    "If no board context is available, explain that the user should select a kanban board as context.",
+  ].join("\n");
+}
+
 function buildSystemPrompt(generation: AssistantGenerationConfig): string {
+  const expert = expertFromGeneration(generation);
+  if (expert === "kanban") {
+    return buildKanbanSystemPrompt();
+  }
+
   const mode = modeFromGeneration(generation);
   const base = [
     "You are a precise whiteboard assistant.",
@@ -431,6 +456,15 @@ export function prepareChatStreamSession(
       if (mermaidCode) artifacts.push({ type: "code", language: "mermaid", code: mermaidCode });
       const d2Code = extractCodeBlock(text, "d2");
       if (d2Code) artifacts.push({ type: "code", language: "d2", code: d2Code });
+      const kanbanOpsJson = extractCodeBlock(text, "kanban-ops");
+      if (kanbanOpsJson) {
+        try {
+          const ops = JSON.parse(kanbanOpsJson);
+          if (Array.isArray(ops)) {
+            artifacts.push({ type: "kanban-ops", source: "kanban", ops });
+          }
+        } catch { /* ignore malformed JSON */ }
+      }
       return addMessage(ownerId, {
         chatId,
         role: "assistant",
@@ -537,6 +571,16 @@ export async function sendAssistantMessage(
     const d2FromReply = extractCodeBlock(replyText, "d2");
     if (d2FromReply) {
       artifacts.push({ type: "code", language: "d2", code: d2FromReply });
+    }
+
+    const kanbanOpsFromReply = extractCodeBlock(replyText, "kanban-ops");
+    if (kanbanOpsFromReply) {
+      try {
+        const ops = JSON.parse(kanbanOpsFromReply);
+        if (Array.isArray(ops)) {
+          artifacts.push({ type: "kanban-ops", source: "kanban", ops });
+        }
+      } catch { /* ignore malformed JSON */ }
     }
 
     const assistantMessage = addMessage(ownerId, {
