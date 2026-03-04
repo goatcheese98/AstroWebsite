@@ -7,6 +7,7 @@ interface HybridMarkdownEditorProps {
     onChange: (newContent: string) => void;
     isDark: boolean;
     isScrollMode: boolean;
+    images?: Record<string, string>;
 }
 
 /**
@@ -23,6 +24,7 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
     onChange,
     isDark,
     isScrollMode,
+    images,
 }) => {
     // Parse content into blocks (memoized to avoid re-parsing on every render)
     const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
@@ -232,6 +234,7 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
                     isEditing={editingBlockId === block.id}
                     isSelectionActive={selectedBlockIds.has(block.id)}
                     isDark={isDark}
+                    images={images}
                     onEdit={handleEdit}
                     onChange={handleChange}
                     onBlur={handleBlur}

@@ -55,9 +55,14 @@ const toMarkdownElement = (element: ExcalidrawElement): MarkdownElement | null =
     version: element.version,
     versionNonce: element.versionNonce,
     locked: element.locked,
+    roundness: element.roundness as { type: number; value?: number } | null | undefined,
+    roughness: element.roughness,
+    strokeWidth: element.strokeWidth,
     customData: {
-      type: 'markdown',
+      type: 'markdown' as const,
       content: customData.content,
+      images: customData.images as Record<string, string> | undefined,
+      settings: customData.settings as import('../islands/markdown/types').MarkdownNoteSettings | undefined,
     },
   };
 };
@@ -298,14 +303,19 @@ export default function CanvasNotesLayer({ api }: CanvasNotesLayerProps) {
   }, [api, componentsLoaded]);
   
   // Handle markdown content update
-  const handleMarkdownUpdate = useCallback((elementId: string, content: string) => {
+  const handleMarkdownUpdate = useCallback((elementId: string, content: string, images?: Record<string, string>, settings?: import('../islands/markdown/types').MarkdownNoteSettings) => {
     if (!api) return;
     const elements = api.getSceneElements();
     const updated = elements.map((el: ExcalidrawElement) => {
       if (el.id === elementId) {
         return {
           ...el,
-          customData: { ...el.customData, content },
+          customData: {
+            ...el.customData,
+            content,
+            ...(images !== undefined ? { images } : {}),
+            ...(settings !== undefined ? { settings } : {}),
+          },
           version: (el.version || 0) + 1,
           versionNonce: Math.floor(Math.random() * 2 ** 31),
         };

@@ -50,6 +50,19 @@ export const getMarkdownStyles = (): string => `
         word-break: break-word;
     }
 
+    .markdown-preview p,
+    .markdown-preview li,
+    .markdown-preview blockquote,
+    .markdown-preview th,
+    .markdown-preview td {
+        white-space: break-spaces;
+    }
+
+    .markdown-preview img {
+        max-width: 100%;
+        height: auto;
+    }
+
     /* Better scrollbar for markdown notes */
     .markdown-note-overlay::-webkit-scrollbar {
         width: 8px;
@@ -116,6 +129,12 @@ export const getMarkdownStyles = (): string => `
         display: block;
         overflow-x: auto;
         white-space: nowrap;
+    }
+
+    /* Image loading shimmer */
+    @keyframes md-shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
     }
 
     /* Fade animation for container */

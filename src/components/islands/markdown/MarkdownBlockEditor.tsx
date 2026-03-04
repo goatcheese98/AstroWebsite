@@ -5,16 +5,18 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { MarkdownBlock } from '../../../lib/markdown-block-parser';
 import { VisualTableEditor } from './VisualTableEditor';
+import { handleImagePasteAsMarkdown, markdownUrlTransform, resolveMarkdownImageSrc } from './utils/markdownMedia';
 
 interface MarkdownBlockEditorProps {
     block: MarkdownBlock;
     isEditing: boolean;
     isSelectionActive: boolean;
     isDark: boolean;
+    images?: Record<string, string>;
     onEdit: (blockId: string, isShift?: boolean) => void;
     onChange: (blockId: string, newContent: string) => void;
     onBlur: () => void;
-    onAddBlock: (afterBlockId: string) => void; // New: Add block after this one
+    onAddBlock: (afterBlockId: string) => void;
 }
 
 /**
@@ -26,6 +28,7 @@ export const MarkdownBlockEditor = memo(({
     isEditing,
     isSelectionActive,
     isDark,
+    images,
     onEdit,
     onChange,
     onBlur,
@@ -74,6 +77,18 @@ export const MarkdownBlockEditor = memo(({
 
     const handleBlur = () => {
         onBlur();
+    };
+
+    const handleMarkdownPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        void handleImagePasteAsMarkdown({
+            event,
+            value: localContent,
+            onChange: (nextValue) => {
+                setLocalContent(nextValue);
+                onChange(block.id, nextValue);
+            },
+            onImageAdd: () => {}, // HybridMarkdownEditor doesn't support image storage
+        });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -152,6 +167,7 @@ export const MarkdownBlockEditor = memo(({
                         onChange={handleChange}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
+                        onPaste={handleMarkdownPaste}
                         style={{
                             width: '100%',
                             height: '1.5em',
@@ -215,6 +231,7 @@ export const MarkdownBlockEditor = memo(({
                         onChange={handleChange}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
+                        onPaste={handleMarkdownPaste}
                         style={{
                             width: '100%',
                             minHeight: `${minHeight}em`,
@@ -262,35 +279,49 @@ export const MarkdownBlockEditor = memo(({
             {/* Copy button (appears on hover) */}
             {isHovered && !isEditing && (
                 <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopy();
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleCopy(); }}
                     onMouseDown={(e) => e.stopPropagation()}
+                    title="Copy as markdown"
                     style={{
                         position: 'absolute',
-                        top: '4px',
-                        right: '4px',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        background: isDark ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-                        color: isDark ? '#e5e5e5' : '#1a1a1a',
-                        fontSize: '11px',
+                        top: '6px',
+                        right: '6px',
+                        width: '26px',
+                        height: '26px',
+                        padding: 0,
+                        borderRadius: '6px',
+                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)'}`,
+                        background: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.96)',
+                        color: isDark ? '#a1a1aa' : '#71717a',
                         cursor: 'pointer',
                         backdropFilter: 'blur(8px)',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
                         zIndex: 10,
                         pointerEvents: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'color 0.15s, border-color 0.15s',
                     }}
-                    title="Copy as markdown"
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#6366f1';
+                        e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = isDark ? '#a1a1aa' : '#71717a';
+                        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+                    }}
                 >
-                    📋 Copy
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
                 </button>
             )}
 
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                urlTransform={markdownUrlTransform}
                 components={{
                     code({ node, className, children, ...props }: any) {
                         const match = /language-(\w+)/.exec(className || '');
@@ -347,6 +378,7 @@ export const MarkdownBlockEditor = memo(({
                                     background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                                     fontWeight: 600,
                                     textAlign: 'left',
+                                    whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
                             >
@@ -360,6 +392,7 @@ export const MarkdownBlockEditor = memo(({
                                 style={{
                                     border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
                                     padding: '8px 12px',
+                                    whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
                             >
@@ -376,6 +409,7 @@ export const MarkdownBlockEditor = memo(({
                                     marginLeft: 0,
                                     fontStyle: 'italic',
                                     color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+                                    whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
                             >
@@ -383,15 +417,35 @@ export const MarkdownBlockEditor = memo(({
                             </blockquote>
                         );
                     },
+                    img({ src, alt, ...props }) {
+                        const resolvedSrc = resolveMarkdownImageSrc(src, images);
+                        if (!resolvedSrc) return null;
+                        return (
+                            <img
+                                src={resolvedSrc}
+                                alt={alt || 'Embedded image'}
+                                loading="lazy"
+                                style={{
+                                    display: 'block',
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                    borderRadius: '8px',
+                                    margin: '0.75em 0',
+                                    border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                                }}
+                                {...props}
+                            />
+                        );
+                    },
                     // Style other elements to match current aesthetic
-                    h1: ({ children, ...props }) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700 }} {...props}>{children}</h1>,
-                    h2: ({ children, ...props }) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600 }} {...props}>{children}</h2>,
-                    h3: ({ children, ...props }) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600 }} {...props}>{children}</h3>,
-                    h4: ({ children, ...props }) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600 }} {...props}>{children}</h4>,
-                    p: ({ children, ...props }) => <p style={{ margin: '0.5em 0', lineHeight: '1.6' }} {...props}>{children}</p>,
+                    h1: ({ children, ...props }) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700, whiteSpace: 'break-spaces' }} {...props}>{children}</h1>,
+                    h2: ({ children, ...props }) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h2>,
+                    h3: ({ children, ...props }) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h3>,
+                    h4: ({ children, ...props }) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h4>,
+                    p: ({ children, ...props }) => <p style={{ margin: '0.5em 0', lineHeight: '1.6', whiteSpace: 'break-spaces' }} {...props}>{children}</p>,
                     ul: ({ children, ...props }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }} {...props}>{children}</ul>,
                     ol: ({ children, ...props }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }} {...props}>{children}</ol>,
-                    li: ({ children, ...props }) => <li style={{ margin: '0.2em 0' }} {...props}>{children}</li>,
+                    li: ({ children, ...props }) => <li style={{ margin: '0.2em 0', whiteSpace: 'break-spaces' }} {...props}>{children}</li>,
                     hr: ({ ...props }) => <hr style={{ border: 'none', borderTop: isDark ? '2px solid rgba(255,255,255,0.1)' : '2px solid rgba(0,0,0,0.1)', margin: '1.5em 0' }} {...props} />,
                 }}
             >

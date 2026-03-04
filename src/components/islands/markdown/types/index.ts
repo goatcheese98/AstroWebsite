@@ -1,4 +1,21 @@
 /**
+ * Visual appearance settings for a markdown note in pretty mode
+ */
+export interface MarkdownNoteSettings {
+    font: string;
+    fontSize: number;
+    background: string;
+    lineHeight: number;
+}
+
+export const DEFAULT_NOTE_SETTINGS: MarkdownNoteSettings = {
+    font: 'inherit',
+    fontSize: 15,
+    background: 'transparent',
+    lineHeight: 1.65,
+};
+
+/**
  * Props for the MarkdownNote component
  */
 export interface MarkdownNoteProps {
@@ -6,8 +23,8 @@ export interface MarkdownNoteProps {
     element: MarkdownElement;
     /** Current app state for positioning calculations */
     appState: AppState;
-    /** Callback when content changes */
-    onChange: (id: string, text: string) => void;
+    /** Callback when content, images, or settings change */
+    onChange: (id: string, content: string, images?: Record<string, string>, settings?: MarkdownNoteSettings) => void;
 }
 
 /**
@@ -71,9 +88,14 @@ export interface MarkdownElement {
     versionNonce?: number;
     locked?: boolean;
     boundElements?: any[];
+    roundness?: { type: number; value?: number } | null;
+    roughness?: number;
+    strokeWidth?: number;
     customData?: {
         type: 'markdown';
         content: string;
+        images?: Record<string, string>;
+        settings?: MarkdownNoteSettings;
     };
 }
 

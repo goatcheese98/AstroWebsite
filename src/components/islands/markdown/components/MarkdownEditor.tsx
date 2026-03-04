@@ -1,25 +1,25 @@
 import React from 'react';
+import { handleImagePasteAsMarkdown } from '../utils/markdownMedia';
 
 interface MarkdownEditorProps {
-    /** Current content value */
     value: string;
-    /** Called when content changes */
     onChange: (value: string) => void;
-    /** Called when editor loses focus */
     onBlur: () => void;
-    /** Called on keydown (for ESC handling) */
     onKeyDown?: (e: React.KeyboardEvent) => void;
+    onImageAdd: (id: string, dataUrl: string) => void;
 }
 
-/**
- * Textarea editor for markdown content
- */
 export const MarkdownEditor = React.memo(function MarkdownEditor({
     value,
     onChange,
     onBlur,
     onKeyDown,
+    onImageAdd,
 }: MarkdownEditorProps) {
+    const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        void handleImagePasteAsMarkdown({ event, value, onChange, onImageAdd });
+    };
+
     return (
         <textarea
             autoFocus
@@ -27,6 +27,7 @@ export const MarkdownEditor = React.memo(function MarkdownEditor({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             onKeyDown={onKeyDown}
+            onPaste={handlePaste}
             style={{
                 width: '100%',
                 height: '100%',

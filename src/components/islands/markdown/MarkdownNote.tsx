@@ -1,10 +1,12 @@
-import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
+import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
 import { applySearchHighlights, clearSearchHighlights } from '@/components/canvas/noteSearchHighlight';
 import { useCommandSubscriber } from '@/stores';
 import { MarkdownEditor, MarkdownPreview } from './components';
 import { HybridMarkdownEditor } from './HybridMarkdownEditor';
 import { getMarkdownStyles } from './styles/markdownStyles';
-import type { MarkdownNoteProps, MarkdownNoteRef } from './types';
+import { prewarmImageCache } from './utils/markdownMedia';
+import type { MarkdownNoteProps, MarkdownNoteRef, MarkdownNoteSettings } from './types';
+import { DEFAULT_NOTE_SETTINGS } from './types';
 import { getOverlayZIndex } from '@/components/islands/overlay-utils';
 import { ZoomHint } from '@/components/islands/ZoomHint';
 import { useZoomHint } from '@/components/islands/useZoomHint';
@@ -15,6 +17,20 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const [isEditing, setIsEditing] = useState(false);
         const [editMode, setEditMode] = useState<'raw' | 'hybrid'>('raw');
         const [content, setContent] = useState(element.customData?.content || '');
+        const [images, setImages] = useState<Record<string, string>>(element.customData?.images || {});
+        const [settings, setSettings] = useState<MarkdownNoteSettings>(() => {
+            if (element.customData?.settings) return element.customData.settings;
+            try {
+                const saved = localStorage.getItem('md-note-defaults');
+                if (saved) return { ...DEFAULT_NOTE_SETTINGS, ...JSON.parse(saved) };
+            } catch { /* ignore */ }
+            return DEFAULT_NOTE_SETTINGS;
+        });
+        const [showSettings, setShowSettings] = useState(false);
+
+        // Pre-warm the blob URL cache during render so ImageRenderer gets instant src on first paint
+        useMemo(() => { if (Object.keys(images).length > 0) prewarmImageCache(images); }, [images]);
+
         const [isNearEdge, setIsNearEdge] = useState(false);
         const [isDragging, setIsDragging] = useState(false);
         const [searchHighlight, setSearchHighlight] = useState<{ query: string; matchIndex: number } | null>(null);
@@ -22,10 +38,16 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         const contentRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
 
-        // Update content when element changes
+        // Update content/images when element changes (e.g. collab sync)
         useEffect(() => {
             setContent(element.customData?.content || '');
         }, [element.customData?.content]);
+        useEffect(() => {
+            setImages(element.customData?.images || {});
+        }, [element.customData?.images]);
+        useEffect(() => {
+            if (element.customData?.settings) setSettings(element.customData.settings);
+        }, [element.customData?.settings]);
 
         // Calculate screen position
         const x = (element.x + appState.scrollX) * appState.zoom.value;
@@ -36,6 +58,17 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         // Determine theme - always light mode on canvas
         const isDark = false; // Canvas is always light mode
+
+        // Match Excalidraw's corner rounding: type 3 = proportional (25% of shorter side), type 2 = fixed value
+        const borderRadius = (() => {
+            if (!element.roundness) return 0;
+            if (element.roundness.type === 3) return Math.min(element.width, element.height) * 0.25;
+            if (element.roundness.type === 2) return element.roundness.value ?? 32;
+            return 0;
+        })();
+
+        // Inset overlay slightly so it stays visually inside the rough (sloppy) stroke lines
+        const roughnessInset = Math.round((element.roughness ?? 0) * 2 + (element.strokeWidth ?? 1) * 0.5);
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
@@ -63,21 +96,33 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             zIndex: getOverlayZIndex(isSelected, isEditing),
         };
 
-        // Content card style - visual layer
-        const contentStyle: React.CSSProperties = {
+        // Clip wrapper — handles shape matching (overflow:hidden + borderRadius) without creating
+        // a scroll container, which would produce visible border-radius paint artifacts.
+        const clampedRadius = Math.max(0, borderRadius - roughnessInset);
+        const clipWrapperStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
-            backgroundColor: isDark ? 'rgba(23, 23, 23, 0.2)' : 'rgba(255, 255, 255, 0.2)',
-            color: isDark ? '#e5e5e5' : '#1a1a1a',
-            borderRadius: '0px',
-            padding: 0, // Remove default padding - each mode handles its own
-            overflow: 'auto',
-            overscrollBehavior: 'contain',
+            overflow: 'hidden',
+            borderRadius: `${clampedRadius}px`,
+            clipPath: roughnessInset > 0
+                ? `inset(${roughnessInset}px round ${clampedRadius}px)`
+                : undefined,
             boxShadow: isSelected
-                ? '0 0 0 2px transparent, 0 10px 20px -3px rgba(129, 140, 248, 0.4)'
+                ? '0 10px 20px -3px rgba(129, 140, 248, 0.4)'
                 : isDark
                     ? '0 4px 12px -1px rgba(0, 0, 0, 0.5)'
                     : '0 4px 8px -1px rgba(0, 0, 0, 0.1)',
+        };
+
+        // Content card style — scroll container, no border-radius to avoid paint artifacts
+        const contentStyle: React.CSSProperties = {
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'transparent',
+            color: isDark ? '#e5e5e5' : '#1a1a1a',
+            padding: 0,
+            overflow: 'auto',
+            overscrollBehavior: 'contain',
             // Always enable pointer events for hover detection and button clicks
             pointerEvents: 'auto',
             // Prevent text selection and interaction when not editing/scrolling
@@ -85,8 +130,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             WebkitUserSelect: isEditing ? 'auto' : 'none',
             cursor: isEditing ? 'text' : 'default',
             outline: 'none',
-            backdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
-            WebkitBackdropFilter: isDark ? 'blur(12px)' : 'blur(8px)',
         };
 
         // Manual dragging support for when pointer-events is auto
@@ -121,14 +164,18 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             excalidrawAPI.updateScene({ appState: { selectedElementIds: {} } });
         }, []);
 
+        // Add an image to local state; it will be saved together with content on exit
+        const handleImageAdd = useCallback((id: string, dataUrl: string) => {
+            setImages(prev => ({ ...prev, [id]: dataUrl }));
+        }, []);
+
         // Exit edit mode and save
         const exitEditMode = useCallback(() => {
             setIsEditing(false);
+            setShowSettings(false);
             setEditMode('raw'); // Reset to raw for next time
-            if (content !== element.customData?.content) {
-                onChange(element.id, content);
-            }
-        }, [content, element.id, element.customData?.content, onChange]);
+            onChange(element.id, content, images, settings);
+        }, [content, images, settings, element.id, onChange]);
 
         // Handle content update
         const updateContent = useCallback((value: string) => {
@@ -363,8 +410,8 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
             const newContent = lines.join('\n');
             setContent(newContent);
-            onChange(element.id, newContent);
-        }, [content, element.id, onChange]);
+            onChange(element.id, newContent, images, settings);
+        }, [content, images, settings, element.id, onChange]);
 
         return (
             <div
@@ -374,37 +421,183 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 data-note-id={element.id}
                 onTouchStart={handleTouchStart}
             >
-                {/* Content card - visual layer */}
+                {/* Clip wrapper - matches Excalidraw element shape (borderRadius + roughness inset) */}
+                <div style={clipWrapperStyle} data-note-id={element.id}>
+                {/* Content card - scroll container only, no borderRadius to avoid paint artifacts */}
                 <div
                     ref={contentRef}
                     style={contentStyle}
-                    data-note-id={element.id}
                     onMouseDown={handleMouseDown}
                 >
                     {isEditing ? (
                         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                            {/* Mode Toggle Button */}
-                            <button
-                                onClick={() => setEditMode(prev => prev === 'raw' ? 'hybrid' : 'raw')}
-                                style={{
-                                    position: 'absolute',
-                                    top: '8px',
-                                    right: '8px',
-                                    zIndex: 1000,
-                                    padding: '4px 12px',
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    background: editMode === 'raw' ? '#818cf8' : '#6366f1',
-                                    color: 'white',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)',
-                                    transition: 'all 0.2s ease',
-                                }}
-                            >
-                                {editMode === 'raw' ? '✨ Pretty' : '📝 Raw'}
-                            </button>
+                            {/* Top-right toolbar */}
+                            <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1000, display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                {/* Settings button — only in pretty mode */}
+                                {editMode === 'hybrid' && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowSettings(v => !v); }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        title="Appearance"
+                                        style={{
+                                            width: 28, height: 28, padding: 0,
+                                            borderRadius: '8px',
+                                            border: showSettings ? '1.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.10)',
+                                            background: showSettings ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.9)',
+                                            color: showSettings ? '#6366f1' : '#9ca3af',
+                                            cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            backdropFilter: 'blur(8px)',
+                                            boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                                            transition: 'all 0.15s ease',
+                                        }}
+                                    >
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+                                            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+                                            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+                                            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+                                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                                        </svg>
+                                    </button>
+                                )}
+                                {/* Mode toggle */}
+                                <button
+                                    onClick={() => { setEditMode(prev => prev === 'raw' ? 'hybrid' : 'raw'); setShowSettings(false); }}
+                                    style={{
+                                        padding: '4px 12px', borderRadius: '12px', border: 'none',
+                                        background: editMode === 'raw' ? '#818cf8' : '#6366f1',
+                                        color: 'white', fontSize: '11px', fontWeight: 600,
+                                        cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                                        transition: 'all 0.2s ease', whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {editMode === 'raw' ? '✨ Pretty' : '📝 Raw'}
+                                </button>
+                            </div>
+
+                            {/* Settings panel */}
+                            {showSettings && editMode === 'hybrid' && (
+                                <div
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                        position: 'absolute', top: 44, right: 8,
+                                        width: 220, background: '#ffffff',
+                                        borderRadius: 10, border: '1.5px solid rgba(0,0,0,0.10)',
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                                        padding: '12px', zIndex: 1001,
+                                        fontFamily: 'system-ui, sans-serif',
+                                    }}
+                                >
+                                    {/* Font family */}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                            {([
+                                                { id: 'inherit', label: 'Default', family: 'system-ui, sans-serif' },
+                                                { id: 'Georgia, serif', label: 'Serif', family: 'Georgia, serif' },
+                                                { id: '"DM Sans", system-ui, sans-serif', label: 'DM Sans', family: '"DM Sans", system-ui, sans-serif' },
+                                                { id: '"Playfair Display", Georgia, serif', label: 'Playfair', family: '"Playfair Display", Georgia, serif' },
+                                                { id: '"SF Mono", monospace', label: 'Mono', family: 'monospace' },
+                                            ] as const).map(f => (
+                                                <button key={f.id} onClick={() => setSettings(s => ({ ...s, font: f.id }))}
+                                                    style={{
+                                                        padding: '4px 9px', border: settings.font === f.id ? '1.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.09)',
+                                                        borderRadius: 6, background: settings.font === f.id ? 'rgba(99,102,241,0.07)' : 'transparent',
+                                                        cursor: 'pointer', fontFamily: f.family, fontSize: 12,
+                                                        fontWeight: settings.font === f.id ? 700 : 400,
+                                                        color: settings.font === f.id ? '#6366f1' : '#374151', textAlign: 'left', transition: 'all 0.1s',
+                                                    }}
+                                                >{f.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
+
+                                    {/* Font size */}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Font Size</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <button onClick={() => setSettings(s => ({ ...s, fontSize: Math.max(10, s.fontSize - 1) }))} disabled={settings.fontSize <= 10}
+                                                style={{ width: 26, height: 26, border: '1.5px solid rgba(0,0,0,0.12)', borderRadius: 6, background: 'transparent', cursor: settings.fontSize <= 10 ? 'default' : 'pointer', fontSize: 15, color: settings.fontSize <= 10 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>−</button>
+                                            <span style={{ flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#374151' }}>{settings.fontSize}px</span>
+                                            <button onClick={() => setSettings(s => ({ ...s, fontSize: Math.min(24, s.fontSize + 1) }))} disabled={settings.fontSize >= 24}
+                                                style={{ width: 26, height: 26, border: '1.5px solid rgba(0,0,0,0.12)', borderRadius: 6, background: 'transparent', cursor: settings.fontSize >= 24 ? 'default' : 'pointer', fontSize: 15, color: settings.fontSize >= 24 ? '#d1d5db' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>+</button>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
+
+                                    {/* Background */}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Background</div>
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            {([
+                                                { id: 'transparent', color: '#ffffff', label: 'None' },
+                                                { id: '#fef9ef', color: '#fef9ef', label: 'Warm' },
+                                                { id: '#f0f7ff', color: '#f0f7ff', label: 'Blue' },
+                                                { id: '#f5f5f5', color: '#f5f5f5', label: 'Gray' },
+                                                { id: '#1e1e2e', color: '#1e1e2e', label: 'Dark' },
+                                            ] as const).map(bg => (
+                                                <button key={bg.id} onClick={() => setSettings(s => ({ ...s, background: bg.id }))} title={bg.label}
+                                                    style={{
+                                                        width: 22, height: 22, borderRadius: '50%', padding: 0, cursor: 'pointer',
+                                                        background: bg.color,
+                                                        border: settings.background === bg.id ? '2.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.15)',
+                                                        boxShadow: settings.background === bg.id ? '0 0 0 1.5px #fff inset' : 'none',
+                                                        transition: 'border 0.1s',
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
+
+                                    {/* Line height */}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Line Spacing</div>
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            {([{ id: 1.4, label: 'Tight' }, { id: 1.65, label: 'Normal' }, { id: 2.0, label: 'Loose' }] as const).map(lh => (
+                                                <button key={lh.id} onClick={() => setSettings(s => ({ ...s, lineHeight: lh.id }))}
+                                                    style={{
+                                                        flex: 1, padding: '4px 0', border: settings.lineHeight === lh.id ? '1.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.09)',
+                                                        borderRadius: 6, background: settings.lineHeight === lh.id ? 'rgba(99,102,241,0.07)' : 'transparent',
+                                                        cursor: 'pointer', fontSize: 11, fontWeight: settings.lineHeight === lh.id ? 700 : 400,
+                                                        color: settings.lineHeight === lh.id ? '#6366f1' : '#6b7280', transition: 'all 0.1s',
+                                                    }}
+                                                >{lh.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
+
+                                    {/* Set as Default */}
+                                    <button
+                                        onClick={() => {
+                                            try { localStorage.setItem('md-note-defaults', JSON.stringify(settings)); } catch { /* ignore */ }
+                                        }}
+                                        style={{
+                                            width: '100%', padding: '6px 0',
+                                            border: '1.5px solid rgba(0,0,0,0.09)', borderRadius: 7,
+                                            background: 'transparent', cursor: 'pointer',
+                                            fontSize: 12, fontWeight: 600, color: '#6b7280',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                            transition: 'all 0.15s',
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.color = '#6366f1'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.09)'; e.currentTarget.style.color = '#6b7280'; }}
+                                    >
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                        </svg>
+                                        Set as Default
+                                    </button>
+                                </div>
+                            )}
 
                             {editMode === 'hybrid' ? (
                                 <HybridMarkdownEditor
@@ -412,20 +605,19 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                     onChange={updateContent}
                                     isDark={isDark}
                                     isScrollMode={true}
+                                    images={images}
                                 />
                             ) : (
                                 <div style={{
-                                    padding: '40px 20px 20px',
-                                    width: '100%',
-                                    height: '100%',
-                                    boxSizing: 'border-box',
-                                    overflow: 'auto'
+                                    padding: '40px 20px 20px', width: '100%', height: '100%',
+                                    boxSizing: 'border-box', overflow: 'auto',
                                 }}>
                                     <MarkdownEditor
                                         value={content}
                                         onChange={updateContent}
-                                        onBlur={() => { }} // We handle save on click outside
+                                        onBlur={() => { }}
                                         onKeyDown={handleKeyDown}
+                                        onImageAdd={handleImageAdd}
                                     />
                                 </div>
                             )}
@@ -443,16 +635,22 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                 height: 'auto',
                                 minHeight: '100%',
                                 boxSizing: 'border-box',
+                                fontFamily: settings.font !== 'inherit' ? settings.font : undefined,
+                                fontSize: settings.fontSize,
+                                backgroundColor: settings.background !== 'transparent' ? settings.background : undefined,
+                                lineHeight: settings.lineHeight,
                             }}
                         >
                             <MarkdownPreview
                                 content={content}
                                 onCheckboxToggle={toggleCheckbox}
                                 isDark={isDark}
+                                images={images}
                             />
                         </div>
                     )}
                 </div>
+                </div>{/* end clip wrapper */}
 
                 {/* Scoped styles */}
                 <style>{getMarkdownStyles()}</style>
