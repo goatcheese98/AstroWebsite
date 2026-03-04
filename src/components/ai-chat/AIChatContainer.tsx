@@ -1171,7 +1171,9 @@ export default function AIChatContainer({
               fillStyle: "solid",
               customData: {
                 type: "markdown",
-                content: markdown || "# New Note",
+                content:
+                  markdown ||
+                  "# ![Markdown icon](https://cdn.jsdelivr.net/gh/dcurtis/markdown-mark/svg/markdown-mark.svg) New Note",
               },
             },
           ],

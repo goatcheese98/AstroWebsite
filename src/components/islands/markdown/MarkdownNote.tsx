@@ -8,12 +8,17 @@ import { prewarmImageCache } from './utils/markdownMedia';
 import type { MarkdownNoteProps, MarkdownNoteRef, MarkdownNoteSettings } from './types';
 import { DEFAULT_NOTE_SETTINGS } from './types';
 import { getOverlayZIndex } from '@/components/islands/overlay-utils';
+import {
+    getExcalidrawCornerRadius,
+    getExcalidrawFontFamily,
+    getExcalidrawSurfaceStyle,
+} from '@/components/islands/excalidraw-element-style';
 import { ZoomHint } from '@/components/islands/ZoomHint';
 import { useZoomHint } from '@/components/islands/useZoomHint';
 import html2canvas from 'html2canvas';
 
 const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
-    ({ element, appState, onChange }, ref) => {
+    ({ element, appState, stackIndex = 0, onChange }, ref) => {
         const [isEditing, setIsEditing] = useState(false);
         const [editMode, setEditMode] = useState<'raw' | 'hybrid'>('raw');
         const [content, setContent] = useState(element.customData?.content || '');
@@ -31,8 +36,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         // Pre-warm the blob URL cache during render so ImageRenderer gets instant src on first paint
         useMemo(() => { if (Object.keys(images).length > 0) prewarmImageCache(images); }, [images]);
 
-        const [isNearEdge, setIsNearEdge] = useState(false);
-        const [isDragging, setIsDragging] = useState(false);
         const [searchHighlight, setSearchHighlight] = useState<{ query: string; matchIndex: number } | null>(null);
         const hasMarksRef = useRef(false);
         const contentRef = useRef<HTMLDivElement>(null);
@@ -49,29 +52,23 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             if (element.customData?.settings) setSettings(element.customData.settings);
         }, [element.customData?.settings]);
 
-        // Calculate screen position
-        const x = (element.x + appState.scrollX) * appState.zoom.value;
-        const y = (element.y + appState.scrollY) * appState.zoom.value;
         const width = element.width;
         const height = element.height;
         const angle = element.angle || 0;
 
         // Determine theme - always light mode on canvas
         const isDark = false; // Canvas is always light mode
+        const excalidrawFontFamily = getExcalidrawFontFamily(element.fontFamily);
 
-        // Match Excalidraw's corner rounding: type 3 = proportional (25% of shorter side), type 2 = fixed value
-        const borderRadius = (() => {
-            if (!element.roundness) return 0;
-            if (element.roundness.type === 3) return Math.min(element.width, element.height) * 0.25;
-            if (element.roundness.type === 2) return element.roundness.value ?? 32;
-            return 0;
-        })();
-
-        // Inset overlay slightly so it stays visually inside the rough (sloppy) stroke lines
-        const roughnessInset = Math.round((element.roughness ?? 0) * 2 + (element.strokeWidth ?? 1) * 0.5);
+        const borderRadius = getExcalidrawCornerRadius(
+            element.width,
+            element.height,
+            element.roundness,
+        );
 
         // Check if element is selected in Excalidraw
         const isSelected = appState.selectedElementIds?.[element.id] === true;
+        const isInteractive = isEditing || isSelected;
         const { visible: zoomHintVisible } = useZoomHint(
           containerRef,
           isSelected && !isEditing,
@@ -93,20 +90,25 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             transform: `scale(${zoom}) rotate(${angle}rad)`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: getOverlayZIndex(isSelected, isEditing),
+            zIndex: getOverlayZIndex(isSelected, isEditing, stackIndex),
         };
 
         // Clip wrapper — handles shape matching (overflow:hidden + borderRadius) without creating
         // a scroll container, which would produce visible border-radius paint artifacts.
-        const clampedRadius = Math.max(0, borderRadius - roughnessInset);
         const clipWrapperStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
             overflow: 'hidden',
-            borderRadius: `${clampedRadius}px`,
-            clipPath: roughnessInset > 0
-                ? `inset(${roughnessInset}px round ${clampedRadius}px)`
-                : undefined,
+            borderRadius: `${borderRadius}px`,
+            boxSizing: 'border-box',
+            ...getExcalidrawSurfaceStyle({
+                backgroundColor: element.backgroundColor,
+                strokeColor: element.strokeColor,
+                strokeWidth: element.strokeWidth,
+                strokeStyle: element.strokeStyle,
+                fillStyle: element.fillStyle,
+                opacity: element.opacity,
+            }),
             boxShadow: isSelected
                 ? '0 10px 20px -3px rgba(129, 140, 248, 0.4)'
                 : isDark
@@ -123,34 +125,14 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             padding: 0,
             overflow: 'auto',
             overscrollBehavior: 'contain',
-            // Always enable pointer events for hover detection and button clicks
-            pointerEvents: 'auto',
+            isolation: 'isolate',
+            pointerEvents: isInteractive ? 'auto' : 'none',
             // Prevent text selection and interaction when not editing/scrolling
             userSelect: isEditing ? 'auto' : 'none',
             WebkitUserSelect: isEditing ? 'auto' : 'none',
             cursor: isEditing ? 'text' : 'default',
             outline: 'none',
         };
-
-        // Manual dragging support for when pointer-events is auto
-        const handleMouseDown = useCallback((e: React.MouseEvent) => {
-            if (isEditing) return;
-
-            // If near edge, let it bubble (it will be pointer-events: none anyway)
-            if (isNearEdge) return;
-
-            // When user clicks on selected note, assume they want to drag
-            // Disable pointer-events so Excalidraw can handle it
-            setIsDragging(true);
-
-            // Re-enable after drag completes
-            const handleMouseUp = () => {
-                setIsDragging(false);
-                document.removeEventListener('mouseup', handleMouseUp);
-            };
-            document.addEventListener('mouseup', handleMouseUp);
-
-        }, [isEditing, isNearEdge]);
 
         // Enter edit mode
         const enterEditMode = useCallback((mode: 'raw' | 'hybrid' = 'raw') => {
@@ -202,7 +184,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         // Hit test helper
         const isPointInNote = useCallback((clientX: number, clientY: number) => {
-            if (!containerRef.current) return { inNote: false, isNearEdge: false };
+            if (!containerRef.current) return { inNote: false };
 
             // Screen coordinates
             const zoom = appState.zoom.value;
@@ -231,16 +213,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             const halfHeight = screenHeight / 2;
             const inNote = dx >= -halfWidth && dx <= halfWidth && dy >= -halfHeight && dy <= halfHeight;
 
-            // Excalidraw handles are usually ~10px. We use a 12px margin for safety.
-            const handleMargin = 12 * zoom;
-            const isNearEdge = inNote && (
-                dx < -halfWidth + handleMargin ||
-                dx > halfWidth - handleMargin ||
-                dy < -halfHeight + handleMargin ||
-                dy > halfHeight - handleMargin
-            );
-
-            return { inNote, isNearEdge };
+            return { inNote };
         }, [element.x, element.y, element.width, element.height, element.angle, appState.scrollX, appState.scrollY, appState.zoom.value]);
 
         // Global capture-phase event handlers
@@ -257,21 +230,12 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 }
             };
 
-            const handleGlobalMouseMove = (e: MouseEvent) => {
-                const { isNearEdge: edge } = isPointInNote(e.clientX, e.clientY);
-                if (edge !== isNearEdge) {
-                    setIsNearEdge(edge);
-                }
-            };
-
             document.addEventListener('dblclick', handleGlobalDblClick, true);
-            document.addEventListener('mousemove', handleGlobalMouseMove, true);
 
             return () => {
                 document.removeEventListener('dblclick', handleGlobalDblClick, true);
-                document.removeEventListener('mousemove', handleGlobalMouseMove, true);
             };
-        }, [isEditing, isNearEdge, isSelected, enterEditMode, isPointInNote]);
+        }, [isEditing, enterEditMode, isPointInNote]);
 
         // Click outside handler - exit edit mode and disable scroll mode
         useEffect(() => {
@@ -427,7 +391,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                 <div
                     ref={contentRef}
                     style={contentStyle}
-                    onMouseDown={handleMouseDown}
                 >
                     {isEditing ? (
                         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -472,7 +435,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                         transition: 'all 0.2s ease', whiteSpace: 'nowrap',
                                     }}
                                 >
-                                    {editMode === 'raw' ? '✨ Pretty' : '📝 Raw'}
+                                    {editMode === 'raw' ? '✨ Pretty' : '📄 Raw'}
                                 </button>
                             </div>
 
@@ -530,32 +493,6 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
                                     <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
 
-                                    {/* Background */}
-                                    <div style={{ marginBottom: 10 }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Background</div>
-                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                            {([
-                                                { id: 'transparent', color: '#ffffff', label: 'None' },
-                                                { id: '#fef9ef', color: '#fef9ef', label: 'Warm' },
-                                                { id: '#f0f7ff', color: '#f0f7ff', label: 'Blue' },
-                                                { id: '#f5f5f5', color: '#f5f5f5', label: 'Gray' },
-                                                { id: '#1e1e2e', color: '#1e1e2e', label: 'Dark' },
-                                            ] as const).map(bg => (
-                                                <button key={bg.id} onClick={() => setSettings(s => ({ ...s, background: bg.id }))} title={bg.label}
-                                                    style={{
-                                                        width: 22, height: 22, borderRadius: '50%', padding: 0, cursor: 'pointer',
-                                                        background: bg.color,
-                                                        border: settings.background === bg.id ? '2.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.15)',
-                                                        boxShadow: settings.background === bg.id ? '0 0 0 1.5px #fff inset' : 'none',
-                                                        transition: 'border 0.1s',
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 10 }} />
-
                                     {/* Line height */}
                                     <div style={{ marginBottom: 10 }}>
                                         <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Line Spacing</div>
@@ -606,11 +543,16 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                     isDark={isDark}
                                     isScrollMode={true}
                                     images={images}
+                                    settings={settings}
+                                    baseFontFamily={excalidrawFontFamily}
                                 />
                             ) : (
                                 <div style={{
                                     padding: '40px 20px 20px', width: '100%', height: '100%',
                                     boxSizing: 'border-box', overflow: 'auto',
+                                    fontFamily: settings.font !== 'inherit' ? settings.font : excalidrawFontFamily,
+                                    fontSize: settings.fontSize,
+                                    lineHeight: settings.lineHeight,
                                 }}>
                                     <MarkdownEditor
                                         value={content}
@@ -624,7 +566,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                         </div>
                     ) : (
                         <div
-                            className="markdown-preview"
+                            className="markdown-preview-frame"
                             style={{
                                 padding: '18px 22px',
                                 paddingTop: '38px',
@@ -632,13 +574,13 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
                                 width: '100%',
-                                height: 'auto',
-                                minHeight: '100%',
+                                height: '100%',
+                                overflow: 'hidden',
                                 boxSizing: 'border-box',
-                                fontFamily: settings.font !== 'inherit' ? settings.font : undefined,
+                                fontFamily: settings.font !== 'inherit' ? settings.font : excalidrawFontFamily,
                                 fontSize: settings.fontSize,
-                                backgroundColor: settings.background !== 'transparent' ? settings.background : undefined,
                                 lineHeight: settings.lineHeight,
+                                backgroundColor: 'transparent',
                             }}
                         >
                             <MarkdownPreview
@@ -646,6 +588,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                 onCheckboxToggle={toggleCheckbox}
                                 isDark={isDark}
                                 images={images}
+                                settings={settings}
                             />
                         </div>
                     )}

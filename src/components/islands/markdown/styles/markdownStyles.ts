@@ -3,8 +3,9 @@
  */
 export const getMarkdownStyles = (): string => `
     .markdown-preview {
-        font-size: 14px;
-        line-height: 1.6;
+        font-size: inherit;
+        line-height: inherit;
+        font-family: inherit;
         color: inherit;
         word-wrap: break-word;
         overflow-wrap: break-word;

@@ -2,12 +2,18 @@
  * Shared z-index logic for canvas overlay elements (MarkdownNote, LexicalNote, WebEmbed, KanbanBoard).
  *
  * Levels:
- *   1 – default (element not selected, sits flush with canvas)
- *   2 – selected (above sibling overlays, still below Excalidraw UI panels)
- *   5 – actively editing (above panels so toolbars/dropdowns don't clip content)
+ *   - Base stack follows scene order (`stackIndex`)
+ *   - Selected overlays are promoted within the same stack band
+ *   - Editing overlays are promoted within the same stack band
  */
-export function getOverlayZIndex(isSelected: boolean, isEditing = false): number {
-  if (isEditing) return 5;
-  if (isSelected) return 2;
-  return 1;
+export function getOverlayZIndex(
+  isSelected: boolean,
+  isEditing = false,
+  stackIndex = 0,
+): number {
+  const clampedStack = Math.max(0, Math.min(Math.floor(stackIndex), 9999));
+  const base = clampedStack * 10;
+  if (isEditing) return base + 3;
+  if (isSelected) return base + 2;
+  return base + 1;
 }

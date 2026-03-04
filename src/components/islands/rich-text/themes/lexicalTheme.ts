@@ -34,6 +34,10 @@ export const lightTheme: EditorThemeClasses = {
     },
     image: 'lexical-image',
     link: 'lexical-link',
+    embedBlock: {
+        base: 'lexical-embed-block',
+        focus: 'lexical-embed-block-focus',
+    },
     text: {
         bold: 'lexical-text-bold',
         italic: 'lexical-text-italic',
@@ -333,22 +337,54 @@ export function getLexicalEditorStyles(): string {
 
         /* ===== Code Blocks ===== */
         .lexical-code {
+            display: block;
             font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
             font-size: 13px;
-            line-height: 1.5;
-            background: #f8f9fa;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
+            line-height: 1.6;
+            color: #d1fae5;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(7, 12, 24, 0.96) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            border-radius: 12px;
+            box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.18), 0 8px 22px rgba(2, 6, 23, 0.24);
+            padding: 14px 16px;
+            margin: 18px 0;
+            max-width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            isolation: isolate;
+            clear: both;
             overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
+            overflow-y: hidden;
+            white-space: pre;
+            word-break: normal;
+            overflow-wrap: normal;
+        }
+
+        .lexical-code::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .lexical-code::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .lexical-code::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 999px;
+        }
+
+        .lexical-code + .lexical-paragraph {
+            margin-top: 14px;
+        }
+
+        .lexical-table + .lexical-code {
+            margin-top: 20px;
         }
 
         .lexical-root-dark .lexical-code {
-            background: #1f2937;
-            border-color: #374151;
+            color: #d1fae5;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(4, 10, 22, 0.98) 100%);
+            border-color: rgba(125, 211, 252, 0.25);
         }
 
         /* Code highlighting */
@@ -432,6 +468,8 @@ export function getLexicalEditorStyles(): string {
             border-collapse: collapse;
             margin: 16px 0;
             font-size: 14px;
+            table-layout: fixed;
+            max-width: 100%;
         }
 
         .lexical-table-cell,
@@ -440,6 +478,17 @@ export function getLexicalEditorStyles(): string {
             padding: 8px 12px;
             text-align: left;
             vertical-align: top;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            min-width: 0;
+        }
+
+        .lexical-table-cell > *,
+        .lexical-table-cell-header > * {
+            margin: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .lexical-table-cell-header {
@@ -454,6 +503,62 @@ export function getLexicalEditorStyles(): string {
 
         .lexical-root-dark .lexical-table-cell-header {
             background: #1f2937;
+        }
+
+        /* ===== Collapsible ===== */
+        .Collapsible__container {
+            margin: 14px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.55);
+            overflow: hidden;
+        }
+
+        .Collapsible__title {
+            margin: 0;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            list-style: none;
+            user-select: none;
+            border-bottom: 1px solid transparent;
+        }
+
+        .Collapsible__title::-webkit-details-marker {
+            display: none;
+        }
+
+        .Collapsible__title::before {
+            content: '▸';
+            display: inline-block;
+            margin-right: 8px;
+            color: #6366f1;
+            transition: transform 0.15s ease;
+        }
+
+        .Collapsible__container[open] > .Collapsible__title {
+            border-bottom-color: #e5e7eb;
+        }
+
+        .Collapsible__container[open] > .Collapsible__title::before {
+            transform: rotate(90deg);
+        }
+
+        .Collapsible__content {
+            padding: 10px 12px 12px;
+        }
+
+        .lexical-root-dark .Collapsible__container {
+            border-color: #334155;
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .lexical-root-dark .Collapsible__container[open] > .Collapsible__title {
+            border-bottom-color: #334155;
+        }
+
+        .lexical-root-dark .Collapsible__title::before {
+            color: #a5b4fc;
         }
 
         /* ===== Scrollbar ===== */
@@ -481,6 +586,28 @@ export function getLexicalEditorStyles(): string {
 
         .lexical-root-dark::-webkit-scrollbar-thumb:hover {
             background: rgba(129, 140, 248, 0.5);
+        }
+
+        /* ===== Embed Blocks (YouTube, Tweet) ===== */
+        .lexical-embed-block {
+            position: relative;
+            margin: 16px 0;
+            user-select: none;
+        }
+
+        .lexical-embed-block iframe {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .lexical-embed-block-focus {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            border-radius: 10px;
+        }
+
+        .lexical-root-dark .lexical-embed-block-focus {
+            outline-color: #818cf8;
         }
 
         /* ===== Placeholder ===== */

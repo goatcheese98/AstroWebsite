@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { MarkdownBlock } from '../../../lib/markdown-block-parser';
+import type { MarkdownNoteSettings } from './types';
 import { VisualTableEditor } from './VisualTableEditor';
 import { handleImagePasteAsMarkdown, markdownUrlTransform, resolveMarkdownImageSrc } from './utils/markdownMedia';
 
@@ -13,6 +14,7 @@ interface MarkdownBlockEditorProps {
     isSelectionActive: boolean;
     isDark: boolean;
     images?: Record<string, string>;
+    settings?: MarkdownNoteSettings;
     onEdit: (blockId: string, isShift?: boolean) => void;
     onChange: (blockId: string, newContent: string) => void;
     onBlur: () => void;
@@ -29,6 +31,7 @@ export const MarkdownBlockEditor = memo(({
     isSelectionActive,
     isDark,
     images,
+    settings,
     onEdit,
     onChange,
     onBlur,
@@ -54,6 +57,25 @@ export const MarkdownBlockEditor = memo(({
             setLocalContent(block.rawContent);
         }
     }, [block.rawContent, isEditing]);
+
+    const syntaxTheme = useMemo(() => {
+        const base = (isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>;
+        return {
+            ...base,
+            'pre[class*="language-"]': {
+                ...(base['pre[class*="language-"]'] || {}),
+                fontFamily: 'inherit',
+                fontSize: '1em',
+                lineHeight: 'inherit',
+            },
+            'code[class*="language-"]': {
+                ...(base['code[class*="language-"]'] || {}),
+                fontFamily: 'inherit',
+                fontSize: '1em',
+                lineHeight: 'inherit',
+            },
+        };
+    }, [isDark]);
 
     const handleClick = (e: React.MouseEvent) => {
         if (!isEditing) {
@@ -177,6 +199,7 @@ export const MarkdownBlockEditor = memo(({
                             padding: '4px',
                             fontFamily: 'inherit',
                             fontSize: 'inherit',
+                            lineHeight: 'inherit',
                             resize: 'none',
                             outline: 'none',
                             borderRadius: '4px',
@@ -239,9 +262,9 @@ export const MarkdownBlockEditor = memo(({
                             background: 'transparent',
                             color: isDark ? '#e5e5e5' : '#1a1a1a',
                             padding: '8px 12px',
-                            fontFamily: '"SF Mono", "Monaco", "Inconsolata", "Fira Code", monospace',
-                            fontSize: '0.85em', // Slightly smaller to prevent excessive zoom
-                            lineHeight: '1.5',
+                            fontFamily: settings?.font !== 'inherit' ? settings?.font : 'inherit',
+                            fontSize: '0.95em',
+                            lineHeight: settings?.lineHeight ?? 'inherit',
                             resize: 'vertical',
                             outline: 'none',
                         }}
@@ -266,6 +289,9 @@ export const MarkdownBlockEditor = memo(({
                 marginTop: '0px',
                 marginBottom: block.type === 'heading' ? '0.5em' : '0',
                 transition: 'background-color 0.15s ease',
+                fontFamily: settings?.font !== 'inherit' ? settings?.font : undefined,
+                fontSize: settings?.fontSize,
+                lineHeight: settings?.lineHeight,
                 background: isSelectionActive
                     ? (isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)')
                     : 'transparent',
@@ -330,9 +356,16 @@ export const MarkdownBlockEditor = memo(({
 
                         return isCodeBlock ? (
                             <SyntaxHighlighter
-                                style={isDark ? (oneDark as any) : (oneLight as any)}
+                                style={syntaxTheme as any}
                                 language={language}
                                 PreTag="div"
+                                customStyle={{
+                                    margin: '0 0 1em 0',
+                                    borderRadius: '6px',
+                                    fontFamily: 'inherit',
+                                    fontSize: '0.92em',
+                                    lineHeight: 'inherit',
+                                }}
                                 {...props}
                             >
                                 {String(children).replace(/\n$/, '')}
@@ -344,8 +377,9 @@ export const MarkdownBlockEditor = memo(({
                                     background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                                     padding: '2px 6px',
                                     borderRadius: '3px',
-                                    fontFamily: '"SF Mono", "Monaco", "Inconsolata", monospace',
+                                    fontFamily: 'inherit',
                                     fontSize: '0.9em',
+                                    lineHeight: 'inherit',
                                 }}
                                 {...props}
                             >
@@ -378,6 +412,7 @@ export const MarkdownBlockEditor = memo(({
                                     background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                                     fontWeight: 600,
                                     textAlign: 'left',
+                                    lineHeight: 'inherit',
                                     whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
@@ -392,6 +427,7 @@ export const MarkdownBlockEditor = memo(({
                                 style={{
                                     border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
                                     padding: '8px 12px',
+                                    lineHeight: 'inherit',
                                     whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
@@ -409,6 +445,7 @@ export const MarkdownBlockEditor = memo(({
                                     marginLeft: 0,
                                     fontStyle: 'italic',
                                     color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+                                    lineHeight: 'inherit',
                                     whiteSpace: 'break-spaces',
                                 }}
                                 {...props}
@@ -438,14 +475,14 @@ export const MarkdownBlockEditor = memo(({
                         );
                     },
                     // Style other elements to match current aesthetic
-                    h1: ({ children, ...props }) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700, whiteSpace: 'break-spaces' }} {...props}>{children}</h1>,
-                    h2: ({ children, ...props }) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h2>,
-                    h3: ({ children, ...props }) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h3>,
-                    h4: ({ children, ...props }) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600, whiteSpace: 'break-spaces' }} {...props}>{children}</h4>,
-                    p: ({ children, ...props }) => <p style={{ margin: '0.5em 0', lineHeight: '1.6', whiteSpace: 'break-spaces' }} {...props}>{children}</p>,
-                    ul: ({ children, ...props }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }} {...props}>{children}</ul>,
-                    ol: ({ children, ...props }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }} {...props}>{children}</ol>,
-                    li: ({ children, ...props }) => <li style={{ margin: '0.2em 0', whiteSpace: 'break-spaces' }} {...props}>{children}</li>,
+                    h1: ({ children, ...props }) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h1>,
+                    h2: ({ children, ...props }) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h2>,
+                    h3: ({ children, ...props }) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h3>,
+                    h4: ({ children, ...props }) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h4>,
+                    p: ({ children, ...props }) => <p style={{ margin: '0.5em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</p>,
+                    ul: ({ children, ...props }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ul>,
+                    ol: ({ children, ...props }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ol>,
+                    li: ({ children, ...props }) => <li style={{ margin: '0.2em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</li>,
                     hr: ({ ...props }) => <hr style={{ border: 'none', borderTop: isDark ? '2px solid rgba(255,255,255,0.1)' : '2px solid rgba(0,0,0,0.1)', margin: '1.5em 0' }} {...props} />,
                 }}
             >

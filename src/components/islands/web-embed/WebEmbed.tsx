@@ -25,6 +25,7 @@ const getPipDimensions = (viewportWidth: number) => {
 export interface WebEmbedProps {
     element: any;
     appState: any;
+    stackIndex?: number;
     onChange: (elementId: string, url: string) => void;
     onPositionChange?: (elementId: string, x: number, y: number) => void;
     onDelete?: (elementId: string) => void;
@@ -45,7 +46,7 @@ export interface WebEmbedRef {
 }
 
 const WebEmbedInner = memo(
-    forwardRef<WebEmbedRef, WebEmbedProps>(({ element, appState, onChange, onDelete }, ref) => {
+    forwardRef<WebEmbedRef, WebEmbedProps>(({ element, appState, stackIndex = 0, onChange, onDelete }, ref) => {
         const [isLoading, setIsLoading] = useState(true);
         const [hasError, setHasError] = useState(false);
         const [urlInput, setUrlInput] = useState(element.customData?.url || '');
@@ -236,7 +237,7 @@ const WebEmbedInner = memo(
             transform: `scale(${zoom}) rotate(${element.angle || 0}rad)`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: getOverlayZIndex(isSelected),
+            zIndex: getOverlayZIndex(isSelected, false, stackIndex),
         };
 
         const pipContainerStyle: React.CSSProperties = {
@@ -286,6 +287,7 @@ const WebEmbedInner = memo(
             backgroundColor: '#ffffff',
             borderRadius: viewMode === 'expanded' ? '14px' : '10px',
             overflow: 'hidden',
+            isolation: 'isolate',
             boxShadow:
                 viewMode === 'expanded'
                     ? '0 28px 72px rgba(15, 23, 42, 0.35)'

@@ -17,8 +17,13 @@ import type {
   KanbanOperation,
   AppState,
 } from './kanban-types';
-import { BOARD_THEMES, BOARD_FONTS } from './kanban-types';
 import { KanbanColumn } from './KanbanColumn';
+import {
+  applyColorOpacity,
+  getExcalidrawCornerRadius,
+  getExcalidrawFontFamily,
+  getExcalidrawSurfaceStyle,
+} from '@/components/islands/excalidraw-element-style';
 import { getOverlayZIndex } from '@/components/islands/overlay-utils';
 import { ZoomHint } from '@/components/islands/ZoomHint';
 import { useZoomHint } from '@/components/islands/useZoomHint';
@@ -26,38 +31,30 @@ import { useZoomHint } from '@/components/islands/useZoomHint';
 interface KanbanBoardProps {
   element: KanbanElement;
   appState: AppState;
+  stackIndex?: number;
   onChange: (elementId: string, data: KanbanBoardData) => void;
 }
 
 const KanbanBoardInner = memo(
-  forwardRef<KanbanNoteRef, KanbanBoardProps>(({ element, appState, onChange }, ref) => {
+  forwardRef<KanbanNoteRef, KanbanBoardProps>(({ element, appState, stackIndex = 0, onChange }, ref) => {
     const [boardData, setBoardData] = useState<KanbanBoardData>(element.customData);
     const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
     const [draggingFromColumnId, setDraggingFromColumnId] = useState<string | null>(null);
     const [overColumnId, setOverColumnId] = useState<string | null>(null);
     const [overCardId, setOverCardId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Interactive whenever the Excalidraw element is selected
     const isInteracting = appState.selectedElementIds?.[element.id] === true;
     const { visible: zoomHintVisible } = useZoomHint(containerRef, isInteracting);
 
-    // Resolve active theme, font, and font size
-    const activeTheme = BOARD_THEMES.find((t) => t.id === boardData.bgTheme) ?? BOARD_THEMES[0];
-    const activeFont = BOARD_FONTS.find((f) => f.id === boardData.fontId) ?? BOARD_FONTS[0];
     const activeFontSize = boardData.fontSize ?? 13;
 
     // Sync from element.customData when it changes externally
     useEffect(() => {
       setBoardData(element.customData);
     }, [element.customData]);
-
-    // Close settings when deselected
-    useEffect(() => {
-      if (!isInteracting) setShowSettings(false);
-    }, [isInteracting]);
 
     const commitChange = useCallback(
       (updater: (prev: KanbanBoardData) => KanbanBoardData) => {
@@ -68,32 +65,6 @@ const KanbanBoardInner = memo(
         });
       },
       [element.id, onChange],
-    );
-
-    // --- Theme / Font ---
-
-    const handleSetTheme = useCallback(
-      (themeId: string) => {
-        commitChange((prev) => ({ ...prev, bgTheme: themeId }));
-      },
-      [commitChange],
-    );
-
-    const handleSetFont = useCallback(
-      (fontId: string) => {
-        commitChange((prev) => ({ ...prev, fontId }));
-      },
-      [commitChange],
-    );
-
-    const handleSetFontSize = useCallback(
-      (delta: number) => {
-        commitChange((prev) => ({
-          ...prev,
-          fontSize: Math.min(20, Math.max(10, (prev.fontSize ?? 13) + delta)),
-        }));
-      },
-      [commitChange],
     );
 
     // --- Column operations ---
@@ -351,8 +322,31 @@ const KanbanBoardInner = memo(
       transform: `scale(${zoom}) rotate(${element.angle || 0}rad)`,
       transformOrigin: 'center center',
       pointerEvents: 'none',
-      zIndex: getOverlayZIndex(isInteracting),
+      zIndex: getOverlayZIndex(isInteracting, false, stackIndex),
     };
+
+    const boardRadius = getExcalidrawCornerRadius(
+      element.width,
+      element.height,
+      element.roundness,
+    ) || 6;
+
+    const boardSurface = getExcalidrawSurfaceStyle({
+      backgroundColor: element.backgroundColor,
+      strokeColor: element.strokeColor,
+      strokeWidth: element.strokeWidth,
+      strokeStyle: element.strokeStyle,
+      fillStyle: element.fillStyle,
+      opacity: element.opacity,
+    });
+    const boardFontFamily = getExcalidrawFontFamily(element.fontFamily) ?? 'Helvetica, Arial, sans-serif';
+    const borderTone = applyColorOpacity(
+      element.strokeColor && element.strokeColor !== 'transparent' ? element.strokeColor : '#000000',
+      ((element.opacity ?? 100) / 100) * 0.3,
+    );
+    const headerBg = 'rgba(255,255,255,0.52)';
+    const columnBg = 'rgba(255,255,255,0.56)';
+    const cardBg = 'rgba(255,255,255,0.86)';
 
     return (
       <div ref={containerRef} style={containerStyle}>
@@ -360,34 +354,35 @@ const KanbanBoardInner = memo(
           style={{
             width: '100%',
             height: '100%',
-            background: activeTheme.boardBg,
-            borderRadius: 6,
-            border: `1.5px solid ${activeTheme.border}`,
+            ...boardSurface,
+            borderRadius: boardRadius,
             boxShadow: isInteracting
               ? '0 0 0 2px #6366f1, 0 10px 20px -3px rgba(0,0,0,0.18)'
               : '0 2px 8px rgba(0,0,0,0.08)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            pointerEvents: 'auto',
+            isolation: 'isolate',
+            pointerEvents: isInteracting ? 'auto' : 'none',
             userSelect: 'none',
             WebkitUserSelect: 'none',
             transition: 'box-shadow 0.15s ease, background 0.2s ease',
-            fontFamily: activeFont.family,
+            fontFamily: boardFontFamily,
             fontSize: activeFontSize,
             position: 'relative',
+            boxSizing: 'border-box',
           }}
         >
           {/* Board header */}
           <div
             style={{
               padding: '10px 14px 8px',
-              borderBottom: `1.5px solid ${activeTheme.border}`,
+              borderBottom: `1.5px solid ${borderTone}`,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               flexShrink: 0,
-              background: activeTheme.headerBg,
+              background: headerBg,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
@@ -460,8 +455,8 @@ const KanbanBoardInner = memo(
               <KanbanColumn
                 key={column.id}
                 column={column}
-                colBg={activeTheme.colBg}
-                cardBg={activeTheme.cardBg}
+                colBg={columnBg}
+                cardBg={cardBg}
                 isOver={overColumnId === column.id}
                 draggingCardId={draggingCardId}
                 overCardId={overCardId}
@@ -512,195 +507,9 @@ const KanbanBoardInner = memo(
               Add column
             </button>
           </div>
-
-          {/* Bottom toolbar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              padding: '4px 10px 6px',
-              flexShrink: 0,
-              borderTop: `1px solid ${activeTheme.border}`,
-              background: activeTheme.headerBg,
-            }}
-          >
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title="Appearance"
-              style={{
-                width: 28,
-                height: 28,
-                border: showSettings ? '1.5px solid #6366f1' : `1.5px solid ${activeTheme.border}`,
-                borderRadius: 6,
-                background: showSettings ? 'rgba(99,102,241,0.08)' : 'transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: showSettings ? '#6366f1' : '#9ca3af',
-                transition: 'all 0.15s ease',
-                padding: 0,
-              }}
-              onMouseEnter={(e) => {
-                if (!showSettings) {
-                  e.currentTarget.style.borderColor = '#6366f1';
-                  e.currentTarget.style.color = '#6366f1';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showSettings) {
-                  e.currentTarget.style.borderColor = activeTheme.border;
-                  e.currentTarget.style.color = '#9ca3af';
-                }
-              }}
-            >
-              {/* Palette icon */}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Settings panel — absolute, opens above the bottom toolbar */}
-          {showSettings && (
-            <div
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute',
-                bottom: 44,
-                right: 10,
-                width: 232,
-                background: '#ffffff',
-                borderRadius: 10,
-                border: '1.5px solid rgba(0,0,0,0.10)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
-                padding: '12px',
-                zIndex: 10,
-              }}
-            >
-              {/* Background section */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
-                  Background
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {BOARD_THEMES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleSetTheme(t.id)}
-                      title={t.name}
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        background: t.boardBg,
-                        border: activeTheme.id === t.id
-                          ? '2.5px solid #6366f1'
-                          : '1.5px solid rgba(0,0,0,0.15)',
-                        cursor: 'pointer',
-                        padding: 0,
-                        flexShrink: 0,
-                        boxShadow: activeTheme.id === t.id ? '0 0 0 1.5px #fff inset' : 'none',
-                        transition: 'border 0.1s ease',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 12 }} />
-
-              {/* Font section */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
-                  Font
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {BOARD_FONTS.map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => handleSetFont(f.id)}
-                      style={{
-                        padding: '5px 10px',
-                        border: activeFont.id === f.id
-                          ? '1.5px solid #6366f1'
-                          : '1.5px solid rgba(0,0,0,0.10)',
-                        borderRadius: 6,
-                        background: activeFont.id === f.id ? 'rgba(99,102,241,0.07)' : 'transparent',
-                        cursor: 'pointer',
-                        fontFamily: f.family,
-                        fontSize: 13,
-                        fontWeight: activeFont.id === f.id ? 700 : 400,
-                        color: activeFont.id === f.id ? '#6366f1' : '#374151',
-                        textAlign: 'left',
-                        transition: 'all 0.1s ease',
-                      }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 12, marginTop: 4 }} />
-
-              {/* Font size section */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
-                  Font Size
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    onClick={() => handleSetFontSize(-1)}
-                    disabled={activeFontSize <= 10}
-                    style={{
-                      width: 28, height: 28,
-                      border: '1.5px solid rgba(0,0,0,0.12)',
-                      borderRadius: 6,
-                      background: 'transparent',
-                      cursor: activeFontSize <= 10 ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 16, lineHeight: 1,
-                      color: activeFontSize <= 10 ? '#d1d5db' : '#374151',
-                      fontFamily: 'system-ui, sans-serif',
-                      padding: 0,
-                    }}
-                  >−</button>
-                  <span style={{ flex: 1, textAlign: 'center', fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                    {activeFontSize}px
-                  </span>
-                  <button
-                    onClick={() => handleSetFontSize(1)}
-                    disabled={activeFontSize >= 20}
-                    style={{
-                      width: 28, height: 28,
-                      border: '1.5px solid rgba(0,0,0,0.12)',
-                      borderRadius: 6,
-                      background: 'transparent',
-                      cursor: activeFontSize >= 20 ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 16, lineHeight: 1,
-                      color: activeFontSize >= 20 ? '#d1d5db' : '#374151',
-                      fontFamily: 'system-ui, sans-serif',
-                      padding: 0,
-                    }}
-                  >+</button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
           .kanban-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
           .kanban-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .kanban-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }

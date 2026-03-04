@@ -9,11 +9,23 @@ import {
   useUnifiedCanvasStore,
   useExcalidrawAPISafe,
   useCommandSubscriber,
+  type ExcalidrawAppState,
   type ExcalidrawElement,
   type Toast,
 } from '@/stores';
 import { convertToExcalidrawElements as convertToExcalidrawElementsRaw } from "@excalidraw/excalidraw";
 import { nanoid } from 'nanoid';
+import {
+  centerElementsInViewport,
+  createImageElementDraft,
+  createKanbanElementDraft,
+  createMarkdownElementDraft,
+  createNewLexElementDraft,
+  createRichTextElementDraft,
+  createWebEmbedElementDraft,
+  getViewportSceneCenter,
+  type CanvasElementInput,
+} from './element-factories';
 
 // Import sub-components
 import { AIChatContainer } from '../ai-chat';
@@ -21,18 +33,6 @@ import IconLibrary from '../islands/IconLibrary';
 import CanvasStatusBadge from '../islands/CanvasStatusBadge';
 import ToastNotification from '../islands/ToastNotification';
 import CanvasSearch from './CanvasSearch';
-
-type CanvasElementInput = Partial<ExcalidrawElement> & {
-  type?: string;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  text?: string;
-  fontSize?: number;
-  fontFamily?: number;
-  points?: [number, number][];
-};
 
 const convertToSceneElements = (elements: CanvasElementInput[]): ExcalidrawElement[] =>
   (
@@ -124,40 +124,13 @@ export default function CanvasUI({
       const isModification = detail.isModification === true;
 
       try {
-        // Get viewport center for positioning if not a modification
         let elementsToConvert = elements;
         if (!isModification) {
-          const appState = api.getAppState();
-          const viewportWidth = typeof appState.width === "number" ? appState.width : 800;
-          const viewportHeight = typeof appState.height === "number" ? appState.height : 600;
-          const viewportCenterX = viewportWidth / 2;
-          const viewportCenterY = viewportHeight / 2;
-          const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-          const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-          // Calculate bounding box
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          elements.forEach((el: CanvasElementInput) => {
-            const x = el.x || 0;
-            const y = el.y || 0;
-            const width = el.width || 0;
-            const height = el.height || 0;
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + width);
-            maxY = Math.max(maxY, y + height);
+          const appState = api.getAppState() as Partial<ExcalidrawAppState>;
+          elementsToConvert = centerElementsInViewport(elements, appState, {
+            width: 0,
+            height: 0,
           });
-
-          const elementsCenterX = (minX + maxX) / 2;
-          const elementsCenterY = (minY + maxY) / 2;
-          const offsetX = sceneX - elementsCenterX;
-          const offsetY = sceneY - elementsCenterY;
-
-          elementsToConvert = elements.map((el: CanvasElementInput) => ({
-            ...el,
-            x: (el.x || 0) + offsetX,
-            y: (el.y || 0) + offsetY,
-          }));
         }
 
         const converted = convertToSceneElements(elementsToConvert);
@@ -229,12 +202,8 @@ export default function CanvasUI({
       }
       const { imageData, width, height } = payload;
 
-      // Create a new image element
-      const appState = api.getAppState();
-      const viewportCenterX = (appState.width || 800) / 2;
-      const viewportCenterY = (appState.height || 600) / 2;
-      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
+      const appState = api.getAppState() as Partial<ExcalidrawAppState>;
+      const sceneCenter = getViewportSceneCenter(appState);
 
       const detectedMimeType =
         typeof imageData === 'string'
@@ -242,36 +211,7 @@ export default function CanvasUI({
           : 'image/png';
 
       const fileId = nanoid();
-
-      const newElement = {
-        id: nanoid(),
-        type: 'image',
-        x: sceneX - (width || 400) / 2,
-        y: sceneY - (height || 300) / 2,
-        width: width || 400,
-        height: height || 300,
-        angle: 0,
-        strokeColor: 'transparent',
-        backgroundColor: 'transparent',
-        fillStyle: 'hachure',
-        strokeWidth: 1,
-        strokeStyle: 'solid',
-        roundness: null,
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        fileId,
-        status: 'saved',
-        scale: [1, 1] as [number, number],
-        seed: Math.floor(Math.random() * 100000),
-        version: 1,
-        versionNonce: Date.now(),
-      };
+      const newElement = createImageElementDraft(sceneCenter, { width, height, fileId });
 
       // Add the image file
       const file = {
@@ -301,36 +241,11 @@ export default function CanvasUI({
         let elementsToAdd = (elements as CanvasElementInput[]).map((el) => ({ ...el }));
         
         if (!isModification) {
-          // Center elements on viewport
-          const appState = api.getAppState();
-          const viewportCenterX = (appState.width || 800) / 2;
-          const viewportCenterY = (appState.height || 600) / 2;
-          const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-          const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-          // Calculate bounding box
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          elementsToAdd.forEach((el: CanvasElementInput) => {
-            const x = el.x || 0;
-            const y = el.y || 0;
-            const w = el.width || 100;
-            const h = el.height || 100;
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
+          const appState = api.getAppState() as Partial<ExcalidrawAppState>;
+          elementsToAdd = centerElementsInViewport(elementsToAdd, appState, {
+            width: 100,
+            height: 100,
           });
-
-          const elementsCenterX = (minX + maxX) / 2;
-          const elementsCenterY = (minY + maxY) / 2;
-          const offsetX = sceneX - elementsCenterX;
-          const offsetY = sceneY - elementsCenterY;
-
-          elementsToAdd = elementsToAdd.map((el: CanvasElementInput) => ({
-            ...el,
-            x: (el.x ?? 0) + offsetX,
-            y: (el.y ?? 0) + offsetY,
-          }));
         }
 
         const converted = convertToSceneElements(elementsToAdd as CanvasElementInput[]);
@@ -396,7 +311,14 @@ export default function CanvasUI({
     input.click();
   }, [api, addToast]);
 
-  // Create markdown note element - with full default content from original
+  const appendCreatedElement = useCallback((elementDraft: CanvasElementInput) => {
+    if (!api) return;
+    const converted = convertToSceneElements([elementDraft]);
+    const currentElements = api.getSceneElements();
+    api.updateScene({ elements: [...currentElements, ...converted] });
+  }, [api]);
+
+  // Create markdown note element
   const handleCreateMarkdown = useCallback(async () => {
     if (!api) {
       addToast('Canvas not ready', 'error');
@@ -404,45 +326,16 @@ export default function CanvasUI({
     }
 
     try {
-      // Get viewport center for positioning
-      const appState = api.getAppState();
-      const viewportCenterX = (appState.width as number) / 2 || 400;
-      const viewportCenterY = (appState.height as number) / 2 || 300;
-
-      // Convert viewport center to scene coordinates
-      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-      const newElement = {
-        type: 'rectangle',
-        x: sceneX - 250,
-        y: sceneY - 175,
-        width: 500,
-        height: 350,
-        backgroundColor: '#ffffff',
-        strokeColor: 'transparent',
-        strokeWidth: 0,
-        roughness: 0,
-        opacity: 100,
-        fillStyle: 'solid',
-        id: nanoid(),
-        locked: false,
-        customData: {
-          type: 'markdown',
-          content: '# 📝 New Note\n\nDouble-click to edit this note.\n\n## Markdown Supported\n- **Bold** and *italic* text\n- Lists and checkboxes\n- Code blocks with syntax highlighting\n- Tables, links, and more!\n\n```javascript\nconst example = "Hello World";\n```',
-        },
-      };
-
-      const converted = convertToSceneElements([newElement]);
-      const currentElements = api.getSceneElements();
-      api.updateScene({ elements: [...currentElements, ...converted] });
-
+      const sceneCenter = getViewportSceneCenter(
+        api.getAppState() as Partial<ExcalidrawAppState>,
+      );
+      appendCreatedElement(createMarkdownElementDraft(sceneCenter));
     } catch (err) {
       console.error('Error creating markdown note:', err);
     }
-  }, [api]);
+  }, [api, addToast, appendCreatedElement]);
 
-  // Create rich text note element - with correct 1000x1200 size
+  // Create rich text note element
   const handleCreateRichText = useCallback(async () => {
     if (!api) {
       addToast('Canvas not ready', 'error');
@@ -450,49 +343,32 @@ export default function CanvasUI({
     }
 
     try {
-      // Import DEFAULT_NOTE_STATE
-      const { DEFAULT_NOTE_STATE } = await import('@/components/islands/rich-text');
-
-      // Get viewport center for positioning
-      const appState = api.getAppState();
-      const viewportCenterX = (appState.width as number) / 2 || 400;
-      const viewportCenterY = (appState.height as number) / 2 || 300;
-
-      // Convert viewport center to scene coordinates
-      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-      // Note: Original size is 1000x1200 - much larger than markdown notes
-      const newElement = {
-        type: 'rectangle',
-        x: sceneX - 500,
-        y: sceneY - 600,
-        width: 1000,
-        height: 1200,
-        backgroundColor: '#ffffff',
-        strokeColor: '#000000',
-        strokeWidth: 1,
-        roughness: 0,
-        opacity: 100,
-        fillStyle: 'solid',
-        roundness: { type: 3 },
-        id: nanoid(),
-        locked: false,
-        customData: {
-          type: 'lexical',
-          lexicalState: DEFAULT_NOTE_STATE,
-          version: 1,
-        },
-      };
-
-      const converted = convertToSceneElements([newElement]);
-      const currentElements = api.getSceneElements();
-      api.updateScene({ elements: [...currentElements, ...converted] });
-
+      const sceneCenter = getViewportSceneCenter(
+        api.getAppState() as Partial<ExcalidrawAppState>,
+      );
+      const newElement = await createRichTextElementDraft(sceneCenter);
+      appendCreatedElement(newElement);
     } catch (err) {
       console.error('Error creating rich text note:', err);
     }
-  }, [api]);
+  }, [api, addToast, appendCreatedElement]);
+
+  // Create NewLex note element
+  const handleCreateNewLex = useCallback(async () => {
+    if (!api) {
+      addToast('Canvas not ready', 'error');
+      return;
+    }
+
+    try {
+      const sceneCenter = getViewportSceneCenter(
+        api.getAppState() as Partial<ExcalidrawAppState>,
+      );
+      appendCreatedElement(createNewLexElementDraft(sceneCenter));
+    } catch (err) {
+      console.error('Error creating NewLex note:', err);
+    }
+  }, [api, addToast, appendCreatedElement]);
 
   // Create kanban board element
   const handleCreateKanban = useCallback(async () => {
@@ -502,44 +378,17 @@ export default function CanvasUI({
     }
 
     try {
-      const { DEFAULT_BOARD } = await import('@/components/islands/kanban/kanban-types');
-
-      const appState = api.getAppState();
-      const viewportCenterX = (appState.width as number) / 2 || 400;
-      const viewportCenterY = (appState.height as number) / 2 || 300;
-
-      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-      const newElement = {
-        type: 'rectangle',
-        x: sceneX - 700,
-        y: sceneY - 400,
-        width: 1400,
-        height: 800,
-        backgroundColor: '#faf8f2',
-        strokeColor: 'rgba(0,0,0,0.12)',
-        strokeWidth: 1,
-        roughness: 0,
-        opacity: 100,
-        fillStyle: 'solid',
-        id: nanoid(),
-        locked: false,
-        customData: {
-          ...DEFAULT_BOARD,
-          title: 'Kanban Board',
-        },
-      };
-
-      const converted = convertToSceneElements([newElement]);
-      const currentElements = api.getSceneElements();
-      api.updateScene({ elements: [...currentElements, ...converted] });
+      const sceneCenter = getViewportSceneCenter(
+        api.getAppState() as Partial<ExcalidrawAppState>,
+      );
+      const newElement = await createKanbanElementDraft(sceneCenter);
+      appendCreatedElement(newElement);
     } catch (err) {
       console.error('Error creating kanban board:', err);
     }
-  }, [api, addToast]);
+  }, [api, addToast, appendCreatedElement]);
 
-  // Create web embed element - without prompt, with correct 700x500 size
+  // Create web embed element
   const handleCreateWebEmbed = useCallback(async () => {
     if (!api) {
       addToast('Canvas not ready', 'error');
@@ -547,45 +396,14 @@ export default function CanvasUI({
     }
 
     try {
-      // Get viewport center for positioning
-      const appState = api.getAppState();
-      const viewportCenterX = (appState.width as number) / 2 || 400;
-      const viewportCenterY = (appState.height as number) / 2 || 300;
-
-      // Convert viewport center to scene coordinates
-      const sceneX = (viewportCenterX / appState.zoom.value) - appState.scrollX;
-      const sceneY = (viewportCenterY / appState.zoom.value) - appState.scrollY;
-
-      // Note: Original size is 700x500 with strokeWidth 4
-      const newElement = {
-        type: 'rectangle',
-        x: sceneX - 350,
-        y: sceneY - 250,
-        width: 700,
-        height: 500,
-        backgroundColor: '#ffffff',
-        strokeColor: '#000000',
-        strokeWidth: 4,
-        roughness: 0,
-        opacity: 100,
-        fillStyle: 'solid',
-        id: nanoid(),
-        locked: false,
-        customData: {
-          type: 'web-embed',
-          url: '',
-          title: 'Web Embed',
-        },
-      };
-
-      const converted = convertToSceneElements([newElement]);
-      const currentElements = api.getSceneElements();
-      api.updateScene({ elements: [...currentElements, ...converted] });
-
+      const sceneCenter = getViewportSceneCenter(
+        api.getAppState() as Partial<ExcalidrawAppState>,
+      );
+      appendCreatedElement(createWebEmbedElementDraft(sceneCenter));
     } catch (err) {
       console.error('Error creating web embed:', err);
     }
-  }, [api]);
+  }, [api, addToast, appendCreatedElement]);
 
   // Open the assistant with the visual expert selected.
   const handleGenerateImage = useCallback(() => {
@@ -619,6 +437,9 @@ export default function CanvasUI({
       case 'create-rich-text':
         void handleCreateRichText();
         break;
+      case 'create-newlex':
+        void handleCreateNewLex();
+        break;
       case 'create-web-embed':
         void handleCreateWebEmbed();
         break;
@@ -640,6 +461,7 @@ export default function CanvasUI({
   }, [
     handleCreateMarkdown,
     handleCreateRichText,
+    handleCreateNewLex,
     handleCreateWebEmbed,
     handleCreateKanban,
     handleGenerateImage,
@@ -738,6 +560,19 @@ export default function CanvasUI({
             <path d="M8 12h8" />
           </svg>
           <span className="aw-label">Rich text note</span>
+        </button>
+        <button
+          className="aw-control-btn"
+          onClick={() => runCanvasAction('create-newlex')}
+          title="Add NewLex note"
+          aria-label="Add NewLex note"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <path d="M8 16v-6l8 6v-6" />
+          </svg>
+          <span className="aw-label">NewLex</span>
         </button>
         <button
           className="aw-control-btn"

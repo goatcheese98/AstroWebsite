@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useExcalidrawAPISafe } from '@/stores';
+import { isOverlayCustomDataType } from './overlay-registry';
 
 type SearchTab = 'canvas' | 'notes';
 
@@ -18,7 +19,7 @@ interface CanvasResult {
 
 interface NoteResult {
   elementId: string;
-  noteType: 'markdown' | 'lexical';
+  noteType: 'markdown' | 'lexical' | 'newlex';
   preview: string;
   matchIndex: number;
 }
@@ -65,6 +66,15 @@ function snippet(text: string, query: string, ctx = 55, startPos?: number): stri
   const s = Math.max(0, idx - ctx);
   const e = Math.min(text.length, idx + query.length + ctx);
   return (s > 0 ? '…' : '') + text.slice(s, e) + (e < text.length ? '…' : '');
+}
+
+function stripHtml(text: string): string {
+  return text
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<\/?[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function Highlighted({ text, query }: { text: string; query: string }) {
@@ -115,7 +125,7 @@ export default function CanvasSearch({ isOpen, onClose }: Props) {
       const e = el as Record<string, unknown>;
       // skip custom note/embed overlays
       const cd = e.customData as Record<string, unknown> | undefined;
-      if (cd?.type === 'markdown' || cd?.type === 'lexical' || cd?.type === 'web-embed') continue;
+      if (isOverlayCustomDataType(cd?.type)) continue;
       const text =
         typeof e.text === 'string' ? e.text :
         typeof e.name === 'string' ? e.name :
@@ -153,6 +163,15 @@ export default function CanvasSearch({ isOpen, onClose }: Props) {
         let offset = 0, matchIdx = 0, pos: number;
         while ((pos = lo.indexOf(q, offset)) !== -1) {
           results.push({ elementId: el.id, noteType: 'lexical', preview: snippet(text, query, 55, pos), matchIndex: matchIdx });
+          offset = pos + q.length;
+          matchIdx++;
+        }
+      } else if (cd.type === 'newlex' && typeof cd.content === 'string') {
+        const text = stripHtml(cd.content);
+        const lo = text.toLowerCase();
+        let offset = 0, matchIdx = 0, pos: number;
+        while ((pos = lo.indexOf(q, offset)) !== -1) {
+          results.push({ elementId: el.id, noteType: 'newlex', preview: snippet(text, query, 55, pos), matchIndex: matchIdx });
           offset = pos + q.length;
           matchIdx++;
         }
@@ -323,7 +342,7 @@ export default function CanvasSearch({ isOpen, onClose }: Props) {
         {!query.trim() && (
           <p style={{ margin: 0, padding: '24px 18px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
             {tab === 'notes'
-              ? 'Search inside markdown and rich text notes'
+              ? 'Search inside markdown, rich text, and NewLex notes'
               : 'Search text labels and frames on the canvas'}
           </p>
         )}
@@ -364,10 +383,19 @@ export default function CanvasSearch({ isOpen, onClose }: Props) {
                   fontWeight: 700,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
-                  color: r.noteType === 'markdown' ? '#7c3aed' : '#2563eb',
+                  color:
+                    r.noteType === 'markdown'
+                      ? '#7c3aed'
+                      : r.noteType === 'newlex'
+                        ? '#0f766e'
+                        : '#2563eb',
                   marginBottom: 3,
                 }}>
-                  {r.noteType === 'markdown' ? 'Markdown' : 'Rich Text'}
+                  {r.noteType === 'markdown'
+                    ? 'Markdown'
+                    : r.noteType === 'newlex'
+                      ? 'NewLex'
+                      : 'Rich Text'}
                 </span>
               ) : (
                 <span style={{

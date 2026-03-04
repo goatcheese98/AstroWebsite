@@ -44,17 +44,31 @@ import {
     CollapsibleContentNode,
     CollapsibleTitleNode,
 } from './nodes/CollapsibleNodes';
+import { ImageNode } from './nodes/ImageNode';
+import { YouTubeNode } from './nodes/YouTubeNode';
+import { TweetNode } from './nodes/TweetNode';
+import { DateTimeNode } from './nodes/DateTimeNode';
+import { PageBreakNode } from './nodes/PageBreakNode';
 
 import { getLexicalTheme, getLexicalEditorStyles } from './themes/lexicalTheme';
-import { EDITOR_NAMESPACE } from './types';
+import { DEFAULT_NOTE_STATE, EDITOR_NAMESPACE } from './types';
 
 // Toolbar
-import { Toolbar } from './components/Toolbar';
+import { ToolbarPlugin } from './plugins/ToolbarPlugin';
 
 // Plugins
 import EquationPlugin from './plugins/EquationPlugin';
 import CollapsiblePlugin from './plugins/CollapsiblePlugin';
+import FloatingLinkEditorPlugin from './plugins/FloatingLinkEditorPlugin';
+import FloatingTextFormatToolbarPlugin from './plugins/FloatingTextFormatToolbarPlugin';
+import ComponentPickerPlugin from './plugins/ComponentPickerPlugin';
+import AutoLinkPlugin from './plugins/AutoLinkPlugin';
 import { HorizontalRulePlugin } from '@lexical/react/LexicalHorizontalRulePlugin';
+import ImagePlugin from './plugins/ImagePlugin';
+import AutoEmbedPlugin from './plugins/AutoEmbedPlugin';
+import PageBreakPlugin from './plugins/PageBreakPlugin';
+import TableActionMenuPlugin from './plugins/TableActionMenuPlugin';
+import DateTimePlugin from './plugins/DateTimePlugin';
 
 interface RichTextEditorProps {
     /** Initial editor state as JSON string */
@@ -67,6 +81,8 @@ interface RichTextEditorProps {
     isScrollMode: boolean;
     /** Whether to show the formatting toolbar */
     showToolbar?: boolean;
+    /** DOM element ID to portal the toolbar into (for breaking out of overflow:hidden containers) */
+    toolbarPortalId?: string;
     /** Whether to focus automatically on mount */
     autoFocus?: boolean;
     /** Whether to hide container styling (border, background, shadow) */
@@ -103,11 +119,14 @@ function InitialStatePlugin({ initialState }: { initialState?: string }): null {
     const isInitializedRef = useRef(false);
 
     useEffect(() => {
-        if (!initialState || isInitializedRef.current) return;
+        if (isInitializedRef.current) return;
         isInitializedRef.current = true;
+        const stateToLoad = initialState && initialState.trim().length > 0
+            ? initialState
+            : DEFAULT_NOTE_STATE;
 
         try {
-            const parsed = JSON.parse(initialState);
+            const parsed = JSON.parse(stateToLoad);
             const editorState = editor.parseEditorState(parsed);
             // Use microtask to avoid flushSync warning during lifecycle
             Promise.resolve().then(() => {
@@ -115,6 +134,15 @@ function InitialStatePlugin({ initialState }: { initialState?: string }): null {
             });
         } catch (err) {
             console.error('Failed to parse initial state:', err);
+            try {
+                const fallbackParsed = JSON.parse(DEFAULT_NOTE_STATE);
+                const fallbackState = editor.parseEditorState(fallbackParsed);
+                Promise.resolve().then(() => {
+                    editor.setEditorState(fallbackState);
+                });
+            } catch (fallbackErr) {
+                console.error('Failed to load fallback initial state:', fallbackErr);
+            }
         }
     }, [editor, initialState]);
 
@@ -251,6 +279,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     isDark,
     isScrollMode,
     showToolbar = true,
+    toolbarPortalId,
     autoFocus = false,
     transparent = false,
     onEscape,
@@ -315,6 +344,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         return { background: rgba };
     }, [backgroundColor, backgroundOpacity, elementOpacity, fillStyle, isDark, transparent]);
 
+    // Ref for the content wrapper to use as anchor for floating plugins
+    const contentWrapperRef = useRef<HTMLDivElement>(null);
+
     const theme = useMemo(() => getLexicalTheme(isDark), [isDark]);
 
     const initialConfig = useMemo(() => ({
@@ -340,6 +372,11 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             CollapsibleContainerNode,
             CollapsibleContentNode,
             CollapsibleTitleNode,
+            ImageNode,
+            YouTubeNode,
+            TweetNode,
+            PageBreakNode,
+            DateTimeNode,
         ],
         // Start with empty editor, load state via plugin
         editorState: null,
@@ -353,26 +390,26 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                ...backgroundStyle,
-                borderRadius: '8px',
-                overflow: 'hidden',
-                boxShadow: transparent ? 'none' : (isDark ? '0 10px 30px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.1)'),
-                border: transparent ? 'none' : (strokeColor
-                    ? `${strokeWidth}px ${strokeStyle} ${strokeColor}`
-                    : `1px solid ${isDark ? '#333' : '#eee'}`),
             }}
         >
             <LexicalComposer initialConfig={initialConfig}>
+                {/* 
+                    Toolbar is rendered via portal if toolbarPortalId is provided.
+                    This allows the toolbar to break out of overflow:hidden containers
+                    (like Excalidraw notes with rounded corners).
+                */}
                 {showToolbar && (
-                    <Toolbar
+                    <ToolbarPlugin
                         isDark={isDark}
                         backgroundOpacity={backgroundOpacity}
                         onBackgroundOpacityChange={onBackgroundOpacityChange}
                         blurAmount={blurAmount}
                         onBlurAmountChange={onBlurAmountChange}
+                        portalId={toolbarPortalId}
                     />
                 )}
                 <div
+                    ref={contentWrapperRef}
                     className="editor-content-wrapper"
                     style={{
                         flex: 1,
@@ -381,6 +418,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         background: 'transparent',
                         cursor: 'text',
                         minHeight: '200px',
+                        ...backgroundStyle,
+                        borderRadius: '8px',
+                        boxShadow: transparent ? 'none' : (isDark ? '0 10px 30px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.1)'),
+                        border: transparent ? 'none' : (strokeColor
+                            ? `${strokeWidth}px ${strokeStyle} ${strokeColor}`
+                            : `1px solid ${isDark ? '#333' : '#eee'}`),
                     }}
                 >
                     <RichTextPlugin
@@ -411,18 +454,31 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 <ListPlugin />
                 <CheckListPlugin />
                 <LinkPlugin />
+                <AutoLinkPlugin />
                 <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
                 <TabIndentationPlugin />
                 <TablePlugin />
                 <HorizontalRulePlugin />
                 <EquationPlugin />
                 <CollapsiblePlugin />
+                <ImagePlugin />
+                <AutoEmbedPlugin />
+                <PageBreakPlugin />
+                <DateTimePlugin />
+                <ComponentPickerPlugin />
                 <ClickToFocusPlugin />
                 <CodeHighlightPlugin />
                 <EscapeHandlerPlugin onEscape={onEscape} />
                 <InitialStatePlugin initialState={initialState} />
                 <FocusPlugin disabled={!autoFocus} />
                 <DebouncedOnChangePlugin onChange={onChange} delay={500} />
+                {contentWrapperRef.current && (
+                    <>
+                        <FloatingLinkEditorPlugin anchorElem={contentWrapperRef.current} isDark={isDark} />
+                        <FloatingTextFormatToolbarPlugin anchorElem={contentWrapperRef.current} isDark={isDark} />
+                        <TableActionMenuPlugin anchorElem={contentWrapperRef.current} isDark={isDark} />
+                    </>
+                )}
             </LexicalComposer>
             <style>{getLexicalEditorStyles()}</style>
         </div>

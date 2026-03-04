@@ -581,7 +581,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isDark, backgroundOpacity = 1,
                 <button onMouseDown={(e) => e.preventDefault()} onClick={() => setShowEquationDialog(true)} style={buttonStyle(false)} title="Insert Equation">
                     <EquationIcon />
                 </button>
-                <button onMouseDown={(e) => e.preventDefault()} onClick={insertCollapsible} style={buttonStyle(false)} title="Insert Collapsible">
+                <button onMouseDown={(e) => e.preventDefault()} onClick={insertCollapsible} style={buttonStyle(false)} title="Insert / Remove Collapsible">
                     <CollapsibleIcon />
                 </button>
                 <button onMouseDown={(e) => e.preventDefault()} onClick={insertHorizontalRule} style={buttonStyle(false)} title="Horizontal Rule">
@@ -856,4 +856,3 @@ const AlignRightIcon = () => (
         <line x1="21" y1="18" x2="7" y2="18" />
     </svg>
 );
-

@@ -45,6 +45,14 @@ export interface KanbanElement {
   version?: number;
   versionNonce?: number;
   locked?: boolean;
+  backgroundColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  fillStyle?: 'hachure' | 'cross-hatch' | 'solid';
+  opacity?: number;
+  fontFamily?: number;
+  roundness?: { type: number; value?: number } | null;
   customData: KanbanBoardData;
 }
 

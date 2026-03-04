@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { MarkdownBlockEditor } from './MarkdownBlockEditor';
 import { parseMarkdownBlocks, reconstructMarkdown, updateBlock, type MarkdownBlock } from '../../../lib/markdown-block-parser';
+import type { MarkdownNoteSettings } from './types';
 
 interface HybridMarkdownEditorProps {
     content: string;
@@ -8,6 +9,8 @@ interface HybridMarkdownEditorProps {
     isDark: boolean;
     isScrollMode: boolean;
     images?: Record<string, string>;
+    settings?: MarkdownNoteSettings;
+    baseFontFamily?: string;
 }
 
 /**
@@ -25,6 +28,8 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
     isDark,
     isScrollMode,
     images,
+    settings,
+    baseFontFamily,
 }) => {
     // Parse content into blocks (memoized to avoid re-parsing on every render)
     const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
@@ -147,6 +152,9 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
                 paddingTop: '38px',
                 pointerEvents: isScrollMode ? 'auto' : 'none',
                 position: 'relative',
+                fontFamily: settings?.font !== 'inherit' ? settings?.font : baseFontFamily,
+                fontSize: settings?.fontSize,
+                lineHeight: settings?.lineHeight,
             }}
             onClick={(e) => {
                 // Allow clicking on the container to deselect block and clear multi-selection
@@ -235,6 +243,7 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
                     isSelectionActive={selectedBlockIds.has(block.id)}
                     isDark={isDark}
                     images={images}
+                    settings={settings}
                     onEdit={handleEdit}
                     onChange={handleChange}
                     onBlur={handleBlur}

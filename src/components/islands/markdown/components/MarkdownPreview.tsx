@@ -7,6 +7,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Components } from 'react-markdown';
 import { markdownUrlTransform, resolveMarkdownImageSrc } from '../utils/markdownMedia';
+import type { MarkdownNoteSettings } from '../types';
 import 'katex/dist/katex.min.css';
 
 interface MarkdownPreviewProps {
@@ -18,7 +19,11 @@ interface MarkdownPreviewProps {
     isDark?: boolean;
     /** Locally stored images keyed by md-img:// id */
     images?: Record<string, string>;
+    /** Optional note appearance settings for typography inheritance */
+    settings?: MarkdownNoteSettings;
 }
+
+const MARKDOWN_ICON_SVG_URL = 'https://cdn.jsdelivr.net/gh/dcurtis/markdown-mark/svg/markdown-mark.svg';
 
 
 /** Renders a single image with loading skeleton and error fallback. */
@@ -38,7 +43,7 @@ const ImageRenderer = React.memo(function ImageRenderer({
                 background: isDark ? 'rgba(239,68,68,0.12)' : '#fef2f2',
                 border: `1px solid ${isDark ? 'rgba(239,68,68,0.35)' : '#fca5a5'}`,
                 color: isDark ? '#fca5a5' : '#dc2626',
-                fontSize: '0.85em', fontFamily: 'sans-serif',
+                fontSize: '0.85em', fontFamily: 'inherit',
             }}>
                 ⚠️ Failed to load image{alt && alt !== 'Embedded image' ? `: ${alt}` : ''}
             </span>
@@ -78,7 +83,32 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
     onCheckboxToggle,
     isDark = false,
     images,
+    settings,
 }: MarkdownPreviewProps) {
+    const syntaxTheme = useMemo(() => {
+        const base = (isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>;
+        return {
+            ...base,
+            'pre[class*="language-"]': {
+                ...(base['pre[class*="language-"]'] || {}),
+                fontFamily: 'inherit',
+                fontSize: '1em',
+                lineHeight: 'inherit',
+            },
+            'code[class*="language-"]': {
+                ...(base['code[class*="language-"]'] || {}),
+                fontFamily: 'inherit',
+                fontSize: '1em',
+                lineHeight: 'inherit',
+            },
+        };
+    }, [isDark]);
+
+    const previewTypographyStyle = useMemo<React.CSSProperties>(() => ({
+        fontFamily: settings?.font !== 'inherit' ? settings?.font : undefined,
+        fontSize: settings?.fontSize,
+        lineHeight: settings?.lineHeight,
+    }), [settings]);
 
     // Custom renderers for markdown elements
     const components: Components = useMemo(() => ({
@@ -88,14 +118,15 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
             return !inline && match ? (
                 <SyntaxHighlighter
-                    style={isDark ? oneDark : oneLight}
+                    style={syntaxTheme as any}
                     language={match[1]}
                     PreTag="div"
                     customStyle={{
                         margin: '0 0 1em 0',
                         borderRadius: '6px',
-                        fontSize: '13px',
-                        lineHeight: '1.5',
+                        fontSize: '0.92em',
+                        lineHeight: 'inherit',
+                        fontFamily: 'inherit',
                     }}
                 >
                     {code}
@@ -108,7 +139,8 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                         padding: '2px 6px',
                         borderRadius: '3px',
                         fontSize: '0.9em',
-                        fontFamily: 'monospace',
+                        fontFamily: 'inherit',
+                        lineHeight: 'inherit',
                         border: isDark ? '1px solid rgba(161, 161, 170, 0.3)' : 'none',
                     }}
                     {...props}
@@ -122,7 +154,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
             return (
                 <p style={{
                     marginBottom: '0.75em',
-                    lineHeight: '1.6',
+                    lineHeight: 'inherit',
                     whiteSpace: 'break-spaces',
                     color: isDark ? '#d4d4d8' : '#3f3f46'
                 }}>
@@ -138,7 +170,8 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                     fontWeight: 700,
                     marginBottom: '0.5em',
                     marginTop: '0.5em',
-                    lineHeight: '1.2',
+                    fontFamily: 'inherit',
+                    lineHeight: 'inherit',
                     whiteSpace: 'break-spaces',
                     color: isDark ? '#f4f4f5' : '#18181b'
                 }}>
@@ -154,7 +187,8 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                     fontWeight: 600,
                     marginBottom: '0.5em',
                     marginTop: '0.75em',
-                    lineHeight: '1.3',
+                    fontFamily: 'inherit',
+                    lineHeight: 'inherit',
                     whiteSpace: 'break-spaces',
                     color: isDark ? '#f4f4f5' : '#18181b'
                 }}>
@@ -170,7 +204,8 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                     fontWeight: 600,
                     marginBottom: '0.4em',
                     marginTop: '0.6em',
-                    lineHeight: '1.4',
+                    fontFamily: 'inherit',
+                    lineHeight: 'inherit',
                     whiteSpace: 'break-spaces',
                     color: isDark ? '#e4e4e7' : '#27272a'
                 }}>
@@ -185,7 +220,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                     marginBottom: '0.75em',
                     marginTop: '0.5em',
                     paddingLeft: '1.5em',
-                    lineHeight: '1.6'
+                    lineHeight: 'inherit'
                 }}>
                     {children}
                 </ul>
@@ -198,7 +233,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                     marginBottom: '0.75em',
                     marginTop: '0.5em',
                     paddingLeft: '1.5em',
-                    lineHeight: '1.6'
+                    lineHeight: 'inherit'
                 }}>
                     {children}
                 </ol>
@@ -261,6 +296,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                         background: isDark ? 'rgba(161, 161, 170, 0.1)' : 'rgba(0, 0, 0, 0.02)',
                         padding: '0.5em 1em',
                         borderRadius: '4px',
+                        lineHeight: 'inherit',
                         whiteSpace: 'break-spaces',
                     }}
                 >
@@ -357,6 +393,21 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
 
         img({ src, alt }) {
             const resolvedSrc = resolveMarkdownImageSrc(src, images);
+            if (resolvedSrc === MARKDOWN_ICON_SVG_URL) {
+                return (
+                    <img
+                        src={resolvedSrc}
+                        alt={alt || 'Markdown icon'}
+                        style={{
+                            width: '1em',
+                            height: '1em',
+                            display: 'inline-block',
+                            margin: '0 0.35em 0 0',
+                            verticalAlign: '-0.08em',
+                        }}
+                    />
+                );
+            }
             if (!resolvedSrc) {
                 // Reference exists but image data is missing (e.g. stripped customData)
                 if (src?.startsWith('md-img://')) {
@@ -367,7 +418,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                             background: isDark ? 'rgba(245,158,11,0.12)' : '#fffbeb',
                             border: `1px solid ${isDark ? 'rgba(245,158,11,0.35)' : '#fcd34d'}`,
                             color: isDark ? '#fcd34d' : '#92400e',
-                            fontSize: '0.85em', fontFamily: 'sans-serif',
+                            fontSize: '0.85em', fontFamily: 'inherit',
                         }}>
                             🖼 Image not found{alt && alt !== 'Embedded image' ? `: ${alt}` : ''}
                         </span>
@@ -390,10 +441,10 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                 />
             );
         },
-    }), [isDark, onCheckboxToggle, images]);
+    }), [isDark, onCheckboxToggle, images, syntaxTheme]);
 
     return (
-        <div className="markdown-preview">
+        <div className="markdown-preview" style={previewTypographyStyle}>
             <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}

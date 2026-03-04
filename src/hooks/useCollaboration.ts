@@ -8,7 +8,7 @@
  *   - AES-GCM-128 E2E encryption  (key lives only in the URL hash — never sent to server)
  *   - `reconcileElements` from @excalidraw/excalidraw for conflict resolution
  *   - Scene changes throttled at 100 ms; cursor/pointer updates at 50 ms
- *   - Custom elements (Lexical, Markdown, WebEmbed) collaborate automatically:
+ *   - Custom elements (Lexical, Markdown, WebEmbed, Kanban) collaborate automatically:
  *     CanvasNotesLayer bumps version/versionNonce on every content edit and calls
  *     api.updateScene(), which fires the Excalidraw onChange and gets picked up here.
  */

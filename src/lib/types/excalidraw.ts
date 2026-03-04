@@ -14,7 +14,7 @@ export type { ExcalidrawElement, AppState, BinaryFiles };
 /**
  * Custom element types we add on top of Excalidraw
  */
-export type CustomElementType = 'markdown' | 'web-embed' | 'lexical';
+export type CustomElementType = 'markdown' | 'web-embed' | 'lexical' | 'newlex';
 
 /**
  * Extended Excalidraw element with our custom data

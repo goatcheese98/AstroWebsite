@@ -35,7 +35,7 @@ export const NoteBadge = React.memo(function NoteBadge({
                 zIndex: 1000,
             }}
         >
-            📝 Markdown
+            📄 Markdown
         </div>
     );
 });

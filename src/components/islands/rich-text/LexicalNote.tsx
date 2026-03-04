@@ -4,13 +4,14 @@ import { getOverlayZIndex } from '@/components/islands/overlay-utils';
 import { ZoomHint } from '@/components/islands/ZoomHint';
 import { useZoomHint } from '@/components/islands/useZoomHint';
 import type { LexicalNoteProps, LexicalNoteRef } from './types';
+import { DEFAULT_NOTE_STATE } from './types';
 import { RichTextEditor } from './RichTextEditor';
 import { getLexicalEditorStyles } from './themes/lexicalTheme';
 import html2canvas from 'html2canvas';
 
 const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
-    ({ element, appState, onChange, onDeselect }, ref) => {
-        const [lexicalState, setLexicalState] = useState(element.customData?.lexicalState || '');
+    ({ element, appState, stackIndex = 0, onChange, onDeselect }, ref) => {
+        const [lexicalState, setLexicalState] = useState(element.customData?.lexicalState || DEFAULT_NOTE_STATE);
         const [isDragging, setIsDragging] = useState(false);
         const searchRafRef = useRef<number | null>(null);
         const [backgroundOpacity, setBackgroundOpacity] = useState(element.customData?.backgroundOpacity ?? 1);
@@ -20,7 +21,7 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
 
         // Update content when element changes (only if it differs from local state)
         useEffect(() => {
-            const incomingState = element.customData?.lexicalState || '';
+            const incomingState = element.customData?.lexicalState || DEFAULT_NOTE_STATE;
             if (incomingState !== lexicalState) {
                 setLexicalState(incomingState);
             }
@@ -44,6 +45,17 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
         const screenCenterX = (element.x + element.width / 2 + appState.scrollX) * zoom;
         const screenCenterY = (element.y + element.height / 2 + appState.scrollY) * zoom;
 
+        // Match Excalidraw corner rounding and keep content inset from stroke edges
+        const borderRadius = (() => {
+            if (!element.roundness) return 0;
+            if (element.roundness.type === 3) return Math.min(element.width, element.height) * 0.25;
+            if (element.roundness.type === 2) return element.roundness.value ?? 32;
+            return 0;
+        })();
+        const roughnessInset = Math.round((element.roughness ?? 0) * 2 + (element.strokeWidth ?? 1) * 0.5);
+        const contentInset = Math.max(0, Math.min(6, roughnessInset));
+        const clampedRadius = Math.max(0, borderRadius - contentInset);
+
         // Container style - position so center matches screenCenterX/Y
         const containerStyle: React.CSSProperties = {
             position: 'absolute',
@@ -54,18 +66,32 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
             transform: `scale(${zoom})`,
             transformOrigin: 'center center',
             pointerEvents: 'none',
-            zIndex: getOverlayZIndex(isSelected),
+            zIndex: getOverlayZIndex(isSelected, false, stackIndex),
+        };
+
+        // Clip wrapper no longer has overflow:hidden - moved to content only
+        // This allows toolbar to extend beyond the rounded corners
+        const clipWrapperStyle: React.CSSProperties = {
+            width: '100%',
+            height: '100%',
+            boxSizing: 'border-box',
+            padding: `${contentInset}px`,
+            borderRadius: `${clampedRadius}px`,
+            // overflow: 'hidden' removed - now applied only to content area
         };
 
         // Content card style - visual layer
+        // overflow: 'hidden' is applied here to clip the editor content
+        // but NOT the toolbar which is rendered before this container
         const contentStyle: React.CSSProperties = {
             width: '100%',
             height: '100%',
             backgroundColor: 'transparent',
             color: isDark ? '#e5e5e5' : '#1a1a1a',
-            borderRadius: '8px',
+            borderRadius: 0,
             padding: 0,
             overflow: 'hidden',
+            isolation: 'isolate',
             boxShadow: isSelected
                 ? '0 0 0 2px #6366f1, 0 10px 40px -10px rgba(0,0,0,0.5)'
                 : 'none',
@@ -77,6 +103,8 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
             transition: 'all 0.2s ease',
             backdropFilter: backgroundOpacity < 1 ? `blur(${blurAmount}px)` : 'none',
             WebkitBackdropFilter: backgroundOpacity < 1 ? `blur(${blurAmount}px)` : 'none',
+            display: 'flex',
+            flexDirection: 'column',
         };
 
         // Manual dragging support
@@ -246,32 +274,74 @@ const LexicalNoteInner = memo(forwardRef<LexicalNoteRef, LexicalNoteProps>(
                 className="lexical-note-container"
                 data-lexical-id={element.id}
             >
-                <div
-                    ref={contentRef}
-                    style={contentStyle}
-                    data-lexical-id={element.id}
-                    onMouseDown={handleMouseDown}
-                >
-                    <RichTextEditor
-                        initialState={lexicalState}
-                        onChange={updateContent}
-                        isDark={isDark}
-                        isScrollMode={true}
-                        showToolbar={true}
-                        autoFocus={false}
-                        transparent={!isSelected}
-                        onEscape={onDeselect}
-                        backgroundOpacity={backgroundOpacity}
-                        onBackgroundOpacityChange={(val) => updateContent({ backgroundOpacity: val })}
-                        blurAmount={blurAmount}
-                        onBlurAmountChange={(val) => updateContent({ blurAmount: val })}
-                        backgroundColor={element.backgroundColor}
-                        fillStyle={element.fillStyle}
-                        elementOpacity={element.opacity}
-                        strokeColor={element.strokeColor}
-                        strokeWidth={element.strokeWidth}
-                        strokeStyle={element.strokeStyle}
-                    />
+                {/* Toolbar area - OUTSIDE the clip wrapper so it's not clipped by borderRadius */}
+                {isSelected && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '-46px', // Position above the note
+                            left: '0',
+                            right: '0',
+                            height: '44px',
+                            zIndex: 100,
+                            pointerEvents: 'auto',
+                            display: 'flex',
+                            justifyContent: 'flex-start',
+                            padding: '0 4px',
+                        }}
+                        data-lexical-toolbar={element.id}
+                    >
+                        <div 
+                            style={{
+                                background: isDark ? 'rgba(26, 26, 26, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+                                borderRadius: '8px',
+                                boxShadow: isDark 
+                                    ? '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)' 
+                                    : '0 4px 20px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                                padding: '4px 8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '13px',
+                                color: isDark ? '#e5e5e5' : '#333',
+                            }}
+                        >
+                            {/* Toolbar will be rendered here via portal from RichTextEditor */}
+                            <div id={`toolbar-portal-${element.id}`} style={{ display: 'flex', alignItems: 'center', gap: '2px' }} />
+                        </div>
+                    </div>
+                )}
+                <div style={clipWrapperStyle} data-lexical-id={element.id}>
+                    <div
+                        ref={contentRef}
+                        style={contentStyle}
+                        data-lexical-id={element.id}
+                        onMouseDown={handleMouseDown}
+                    >
+                        <RichTextEditor
+                            initialState={lexicalState}
+                            onChange={updateContent}
+                            isDark={isDark}
+                            isScrollMode={true}
+                            showToolbar={isSelected}
+                            toolbarPortalId={`toolbar-portal-${element.id}`}
+                            autoFocus={false}
+                            transparent={false}
+                            onEscape={onDeselect}
+                            backgroundOpacity={backgroundOpacity}
+                            onBackgroundOpacityChange={(val) => updateContent({ backgroundOpacity: val })}
+                            blurAmount={blurAmount}
+                            onBlurAmountChange={(val) => updateContent({ blurAmount: val })}
+                            backgroundColor={element.backgroundColor}
+                            fillStyle={element.fillStyle}
+                            elementOpacity={element.opacity}
+                            strokeColor="transparent"
+                            strokeWidth={0}
+                            strokeStyle={element.strokeStyle}
+                        />
+                    </div>
                 </div>
                 <ZoomHint visible={zoomHintVisible} />
             </div>

@@ -23,6 +23,8 @@ export interface MarkdownNoteProps {
     element: MarkdownElement;
     /** Current app state for positioning calculations */
     appState: AppState;
+    /** Scene stacking index used for cross-overlay z-order */
+    stackIndex?: number;
     /** Callback when content, images, or settings change */
     onChange: (id: string, content: string, images?: Record<string, string>, settings?: MarkdownNoteSettings) => void;
 }
@@ -88,9 +90,15 @@ export interface MarkdownElement {
     versionNonce?: number;
     locked?: boolean;
     boundElements?: any[];
+    backgroundColor?: string;
+    strokeColor?: string;
+    strokeWidth?: number;
+    strokeStyle?: 'solid' | 'dashed' | 'dotted';
+    fillStyle?: 'hachure' | 'cross-hatch' | 'solid';
+    opacity?: number;
+    fontFamily?: number;
     roundness?: { type: number; value?: number } | null;
     roughness?: number;
-    strokeWidth?: number;
     customData?: {
         type: 'markdown';
         content: string;
@@ -214,7 +222,7 @@ export const DEFAULT_NOTE_HEIGHT = 350;
 /**
  * Default content for new notes
  */
-export const DEFAULT_NOTE_CONTENT = `# 📝 New Note
+export const DEFAULT_NOTE_CONTENT = `# ![Markdown icon](https://cdn.jsdelivr.net/gh/dcurtis/markdown-mark/svg/markdown-mark.svg) New Note
 
 Double-click to edit this note.
 
