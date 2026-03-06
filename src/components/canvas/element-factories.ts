@@ -142,33 +142,6 @@ export function createMarkdownElementDraft(sceneCenter: SceneCenter): CanvasElem
   };
 }
 
-export async function createRichTextElementDraft(
-  sceneCenter: SceneCenter,
-): Promise<CanvasElementInput> {
-  const { DEFAULT_NOTE_STATE } = await import('@/components/islands/rich-text');
-  const width = 1000;
-  const height = 1200;
-
-  return {
-    type: 'rectangle',
-    ...createCenteredRect(sceneCenter, width, height),
-    backgroundColor: '#ffffff',
-    strokeColor: '#000000',
-    strokeWidth: 1,
-    roughness: 0,
-    opacity: 100,
-    fillStyle: 'solid',
-    roundness: { type: 3 },
-    id: nanoid(),
-    locked: false,
-    customData: {
-      type: 'lexical',
-      lexicalState: DEFAULT_NOTE_STATE,
-      version: 1,
-    },
-  };
-}
-
 export function createNewLexElementDraft(sceneCenter: SceneCenter): CanvasElementInput {
   const width = 920;
   const height = 980;
@@ -187,7 +160,7 @@ export function createNewLexElementDraft(sceneCenter: SceneCenter): CanvasElemen
     locked: false,
     customData: {
       type: 'newlex',
-      content: DEFAULT_NEWLEX_CONTENT,
+      lexicalState: DEFAULT_NEWLEX_CONTENT,
       comments: [],
       commentsPanelOpen: false,
       version: 1,

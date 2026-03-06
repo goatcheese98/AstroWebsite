@@ -2,29 +2,55 @@ import React, { useState, useCallback, useRef } from 'react';
 import type { KanbanCard } from './kanban-types';
 import { LABEL_COLORS, PRIORITY_COLORS } from './kanban-types';
 
+function getTodayIso(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDueDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 interface KanbanCardViewProps {
   card: KanbanCard;
   columnId: string;
   cardBg: string;
+  isDragging: boolean;
+  showReturnCue: boolean;
   onUpdate: (cardId: string, changes: Partial<KanbanCard>) => void;
   onDelete: (cardId: string) => void;
   onDragStart: (e: React.DragEvent, cardId: string, fromColumnId: string) => void;
+  onDragEnd: () => void;
   onDragEnter: (cardId: string) => void;
+  onDragOverCard: (e: React.DragEvent<HTMLDivElement>, cardId: string) => void;
 }
 
 export function KanbanCardView({
   card,
   columnId,
   cardBg,
+  isDragging,
+  showReturnCue,
   onUpdate,
   onDelete,
   onDragStart,
+  onDragEnd,
   onDragEnter,
+  onDragOverCard,
 }: KanbanCardViewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(card.title);
   const [editDesc, setEditDesc] = useState(card.description || '');
   const [editPriority, setEditPriority] = useState<KanbanCard['priority']>(card.priority);
+  const [editDueDate, setEditDueDate] = useState(card.dueDate || '');
   const [isHovered, setIsHovered] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,9 +62,10 @@ export function KanbanCardView({
     setEditTitle(card.title);
     setEditDesc(card.description || '');
     setEditPriority(card.priority);
+    setEditDueDate(card.dueDate || '');
     setIsEditing(true);
     setTimeout(() => titleInputRef.current?.focus(), 0);
-  }, [card.title, card.description, card.priority]);
+  }, [card.title, card.description, card.priority, card.dueDate]);
 
   const saveEdit = useCallback(() => {
     if (editTitle.trim()) {
@@ -46,17 +73,19 @@ export function KanbanCardView({
         title: editTitle.trim(),
         description: editDesc.trim() || undefined,
         priority: editPriority || undefined,
+        dueDate: editDueDate || undefined,
       });
     }
     setIsEditing(false);
-  }, [card.id, editTitle, editDesc, editPriority, onUpdate]);
+  }, [card.id, editTitle, editDesc, editPriority, editDueDate, onUpdate]);
 
   const cancelEdit = useCallback(() => {
     setEditTitle(card.title);
     setEditDesc(card.description || '');
     setEditPriority(card.priority);
+    setEditDueDate(card.dueDate || '');
     setIsEditing(false);
-  }, [card.title, card.description, card.priority]);
+  }, [card.title, card.description, card.priority, card.dueDate]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -70,6 +99,7 @@ export function KanbanCardView({
   );
 
   const priorityColor = card.priority ? PRIORITY_COLORS[card.priority] : undefined;
+  const isOverdue = !!card.dueDate && card.dueDate < getTodayIso();
 
   if (isEditing) {
     return (
@@ -166,6 +196,29 @@ export function KanbanCardView({
           </div>
         </div>
 
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontFamily: 'inherit', fontSize: '0.77em', color: '#9ca3af', display: 'block', marginBottom: 4 }}>
+            Due Date
+          </span>
+          <input
+            type="date"
+            value={editDueDate}
+            onChange={(e) => setEditDueDate(e.target.value)}
+            style={{
+              width: '100%',
+              border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: 3,
+              outline: 'none',
+              background: 'rgba(255,255,255,0.8)',
+              fontFamily: 'inherit',
+              fontSize: '0.83em',
+              color: '#555',
+              padding: '4px 6px',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
           <button
             onClick={cancelEdit}
@@ -207,24 +260,31 @@ export function KanbanCardView({
     <div
       draggable
       onDragStart={(e) => onDragStart(e, card.id, columnId)}
+      onDragEnd={onDragEnd}
       onDragEnter={() => onDragEnter(card.id)}
+      onDragOver={(e) => onDragOverCard(e, card.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={openEdit}
       style={{
         background: cardBg,
-        border: '1.5px solid rgba(0,0,0,0.10)',
+        border: showReturnCue
+          ? '1.5px solid rgba(99,102,241,0.55)'
+          : '1.5px solid rgba(0,0,0,0.10)',
         borderRadius: 4,
         padding: '8px 10px',
         marginBottom: 6,
-        cursor: 'grab',
+        cursor: isDragging ? 'grabbing' : 'grab',
         position: 'relative',
-        boxShadow: isHovered
-          ? '0 3px 10px rgba(0,0,0,0.12)'
-          : '0 1px 3px rgba(0,0,0,0.07)',
+        boxShadow: showReturnCue
+          ? '0 0 0 2px rgba(99,102,241,0.16), 0 3px 10px rgba(0,0,0,0.10)'
+          : isHovered
+            ? '0 3px 10px rgba(0,0,0,0.12)'
+            : '0 1px 3px rgba(0,0,0,0.07)',
         transition: 'box-shadow 0.15s ease',
         userSelect: 'none',
+        opacity: isDragging && !showReturnCue ? 0.62 : 1,
       }}
     >
       {/* Labels */}
@@ -318,6 +378,12 @@ export function KanbanCardView({
           <span style={{ fontFamily: 'inherit', fontSize: '0.77em', color: priorityColor, fontWeight: 600 }}>
             {card.priority}
           </span>
+        </div>
+      )}
+
+      {card.dueDate && (
+        <div style={{ marginTop: 4, fontFamily: 'inherit', fontSize: '0.77em', fontWeight: 600, color: isOverdue ? '#ef4444' : '#6b7280' }}>
+          Due {formatDueDate(card.dueDate)}
         </div>
       )}
 

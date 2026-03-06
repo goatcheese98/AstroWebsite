@@ -4,6 +4,7 @@ export interface KanbanCard {
   description?: string;
   labels?: string[];
   priority?: 'low' | 'medium' | 'high';
+  dueDate?: string;
   checklist?: Array<{ text: string; done: boolean }>;
 }
 
@@ -11,6 +12,7 @@ export interface KanbanColumn {
   id: string;
   title: string;
   color?: string;
+  wipLimit?: number;
   cards: KanbanCard[];
 }
 

@@ -17,12 +17,13 @@ import type {
   KanbanOperation,
   AppState,
 } from './kanban-types';
+import { BOARD_THEMES, BOARD_FONTS } from './kanban-types';
 import { KanbanColumn } from './KanbanColumn';
+import { applyKanbanOperations, moveKanbanCard } from './kanban-logic';
 import {
   applyColorOpacity,
   getExcalidrawCornerRadius,
   getExcalidrawFontFamily,
-  getExcalidrawSurfaceStyle,
 } from '@/components/islands/excalidraw-element-style';
 import { getOverlayZIndex } from '@/components/islands/overlay-utils';
 import { ZoomHint } from '@/components/islands/ZoomHint';
@@ -35,6 +36,15 @@ interface KanbanBoardProps {
   onChange: (elementId: string, data: KanbanBoardData) => void;
 }
 
+const MAX_HISTORY_ENTRIES = 100;
+
+function cloneBoardData(data: KanbanBoardData): KanbanBoardData {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(data);
+  }
+  return JSON.parse(JSON.stringify(data)) as KanbanBoardData;
+}
+
 const KanbanBoardInner = memo(
   forwardRef<KanbanNoteRef, KanbanBoardProps>(({ element, appState, stackIndex = 0, onChange }, ref) => {
     const [boardData, setBoardData] = useState<KanbanBoardData>(element.customData);
@@ -43,28 +53,137 @@ const KanbanBoardInner = memo(
     const [overColumnId, setOverColumnId] = useState<string | null>(null);
     const [overCardId, setOverCardId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [pendingDeleteColumnId, setPendingDeleteColumnId] = useState<string | null>(null);
+    const [historyTick, setHistoryTick] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const undoStackRef = useRef<KanbanBoardData[]>([]);
+    const redoStackRef = useRef<KanbanBoardData[]>([]);
 
     // Interactive whenever the Excalidraw element is selected
     const isInteracting = appState.selectedElementIds?.[element.id] === true;
     const { visible: zoomHintVisible } = useZoomHint(containerRef, isInteracting);
 
+    const activeTheme = BOARD_THEMES.find((theme) => theme.id === boardData.bgTheme) ?? BOARD_THEMES[0];
+    const activeFont = BOARD_FONTS.find((font) => font.id === boardData.fontId);
     const activeFontSize = boardData.fontSize ?? 13;
+    const canUndo = historyTick >= 0 && undoStackRef.current.length > 0;
+    const canRedo = historyTick >= 0 && redoStackRef.current.length > 0;
 
     // Sync from element.customData when it changes externally
     useEffect(() => {
       setBoardData(element.customData);
     }, [element.customData]);
 
+    useEffect(() => {
+      undoStackRef.current = [];
+      redoStackRef.current = [];
+      setHistoryTick((tick) => tick + 1);
+    }, [element.id]);
+
+    useEffect(() => {
+      if (!isInteracting) {
+        setShowSettings(false);
+        setPendingDeleteColumnId(null);
+      }
+    }, [isInteracting]);
+
+    useEffect(() => {
+      if (
+        pendingDeleteColumnId &&
+        !boardData.columns.some((column) => column.id === pendingDeleteColumnId)
+      ) {
+        setPendingDeleteColumnId(null);
+      }
+    }, [pendingDeleteColumnId, boardData.columns]);
+
+    useEffect(() => {
+      if (!pendingDeleteColumnId) return;
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setPendingDeleteColumnId(null);
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [pendingDeleteColumnId]);
+
     const commitChange = useCallback(
       (updater: (prev: KanbanBoardData) => KanbanBoardData) => {
         setBoardData((prev) => {
           const next = updater(prev);
+          if (next === prev) {
+            return prev;
+          }
+          undoStackRef.current = [
+            ...undoStackRef.current.slice(-(MAX_HISTORY_ENTRIES - 1)),
+            cloneBoardData(prev),
+          ];
+          redoStackRef.current = [];
           onChange(element.id, next);
           return next;
         });
+        setHistoryTick((tick) => tick + 1);
       },
       [element.id, onChange],
+    );
+
+    const handleUndo = useCallback(() => {
+      const previous = undoStackRef.current.at(-1);
+      if (!previous) return;
+      undoStackRef.current = undoStackRef.current.slice(0, -1);
+
+      setBoardData((current) => {
+        redoStackRef.current = [
+          ...redoStackRef.current.slice(-(MAX_HISTORY_ENTRIES - 1)),
+          cloneBoardData(current),
+        ];
+        const next = cloneBoardData(previous);
+        onChange(element.id, next);
+        return next;
+      });
+
+      setHistoryTick((tick) => tick + 1);
+    }, [element.id, onChange]);
+
+    const handleRedo = useCallback(() => {
+      const nextFromRedo = redoStackRef.current.at(-1);
+      if (!nextFromRedo) return;
+      redoStackRef.current = redoStackRef.current.slice(0, -1);
+
+      setBoardData((current) => {
+        undoStackRef.current = [
+          ...undoStackRef.current.slice(-(MAX_HISTORY_ENTRIES - 1)),
+          cloneBoardData(current),
+        ];
+        const next = cloneBoardData(nextFromRedo);
+        onChange(element.id, next);
+        return next;
+      });
+
+      setHistoryTick((tick) => tick + 1);
+    }, [element.id, onChange]);
+
+    const handleSetTheme = useCallback(
+      (themeId: string) => {
+        commitChange((prev) => ({ ...prev, bgTheme: themeId }));
+      },
+      [commitChange],
+    );
+
+    const handleSetFont = useCallback(
+      (fontId: string) => {
+        commitChange((prev) => ({ ...prev, fontId }));
+      },
+      [commitChange],
+    );
+
+    const handleSetFontSize = useCallback(
+      (delta: number) => {
+        commitChange((prev) => ({
+          ...prev,
+          fontSize: Math.min(20, Math.max(10, (prev.fontSize ?? 13) + delta)),
+        }));
+      },
+      [commitChange],
     );
 
     // --- Column operations ---
@@ -90,6 +209,25 @@ const KanbanBoardInner = memo(
       },
       [commitChange],
     );
+
+    const handleRequestDeleteColumn = useCallback(
+      (columnId: string) => {
+        const targetColumn = boardData.columns.find((column) => column.id === columnId);
+        if (!targetColumn) return;
+        setPendingDeleteColumnId(columnId);
+      },
+      [boardData.columns],
+    );
+
+    const handleCancelDeleteColumn = useCallback(() => {
+      setPendingDeleteColumnId(null);
+    }, []);
+
+    const handleConfirmDeleteColumn = useCallback(() => {
+      if (!pendingDeleteColumnId) return;
+      handleDeleteColumn(pendingDeleteColumnId);
+      setPendingDeleteColumnId(null);
+    }, [pendingDeleteColumnId, handleDeleteColumn]);
 
     const handleAddColumn = useCallback(() => {
       commitChange((prev) => ({
@@ -157,6 +295,13 @@ const KanbanBoardInner = memo(
       [],
     );
 
+    const handleDragEnd = useCallback(() => {
+      setDraggingCardId(null);
+      setDraggingFromColumnId(null);
+      setOverColumnId(null);
+      setOverCardId(null);
+    }, []);
+
     const handleCardDragEnter = useCallback((cardId: string | null) => {
       setOverCardId(cardId);
     }, []);
@@ -170,111 +315,31 @@ const KanbanBoardInner = memo(
     const handleDrop = useCallback(
       (e: React.DragEvent, toColumnId: string) => {
         e.preventDefault();
-        setOverColumnId(null);
+        if (!draggingCardId || !draggingFromColumnId) {
+          handleDragEnd();
+          return;
+        }
 
-        if (!draggingCardId || !draggingFromColumnId) return;
-
-        const cardId = draggingCardId;
-        const fromColumnId = draggingFromColumnId;
-        const targetCardId = overCardId;
-        setDraggingCardId(null);
-        setDraggingFromColumnId(null);
-        setOverCardId(null);
-
-        commitChange((prev) => {
-          const fromCol = prev.columns.find((c) => c.id === fromColumnId);
-          const card = fromCol?.cards.find((c) => c.id === cardId);
-          if (!card) return prev;
-
-          if (fromColumnId === toColumnId) {
-            // Intra-column reorder
-            const newCards = fromCol!.cards.filter((c) => c.id !== cardId);
-            const insertIdx = targetCardId
-              ? newCards.findIndex((c) => c.id === targetCardId)
-              : -1;
-            newCards.splice(insertIdx === -1 ? newCards.length : insertIdx, 0, card);
-            return {
-              ...prev,
-              columns: prev.columns.map((col) =>
-                col.id === fromColumnId ? { ...col, cards: newCards } : col,
-              ),
-            };
-          }
-
-          // Cross-column move
-          const toCol = prev.columns.find((c) => c.id === toColumnId);
-          if (!toCol) return prev;
-          const toCards = toCol.cards.filter((c) => c.id !== cardId);
-          const insertIdx = targetCardId
-            ? toCards.findIndex((c) => c.id === targetCardId)
-            : -1;
-          toCards.splice(insertIdx === -1 ? toCards.length : insertIdx, 0, card);
-
-          return {
-            ...prev,
-            columns: prev.columns.map((col) => {
-              if (col.id === fromColumnId) return { ...col, cards: col.cards.filter((c) => c.id !== cardId) };
-              if (col.id === toColumnId) return { ...col, cards: toCards };
-              return col;
-            }),
-          };
-        });
+        const dropTargetCardId = overCardId;
+        commitChange((prev) =>
+          moveKanbanCard({
+            board: prev,
+            cardId: draggingCardId,
+            fromColumnId: draggingFromColumnId,
+            toColumnId,
+            overCardId: dropTargetCardId,
+          }),
+        );
+        handleDragEnd();
       },
-      [draggingCardId, draggingFromColumnId, overCardId, commitChange],
+      [draggingCardId, draggingFromColumnId, overCardId, commitChange, handleDragEnd],
     );
 
     // --- Apply AI operations ---
 
     const applyOperations = useCallback(
       (ops: KanbanOperation[]) => {
-        commitChange((prev) => {
-          const next = { ...prev, columns: [...prev.columns.map((c) => ({ ...c, cards: [...c.cards] }))] };
-
-          for (const op of ops) {
-            if (op.op === 'add_card') {
-              const col = next.columns.find((c) => c.id === op.columnId);
-              if (col) col.cards.push({ id: nanoid(), title: 'New card', ...op.card } as KanbanCard);
-            } else if (op.op === 'update_card') {
-              for (const col of next.columns) {
-                const i = col.cards.findIndex((c) => c.id === op.cardId);
-                if (i !== -1) { col.cards[i] = { ...col.cards[i], ...op.changes }; break; }
-              }
-            } else if (op.op === 'delete_card') {
-              for (const col of next.columns) {
-                const before = col.cards.length;
-                col.cards = col.cards.filter((c) => c.id !== op.cardId);
-                if (col.cards.length !== before) break;
-              }
-            } else if (op.op === 'move_card') {
-              let movingCard: KanbanCard | undefined;
-              for (const col of next.columns) {
-                const idx = col.cards.findIndex((c) => c.id === op.cardId);
-                if (idx !== -1) { movingCard = col.cards.splice(idx, 1)[0]; break; }
-              }
-              if (movingCard) {
-                const toCol = next.columns.find((c) => c.id === op.toColumnId);
-                if (toCol) {
-                  if (op.toIndex !== undefined) toCol.cards.splice(op.toIndex, 0, movingCard);
-                  else toCol.cards.push(movingCard);
-                }
-              }
-            } else if (op.op === 'add_column') {
-              next.columns.push({ id: nanoid(), title: 'New Column', cards: [], ...op.column } as KanbanColumnType);
-            } else if (op.op === 'update_column') {
-              const i = next.columns.findIndex((c) => c.id === op.columnId);
-              if (i !== -1) next.columns[i] = { ...next.columns[i], ...op.changes };
-            } else if (op.op === 'delete_column') {
-              next.columns = next.columns.filter((c) => c.id !== op.columnId);
-            } else if (op.op === 'reorder_cards') {
-              const col = next.columns.find((c) => c.id === op.columnId);
-              if (col) {
-                const map = new Map(col.cards.map((c) => [c.id, c]));
-                col.cards = op.cardIds.map((id) => map.get(id)).filter((c): c is KanbanCard => !!c);
-              }
-            }
-          }
-          return next;
-        });
+        commitChange((prev) => applyKanbanOperations(prev, ops));
       },
       [commitChange],
     );
@@ -331,22 +396,16 @@ const KanbanBoardInner = memo(
       element.roundness,
     ) || 6;
 
-    const boardSurface = getExcalidrawSurfaceStyle({
-      backgroundColor: element.backgroundColor,
-      strokeColor: element.strokeColor,
-      strokeWidth: element.strokeWidth,
-      strokeStyle: element.strokeStyle,
-      fillStyle: element.fillStyle,
-      opacity: element.opacity,
-    });
-    const boardFontFamily = getExcalidrawFontFamily(element.fontFamily) ?? 'Helvetica, Arial, sans-serif';
-    const borderTone = applyColorOpacity(
-      element.strokeColor && element.strokeColor !== 'transparent' ? element.strokeColor : '#000000',
-      ((element.opacity ?? 100) / 100) * 0.3,
-    );
-    const headerBg = 'rgba(255,255,255,0.52)';
-    const columnBg = 'rgba(255,255,255,0.56)';
-    const cardBg = 'rgba(255,255,255,0.86)';
+    const boardOpacity = (element.opacity ?? 100) / 100;
+    const boardFontFamily = activeFont?.family ?? getExcalidrawFontFamily(element.fontFamily) ?? 'Helvetica, Arial, sans-serif';
+    const boardBg = applyColorOpacity(activeTheme.boardBg, boardOpacity);
+    const borderTone = applyColorOpacity(activeTheme.border, boardOpacity);
+    const headerBg = applyColorOpacity(activeTheme.headerBg, boardOpacity);
+    const columnBg = applyColorOpacity(activeTheme.colBg, boardOpacity);
+    const cardBg = applyColorOpacity(activeTheme.cardBg, boardOpacity);
+    const pendingDeleteColumn = pendingDeleteColumnId
+      ? boardData.columns.find((column) => column.id === pendingDeleteColumnId) ?? null
+      : null;
 
     return (
       <div ref={containerRef} style={containerStyle}>
@@ -354,7 +413,8 @@ const KanbanBoardInner = memo(
           style={{
             width: '100%',
             height: '100%',
-            ...boardSurface,
+            background: boardBg,
+            border: `1.5px solid ${borderTone}`,
             borderRadius: boardRadius,
             boxShadow: isInteracting
               ? '0 0 0 2px #6366f1, 0 10px 20px -3px rgba(0,0,0,0.18)'
@@ -435,6 +495,60 @@ const KanbanBoardInner = memo(
             <span style={{ fontFamily: 'inherit', fontSize: '0.85em', color: '#9ca3af', marginLeft: 4 }}>
               {boardData.columns.reduce((sum, col) => sum + col.cards.length, 0)} cards
             </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUndo();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                disabled={!canUndo}
+                title="Undo"
+                style={{
+                  width: 24,
+                  height: 24,
+                  border: '1.5px solid rgba(0,0,0,0.12)',
+                  borderRadius: 5,
+                  background: canUndo ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.5)',
+                  cursor: canUndo ? 'pointer' : 'default',
+                  color: canUndo ? '#374151' : '#c4c8d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  lineHeight: 1,
+                  fontSize: 14,
+                }}
+              >
+                ↶
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRedo();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                disabled={!canRedo}
+                title="Redo"
+                style={{
+                  width: 24,
+                  height: 24,
+                  border: '1.5px solid rgba(0,0,0,0.12)',
+                  borderRadius: 5,
+                  background: canRedo ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.5)',
+                  cursor: canRedo ? 'pointer' : 'default',
+                  color: canRedo ? '#374151' : '#c4c8d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  lineHeight: 1,
+                  fontSize: 14,
+                }}
+              >
+                ↷
+              </button>
+            </div>
           </div>
 
           {/* Columns area */}
@@ -459,13 +573,15 @@ const KanbanBoardInner = memo(
                 cardBg={cardBg}
                 isOver={overColumnId === column.id}
                 draggingCardId={draggingCardId}
+                draggingFromColumnId={draggingFromColumnId}
                 overCardId={overCardId}
                 onUpdateColumn={handleUpdateColumn}
-                onDeleteColumn={handleDeleteColumn}
+                onRequestDeleteColumn={handleRequestDeleteColumn}
                 onUpdateCard={handleUpdateCard}
                 onDeleteCard={handleDeleteCard}
                 onAddCard={handleAddCard}
                 onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onCardDragEnter={handleCardDragEnter}
@@ -507,9 +623,277 @@ const KanbanBoardInner = memo(
               Add column
             </button>
           </div>
+
+          {pendingDeleteColumn && (
+            <div
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                if (e.currentTarget === e.target) {
+                  handleCancelDeleteColumn();
+                }
+              }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(15,23,42,0.24)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+                zIndex: 20,
+              }}
+            >
+              <div
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  width: 'min(420px, 100%)',
+                  background: '#ffffff',
+                  border: '1.5px solid rgba(0,0,0,0.12)',
+                  borderRadius: 10,
+                  boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+                  padding: '14px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <div style={{ fontSize: '1.02em', fontWeight: 700, color: '#111827', marginBottom: 6 }}>
+                  Delete column?
+                </div>
+                <div style={{ fontSize: '0.9em', color: '#6b7280', lineHeight: 1.45, marginBottom: 12 }}>
+                  Delete "{pendingDeleteColumn.title}" and its {pendingDeleteColumn.cards.length} card(s)?
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button
+                    onClick={handleCancelDeleteColumn}
+                    style={{
+                      padding: '6px 10px',
+                      border: '1.5px solid rgba(0,0,0,0.15)',
+                      borderRadius: 6,
+                      background: '#ffffff',
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      fontFamily: 'inherit',
+                      fontSize: '0.85em',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDeleteColumn}
+                    style={{
+                      padding: '6px 10px',
+                      border: '1.5px solid #ef4444',
+                      borderRadius: 6,
+                      background: '#ef4444',
+                      cursor: 'pointer',
+                      color: '#ffffff',
+                      fontFamily: 'inherit',
+                      fontSize: '0.85em',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom toolbar */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              padding: '4px 10px 6px',
+              flexShrink: 0,
+              borderTop: `1px solid ${borderTone}`,
+              background: headerBg,
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSettings((visible) => !visible);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              title="Appearance"
+              style={{
+                width: 28,
+                height: 28,
+                border: showSettings ? '1.5px solid #6366f1' : `1.5px solid ${borderTone}`,
+                borderRadius: 6,
+                background: showSettings ? 'rgba(99,102,241,0.08)' : 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: showSettings ? '#6366f1' : '#9ca3af',
+                transition: 'all 0.15s ease',
+                padding: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (!showSettings) {
+                  e.currentTarget.style.borderColor = '#6366f1';
+                  e.currentTarget.style.color = '#6366f1';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showSettings) {
+                  e.currentTarget.style.borderColor = borderTone;
+                  e.currentTarget.style.color = '#9ca3af';
+                }
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+              </svg>
+            </button>
+          </div>
+
+          {showSettings && (
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                bottom: 44,
+                right: 10,
+                width: 232,
+                background: '#ffffff',
+                borderRadius: 10,
+                border: '1.5px solid rgba(0,0,0,0.1)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                padding: '12px',
+                zIndex: 10,
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
+                  Background
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {BOARD_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      onClick={() => handleSetTheme(theme.id)}
+                      title={theme.name}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: theme.colBg,
+                        border: activeTheme.id === theme.id ? '2.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.15)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        flexShrink: 0,
+                        boxShadow: activeTheme.id === theme.id ? '0 0 0 1.5px #fff inset' : 'none',
+                        transition: 'border 0.1s ease',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 12 }} />
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
+                  Font
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {BOARD_FONTS.map((font) => {
+                    const isSelected = activeFont?.id === font.id;
+                    return (
+                      <button
+                        key={font.id}
+                        onClick={() => handleSetFont(font.id)}
+                        style={{
+                          padding: '5px 10px',
+                          border: isSelected ? '1.5px solid #6366f1' : '1.5px solid rgba(0,0,0,0.1)',
+                          borderRadius: 6,
+                          background: isSelected ? 'rgba(99,102,241,0.07)' : 'transparent',
+                          cursor: 'pointer',
+                          fontFamily: font.family,
+                          fontSize: 13,
+                          fontWeight: isSelected ? 700 : 400,
+                          color: isSelected ? '#6366f1' : '#374151',
+                          textAlign: 'left',
+                          transition: 'all 0.1s ease',
+                        }}
+                      >
+                        {font.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', marginBottom: 12, marginTop: 4 }} />
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'system-ui, sans-serif' }}>
+                  Font Size
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => handleSetFontSize(-1)}
+                    disabled={activeFontSize <= 10}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      border: '1.5px solid rgba(0,0,0,0.12)',
+                      borderRadius: 6,
+                      background: 'transparent',
+                      cursor: activeFontSize <= 10 ? 'default' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                      lineHeight: 1,
+                      color: activeFontSize <= 10 ? '#d1d5db' : '#374151',
+                      fontFamily: 'system-ui, sans-serif',
+                      padding: 0,
+                    }}
+                  >
+                    -
+                  </button>
+                  <span style={{ flex: 1, textAlign: 'center', fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    {activeFontSize}px
+                  </span>
+                  <button
+                    onClick={() => handleSetFontSize(1)}
+                    disabled={activeFontSize >= 20}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      border: '1.5px solid rgba(0,0,0,0.12)',
+                      borderRadius: 6,
+                      background: 'transparent',
+                      cursor: activeFontSize >= 20 ? 'default' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                      lineHeight: 1,
+                      color: activeFontSize >= 20 ? '#d1d5db' : '#374151',
+                      fontFamily: 'system-ui, sans-serif',
+                      padding: 0,
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
           .kanban-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
           .kanban-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .kanban-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }

@@ -84,11 +84,11 @@ export class EquationNode extends DecoratorNode<React.JSX.Element> {
 
     static importDOM(): DOMConversionMap | null {
         return {
-            div: (node: Node) => ({
+            div: (_node: Node) => ({
                 conversion: $convertEquationElement,
                 priority: 1,
             }),
-            span: (node: Node) => ({
+            span: (_node: Node) => ({
                 conversion: $convertEquationElement,
                 priority: 1,
             }),
@@ -140,8 +140,6 @@ export function $createEquationNode(equation: string, inline?: boolean): Equatio
 export function $isEquationNode(node: LexicalNode | null | undefined): node is EquationNode {
     return node instanceof EquationNode;
 }
-
-// React component for rendering
 
 interface EquationComponentProps {
     equation: string;

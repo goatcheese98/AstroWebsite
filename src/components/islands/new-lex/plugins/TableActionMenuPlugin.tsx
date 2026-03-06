@@ -13,7 +13,6 @@ import {
     $getTableRowNodeFromTableCellNodeOrThrow,
     $getTableNodeFromLexicalNodeOrThrow,
     $getTableColumnIndexFromTableCellNode,
-    $getTableRowIndexFromTableCellNode,
     $createTableCellNode,
     $createTableRowNode,
     TableCellNode,
@@ -28,15 +27,9 @@ interface TableActionMenuProps {
     tableCellNode: TableCellNode;
 }
 
-function TableActionMenu({
-    anchorElem,
-    editor,
-    onClose,
-    tableCellNode,
-}: TableActionMenuProps): JSX.Element {
+function TableActionMenu({ anchorElem, editor, onClose, tableCellNode }: TableActionMenuProps): JSX.Element {
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Close menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -50,22 +43,15 @@ function TableActionMenu({
     const handleAddRowAbove = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
-            
-            // Get number of columns from first row
             const firstRow = tableNode.getFirstChild() as TableRowNode;
             const columnCount = firstRow ? firstRow.getChildrenSize() : 1;
-            
-            // Create new row with cells
             const newRow = $createTableRowNode();
             for (let i = 0; i < columnCount; i++) {
                 const cell = $createTableCellNode();
                 cell.append($createParagraphNode());
                 newRow.append(cell);
             }
-            
             rowNode.insertBefore(newRow);
         });
         onClose();
@@ -74,22 +60,15 @@ function TableActionMenu({
     const handleAddRowBelow = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
-            
-            // Get number of columns from first row
             const firstRow = tableNode.getFirstChild() as TableRowNode;
             const columnCount = firstRow ? firstRow.getChildrenSize() : 1;
-            
-            // Create new row with cells
             const newRow = $createTableRowNode();
             for (let i = 0; i < columnCount; i++) {
                 const cell = $createTableCellNode();
                 cell.append($createParagraphNode());
                 newRow.append(cell);
             }
-            
             rowNode.insertAfter(newRow);
         });
         onClose();
@@ -98,11 +77,7 @@ function TableActionMenu({
     const handleDeleteRow = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
-            
-            // Don't delete if it's the last row
             if (tableNode.getChildrenSize() <= 1) {
                 tableNode.remove();
             } else {
@@ -115,12 +90,8 @@ function TableActionMenu({
     const handleAddColumnLeft = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
             const columnIndex = $getTableColumnIndexFromTableCellNode(tableCellNode);
-            
-            // Add cell to each row at the specified column index
             tableNode.getChildren().forEach((row) => {
                 if ($isTableRowNode(row)) {
                     const newCell = $createTableCellNode();
@@ -140,12 +111,8 @@ function TableActionMenu({
     const handleAddColumnRight = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
             const columnIndex = $getTableColumnIndexFromTableCellNode(tableCellNode);
-            
-            // Add cell to each row after the specified column index
             tableNode.getChildren().forEach((row) => {
                 if ($isTableRowNode(row)) {
                     const newCell = $createTableCellNode();
@@ -165,18 +132,12 @@ function TableActionMenu({
     const handleDeleteColumn = useCallback(() => {
         editor.update(() => {
             const rowNode = $getTableRowNodeFromTableCellNodeOrThrow(tableCellNode);
-            if (!rowNode) return;
-            
             const tableNode = $getTableNodeFromLexicalNodeOrThrow(rowNode);
             const columnIndex = $getTableColumnIndexFromTableCellNode(tableCellNode);
-            
-            // Check if this is the last column
             const firstRow = tableNode.getFirstChild() as TableRowNode;
             if (firstRow && firstRow.getChildrenSize() <= 1) {
-                // Delete entire table if last column
                 tableNode.remove();
             } else {
-                // Remove cell from each row at the specified column index
                 tableNode.getChildren().forEach((row) => {
                     if ($isTableRowNode(row)) {
                         const children = row.getChildren();
@@ -196,7 +157,6 @@ function TableActionMenu({
             if ($isRangeSelection(selection)) {
                 $patchStyleText(selection, { 'background-color': color });
             } else {
-                // If no text selection, apply to cell
                 tableCellNode.setStyle(`background-color: ${color}`);
             }
         });
@@ -243,39 +203,17 @@ function TableActionMenu({
 
     return createPortal(
         <div ref={menuRef} style={menuStyle}>
-            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
-                Row
-            </div>
-            <div style={itemStyle} onClick={handleAddRowAbove} onMouseDown={(e) => e.preventDefault()}>
-                Add row above
-            </div>
-            <div style={itemStyle} onClick={handleAddRowBelow} onMouseDown={(e) => e.preventDefault()}>
-                Add row below
-            </div>
-            <div style={{ ...itemStyle, color: '#dc2626' }} onClick={handleDeleteRow} onMouseDown={(e) => e.preventDefault()}>
-                Delete row
-            </div>
-            
+            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Row</div>
+            <div style={itemStyle} onClick={handleAddRowAbove} onMouseDown={(e) => e.preventDefault()}>Add row above</div>
+            <div style={itemStyle} onClick={handleAddRowBelow} onMouseDown={(e) => e.preventDefault()}>Add row below</div>
+            <div style={{ ...itemStyle, color: '#dc2626' }} onClick={handleDeleteRow} onMouseDown={(e) => e.preventDefault()}>Delete row</div>
             <div style={dividerStyle} />
-            
-            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
-                Column
-            </div>
-            <div style={itemStyle} onClick={handleAddColumnLeft} onMouseDown={(e) => e.preventDefault()}>
-                Add column left
-            </div>
-            <div style={itemStyle} onClick={handleAddColumnRight} onMouseDown={(e) => e.preventDefault()}>
-                Add column right
-            </div>
-            <div style={{ ...itemStyle, color: '#dc2626' }} onClick={handleDeleteColumn} onMouseDown={(e) => e.preventDefault()}>
-                Delete column
-            </div>
-            
+            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Column</div>
+            <div style={itemStyle} onClick={handleAddColumnLeft} onMouseDown={(e) => e.preventDefault()}>Add column left</div>
+            <div style={itemStyle} onClick={handleAddColumnRight} onMouseDown={(e) => e.preventDefault()}>Add column right</div>
+            <div style={{ ...itemStyle, color: '#dc2626' }} onClick={handleDeleteColumn} onMouseDown={(e) => e.preventDefault()}>Delete column</div>
             <div style={dividerStyle} />
-            
-            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
-                Background
-            </div>
+            <div style={{ padding: '4px 16px', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Background</div>
             <div style={{ display: 'flex', gap: '4px', padding: '8px 16px', flexWrap: 'wrap' }}>
                 {colors.map((c) => (
                     <button
@@ -311,28 +249,18 @@ export default function TableActionMenuPlugin({
 
     useEffect(() => {
         const handleContextMenu = (event: MouseEvent) => {
-            // Check if the click target is inside a table cell
             const target = event.target as HTMLElement;
             const cellElement = target.closest('td, th');
-            
-            if (!cellElement) {
-                return;
-            }
+            if (!cellElement) return;
 
-            // Use editor state to find the table cell node from selection
             editor.getEditorState().read(() => {
                 const selection = $getSelection();
-                
-                if (!$isRangeSelection(selection)) {
-                    return;
-                }
+                if (!$isRangeSelection(selection)) return;
 
-                // Get the anchor node and traverse up to find the table cell
                 const anchorNode = selection.anchor.getNode();
-                let currentNode = anchorNode;
+                let currentNode: typeof anchorNode | null = anchorNode;
                 let cellNode: TableCellNode | null = null;
 
-                // Traverse up the tree to find TableCellNode
                 while (currentNode !== null) {
                     if ($isTableCellNode(currentNode)) {
                         cellNode = currentNode;
@@ -344,7 +272,6 @@ export default function TableActionMenuPlugin({
                 if (cellNode) {
                     event.preventDefault();
                     setTableCellNode(cellNode);
-                    // Account for scroll position using pageX/pageY
                     setPosition({ x: event.pageX, y: event.pageY });
                     setIsMenuOpen(true);
                 }
@@ -368,9 +295,7 @@ export default function TableActionMenuPlugin({
         setTableCellNode(null);
     }, []);
 
-    if (!isMenuOpen || !tableCellNode) {
-        return null;
-    }
+    if (!isMenuOpen || !tableCellNode) return null;
 
     return (
         <div style={{ position: 'absolute', left: position.x, top: position.y, zIndex: 1000 }}>

@@ -11,6 +11,7 @@ interface HybridMarkdownEditorProps {
     images?: Record<string, string>;
     settings?: MarkdownNoteSettings;
     baseFontFamily?: string;
+    onImageAdd?: (id: string, dataUrl: string) => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
     images,
     settings,
     baseFontFamily,
+    onImageAdd,
 }) => {
     // Parse content into blocks (memoized to avoid re-parsing on every render)
     const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
@@ -248,6 +250,7 @@ export const HybridMarkdownEditor: React.FC<HybridMarkdownEditorProps> = ({
                     onChange={handleChange}
                     onBlur={handleBlur}
                     onAddBlock={handleAddBlock}
+                    onImageAdd={onImageAdd}
                 />
             ))}
         </div>

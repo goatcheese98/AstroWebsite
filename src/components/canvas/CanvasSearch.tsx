@@ -2,7 +2,7 @@
  * CanvasSearch — two-tab search overlay (Ctrl+F)
  *
  * Canvas tab: searches Excalidraw text/frame elements
- * Notes tab:  searches markdown content + lexical rich-text state
+ * Notes tab:  searches markdown content + newlex Lexical state
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -19,7 +19,7 @@ interface CanvasResult {
 
 interface NoteResult {
   elementId: string;
-  noteType: 'markdown' | 'lexical' | 'newlex';
+  noteType: 'markdown' | 'newlex';
   preview: string;
   matchIndex: number;
 }
@@ -68,14 +68,6 @@ function snippet(text: string, query: string, ctx = 55, startPos?: number): stri
   return (s > 0 ? '…' : '') + text.slice(s, e) + (e < text.length ? '…' : '');
 }
 
-function stripHtml(text: string): string {
-  return text
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<\/?[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 function Highlighted({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>;
@@ -157,17 +149,8 @@ export default function CanvasSearch({ isOpen, onClose }: Props) {
           offset = pos + q.length;
           matchIdx++;
         }
-      } else if (cd.type === 'lexical' && typeof cd.lexicalState === 'string') {
+      } else if (cd.type === 'newlex' && typeof cd.lexicalState === 'string') {
         const text = extractLexicalText(cd.lexicalState);
-        const lo = text.toLowerCase();
-        let offset = 0, matchIdx = 0, pos: number;
-        while ((pos = lo.indexOf(q, offset)) !== -1) {
-          results.push({ elementId: el.id, noteType: 'lexical', preview: snippet(text, query, 55, pos), matchIndex: matchIdx });
-          offset = pos + q.length;
-          matchIdx++;
-        }
-      } else if (cd.type === 'newlex' && typeof cd.content === 'string') {
-        const text = stripHtml(cd.content);
         const lo = text.toLowerCase();
         let offset = 0, matchIdx = 0, pos: number;
         while ((pos = lo.indexOf(q, offset)) !== -1) {

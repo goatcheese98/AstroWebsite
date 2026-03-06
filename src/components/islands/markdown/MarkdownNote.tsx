@@ -1,4 +1,4 @@
-import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
+import React, { memo, forwardRef, useImperativeHandle, useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { applySearchHighlights, clearSearchHighlights } from '@/components/canvas/noteSearchHighlight';
 import { useCommandSubscriber } from '@/stores';
 import { MarkdownEditor, MarkdownPreview } from './components';
@@ -33,8 +33,18 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
         });
         const [showSettings, setShowSettings] = useState(false);
 
-        // Pre-warm the blob URL cache during render so ImageRenderer gets instant src on first paint
-        useMemo(() => { if (Object.keys(images).length > 0) prewarmImageCache(images); }, [images]);
+        // Stable refs — updated synchronously so callbacks don't need to capture changing state/props
+        const onChangeRef = useRef(onChange);
+        onChangeRef.current = onChange;
+        const contentLatest = useRef(content);
+        contentLatest.current = content;
+        const imagesLatest = useRef(images);
+        imagesLatest.current = images;
+        const settingsLatest = useRef(settings);
+        settingsLatest.current = settings;
+
+        // Pre-warm the blob URL cache after render so ImageRenderer gets instant src on first paint
+        useEffect(() => { if (Object.keys(images).length > 0) prewarmImageCache(images); }, [images]);
 
         const [searchHighlight, setSearchHighlight] = useState<{ query: string; matchIndex: number } | null>(null);
         const hasMarksRef = useRef(false);
@@ -148,16 +158,20 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
 
         // Add an image to local state; it will be saved together with content on exit
         const handleImageAdd = useCallback((id: string, dataUrl: string) => {
-            setImages(prev => ({ ...prev, [id]: dataUrl }));
+            setImages(prev => {
+                const next = { ...prev, [id]: dataUrl };
+                imagesLatest.current = next; // sync ref immediately before next render
+                return next;
+            });
         }, []);
 
-        // Exit edit mode and save
+        // Exit edit mode and save — reads latest state via refs so this callback is stable
         const exitEditMode = useCallback(() => {
             setIsEditing(false);
             setShowSettings(false);
             setEditMode('raw'); // Reset to raw for next time
-            onChange(element.id, content, images, settings);
-        }, [content, images, settings, element.id, onChange]);
+            onChangeRef.current(element.id, contentLatest.current, imagesLatest.current, settingsLatest.current);
+        }, [element.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
         // Handle content update
         const updateContent = useCallback((value: string) => {
@@ -361,9 +375,9 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             updateTransform
         }), [exportAsImage, updateTransform]);
 
-        // Toggle checkbox in preview mode
+        // Toggle checkbox in preview mode — stable callback via refs
         const toggleCheckbox = useCallback((lineIndex: number) => {
-            const lines = content.split('\n');
+            const lines = contentLatest.current.split('\n');
             const line = lines[lineIndex];
 
             if (line?.includes('- [ ]')) {
@@ -373,9 +387,10 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
             }
 
             const newContent = lines.join('\n');
+            contentLatest.current = newContent;
             setContent(newContent);
-            onChange(element.id, newContent, images, settings);
-        }, [content, images, settings, element.id, onChange]);
+            onChangeRef.current(element.id, newContent, imagesLatest.current, settingsLatest.current);
+        }, [element.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
         return (
             <div
@@ -545,6 +560,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                     images={images}
                                     settings={settings}
                                     baseFontFamily={excalidrawFontFamily}
+                                    onImageAdd={handleImageAdd}
                                 />
                             ) : (
                                 <div style={{
@@ -574,8 +590,7 @@ const MarkdownNoteInner = memo(forwardRef<MarkdownNoteRef, MarkdownNoteProps>(
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
                                 width: '100%',
-                                height: '100%',
-                                overflow: 'hidden',
+                                minHeight: '100%',
                                 boxSizing: 'border-box',
                                 fontFamily: settings.font !== 'inherit' ? settings.font : excalidrawFontFamily,
                                 fontSize: settings.fontSize,

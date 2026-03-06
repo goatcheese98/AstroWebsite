@@ -9,6 +9,7 @@ import type {
   ExcalidrawAppState,
   ExcalidrawElement,
 } from '@/stores';
+import { compressImageDataUrl } from '@/lib/image-compression';
 
 // Import Excalidraw - the client:only directive in parent handles SSR
 import { Excalidraw } from "@excalidraw/excalidraw";
@@ -142,6 +143,10 @@ export default function CanvasCore({
     hasInitializedRef.current = true;
   }, [canvasData]);
   
+  // Track which file IDs have already been compressed (or are in-flight).
+  // Prevents re-compressing on every onChange after addFiles triggers a new change event.
+  const compressedFileIdsRef = useRef<Set<string>>(new Set());
+
   const handleChange = useCallback((
     elements: readonly unknown[],
     appState: unknown,
@@ -171,6 +176,40 @@ export default function CanvasCore({
       setDirty(true);
     }
     onSceneChange?.(safeElements, safeAppState, safeFiles);
+
+    // Async-compress any newly added image files to keep storage lean.
+    // We replace each file's dataURL in-place (same ID) so element references stay valid.
+    const newFileIds = Object.keys(safeFiles).filter(
+      (id) => !compressedFileIdsRef.current.has(id)
+    );
+    if (newFileIds.length > 0) {
+      // Mark as known immediately to prevent duplicate compression jobs
+      newFileIds.forEach((id) => compressedFileIdsRef.current.add(id));
+
+      void (async () => {
+        const api = apiRef.current as any;
+        if (!api?.addFiles) return;
+
+        const compressed: Array<{ id: string; dataURL: string; mimeType: string; created: number }> = [];
+        for (const id of newFileIds) {
+          const file = (safeFiles as Record<string, any>)[id];
+          if (!file?.dataURL) continue;
+          const compressedDataURL = await compressImageDataUrl(file.dataURL as string);
+          if (compressedDataURL !== file.dataURL) {
+            compressed.push({
+              id,
+              dataURL: compressedDataURL,
+              mimeType: compressedDataURL.startsWith('data:image/webp') ? 'image/webp' : (file.mimeType ?? 'image/jpeg'),
+              created: file.created ?? Date.now(),
+            });
+          }
+        }
+
+        if (compressed.length > 0) {
+          api.addFiles(compressed);
+        }
+      })();
+    }
   }, [setCanvasData, setDirty, onSceneChange]);
   
   // Handle API ready - Excalidraw passes API via excalidrawAPI prop callback

@@ -21,7 +21,6 @@ import {
   createKanbanElementDraft,
   createMarkdownElementDraft,
   createNewLexElementDraft,
-  createRichTextElementDraft,
   createWebEmbedElementDraft,
   getViewportSceneCenter,
   type CanvasElementInput,
@@ -335,24 +334,6 @@ export default function CanvasUI({
     }
   }, [api, addToast, appendCreatedElement]);
 
-  // Create rich text note element
-  const handleCreateRichText = useCallback(async () => {
-    if (!api) {
-      addToast('Canvas not ready', 'error');
-      return;
-    }
-
-    try {
-      const sceneCenter = getViewportSceneCenter(
-        api.getAppState() as Partial<ExcalidrawAppState>,
-      );
-      const newElement = await createRichTextElementDraft(sceneCenter);
-      appendCreatedElement(newElement);
-    } catch (err) {
-      console.error('Error creating rich text note:', err);
-    }
-  }, [api, addToast, appendCreatedElement]);
-
   // Create NewLex note element
   const handleCreateNewLex = useCallback(async () => {
     if (!api) {
@@ -434,9 +415,6 @@ export default function CanvasUI({
       case 'create-markdown':
         void handleCreateMarkdown();
         break;
-      case 'create-rich-text':
-        void handleCreateRichText();
-        break;
       case 'create-newlex':
         void handleCreateNewLex();
         break;
@@ -460,7 +438,6 @@ export default function CanvasUI({
     }
   }, [
     handleCreateMarkdown,
-    handleCreateRichText,
     handleCreateNewLex,
     handleCreateWebEmbed,
     handleCreateKanban,
@@ -546,20 +523,6 @@ export default function CanvasUI({
             <line x1="9" y1="15" x2="15" y2="15" />
           </svg>
           <span className="aw-label">Markdown note</span>
-        </button>
-        <button
-          className="aw-control-btn"
-          onClick={() => runCanvasAction('create-rich-text')}
-          title="Add rich text note"
-          aria-label="Add rich text note"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 7V4h16v3" />
-            <path d="M9 20h6" />
-            <path d="M12 4v16" />
-            <path d="M8 12h8" />
-          </svg>
-          <span className="aw-label">Rich text note</span>
         </button>
         <button
           className="aw-control-btn"

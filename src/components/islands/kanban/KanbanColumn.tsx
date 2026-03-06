@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import type { KanbanColumn as KanbanColumnType, KanbanCard } from './kanban-types';
 import { PRIORITY_COLORS } from './kanban-types';
 import { KanbanCardView } from './KanbanCardView';
+import { getProjectedOverCardId } from './kanban-logic';
 
 function DropIndicator() {
   return (
@@ -27,13 +28,15 @@ interface KanbanColumnProps {
   cardBg: string;
   isOver: boolean;
   draggingCardId: string | null;
+  draggingFromColumnId: string | null;
   overCardId: string | null;
   onUpdateColumn: (columnId: string, changes: Partial<KanbanColumnType>) => void;
-  onDeleteColumn: (columnId: string) => void;
+  onRequestDeleteColumn: (columnId: string) => void;
   onUpdateCard: (cardId: string, changes: Partial<KanbanCard>) => void;
   onDeleteCard: (cardId: string) => void;
   onAddCard: (columnId: string, card: Partial<KanbanCard>) => void;
   onDragStart: (e: React.DragEvent, cardId: string, fromColumnId: string) => void;
+  onDragEnd: () => void;
   onDragOver: (e: React.DragEvent, columnId: string) => void;
   onDrop: (e: React.DragEvent, columnId: string) => void;
   onCardDragEnter: (cardId: string | null) => void;
@@ -45,13 +48,15 @@ export function KanbanColumn({
   cardBg,
   isOver,
   draggingCardId,
+  draggingFromColumnId,
   overCardId,
   onUpdateColumn,
-  onDeleteColumn,
+  onRequestDeleteColumn,
   onUpdateCard,
   onDeleteCard,
   onAddCard,
   onDragStart,
+  onDragEnd,
   onDragOver,
   onDrop,
   onCardDragEnter,
@@ -63,9 +68,14 @@ export function KanbanColumn({
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDesc, setNewCardDesc] = useState('');
   const [newCardPriority, setNewCardPriority] = useState<KanbanCard['priority']>(undefined);
+  const [newCardDueDate, setNewCardDueDate] = useState('');
   const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [isEditingWipLimit, setIsEditingWipLimit] = useState(false);
+  const [wipLimitValue, setWipLimitValue] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
   const newCardInputRef = useRef<HTMLInputElement>(null);
+  const wipLimitInputRef = useRef<HTMLInputElement>(null);
+  const isOverWipLimit = typeof column.wipLimit === 'number' && column.cards.length > column.wipLimit;
 
   const saveTitle = useCallback(() => {
     if (titleValue.trim()) {
@@ -92,6 +102,7 @@ export function KanbanColumn({
     setNewCardTitle('');
     setNewCardDesc('');
     setNewCardPriority(undefined);
+    setNewCardDueDate('');
     setShowMoreDetails(false);
     setTimeout(() => newCardInputRef.current?.focus(), 0);
   }, []);
@@ -103,20 +114,23 @@ export function KanbanColumn({
         title: newCardTitle.trim(),
         description: newCardDesc.trim() || undefined,
         priority: newCardPriority || undefined,
+        dueDate: newCardDueDate || undefined,
       });
     }
     setAddingCard(false);
     setNewCardTitle('');
     setNewCardDesc('');
     setNewCardPriority(undefined);
+    setNewCardDueDate('');
     setShowMoreDetails(false);
-  }, [column.id, newCardTitle, newCardDesc, newCardPriority, onAddCard]);
+  }, [column.id, newCardTitle, newCardDesc, newCardPriority, newCardDueDate, onAddCard]);
 
   const cancelNewCard = useCallback(() => {
     setAddingCard(false);
     setNewCardTitle('');
     setNewCardDesc('');
     setNewCardPriority(undefined);
+    setNewCardDueDate('');
     setShowMoreDetails(false);
   }, []);
 
@@ -127,6 +141,51 @@ export function KanbanColumn({
     },
     [submitNewCard, cancelNewCard],
   );
+
+  const handleCardDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, hoveredCardId: string) => {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midpointY = rect.top + rect.height / 2;
+      const isPastMidpoint = e.clientY > midpointY;
+      const projectedCardId = getProjectedOverCardId(
+        column.cards,
+        hoveredCardId,
+        isPastMidpoint,
+      );
+      onCardDragEnter(projectedCardId);
+    },
+    [column.cards, onCardDragEnter],
+  );
+
+  const openWipLimitEditor = useCallback(() => {
+    setWipLimitValue(
+      typeof column.wipLimit === 'number' ? String(column.wipLimit) : '',
+    );
+    setIsEditingWipLimit(true);
+    setTimeout(() => wipLimitInputRef.current?.focus(), 0);
+  }, [column.wipLimit]);
+
+  const saveWipLimit = useCallback(() => {
+    const trimmed = wipLimitValue.trim();
+    if (!trimmed) {
+      onUpdateColumn(column.id, { wipLimit: undefined });
+      setIsEditingWipLimit(false);
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setWipLimitValue(
+        typeof column.wipLimit === 'number' ? String(column.wipLimit) : '',
+      );
+      setIsEditingWipLimit(false);
+      return;
+    }
+
+    onUpdateColumn(column.id, { wipLimit: Math.floor(parsed) });
+    setIsEditingWipLimit(false);
+  }, [wipLimitValue, onUpdateColumn, column.id, column.wipLimit]);
 
   return (
     <div
@@ -141,9 +200,17 @@ export function KanbanColumn({
         minWidth: 220,
         maxWidth: 260,
         width: 240,
-        background: isOver ? 'rgba(99,102,241,0.06)' : colBg,
+        background: isOver
+          ? 'rgba(99,102,241,0.06)'
+          : isOverWipLimit
+            ? 'rgba(254,242,242,0.75)'
+            : colBg,
         borderRadius: 6,
-        border: isOver ? '2px dashed rgba(99,102,241,0.5)' : '1.5px solid rgba(0,0,0,0.08)',
+        border: isOver
+          ? '2px dashed rgba(99,102,241,0.5)'
+          : isOverWipLimit
+            ? '1.5px solid rgba(239,68,68,0.35)'
+            : '1.5px solid rgba(0,0,0,0.08)',
         flexShrink: 0,
         maxHeight: '100%',
         overflow: 'hidden',
@@ -203,31 +270,66 @@ export function KanbanColumn({
           </div>
         )}
 
-        <span
-          style={{
-            background: 'rgba(0,0,0,0.07)',
-            color: '#6b7280',
-            borderRadius: 10,
-            padding: '1px 6px',
-            fontSize: '0.77em',
-            fontFamily: 'inherit',
-            fontWeight: 600,
-            flexShrink: 0,
-          }}
-        >
-          {column.cards.length}
-        </span>
+        {isEditingWipLimit ? (
+          <input
+            ref={wipLimitInputRef}
+            value={wipLimitValue}
+            onChange={(e) => setWipLimitValue(e.target.value)}
+            onBlur={saveWipLimit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveWipLimit();
+              if (e.key === 'Escape') {
+                setIsEditingWipLimit(false);
+                setWipLimitValue(
+                  typeof column.wipLimit === 'number' ? String(column.wipLimit) : '',
+                );
+              }
+            }}
+            placeholder="∞"
+            style={{
+              width: 40,
+              height: 20,
+              border: '1.5px solid rgba(99,102,241,0.5)',
+              borderRadius: 10,
+              outline: 'none',
+              background: 'rgba(255,255,255,0.88)',
+              color: '#4b5563',
+              fontSize: '0.74em',
+              fontFamily: 'inherit',
+              fontWeight: 700,
+              textAlign: 'center',
+              padding: 0,
+              flexShrink: 0,
+            }}
+          />
+        ) : (
+          <span
+            onDoubleClick={openWipLimitEditor}
+            title="Double-click to set WIP limit"
+            style={{
+              background: isOverWipLimit ? 'rgba(239,68,68,0.14)' : 'rgba(0,0,0,0.07)',
+              color: isOverWipLimit ? '#dc2626' : '#6b7280',
+              borderRadius: 10,
+              padding: '1px 6px',
+              fontSize: '0.77em',
+              fontFamily: 'inherit',
+              fontWeight: 700,
+              flexShrink: 0,
+              cursor: 'text',
+              userSelect: 'none',
+            }}
+          >
+            {typeof column.wipLimit === 'number'
+              ? `${column.cards.length}/${column.wipLimit}`
+              : column.cards.length}
+          </span>
+        )}
 
         {isHovered && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (
-                column.cards.length === 0 ||
-                window.confirm(`Delete "${column.title}" and its ${column.cards.length} card(s)?`)
-              ) {
-                onDeleteColumn(column.id);
-              }
+              onRequestDeleteColumn(column.id);
             }}
             title="Delete column"
             style={{
@@ -262,6 +364,21 @@ export function KanbanColumn({
           scrollbarWidth: 'none',
         }}
       >
+        {typeof column.wipLimit === 'number' && (
+          <div
+            style={{
+              marginBottom: 6,
+              fontFamily: 'inherit',
+              fontSize: '0.74em',
+              fontWeight: 700,
+              color: isOverWipLimit ? '#dc2626' : '#9ca3af',
+              letterSpacing: '0.01em',
+            }}
+          >
+            WIP {column.cards.length}/{column.wipLimit}
+          </div>
+        )}
+
         {column.cards.map((card) => {
           // Show indicator before this card when dragging over it (but not when it's the card being dragged)
           const showIndicatorBefore =
@@ -275,10 +392,18 @@ export function KanbanColumn({
                 card={card}
                 columnId={column.id}
                 cardBg={cardBg}
+                isDragging={draggingCardId === card.id}
+                showReturnCue={
+                  draggingCardId === card.id &&
+                  draggingFromColumnId === column.id &&
+                  overCardId === card.id
+                }
                 onUpdate={onUpdateCard}
                 onDelete={onDeleteCard}
                 onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
                 onDragEnter={onCardDragEnter}
+                onDragOverCard={handleCardDragOver}
               />
             </React.Fragment>
           );
@@ -287,6 +412,10 @@ export function KanbanColumn({
         <div
           style={{ flex: 1, minHeight: 20 }}
           onDragEnter={() => onCardDragEnter(null)}
+          onDragOver={(e) => {
+            e.preventDefault();
+            onCardDragEnter(null);
+          }}
         />
         {/* Indicator at the bottom: overCardId is null means cursor is below all cards */}
         {!!draggingCardId && isOver && !overCardId && <DropIndicator />}
@@ -414,6 +543,29 @@ export function KanbanColumn({
                       );
                     })}
                   </div>
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <span style={{ fontFamily: 'inherit', fontSize: '0.77em', color: '#9ca3af', display: 'block', marginBottom: 4 }}>
+                    Due Date
+                  </span>
+                  <input
+                    type="date"
+                    value={newCardDueDate}
+                    onChange={(e) => setNewCardDueDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      borderRadius: 3,
+                      outline: 'none',
+                      background: 'rgba(255,255,255,0.8)',
+                      fontFamily: 'inherit',
+                      fontSize: '0.83em',
+                      color: '#555',
+                      padding: '4px 6px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
               </div>
             )}

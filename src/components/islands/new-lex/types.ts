@@ -19,7 +19,7 @@ export interface NewLexCommentThread {
 }
 
 export interface NewLexUpdatePayload {
-  content?: string;
+  lexicalState?: string;
   comments?: NewLexCommentThread[];
   commentsPanelOpen?: boolean;
 }
@@ -66,7 +66,7 @@ export interface NewLexElement {
   opacity?: number;
   customData?: {
     type: 'newlex';
-    content: string;
+    lexicalState: string;
     comments?: NewLexCommentThread[];
     commentsPanelOpen?: boolean;
     version: number;
@@ -82,11 +82,6 @@ export interface AppState {
   selectedElementIds?: Record<string, boolean>;
 }
 
-export const DEFAULT_NEWLEX_CONTENT = [
-  '<h1>NewLex</h1>',
-  '<p>Experimental high-performance note.</p>',
-  '<ul>',
-  '<li>Minimal rich text foundation</li>',
-  '<li>No advanced embeds yet</li>',
-  '</ul>',
-].join('');
+// Empty Lexical root state JSON
+export const DEFAULT_NEWLEX_CONTENT =
+  '{"root":{"children":[{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1}],"direction":null,"format":"","indent":0,"type":"root","version":1}}';

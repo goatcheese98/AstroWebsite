@@ -8,6 +8,8 @@ import type { MarkdownNoteSettings } from './types';
 import { VisualTableEditor } from './VisualTableEditor';
 import { handleImagePasteAsMarkdown, markdownUrlTransform, resolveMarkdownImageSrc } from './utils/markdownMedia';
 
+const MARKDOWN_ICON_SVG_URL = 'https://cdn.jsdelivr.net/gh/dcurtis/markdown-mark/svg/markdown-mark.svg';
+
 interface MarkdownBlockEditorProps {
     block: MarkdownBlock;
     isEditing: boolean;
@@ -19,6 +21,7 @@ interface MarkdownBlockEditorProps {
     onChange: (blockId: string, newContent: string) => void;
     onBlur: () => void;
     onAddBlock: (afterBlockId: string) => void;
+    onImageAdd?: (id: string, dataUrl: string) => void;
 }
 
 /**
@@ -35,7 +38,8 @@ export const MarkdownBlockEditor = memo(({
     onEdit,
     onChange,
     onBlur,
-    onAddBlock
+    onAddBlock,
+    onImageAdd,
 }: MarkdownBlockEditorProps) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [localContent, setLocalContent] = useState(block.rawContent);
@@ -58,6 +62,10 @@ export const MarkdownBlockEditor = memo(({
         }
     }, [block.rawContent, isEditing]);
 
+    // Stable ref — updated each render so memoized components always see latest images
+    const imagesRef = useRef(images);
+    imagesRef.current = images;
+
     const syntaxTheme = useMemo(() => {
         const base = (isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>;
         return {
@@ -76,6 +84,154 @@ export const MarkdownBlockEditor = memo(({
             },
         };
     }, [isDark]);
+
+    // Memoized components — deps exclude `images` (accessed via ref) to prevent
+    // ReactMarkdown from unmounting/remounting img elements on every hover state change
+    const components = useMemo(() => ({
+        code({ node, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '');
+            const language = match ? match[1] : '';
+            const isCodeBlock = className && language;
+
+            return isCodeBlock ? (
+                <SyntaxHighlighter
+                    style={syntaxTheme as any}
+                    language={language}
+                    PreTag="div"
+                    customStyle={{
+                        margin: '0 0 1em 0',
+                        borderRadius: '6px',
+                        fontFamily: 'inherit',
+                        fontSize: '0.92em',
+                        lineHeight: 'inherit',
+                    }}
+                    {...props}
+                >
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            ) : (
+                <code
+                    className={className}
+                    style={{
+                        background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                        padding: '2px 6px',
+                        borderRadius: '3px',
+                        fontFamily: 'inherit',
+                        fontSize: '0.9em',
+                        lineHeight: 'inherit',
+                    }}
+                    {...props}
+                >
+                    {children}
+                </code>
+            );
+        },
+        table({ children, ...props }: any) {
+            return (
+                <div style={{ overflowX: 'auto', margin: '1em 0' }}>
+                    <table
+                        style={{
+                            borderCollapse: 'collapse',
+                            width: '100%',
+                            border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                        }}
+                        {...props}
+                    >
+                        {children}
+                    </table>
+                </div>
+            );
+        },
+        th({ children, ...props }: any) {
+            return (
+                <th
+                    style={{
+                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                        padding: '8px 12px',
+                        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                        fontWeight: 600,
+                        textAlign: 'left',
+                        lineHeight: 'inherit',
+                        whiteSpace: 'break-spaces',
+                    }}
+                    {...props}
+                >
+                    {children}
+                </th>
+            );
+        },
+        td({ children, ...props }: any) {
+            return (
+                <td
+                    style={{
+                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                        padding: '8px 12px',
+                        lineHeight: 'inherit',
+                        whiteSpace: 'break-spaces',
+                    }}
+                    {...props}
+                >
+                    {children}
+                </td>
+            );
+        },
+        blockquote({ children, ...props }: any) {
+            return (
+                <blockquote
+                    style={{
+                        borderLeft: isDark ? '4px solid rgba(99, 102, 241, 0.5)' : '4px solid rgba(99, 102, 241, 0.4)',
+                        paddingLeft: '1em',
+                        marginLeft: 0,
+                        fontStyle: 'italic',
+                        color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+                        lineHeight: 'inherit',
+                        whiteSpace: 'break-spaces',
+                    }}
+                    {...props}
+                >
+                    {children}
+                </blockquote>
+            );
+        },
+        img({ src, alt, ...props }: any) {
+            if (src === MARKDOWN_ICON_SVG_URL) {
+                return (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 128" style={{ width: '1em', height: '1em', display: 'inline-block', margin: '0 0.35em 0 0', verticalAlign: '-0.08em', flexShrink: 0 }} aria-hidden="true">
+                        <rect width="198" height="118" x="5" y="5" ry="10" stroke="currentColor" strokeWidth="10" fill="none" />
+                        <path d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z" fill="currentColor" />
+                    </svg>
+                );
+            }
+            // Use imagesRef.current so images are always current without being a dep
+            const resolvedSrc = resolveMarkdownImageSrc(src, imagesRef.current);
+            if (!resolvedSrc) return null;
+            return (
+                <img
+                    src={resolvedSrc}
+                    alt={alt || 'Embedded image'}
+                    loading="lazy"
+                    style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        height: 'auto',
+                        borderRadius: '8px',
+                        margin: '0.75em 0',
+                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                    }}
+                    {...props}
+                />
+            );
+        },
+        h1: ({ children, ...props }: any) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h1>,
+        h2: ({ children, ...props }: any) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h2>,
+        h3: ({ children, ...props }: any) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h3>,
+        h4: ({ children, ...props }: any) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h4>,
+        p: ({ children, ...props }: any) => <p style={{ margin: '0.5em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</p>,
+        ul: ({ children, ...props }: any) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ul>,
+        ol: ({ children, ...props }: any) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ol>,
+        li: ({ children, ...props }: any) => <li style={{ margin: '0.2em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</li>,
+        hr: ({ ...props }: any) => <hr style={{ border: 'none', borderTop: isDark ? '2px solid rgba(255,255,255,0.1)' : '2px solid rgba(0,0,0,0.1)', margin: '1.5em 0' }} {...props} />,
+    }), [isDark, syntaxTheme]);
 
     const handleClick = (e: React.MouseEvent) => {
         if (!isEditing) {
@@ -109,7 +265,7 @@ export const MarkdownBlockEditor = memo(({
                 setLocalContent(nextValue);
                 onChange(block.id, nextValue);
             },
-            onImageAdd: () => {}, // HybridMarkdownEditor doesn't support image storage
+            onImageAdd: onImageAdd ?? (() => {}),
         });
     };
 
@@ -348,143 +504,7 @@ export const MarkdownBlockEditor = memo(({
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 urlTransform={markdownUrlTransform}
-                components={{
-                    code({ node, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        const language = match ? match[1] : '';
-                        const isCodeBlock = className && language;
-
-                        return isCodeBlock ? (
-                            <SyntaxHighlighter
-                                style={syntaxTheme as any}
-                                language={language}
-                                PreTag="div"
-                                customStyle={{
-                                    margin: '0 0 1em 0',
-                                    borderRadius: '6px',
-                                    fontFamily: 'inherit',
-                                    fontSize: '0.92em',
-                                    lineHeight: 'inherit',
-                                }}
-                                {...props}
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code
-                                className={className}
-                                style={{
-                                    background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                                    padding: '2px 6px',
-                                    borderRadius: '3px',
-                                    fontFamily: 'inherit',
-                                    fontSize: '0.9em',
-                                    lineHeight: 'inherit',
-                                }}
-                                {...props}
-                            >
-                                {children}
-                            </code>
-                        );
-                    },
-                    table({ children, ...props }) {
-                        return (
-                            <div style={{ overflowX: 'auto', margin: '1em 0' }}>
-                                <table
-                                    style={{
-                                        borderCollapse: 'collapse',
-                                        width: '100%',
-                                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
-                                    }}
-                                    {...props}
-                                >
-                                    {children}
-                                </table>
-                            </div>
-                        );
-                    },
-                    th({ children, ...props }) {
-                        return (
-                            <th
-                                style={{
-                                    border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
-                                    padding: '8px 12px',
-                                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                    fontWeight: 600,
-                                    textAlign: 'left',
-                                    lineHeight: 'inherit',
-                                    whiteSpace: 'break-spaces',
-                                }}
-                                {...props}
-                            >
-                                {children}
-                            </th>
-                        );
-                    },
-                    td({ children, ...props }) {
-                        return (
-                            <td
-                                style={{
-                                    border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
-                                    padding: '8px 12px',
-                                    lineHeight: 'inherit',
-                                    whiteSpace: 'break-spaces',
-                                }}
-                                {...props}
-                            >
-                                {children}
-                            </td>
-                        );
-                    },
-                    blockquote({ children, ...props }) {
-                        return (
-                            <blockquote
-                                style={{
-                                    borderLeft: isDark ? '4px solid rgba(99, 102, 241, 0.5)' : '4px solid rgba(99, 102, 241, 0.4)',
-                                    paddingLeft: '1em',
-                                    marginLeft: 0,
-                                    fontStyle: 'italic',
-                                    color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
-                                    lineHeight: 'inherit',
-                                    whiteSpace: 'break-spaces',
-                                }}
-                                {...props}
-                            >
-                                {children}
-                            </blockquote>
-                        );
-                    },
-                    img({ src, alt, ...props }) {
-                        const resolvedSrc = resolveMarkdownImageSrc(src, images);
-                        if (!resolvedSrc) return null;
-                        return (
-                            <img
-                                src={resolvedSrc}
-                                alt={alt || 'Embedded image'}
-                                loading="lazy"
-                                style={{
-                                    display: 'block',
-                                    maxWidth: '100%',
-                                    height: 'auto',
-                                    borderRadius: '8px',
-                                    margin: '0.75em 0',
-                                    border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
-                                }}
-                                {...props}
-                            />
-                        );
-                    },
-                    // Style other elements to match current aesthetic
-                    h1: ({ children, ...props }) => <h1 style={{ marginTop: '0.5em', marginBottom: '0.5em', fontSize: '1.8em', fontWeight: 700, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h1>,
-                    h2: ({ children, ...props }) => <h2 style={{ marginTop: '0.5em', marginBottom: '0.4em', fontSize: '1.5em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h2>,
-                    h3: ({ children, ...props }) => <h3 style={{ marginTop: '0.4em', marginBottom: '0.3em', fontSize: '1.3em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h3>,
-                    h4: ({ children, ...props }) => <h4 style={{ marginTop: '0.3em', marginBottom: '0.2em', fontSize: '1.1em', fontWeight: 600, fontFamily: 'inherit', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</h4>,
-                    p: ({ children, ...props }) => <p style={{ margin: '0.5em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</p>,
-                    ul: ({ children, ...props }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ul>,
-                    ol: ({ children, ...props }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em', lineHeight: 'inherit' }} {...props}>{children}</ol>,
-                    li: ({ children, ...props }) => <li style={{ margin: '0.2em 0', lineHeight: 'inherit', whiteSpace: 'break-spaces' }} {...props}>{children}</li>,
-                    hr: ({ ...props }) => <hr style={{ border: 'none', borderTop: isDark ? '2px solid rgba(255,255,255,0.1)' : '2px solid rgba(0,0,0,0.1)', margin: '1.5em 0' }} {...props} />,
-                }}
+                components={components}
             >
                 {block.rawContent}
             </ReactMarkdown>

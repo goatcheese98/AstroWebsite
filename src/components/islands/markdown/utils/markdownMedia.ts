@@ -1,6 +1,8 @@
 import type React from 'react';
 import { defaultUrlTransform } from 'react-markdown';
+import { compressImageDataUrl } from '@/lib/image-compression';
 
+export { compressImageDataUrl };
 export const MD_IMAGE_PREFIX = 'md-img://';
 const IMAGE_MIME_PREFIX = 'image/';
 
@@ -28,6 +30,7 @@ const readBlobAsDataUrl = (blob: Blob): Promise<string> =>
         reader.onerror = () => reject(reader.error || new Error('Failed to read image'));
         reader.readAsDataURL(blob);
     });
+
 
 /** Convert a data URL to a blob:// Object URL (faster rendering, avoids base64 per-frame decode). */
 const dataUrlToObjectUrl = (dataUrl: string): string => {
@@ -119,7 +122,8 @@ export const handleImagePasteAsMarkdown = async ({
         event.preventDefault();
         const file = imageItem.getAsFile();
         if (!file) return false;
-        const dataUrl = await readBlobAsDataUrl(file);
+        const raw = await readBlobAsDataUrl(file);
+        const dataUrl = await compressImageDataUrl(raw);
         const id = genImageId();
         onImageAdd(id, dataUrl);
         insertMarkdownAtCursor(target, value, `${MD_IMAGE_PREFIX}${id}`, onChange, file.name);
@@ -130,8 +134,9 @@ export const handleImagePasteAsMarkdown = async ({
     const text = cd.getData('text/plain');
     if (text.includes('"excalidraw/clipboard"')) {
         event.preventDefault();
-        const dataUrl = extractExcalidrawDataUrl(text);
-        if (dataUrl) {
+        const raw = extractExcalidrawDataUrl(text);
+        if (raw) {
+            const dataUrl = await compressImageDataUrl(raw);
             const id = genImageId();
             onImageAdd(id, dataUrl);
             insertMarkdownAtCursor(target, value, `${MD_IMAGE_PREFIX}${id}`, onChange, 'canvas-image');
@@ -145,11 +150,12 @@ export const handleImagePasteAsMarkdown = async ({
     if (htmlSrc) {
         event.preventDefault();
         if (htmlSrc.startsWith('data:image/')) {
+            const dataUrl = await compressImageDataUrl(htmlSrc);
             const id = genImageId();
-            onImageAdd(id, htmlSrc);
+            onImageAdd(id, dataUrl);
             insertMarkdownAtCursor(target, value, `${MD_IMAGE_PREFIX}${id}`, onChange);
         } else {
-            // External URL — embed directly
+            // External URL — embed directly (no storage needed)
             insertMarkdownAtCursor(target, value, htmlSrc, onChange);
         }
         return true;

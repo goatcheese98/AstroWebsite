@@ -113,27 +113,34 @@ export function useZoomHint(
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // ctrlKey: pinch-to-zoom or Ctrl+scroll — forward as zoom so Excalidraw handles it
+      // ctrlKey: pinch-to-zoom or Ctrl+scroll — always forward as zoom.
+      // If this handler fires, a child with pointer-events:auto captured the event;
+      // we must route it explicitly regardless of selected state.
       if (e.ctrlKey) {
-        if (!panRef.current) return;
         e.preventDefault();
         e.stopPropagation();
         zoomCanvas(e);
         return;
       }
 
-      // metaKey (⌘ on Mac): pan the canvas horizontally / vertically
+      // metaKey (⌘ on Mac): always forward as pan for the same reason.
       if (e.metaKey) {
-        if (!panRef.current) return;
         e.preventDefault();
         e.stopPropagation();
         panCanvas(e);
         return;
       }
 
-      // Plain scroll: let it propagate naturally (content inside the element scrolls
-      // as expected). The hint is informational only — we don't consume the event.
-      if (!hintRef.current) return;
+      // Plain scroll when not selected: forward to Excalidraw as pan.
+      // A child with pointer-events:auto (e.g. click-select overlay) may have
+      // captured this event; we need to explicitly route it to the canvas so
+      // the user can still pan by scrolling over an unselected element.
+      if (!hintRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        panCanvas(e);
+        return;
+      }
       setVisible(true);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setVisible(false), HINT_DURATION_MS);

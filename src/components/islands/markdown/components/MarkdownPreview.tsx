@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -24,6 +24,14 @@ interface MarkdownPreviewProps {
 }
 
 const MARKDOWN_ICON_SVG_URL = 'https://cdn.jsdelivr.net/gh/dcurtis/markdown-mark/svg/markdown-mark.svg';
+
+/** Inline SVG for the Markdown logo — avoids CDN dependency and always renders. */
+const MarkdownLogoIcon = ({ style }: { style?: React.CSSProperties }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 128" style={style} aria-hidden="true">
+        <rect width="198" height="118" x="5" y="5" ry="10" stroke="currentColor" strokeWidth="10" fill="none" />
+        <path d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z" fill="currentColor" />
+    </svg>
+);
 
 
 /** Renders a single image with loading skeleton and error fallback. */
@@ -110,7 +118,16 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
         lineHeight: settings?.lineHeight,
     }), [settings]);
 
+    // Stable refs — updated each render so component renderers always see latest values
+    // without being included in useMemo deps (which would recreate the components object
+    // and cause ReactMarkdown to unmount/remount children like ImageRenderer).
+    const imagesRef = useRef(images);
+    imagesRef.current = images;
+    const onCheckboxToggleRef = useRef(onCheckboxToggle);
+    onCheckboxToggleRef.current = onCheckboxToggle;
+
     // Custom renderers for markdown elements
+    // deps: only isDark + syntaxTheme — both are stable in practice (canvas is always light mode)
     const components: Components = useMemo(() => ({
         code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
@@ -266,7 +283,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                         onChange={(e) => {
                             e.stopPropagation();
                             if (lineIndex !== undefined) {
-                                onCheckboxToggle(lineIndex - 1); // -1 for 0-indexed
+                                onCheckboxToggleRef.current(lineIndex - 1); // -1 for 0-indexed
                             }
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -392,22 +409,20 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
         },
 
         img({ src, alt }) {
-            const resolvedSrc = resolveMarkdownImageSrc(src, images);
-            if (resolvedSrc === MARKDOWN_ICON_SVG_URL) {
+            // Inline the Markdown logo — avoids CDN dependency, works offline and with strict CSP
+            if (src === MARKDOWN_ICON_SVG_URL) {
                 return (
-                    <img
-                        src={resolvedSrc}
-                        alt={alt || 'Markdown icon'}
-                        style={{
-                            width: '1em',
-                            height: '1em',
-                            display: 'inline-block',
-                            margin: '0 0.35em 0 0',
-                            verticalAlign: '-0.08em',
-                        }}
-                    />
+                    <MarkdownLogoIcon style={{
+                        width: '1em',
+                        height: '1em',
+                        display: 'inline-block',
+                        margin: '0 0.35em 0 0',
+                        verticalAlign: '-0.08em',
+                        flexShrink: 0,
+                    }} />
                 );
             }
+            const resolvedSrc = resolveMarkdownImageSrc(src, imagesRef.current);
             if (!resolvedSrc) {
                 // Reference exists but image data is missing (e.g. stripped customData)
                 if (src?.startsWith('md-img://')) {
@@ -441,7 +456,7 @@ export const MarkdownPreview = React.memo(function MarkdownPreview({
                 />
             );
         },
-    }), [isDark, onCheckboxToggle, images, syntaxTheme]);
+    }), [isDark, syntaxTheme]); // images + onCheckboxToggle accessed via refs — no deps needed
 
     return (
         <div className="markdown-preview" style={previewTypographyStyle}>

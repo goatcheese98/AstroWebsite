@@ -141,35 +141,107 @@ export class CanvasPersistenceCoordinator extends EventTarget {
     }
   }
 
+  private isQuotaError(err: unknown): boolean {
+    return (
+      err instanceof DOMException &&
+      (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    );
+  }
+
   /**
-   * Execute immediate save to localStorage
+   * Level 1 strip: remove only markdown note inline images from customData.
+   * Preserves Excalidraw native image files.
+   */
+  private stripMarkdownImages(canvasData: CanvasData): CanvasData {
+    const elements = canvasData.elements.map((el: any) => {
+      if (el.customData?.images && Object.keys(el.customData.images).length > 0) {
+        return { ...el, customData: { ...el.customData, images: {} } };
+      }
+      return el;
+    });
+    return { ...canvasData, elements };
+  }
+
+  /**
+   * Level 2 strip: remove ALL image data — both markdown customData images and
+   * Excalidraw native image files.  Last-resort fallback so at least element
+   * structure and text survive. Images reload from cloud on next sync.
+   */
+  private stripAllImages(canvasData: CanvasData): CanvasData {
+    const elements = canvasData.elements.map((el: any) => {
+      if (el.customData?.images) {
+        return { ...el, customData: { ...el.customData, images: {} } };
+      }
+      return el;
+    });
+    return { ...canvasData, elements, files: {} };
+  }
+
+  /**
+   * Execute immediate save to localStorage with cascading quota-fallback:
+   *   1. Full data
+   *   2. Strip markdown inline images only
+   *   3. Strip all image data (markdown + Excalidraw files)
+   * Images are always preserved in cloud (R2) storage and reload on next sync.
    */
   private executeSave(canvasData: CanvasData, canvasId: string | null): void {
     this._isSaving = true;
     this.emitStateChange();
 
-    try {
+    const persist = (data: CanvasData): void => {
       const dataToSave: SaveData = {
         version: STORAGE_VERSION,
-        canvasData,
+        canvasData: data,
         savedAt: Date.now(),
         canvasId,
       };
-
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-      
+    };
+
+    const markSaved = (): void => {
       this._lastSaved = new Date();
       this._hasUnsavedChanges = false;
       this._isSaving = false;
-      
       this.emitStateChange();
       this.emit("saved", { to: "localStorage" });
+    };
+
+    // Attempt 1: full save
+    try {
+      persist(canvasData);
+      markSaved();
+      return;
     } catch (err) {
-      this._isSaving = false;
-      this.emitStateChange();
-      this.emit("error", err instanceof Error ? err : new Error("Save failed"));
-      console.error("❌ Failed to save canvas:", err);
+      if (!this.isQuotaError(err)) {
+        this._isSaving = false;
+        this.emitStateChange();
+        this.emit("error", err instanceof Error ? err : new Error("Save failed"));
+        console.error("❌ Failed to save canvas:", err);
+        return;
+      }
     }
+
+    // Attempt 2: strip markdown inline images
+    try {
+      persist(this.stripMarkdownImages(canvasData));
+      markSaved();
+      console.warn("⚠️ localStorage quota: saved without markdown inline images (safe in cloud)");
+      return;
+    } catch { /* try next level */ }
+
+    // Attempt 3: strip all image data
+    try {
+      persist(this.stripAllImages(canvasData));
+      markSaved();
+      console.warn("⚠️ localStorage quota: saved without any images (safe in cloud storage)");
+      return;
+    } catch { /* fall through to error */ }
+
+    // All attempts failed — storage completely full
+    this._isSaving = false;
+    this.emitStateChange();
+    this.emit("error", new Error("Save failed: localStorage is full. Please clear browser storage or sign in to use cloud saves."));
+    console.error("❌ localStorage completely full — canvas structure may be too large");
   }
 
   /**

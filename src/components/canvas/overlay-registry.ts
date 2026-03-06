@@ -8,11 +8,6 @@ import type {
 import type { MarkdownNoteSettings } from '@/components/islands/markdown/types';
 import type { WebEmbedProps, WebEmbedRef } from '@/components/islands/web-embed';
 import type {
-  LexicalElement,
-  LexicalNoteProps,
-  LexicalNoteRef,
-} from '@/components/islands/rich-text';
-import type {
   KanbanBoardData,
   KanbanElement,
   KanbanNoteRef,
@@ -27,14 +22,12 @@ import type {
 export type OverlayType =
   | 'markdown'
   | 'web-embed'
-  | 'lexical'
   | 'newlex'
   | 'kanban';
 
 export const OVERLAY_TYPES: OverlayType[] = [
   'markdown',
   'web-embed',
-  'lexical',
   'newlex',
   'kanban',
 ];
@@ -64,7 +57,6 @@ export type OverlayTransformRef = {
 export type OverlayElementsByType = {
   markdown: MarkdownElement[];
   'web-embed': ExcalidrawElement[];
-  lexical: LexicalElement[];
   newlex: NewLexElement[];
   kanban: KanbanElement[];
 };
@@ -80,13 +72,8 @@ export type OverlayUpdatePayloadMap = {
     settings?: MarkdownNoteSettings;
   };
   'web-embed': { url: string };
-  lexical: {
-    lexicalState?: string;
-    backgroundOpacity?: number;
-    blurAmount?: number;
-  };
   newlex: {
-    content?: string;
+    lexicalState?: string;
     comments?: NewLexCommentThread[];
     commentsPanelOpen?: boolean;
   };
@@ -103,7 +90,6 @@ type KanbanBoardProps = {
 type OverlayComponentPropsMap = {
   markdown: MarkdownNoteProps;
   'web-embed': WebEmbedProps;
-  lexical: LexicalNoteProps;
   newlex: NewLexNoteProps;
   kanban: KanbanBoardProps;
 };
@@ -111,7 +97,6 @@ type OverlayComponentPropsMap = {
 export type OverlayComponentsByType = {
   markdown: ComponentType<MarkdownNoteProps & RefAttributes<MarkdownNoteRef>>;
   'web-embed': ComponentType<WebEmbedProps & RefAttributes<WebEmbedRef>>;
-  lexical: ComponentType<LexicalNoteProps & RefAttributes<LexicalNoteRef>>;
   newlex: ComponentType<NewLexNoteProps & RefAttributes<NewLexNoteRef>>;
   kanban: ComponentType<KanbanBoardProps & RefAttributes<KanbanNoteRef>>;
 };
@@ -191,65 +176,6 @@ const toMarkdownElement = (element: ExcalidrawElement): MarkdownElement | null =
   };
 };
 
-const toLexicalElement = (element: ExcalidrawElement): LexicalElement | null => {
-  const customData = element.customData as Record<string, unknown> | undefined;
-  if (
-    element.isDeleted ||
-    customData?.type !== 'lexical' ||
-    typeof customData.lexicalState !== 'string'
-  ) {
-    return null;
-  }
-
-  const fillStyle =
-    element.fillStyle === 'solid' ||
-    element.fillStyle === 'hachure' ||
-    element.fillStyle === 'cross-hatch'
-      ? element.fillStyle
-      : undefined;
-
-  const strokeStyle =
-    element.strokeStyle === 'solid' ||
-    element.strokeStyle === 'dashed' ||
-    element.strokeStyle === 'dotted'
-      ? element.strokeStyle
-      : undefined;
-
-  return {
-    id: element.id,
-    x: element.x,
-    y: element.y,
-    width: element.width,
-    height: element.height,
-    angle: element.angle,
-    isDeleted: element.isDeleted,
-    version: element.version,
-    versionNonce: element.versionNonce,
-    locked: element.locked,
-    backgroundColor: element.backgroundColor,
-    strokeColor: element.strokeColor,
-    strokeWidth: element.strokeWidth,
-    strokeStyle,
-    fillStyle,
-    roundness: element.roundness as { type: number; value?: number } | null | undefined,
-    roughness: element.roughness,
-    opacity: element.opacity,
-    customData: {
-      type: 'lexical',
-      lexicalState: customData.lexicalState,
-      backgroundOpacity:
-        typeof customData.backgroundOpacity === 'number'
-          ? customData.backgroundOpacity
-          : undefined,
-      blurAmount:
-        typeof customData.blurAmount === 'number'
-          ? customData.blurAmount
-          : undefined,
-      version: typeof customData.version === 'number' ? customData.version : 1,
-    },
-  };
-};
-
 const toKanbanElement = (element: ExcalidrawElement): KanbanElement | null => {
   const customData = element.customData as Record<string, unknown> | undefined;
   if (
@@ -299,11 +225,7 @@ const toKanbanElement = (element: ExcalidrawElement): KanbanElement | null => {
 
 const toNewLexElement = (element: ExcalidrawElement): NewLexElement | null => {
   const customData = element.customData as Record<string, unknown> | undefined;
-  if (
-    element.isDeleted ||
-    customData?.type !== 'newlex' ||
-    typeof customData.content !== 'string'
-  ) {
+  if (element.isDeleted || customData?.type !== 'newlex') {
     return null;
   }
 
@@ -320,6 +242,12 @@ const toNewLexElement = (element: ExcalidrawElement): NewLexElement | null => {
     element.strokeStyle === 'dotted'
       ? element.strokeStyle
       : undefined;
+
+  // Accept either lexicalState (new) or content (legacy migration — treat as empty)
+  const lexicalState =
+    typeof customData.lexicalState === 'string'
+      ? customData.lexicalState
+      : '';
 
   return {
     id: element.id,
@@ -342,7 +270,7 @@ const toNewLexElement = (element: ExcalidrawElement): NewLexElement | null => {
     opacity: element.opacity,
     customData: {
       type: 'newlex',
-      content: customData.content,
+      lexicalState,
       comments: Array.isArray(customData.comments)
         ? (customData.comments as NewLexCommentThread[])
         : [],
@@ -411,34 +339,6 @@ export const overlayRegistry: OverlayRegistry = {
         },
       }),
   },
-  lexical: {
-    type: 'lexical',
-    parse: toLexicalElement,
-    createProps: ({ element, appState, stackIndex, onUpdate, onDeselect }) => ({
-      element,
-      appState,
-      stackIndex,
-      onChange: (elementId, updates) => onUpdate(elementId, updates),
-      onDeselect,
-    }),
-    applyUpdate: (element, payload) => {
-      const nextCustomData = { ...element.customData };
-      if (payload.lexicalState !== undefined) {
-        nextCustomData.lexicalState = payload.lexicalState;
-      }
-      if (payload.backgroundOpacity !== undefined) {
-        nextCustomData.backgroundOpacity = payload.backgroundOpacity;
-      }
-      if (payload.blurAmount !== undefined) {
-        nextCustomData.blurAmount = payload.blurAmount;
-      }
-
-      return bumpElementVersion({
-        ...element,
-        customData: nextCustomData,
-      });
-    },
-  },
   newlex: {
     type: 'newlex',
     parse: toNewLexElement,
@@ -454,7 +354,7 @@ export const overlayRegistry: OverlayRegistry = {
         ...element,
         customData: {
           ...element.customData,
-          ...(payload.content !== undefined ? { content: payload.content } : {}),
+          ...(payload.lexicalState !== undefined ? { lexicalState: payload.lexicalState } : {}),
           ...(payload.comments !== undefined ? { comments: payload.comments } : {}),
           ...(payload.commentsPanelOpen !== undefined
             ? { commentsPanelOpen: payload.commentsPanelOpen }
@@ -492,11 +392,6 @@ export async function loadOverlayComponents(): Promise<OverlayComponentsByType> 
     cachedOverlayComponents['web-embed'] = mod.WebEmbed;
   }
 
-  if (!cachedOverlayComponents.lexical) {
-    const mod = await import('@/components/islands/rich-text');
-    cachedOverlayComponents.lexical = mod.LexicalNote;
-  }
-
   if (!cachedOverlayComponents.newlex) {
     const mod = await import('@/components/islands/new-lex');
     cachedOverlayComponents.newlex = mod.NewLexNote;
@@ -510,7 +405,6 @@ export async function loadOverlayComponents(): Promise<OverlayComponentsByType> 
   return {
     markdown: cachedOverlayComponents.markdown!,
     'web-embed': cachedOverlayComponents['web-embed']!,
-    lexical: cachedOverlayComponents.lexical!,
     newlex: cachedOverlayComponents.newlex!,
     kanban: cachedOverlayComponents.kanban!,
   };
@@ -520,7 +414,6 @@ export function createEmptyOverlayElements(): OverlayElementsByType {
   return {
     markdown: [],
     'web-embed': [],
-    lexical: [],
     newlex: [],
     kanban: [],
   };
@@ -530,7 +423,6 @@ export function createOverlayRefMaps(): OverlayRefsByType {
   return {
     markdown: new Map(),
     'web-embed': new Map(),
-    lexical: new Map(),
     newlex: new Map(),
     kanban: new Map(),
   };
