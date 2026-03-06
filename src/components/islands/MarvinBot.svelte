@@ -8,10 +8,14 @@
     | "left-arm"
     | "left-leg"
     | "right-leg"
-    | "body-shake"
     | "head-bang"
     | "dance"
-    | "jump";
+    | "jump"
+    | "floss"
+    | "orange-justice"
+    | "hype"
+    | "sprinkler"
+    | "shuffle";
   type TetrisMode = "closed" | "menu" | "playing" | "paused" | "gameover";
   type TetrisAction = "left" | "right" | "down" | "rotate" | "drop" | "pause";
   type WhacMode = "closed" | "menu" | "playing" | "gameover";
@@ -28,10 +32,14 @@
     "left-arm",
     "left-leg",
     "right-leg",
-    "body-shake",
     "head-bang",
     "dance",
     "jump",
+    "floss",
+    "orange-justice",
+    "hype",
+    "sprinkler",
+    "shuffle",
   ];
 
   const COLORS = {
@@ -268,10 +276,6 @@
   let clickAnimation = $state<ClickAnimation | null>(null);
   let breathPhase = $state(0);
   let idleTime = $state(0);
-  let particles = $state<
-    { id: number; x: number; y: number; opacity: number; scale: number; vx: number }[]
-  >([]);
-  let particleId = $state(0);
   let gameView = $state<GameView>("list");
   let expandedGameOpen = $state(false);
   let tetrisMode = $state<TetrisMode>("closed");
@@ -864,34 +868,6 @@
     }, delay);
   }
 
-  function spawnParticles() {
-    const newParticles = Array.from({ length: 8 }, (_, i) => ({
-      id: particleId++,
-      x: 120 + Math.random() * 60,
-      y: 180,
-      opacity: 1,
-      scale: 0.6 + Math.random() * 0.7,
-      vx: (Math.random() - 0.5) * 1.5,
-    }));
-    particles = [...particles, ...newParticles];
-
-    let frame = 0;
-    const animateParticles = () => {
-      frame++;
-      particles = particles
-        .map((p) => ({
-          ...p,
-          y: p.y - 2.2,
-          x: p.x + p.vx + Math.sin(frame * 0.12 + p.id) * 0.3,
-          opacity: p.opacity - 0.018,
-          scale: p.scale * 0.993,
-        }))
-        .filter((p) => p.opacity > 0);
-      if (particles.length > 0) requestAnimationFrame(animateParticles);
-    };
-    requestAnimationFrame(animateParticles);
-  }
-
   $effect(() => {
     window.addEventListener("mousemove", handleGlobalMouseMove, { passive: true });
     window.addEventListener("keydown", handleTetrisKeydown, tetrisKeyListenerOptions);
@@ -957,7 +933,6 @@
     idleTime = 0;
     robotState = "excited";
     screenMessage = "hi";
-    spawnParticles();
     setTimeout(() => (robotState = "love"), 300);
     setTimeout(() => { robotState = "happy"; }, 1200);
     setTimeout(() => {
@@ -1057,10 +1032,14 @@
     class:anim-left-arm={clickAnimation === "left-arm"}
     class:anim-left-leg={clickAnimation === "left-leg"}
     class:anim-right-leg={clickAnimation === "right-leg"}
-    class:anim-body-shake={clickAnimation === "body-shake"}
     class:anim-head-bang={clickAnimation === "head-bang"}
     class:anim-dance={clickAnimation === "dance"}
     class:anim-jump={clickAnimation === "jump"}
+    class:anim-floss={clickAnimation === "floss"}
+    class:anim-orange-justice={clickAnimation === "orange-justice"}
+    class:anim-hype={clickAnimation === "hype"}
+    class:anim-sprinkler={clickAnimation === "sprinkler"}
+    class:anim-shuffle={clickAnimation === "shuffle"}
   >
     <svg width="360" height="504" viewBox="0 -40 300 420" style="overflow: visible;">
       <defs>
@@ -1726,77 +1705,79 @@
           class="head-group"
           style="transform-origin: 150px 100px; transform: translate({headTranslateX}px, {headTranslateY}px) rotate({headRotate}deg) scale(0.93); transition: transform 0.1s ease-out;"
         >
-          <circle
-            cx="150"
-            cy="88"
-            r="58"
-            fill="url(#headGrad)"
-            stroke={COLORS.bodyStroke}
-            stroke-width="2.5"
-            filter="url(#dropShadow)"
-          />
-          <path d="M 106 68 Q 150 35 194 68" fill="none" stroke="white" stroke-width="2" opacity="0.2" />
-          <path d="M 100 74 Q 110 62 128 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
-          <path d="M 200 74 Q 190 62 172 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
-          <path d="M 100 110 Q 150 116 200 110" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.1" />
-
-          <!-- Ear panels -->
-          <g class="left-ear">
-            <rect x="88" y="70" width="16" height="36" rx="5" fill={COLORS.bodyStroke} opacity="0.45" />
-            <rect x="90" y="72" width="12" height="8" rx="2" fill={COLORS.jointDark} opacity="0.5" />
-            <rect x="91" y="99" width="10" height="4" rx="2" fill={COLORS.joint} opacity="0.6" />
-          </g>
-          <g class="right-ear">
-            <rect x="196" y="70" width="16" height="36" rx="5" fill={COLORS.bodyStroke} opacity="0.45" />
-            <rect x="198" y="72" width="12" height="8" rx="2" fill={COLORS.jointDark} opacity="0.5" />
-            <rect x="199" y="99" width="10" height="4" rx="2" fill={COLORS.joint} opacity="0.6" />
-          </g>
-
-          <!-- Orange eye ring -->
-          <circle
-            cx="150"
-            cy="88"
-            r="47"
-            fill="none"
-            stroke={COLORS.eyeRing}
-            stroke-width="4"
-            class="eye-ring"
-            class:pulsing={isHovering}
-            style="transform-origin: 150px 88px;"
-          />
-          <circle cx="150" cy="88" r="42" fill="none" stroke={COLORS.eyeRing} stroke-width="1" opacity="0.25" />
-          <circle cx="150" cy="88" r="40" fill={COLORS.bodyStroke} />
-          <circle cx="150" cy="88" r="35" fill="none" stroke="#334155" stroke-width="1" opacity="0.4" />
-
-          {#if isSleeping}
-            <circle cx="150" cy="88" r="39" fill="#3d4f62" />
-            <path d="M 122 88 Q 150 78 178 88" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round" />
-            <path d="M 122 90 Q 150 82 178 90" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" opacity="0.4" />
-          {:else}
+          <g class="head-motion-group">
             <circle
               cx="150"
               cy="88"
-              r={eyeSize}
-              fill={eyeGlow}
-              filter="url(#eyeGlow)"
-              style="transition: all 0.3s ease;"
-            >
-              {#if isActive}
-                <animate attributeName="opacity" values="1;0.85;1" dur="0.4s" repeatCount="indefinite" />
-              {/if}
-            </circle>
-            <circle
-              cx={150 + mouseOffset.x * 0.5}
-              cy={88 + mouseOffset.y * 0.3}
-              r="9"
-              fill="#78350f"
-              opacity="0.35"
-              style="transition: all 0.1s ease;"
+              r="58"
+              fill="url(#headGrad)"
+              stroke={COLORS.bodyStroke}
+              stroke-width="2.5"
+              filter="url(#dropShadow)"
             />
-            <circle cx="139" cy="74" r="9" fill="white" opacity="0.85" />
-            <circle cx="162" cy="98" r="3.5" fill="white" opacity="0.45" />
-            <circle cx="135" cy="82" r="2" fill="white" opacity="0.3" />
-          {/if}
+            <path d="M 106 68 Q 150 35 194 68" fill="none" stroke="white" stroke-width="2" opacity="0.2" />
+            <path d="M 100 74 Q 110 62 128 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
+            <path d="M 200 74 Q 190 62 172 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
+            <path d="M 100 110 Q 150 116 200 110" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.1" />
+
+            <!-- Ear panels -->
+            <g class="left-ear">
+              <rect x="88" y="70" width="16" height="36" rx="5" fill={COLORS.bodyStroke} opacity="0.45" />
+              <rect x="90" y="72" width="12" height="8" rx="2" fill={COLORS.jointDark} opacity="0.5" />
+              <rect x="91" y="99" width="10" height="4" rx="2" fill={COLORS.joint} opacity="0.6" />
+            </g>
+            <g class="right-ear">
+              <rect x="196" y="70" width="16" height="36" rx="5" fill={COLORS.bodyStroke} opacity="0.45" />
+              <rect x="198" y="72" width="12" height="8" rx="2" fill={COLORS.jointDark} opacity="0.5" />
+              <rect x="199" y="99" width="10" height="4" rx="2" fill={COLORS.joint} opacity="0.6" />
+            </g>
+
+            <!-- Orange eye ring -->
+            <circle
+              cx="150"
+              cy="88"
+              r="47"
+              fill="none"
+              stroke={COLORS.eyeRing}
+              stroke-width="4"
+              class="eye-ring"
+              class:pulsing={isHovering}
+              style="transform-origin: 150px 88px;"
+            />
+            <circle cx="150" cy="88" r="42" fill="none" stroke={COLORS.eyeRing} stroke-width="1" opacity="0.25" />
+            <circle cx="150" cy="88" r="40" fill={COLORS.bodyStroke} />
+            <circle cx="150" cy="88" r="35" fill="none" stroke="#334155" stroke-width="1" opacity="0.4" />
+
+            {#if isSleeping}
+              <circle cx="150" cy="88" r="39" fill="#3d4f62" />
+              <path d="M 122 88 Q 150 78 178 88" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round" />
+              <path d="M 122 90 Q 150 82 178 90" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" opacity="0.4" />
+            {:else}
+              <circle
+                cx="150"
+                cy="88"
+                r={eyeSize}
+                fill={eyeGlow}
+                filter="url(#eyeGlow)"
+                style="transition: all 0.3s ease;"
+              >
+                {#if isActive}
+                  <animate attributeName="opacity" values="1;0.85;1" dur="0.4s" repeatCount="indefinite" />
+                {/if}
+              </circle>
+              <circle
+                cx={150 + mouseOffset.x * 0.5}
+                cy={88 + mouseOffset.y * 0.3}
+                r="9"
+                fill="#78350f"
+                opacity="0.35"
+                style="transition: all 0.1s ease;"
+              />
+              <circle cx="139" cy="74" r="9" fill="white" opacity="0.85" />
+              <circle cx="162" cy="98" r="3.5" fill="white" opacity="0.45" />
+              <circle cx="135" cy="82" r="2" fill="white" opacity="0.3" />
+            {/if}
+          </g>
         </g>
 
         <!-- ===== ANTENNA ===== -->
@@ -1844,18 +1825,6 @@
         </g>
       </g>
 
-      <!-- Gold spark particles -->
-      {#each particles as particle (particle.id)}
-        <text
-          x={particle.x}
-          y={particle.y}
-          font-size={13 * particle.scale}
-          opacity={particle.opacity}
-          fill="#fbbf24"
-          text-anchor="middle"
-          style="pointer-events: none;"
-        >✦</text>
-      {/each}
     </svg>
   </div>
 
@@ -1888,7 +1857,7 @@
     outline: none;
   }
 
-  .bot:not(.anim-dance):not(.anim-jump) {
+  .bot:not(.anim-dance):not(.anim-jump):not(.anim-floss):not(.anim-orange-justice):not(.anim-hype):not(.anim-sprinkler):not(.anim-shuffle) {
     animation: idle-sway 4s ease-in-out infinite;
   }
 
@@ -1898,7 +1867,7 @@
     75% { transform: rotate(-0.3deg); }
   }
 
-  .bot.sleeping:not(.anim-dance):not(.anim-jump) {
+  .bot.sleeping:not(.anim-dance):not(.anim-jump):not(.anim-floss):not(.anim-orange-justice):not(.anim-hype):not(.anim-sprinkler):not(.anim-shuffle) {
     animation: sleep-bob 3s ease-in-out infinite;
   }
 
@@ -2015,12 +1984,17 @@
     transition: transform 0.3s ease;
   }
 
+  .bot :global(.head-motion-group) {
+    transform-origin: 150px 100px;
+    transition: transform 0.1s ease-out;
+  }
+
   /* === Idle arm swing === */
-  .bot:not(.anim-dance):not(.anim-jump):not(.state-waving):not(.state-happy):not(.state-excited):not(.state-love) :global(.left-arm-group) {
+  .bot:not(.anim-dance):not(.anim-jump):not(.anim-floss):not(.anim-orange-justice):not(.anim-hype):not(.anim-sprinkler):not(.anim-shuffle):not(.state-waving):not(.state-happy):not(.state-excited):not(.state-love) :global(.left-arm-group) {
     animation: idle-left-arm 4s ease-in-out infinite;
   }
 
-  .bot:not(.anim-dance):not(.anim-jump):not(.state-waving):not(.state-happy):not(.state-excited):not(.state-love) :global(.right-arm-group) {
+  .bot:not(.anim-dance):not(.anim-jump):not(.anim-floss):not(.anim-orange-justice):not(.anim-hype):not(.anim-sprinkler):not(.anim-shuffle):not(.state-waving):not(.state-happy):not(.state-excited):not(.state-love) :global(.right-arm-group) {
     animation: idle-right-arm 4s ease-in-out infinite;
   }
 
@@ -2160,17 +2134,7 @@
     50% { transform: translateY(-12px); }
   }
 
-  .anim-body-shake {
-    animation: body-wiggle 0.28s ease-in-out 5 !important;
-    animation-fill-mode: forwards;
-  }
-  @keyframes body-wiggle {
-    0%, 100% { transform: translateX(0) rotate(0deg); }
-    25% { transform: translateX(-6px) rotate(-2deg); }
-    75% { transform: translateX(6px) rotate(2deg); }
-  }
-
-  .anim-head-bang :global(.head-group) {
+  .anim-head-bang :global(.head-motion-group) {
     animation: head-bop 0.32s ease-in-out 4;
     animation-fill-mode: forwards;
   }
@@ -2180,25 +2144,25 @@
   }
 
   .anim-dance {
-    animation: dance-move 0.4s ease-in-out 5 !important;
+    animation: dance-move 0.5s ease-in-out 4 !important;
   }
   .anim-dance :global(.left-arm-group) {
-    animation: dance-left-arm 0.4s ease-in-out 5;
+    animation: dance-left-arm 0.5s ease-in-out 4;
   }
   .anim-dance :global(.right-arm-group) {
-    animation: dance-right-arm 0.4s ease-in-out 5;
+    animation: dance-right-arm 0.5s ease-in-out 4;
   }
   .anim-dance :global(.left-forearm-group) {
-    animation: dance-left-forearm 0.4s ease-in-out 5;
+    animation: dance-left-forearm 0.5s ease-in-out 4;
   }
   .anim-dance :global(.right-forearm-group) {
-    animation: dance-right-forearm 0.4s ease-in-out 5;
+    animation: dance-right-forearm 0.5s ease-in-out 4;
   }
   .anim-dance :global(.left-leg-group) {
-    animation: dance-left-leg 0.4s ease-in-out 5;
+    animation: dance-left-leg 0.5s ease-in-out 4;
   }
   .anim-dance :global(.right-leg-group) {
-    animation: dance-right-leg 0.4s ease-in-out 5;
+    animation: dance-right-leg 0.5s ease-in-out 4;
   }
 
   @keyframes dance-move {
@@ -2273,4 +2237,371 @@
     0%, 100% { transform: rotate(0deg); }
     40%, 70% { transform: rotate(-32deg); }
   }
+
+  .anim-floss :global(.body-group) {
+    animation: floss-body 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.left-arm-group) {
+    animation: floss-left-arm 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.right-arm-group) {
+    animation: floss-right-arm 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.left-forearm-group) {
+    animation: floss-left-forearm 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.right-forearm-group) {
+    animation: floss-right-forearm 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.left-leg-group) {
+    animation: floss-left-leg 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.right-leg-group) {
+    animation: floss-right-leg 0.48s ease-in-out 4;
+  }
+  .anim-floss :global(.head-motion-group) {
+    animation: floss-head 0.48s ease-in-out 4;
+  }
+
+  @keyframes floss-body {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    25% { transform: translateX(-10px) translateY(-4px); }
+    50% { transform: translateX(0) translateY(0); }
+    75% { transform: translateX(10px) translateY(-4px); }
+  }
+  @keyframes floss-left-arm {
+    0%, 100% { transform: rotate(34deg); }
+    25% { transform: rotate(-32deg); }
+    50% { transform: rotate(-40deg); }
+    75% { transform: rotate(26deg); }
+  }
+  @keyframes floss-right-arm {
+    0%, 100% { transform: rotate(-34deg); }
+    25% { transform: rotate(32deg); }
+    50% { transform: rotate(40deg); }
+    75% { transform: rotate(-26deg); }
+  }
+  @keyframes floss-left-forearm {
+    0%, 100% { transform: rotate(12deg); }
+    25% { transform: rotate(28deg); }
+    50% { transform: rotate(34deg); }
+    75% { transform: rotate(-10deg); }
+  }
+  @keyframes floss-right-forearm {
+    0%, 100% { transform: rotate(-12deg); }
+    25% { transform: rotate(-28deg); }
+    50% { transform: rotate(-34deg); }
+    75% { transform: rotate(10deg); }
+  }
+  @keyframes floss-left-leg {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(-4px) rotate(6deg); }
+    75% { transform: translateX(3px) rotate(-4deg); }
+  }
+  @keyframes floss-right-leg {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(3px) rotate(-4deg); }
+    75% { transform: translateX(-4px) rotate(6deg); }
+  }
+  @keyframes floss-head {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-2px) rotate(-2deg); }
+    75% { transform: translateY(-2px) rotate(2deg); }
+  }
+
+  .anim-orange-justice :global(.body-group) {
+    animation: orange-justice-body 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.left-arm-group) {
+    animation: orange-justice-left-arm 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.right-arm-group) {
+    animation: orange-justice-right-arm 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.left-forearm-group) {
+    animation: orange-justice-left-forearm 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.right-forearm-group) {
+    animation: orange-justice-right-forearm 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.left-leg-group) {
+    animation: orange-justice-left-leg 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.right-leg-group) {
+    animation: orange-justice-right-leg 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.left-shin-group) {
+    animation: orange-justice-left-shin 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.right-shin-group) {
+    animation: orange-justice-right-shin 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+  .anim-orange-justice :global(.head-motion-group) {
+    animation: orange-justice-head 0.5s cubic-bezier(0.45, 0, 0.55, 1) 4;
+  }
+
+  @keyframes orange-justice-body {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    25% { transform: translateX(-8px) translateY(-8px); }
+    50% { transform: translateX(0) translateY(2px); }
+    75% { transform: translateX(8px) translateY(-8px); }
+  }
+  @keyframes orange-justice-left-arm {
+    0%, 100% { transform: rotate(10deg); }
+    25% { transform: rotate(56deg); }
+    50% { transform: rotate(-8deg); }
+    75% { transform: rotate(42deg); }
+  }
+  @keyframes orange-justice-right-arm {
+    0%, 100% { transform: rotate(-10deg); }
+    25% { transform: rotate(-56deg); }
+    50% { transform: rotate(8deg); }
+    75% { transform: rotate(-42deg); }
+  }
+  @keyframes orange-justice-left-forearm {
+    0%, 100% { transform: rotate(14deg); }
+    25% { transform: rotate(30deg); }
+    50% { transform: rotate(-12deg); }
+    75% { transform: rotate(24deg); }
+  }
+  @keyframes orange-justice-right-forearm {
+    0%, 100% { transform: rotate(-14deg); }
+    25% { transform: rotate(-30deg); }
+    50% { transform: rotate(12deg); }
+    75% { transform: rotate(-24deg); }
+  }
+  @keyframes orange-justice-left-leg {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-4px) rotate(8deg); }
+    50% { transform: translateY(8px) rotate(-6deg); }
+    75% { transform: translateY(-6px) rotate(12deg); }
+  }
+  @keyframes orange-justice-right-leg {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(8px) rotate(-6deg); }
+    50% { transform: translateY(-4px) rotate(8deg); }
+    75% { transform: translateY(-6px) rotate(-12deg); }
+  }
+  @keyframes orange-justice-left-shin {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    50% { transform: rotate(8deg); }
+    75% { transform: rotate(-14deg); }
+  }
+  @keyframes orange-justice-right-shin {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(8deg); }
+    50% { transform: rotate(-10deg); }
+    75% { transform: rotate(14deg); }
+  }
+  @keyframes orange-justice-head {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-3px) rotate(-3deg); }
+    75% { transform: translateY(-3px) rotate(3deg); }
+  }
+
+  .anim-hype :global(.body-group) {
+    animation: hype-body 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.left-arm-group) {
+    animation: hype-left-arm 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.right-arm-group) {
+    animation: hype-right-arm 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.left-forearm-group) {
+    animation: hype-left-forearm 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.right-forearm-group) {
+    animation: hype-right-forearm 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.left-leg-group),
+  .anim-hype :global(.right-leg-group) {
+    animation: hype-legs 0.45s ease-in-out 4;
+  }
+  .anim-hype :global(.head-motion-group) {
+    animation: hype-head 0.45s ease-in-out 4;
+  }
+
+  @keyframes hype-body {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    35% { transform: translateY(-10px) scaleY(1.01); }
+    65% { transform: translateY(3px) scaleY(0.99); }
+  }
+  @keyframes hype-left-arm {
+    0%, 100% { transform: rotate(10deg); }
+    35% { transform: rotate(56deg); }
+    65% { transform: rotate(24deg); }
+  }
+  @keyframes hype-right-arm {
+    0%, 100% { transform: rotate(-10deg); }
+    35% { transform: rotate(-56deg); }
+    65% { transform: rotate(-24deg); }
+  }
+  @keyframes hype-left-forearm {
+    0%, 100% { transform: rotate(8deg); }
+    35% { transform: rotate(34deg); }
+    65% { transform: rotate(18deg); }
+  }
+  @keyframes hype-right-forearm {
+    0%, 100% { transform: rotate(-8deg); }
+    35% { transform: rotate(-34deg); }
+    65% { transform: rotate(-18deg); }
+  }
+  @keyframes hype-legs {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-8px); }
+    65% { transform: translateY(4px); }
+  }
+  @keyframes hype-head {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-4px); }
+    65% { transform: translateY(2px); }
+  }
+
+  .anim-sprinkler :global(.body-group) {
+    animation: sprinkler-body 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.left-arm-group) {
+    animation: sprinkler-left-arm 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.right-arm-group) {
+    animation: sprinkler-right-arm 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.left-forearm-group) {
+    animation: sprinkler-left-forearm 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.right-forearm-group) {
+    animation: sprinkler-right-forearm 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.left-leg-group) {
+    animation: sprinkler-left-leg 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.right-leg-group) {
+    animation: sprinkler-right-leg 0.5s ease-in-out 4;
+  }
+  .anim-sprinkler :global(.head-motion-group) {
+    animation: sprinkler-head 0.5s ease-in-out 4;
+  }
+
+  @keyframes sprinkler-body {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    25% { transform: translateX(-6px) translateY(-6px); }
+    75% { transform: translateX(6px) translateY(-2px); }
+  }
+  @keyframes sprinkler-left-arm {
+    0%, 100% { transform: rotate(60deg); }
+    50% { transform: rotate(18deg); }
+  }
+  @keyframes sprinkler-right-arm {
+    0%, 100% { transform: rotate(-18deg); }
+    25% { transform: rotate(-64deg); }
+    75% { transform: rotate(-38deg); }
+  }
+  @keyframes sprinkler-left-forearm {
+    0%, 100% { transform: rotate(26deg); }
+    50% { transform: rotate(8deg); }
+  }
+  @keyframes sprinkler-right-forearm {
+    0%, 100% { transform: rotate(-8deg); }
+    25% { transform: rotate(-28deg); }
+    75% { transform: rotate(-16deg); }
+  }
+  @keyframes sprinkler-left-leg {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(6deg); }
+  }
+  @keyframes sprinkler-right-leg {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(6px) rotate(-5deg); }
+    75% { transform: translateY(-4px) rotate(4deg); }
+  }
+  @keyframes sprinkler-head {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-3deg); }
+    75% { transform: rotate(2deg); }
+  }
+
+  .anim-shuffle :global(.body-group) {
+    animation: shuffle-body 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.left-arm-group) {
+    animation: shuffle-left-arm 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.right-arm-group) {
+    animation: shuffle-right-arm 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.left-forearm-group) {
+    animation: shuffle-left-forearm 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.right-forearm-group) {
+    animation: shuffle-right-forearm 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.left-leg-group) {
+    animation: shuffle-left-leg 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.right-leg-group) {
+    animation: shuffle-right-leg 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.left-shin-group) {
+    animation: shuffle-left-shin 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.right-shin-group) {
+    animation: shuffle-right-shin 0.4s ease-in-out 5;
+  }
+  .anim-shuffle :global(.head-motion-group) {
+    animation: shuffle-head 0.4s ease-in-out 5;
+  }
+
+  @keyframes shuffle-body {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    25% { transform: translateX(-8px) translateY(-4px); }
+    75% { transform: translateX(8px) translateY(-4px); }
+  }
+  @keyframes shuffle-left-arm {
+    0%, 100% { transform: rotate(8deg); }
+    25% { transform: rotate(30deg); }
+    75% { transform: rotate(-12deg); }
+  }
+  @keyframes shuffle-right-arm {
+    0%, 100% { transform: rotate(-8deg); }
+    25% { transform: rotate(12deg); }
+    75% { transform: rotate(-30deg); }
+  }
+  @keyframes shuffle-left-forearm {
+    0%, 100% { transform: rotate(6deg); }
+    25% { transform: rotate(18deg); }
+    75% { transform: rotate(-10deg); }
+  }
+  @keyframes shuffle-right-forearm {
+    0%, 100% { transform: rotate(-6deg); }
+    25% { transform: rotate(10deg); }
+    75% { transform: rotate(-18deg); }
+  }
+  @keyframes shuffle-left-leg {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(-10px) rotate(8deg); }
+    75% { transform: translateX(4px) rotate(-4deg); }
+  }
+  @keyframes shuffle-right-leg {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(4px) rotate(-4deg); }
+    75% { transform: translateX(10px) rotate(8deg); }
+  }
+  @keyframes shuffle-left-shin {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(8deg); }
+  }
+  @keyframes shuffle-right-shin {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(8deg); }
+    75% { transform: rotate(-10deg); }
+  }
+  @keyframes shuffle-head {
+    0%, 100% { transform: translateY(0); }
+    25% { transform: translateY(-2px); }
+    75% { transform: translateY(-3px); }
+  }
+
 </style>

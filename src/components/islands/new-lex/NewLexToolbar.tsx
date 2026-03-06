@@ -36,6 +36,7 @@ import { INSERT_TABLE_COMMAND } from '@lexical/table';
 import { INSERT_HORIZONTAL_RULE_COMMAND } from '@lexical/react/LexicalHorizontalRuleNode';
 import { $convertToMarkdownString, TRANSFORMERS } from '@lexical/markdown';
 import { INSERT_EQUATION_COMMAND } from './plugins/EquationPlugin';
+import { INSERT_IMAGE_COMMAND, openImageFilePicker } from './plugins/ImagesPlugin';
 import {
   $patchStyleText,
   $getSelectionStyleValueForProperty,
@@ -58,7 +59,8 @@ type BlockType =
 function getBlockType(selection: ReturnType<typeof $getSelection>): BlockType {
   if (!$isRangeSelection(selection)) return 'paragraph';
   const anchor = selection.anchor.getNode();
-  const topLevel = anchor.getTopLevelElementOrThrow();
+  const topLevel = anchor.getTopLevelElement();
+  if (topLevel === null || topLevel.getType() === 'root') return 'paragraph';
 
   if ($isHeadingNode(topLevel)) return topLevel.getTag() as BlockType;
   if ($isQuoteNode(topLevel)) return 'quote';
@@ -222,16 +224,36 @@ const CommentListIcon = () => (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const ImageIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+
+const WordCountIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="13" y2="18" />
+  </svg>
+);
+
 export interface NewLexToolbarProps {
   onRequestComment?: (selectedText: string) => void;
   onToggleCommentsPanel?: () => void;
   isCommentsPanelOpen?: boolean;
+  showWordCount?: boolean;
+  onToggleWordCount?: () => void;
 }
 
 export default function NewLexToolbar({
   onRequestComment,
   onToggleCommentsPanel,
   isCommentsPanelOpen,
+  showWordCount,
+  onToggleWordCount,
 }: NewLexToolbarProps): React.ReactElement {
   const [editor] = useLexicalComposerContext();
 
@@ -397,6 +419,12 @@ export default function NewLexToolbar({
   const handleLinkToggle = useCallback(() => {
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, isLink ? null : 'https://');
   }, [editor, isLink]);
+
+  const insertImage = useCallback(() => {
+    openImageFilePicker((payload) => {
+      editor.dispatchCommand(INSERT_IMAGE_COMMAND, payload);
+    });
+  }, [editor]);
 
   const copyAsMarkdown = useCallback(() => {
     editor.getEditorState().read(() => {
@@ -883,6 +911,17 @@ export default function NewLexToolbar({
         <HrIcon />
       </button>
 
+      {/* Image insert */}
+      <button
+        type="button"
+        style={btn(false)}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={insertImage}
+        title="Insert image"
+      >
+        <ImageIcon />
+      </button>
+
       {/* Copy as Markdown */}
       <button
         type="button"
@@ -902,6 +941,19 @@ export default function NewLexToolbar({
         <MarkdownCopyIcon />
         {mdCopied ? 'Copied!' : 'MD'}
       </button>
+
+      {/* Word count toggle */}
+      {onToggleWordCount && (
+        <button
+          type="button"
+          style={btn(!!showWordCount)}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onToggleWordCount}
+          title={showWordCount ? 'Hide word count' : 'Show word count'}
+        >
+          <WordCountIcon />
+        </button>
+      )}
 
       {/* Comment buttons — spacer pushes them to the right */}
       {(onRequestComment || onToggleCommentsPanel) && (

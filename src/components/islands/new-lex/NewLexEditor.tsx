@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
@@ -18,6 +18,7 @@ import { LinkNode, AutoLinkNode } from '@lexical/link';
 import { CodeNode, CodeHighlightNode } from '@lexical/code';
 import { TableNode, TableCellNode, TableRowNode } from '@lexical/table';
 import { EquationNode } from './nodes/EquationNode';
+import { ImageNode } from './nodes/ImageNode';
 import EquationPlugin from './plugins/EquationPlugin';
 import AutoLinkPlugin from './plugins/AutoLinkPlugin';
 import FloatingLinkEditorPlugin from './plugins/FloatingLinkEditorPlugin';
@@ -26,6 +27,8 @@ import CodeHighlightPlugin from './plugins/CodeHighlightPlugin';
 import AutoCodeLanguagePlugin from './plugins/AutoCodeLanguagePlugin';
 import CodeCopyButtonPlugin from './plugins/CodeCopyButtonPlugin';
 import FloatingFormatToolbar from './plugins/FloatingFormatToolbar';
+import ImagesPlugin from './plugins/ImagesPlugin';
+import WordCountPlugin from './plugins/WordCountPlugin';
 import NewLexToolbar from './NewLexToolbar';
 import { DEFAULT_NEWLEX_CONTENT } from './types';
 
@@ -95,6 +98,7 @@ const newlexTheme = {
     variable: 'newlex-token-variable',
   },
   hr: 'newlex-hr',
+  image: 'newlex-editor-image',
 };
 
 const EDITOR_NODES = [
@@ -111,6 +115,7 @@ const EDITOR_NODES = [
   TableRowNode,
   HorizontalRuleNode,
   EquationNode,
+  ImageNode,
 ];
 
 interface NewLexEditorProps {
@@ -120,6 +125,109 @@ interface NewLexEditorProps {
   onToggleCommentsPanel?: () => void;
   isCommentsPanelOpen?: boolean;
   isEditing: boolean;
+}
+
+// Inner component that can use hooks requiring LexicalComposerContext
+function NewLexInner({
+  onChange,
+  onRequestComment,
+  onToggleCommentsPanel,
+  isCommentsPanelOpen,
+  isEditing,
+  anchorRef,
+}: Omit<NewLexEditorProps, 'initialState'> & { anchorRef: React.RefObject<HTMLDivElement | null> }): React.ReactElement {
+  const [showWordCount, setShowWordCount] = useState(false);
+
+  const handleChange = useCallback(
+    (editorState: EditorState) => {
+      const json = JSON.stringify(editorState.toJSON());
+      onChange(json);
+    },
+    [onChange],
+  );
+
+  return (
+    <>
+      {isEditing && (
+        <NewLexToolbar
+          onRequestComment={onRequestComment}
+          onToggleCommentsPanel={onToggleCommentsPanel}
+          isCommentsPanelOpen={isCommentsPanelOpen}
+          showWordCount={showWordCount}
+          onToggleWordCount={() => setShowWordCount((v) => !v)}
+        />
+      )}
+
+      <div
+        ref={anchorRef}
+        style={{
+          position: 'relative',
+          flex: 1,
+          overflow: 'hidden',
+        }}
+      >
+        <RichTextPlugin
+          contentEditable={
+            <ContentEditable
+              style={{
+                width: '100%',
+                height: '100%',
+                overflow: 'auto',
+                outline: 'none',
+                padding: '14px 16px',
+                boxSizing: 'border-box',
+                color: '#111827',
+                fontSize: 15,
+                lineHeight: 1.6,
+                fontFamily: '"IBM Plex Sans", "SF Pro Text", "Segoe UI", sans-serif',
+                position: 'absolute',
+                inset: 0,
+                cursor: isEditing ? 'text' : 'default',
+              }}
+              aria-placeholder="Start writing..."
+              placeholder={
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 14,
+                    left: 16,
+                    color: '#9ca3af',
+                    fontSize: 15,
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                  }}
+                >
+                  Start writing...
+                </div>
+              }
+            />
+          }
+          ErrorBoundary={({ children }) => <>{children}</>}
+        />
+
+        <EditablePlugin editable={isEditing} />
+        <HistoryPlugin />
+        <ListPlugin />
+        <CheckListPlugin />
+        <LinkPlugin />
+        <TablePlugin />
+        <HorizontalRulePlugin />
+        <CodeHighlightPlugin />
+        <AutoCodeLanguagePlugin />
+        <CodeCopyButtonPlugin />
+        <FloatingFormatToolbar />
+        <EquationPlugin />
+        <ImagesPlugin />
+        <AutoLinkPlugin />
+        <FloatingLinkEditorPlugin anchorElem={anchorRef.current ?? undefined} />
+        <TableActionMenuPlugin anchorElem={anchorRef.current ?? undefined} />
+
+        <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
+      </div>
+
+      <WordCountPlugin show={showWordCount} />
+    </>
+  );
 }
 
 function EditablePlugin({ editable }: { editable: boolean }): null {
@@ -153,14 +261,6 @@ export default function NewLexEditor({
     },
   };
 
-  const handleChange = useCallback(
-    (editorState: EditorState) => {
-      const json = JSON.stringify(editorState.toJSON());
-      onChange(json);
-    },
-    [onChange],
-  );
-
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div
@@ -172,79 +272,14 @@ export default function NewLexEditor({
           position: 'relative',
         }}
       >
-        {isEditing && (
-          <NewLexToolbar
-            onRequestComment={onRequestComment}
-            onToggleCommentsPanel={onToggleCommentsPanel}
-            isCommentsPanelOpen={isCommentsPanelOpen}
-          />
-        )}
-
-        <div
-          ref={anchorRef}
-          style={{
-            position: 'relative',
-            flex: 1,
-            overflow: 'hidden',
-          }}
-        >
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  overflow: 'auto',
-                  outline: 'none',
-                  padding: '14px 16px',
-                  boxSizing: 'border-box',
-                  color: '#111827',
-                  fontSize: 15,
-                  lineHeight: 1.6,
-                  fontFamily: '"IBM Plex Sans", "SF Pro Text", "Segoe UI", sans-serif',
-                  position: 'absolute',
-                  inset: 0,
-                  cursor: isEditing ? 'text' : 'default',
-                }}
-                aria-placeholder="Start writing..."
-                placeholder={
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 14,
-                      left: 16,
-                      color: '#9ca3af',
-                      fontSize: 15,
-                      pointerEvents: 'none',
-                      userSelect: 'none',
-                    }}
-                  >
-                    Start writing...
-                  </div>
-                }
-              />
-            }
-            ErrorBoundary={({ children }) => <>{children}</>}
-          />
-
-          <EditablePlugin editable={isEditing} />
-          <HistoryPlugin />
-          <ListPlugin />
-          <CheckListPlugin />
-          <LinkPlugin />
-          <TablePlugin />
-          <HorizontalRulePlugin />
-          <CodeHighlightPlugin />
-          <AutoCodeLanguagePlugin />
-          <CodeCopyButtonPlugin />
-          <FloatingFormatToolbar />
-          <EquationPlugin />
-          <AutoLinkPlugin />
-          <FloatingLinkEditorPlugin anchorElem={anchorRef.current ?? undefined} />
-          <TableActionMenuPlugin anchorElem={anchorRef.current ?? undefined} />
-
-          <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
-        </div>
+        <NewLexInner
+          onChange={onChange}
+          onRequestComment={onRequestComment}
+          onToggleCommentsPanel={onToggleCommentsPanel}
+          isCommentsPanelOpen={isCommentsPanelOpen}
+          isEditing={isEditing}
+          anchorRef={anchorRef}
+        />
 
         <style>{`
           .newlex-editor-root {
@@ -400,10 +435,6 @@ export default function NewLexEditor({
             letter-spacing: 0.02em;
             transition: color 0.12s, border-color 0.12s, background 0.12s;
             z-index: 1;
-            /* Sit to the left of the language badge — badge is also right:0
-               but rendered by ::before which is on top of us in paint order.
-               We shift left enough to clear it; the badge auto-hides when
-               the language is 'auto' (no data-highlight-language attr set). */
             margin-right: 56px;
           }
           .newlex-code-copy:hover {
