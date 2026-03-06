@@ -128,6 +128,7 @@ const NewLexNoteInner = memo(
       const pendingLexicalCommitRef = useRef<number | null>(null);
       const pendingCommentsCommitRef = useRef<number | null>(null);
       const commentsRef = useRef<NewLexCommentThread[]>(comments);
+      const pendingLexicalStateRef = useRef<string | null>(null);
 
       useEffect(() => {
         commentsRef.current = comments;
@@ -156,11 +157,13 @@ const NewLexNoteInner = memo(
 
       const scheduleLexicalCommit = useCallback(
         (nextState: string) => {
+          pendingLexicalStateRef.current = nextState;
           if (pendingLexicalCommitRef.current !== null) {
             window.clearTimeout(pendingLexicalCommitRef.current);
           }
           pendingLexicalCommitRef.current = window.setTimeout(() => {
             pendingLexicalCommitRef.current = null;
+            pendingLexicalStateRef.current = null;
             commitNote({ lexicalState: nextState });
           }, CONTENT_COMMIT_DEBOUNCE_MS);
         },
@@ -185,6 +188,16 @@ const NewLexNoteInner = memo(
         window.clearTimeout(pendingCommentsCommitRef.current);
         pendingCommentsCommitRef.current = null;
         commitNote({ comments: commentsRef.current });
+      }, [commitNote]);
+
+      const flushPendingLexicalCommit = useCallback(() => {
+        if (pendingLexicalCommitRef.current === null) return;
+        window.clearTimeout(pendingLexicalCommitRef.current);
+        pendingLexicalCommitRef.current = null;
+        if (pendingLexicalStateRef.current !== null) {
+          commitNote({ lexicalState: pendingLexicalStateRef.current });
+          pendingLexicalStateRef.current = null;
+        }
       }, [commitNote]);
 
       const persistComments = useCallback(
@@ -219,15 +232,13 @@ const NewLexNoteInner = memo(
         setIsCommentsPanelOpenState(incomingOpen);
       }, [element.customData?.commentsPanelOpen]);
 
-      // Cleanup on unmount
+      // Cleanup on unmount — flush any pending debounced writes so content isn't lost
       useEffect(
         () => () => {
-          if (pendingLexicalCommitRef.current !== null) {
-            window.clearTimeout(pendingLexicalCommitRef.current);
-          }
+          flushPendingLexicalCommit();
           flushPendingCommentsCommit();
         },
-        [flushPendingCommentsCommit],
+        [flushPendingLexicalCommit, flushPendingCommentsCommit],
       );
 
       useEffect(() => {
