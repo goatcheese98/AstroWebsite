@@ -1,7 +1,12 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import { SignUp } from "@clerk/astro/components";
+import SignupForm from "@/components/auth/SignupForm";
 import "@/styles/auth-modern.css";
+
+const publishableKey =
+  Astro.locals.runtime?.env.PUBLIC_CLERK_PUBLISHABLE_KEY ??
+  import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ??
+  null;
 ---
 
 <BaseLayout title="Create Account - AstroWeb" description="Create your account">
@@ -22,12 +27,7 @@ import "@/styles/auth-modern.css";
       </a>
 
       <div class="auth-card-wrapper">
-        <SignUp
-          path="/signup"
-          routing="path"
-          signInUrl="/login"
-          forceRedirectUrl="/"
-        />
+        <SignupForm client:only="react" publishableKey={publishableKey} />
       </div>
     </div>
   </div>
@@ -81,34 +81,26 @@ import "@/styles/auth-modern.css";
     color: #3b82f6;
   }
 
-  .auth-card-3d {
-    background: white;
-    border-radius: 24px;
-    padding: 3rem 2.5rem;
-    box-shadow:
-      0 20px 25px -5px rgba(0, 0, 0, 0.1),
-      0 10px 10px -5px rgba(0, 0, 0, 0.04),
-      0 0 0 1px rgba(0, 0, 0, 0.05);
-    transform: translateY(0);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  .auth-card-wrapper {
+    display: flex;
+    justify-content: center;
   }
 
-  .auth-card-3d:hover {
-    transform: translateY(-4px);
+  :global(.auth-unavailable) {
+    width: min(100%, 420px);
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #475569;
     box-shadow:
-      0 25px 50px -12px rgba(0, 0, 0, 0.15),
-      0 12px 15px -5px rgba(0, 0, 0, 0.08),
-      0 0 0 1px rgba(0, 0, 0, 0.05);
+      0 12px 30px rgba(15, 23, 42, 0.08),
+      inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+    text-align: center;
   }
 
   @media (max-width: 640px) {
     .auth-page-modern {
       padding: 1rem;
-    }
-
-    .auth-card-3d {
-      padding: 2rem 1.5rem;
-      border-radius: 16px;
     }
 
     .back-link-modern {

@@ -1,7 +1,12 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import { SignIn } from "@clerk/astro/components";
+import LoginForm from "@/components/auth/LoginForm";
 import "@/styles/auth-modern.css";
+
+const publishableKey =
+  Astro.locals.runtime?.env.PUBLIC_CLERK_PUBLISHABLE_KEY ??
+  import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ??
+  null;
 ---
 
 <BaseLayout title="Sign In - AstroWeb" description="Sign in to your account">
@@ -22,12 +27,7 @@ import "@/styles/auth-modern.css";
       </a>
 
       <div class="auth-card-wrapper">
-        <SignIn
-          path="/login"
-          routing="path"
-          signUpUrl="/signup"
-          forceRedirectUrl="/"
-        />
+        <LoginForm client:only="react" publishableKey={publishableKey} />
       </div>
     </div>
   </div>
@@ -104,6 +104,18 @@ import "@/styles/auth-modern.css";
   .auth-card-wrapper {
     display: flex;
     justify-content: center;
+  }
+
+  :global(.auth-unavailable) {
+    width: min(100%, 420px);
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #475569;
+    box-shadow:
+      0 12px 30px rgba(15, 23, 42, 0.08),
+      inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+    text-align: center;
   }
 
   @media (max-width: 640px) {
