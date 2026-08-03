@@ -1,0 +1,105 @@
+---
+import { LEVEL_UP_CASE_STUDY } from "../../lib/portfolio-content";
+---
+
+<section class="dossier-section dossier-case" id="level-up" aria-labelledby="level-up-title">
+  <div class="dossier-shell">
+    <header class="dossier-section__header">
+      <div>
+        <p class="dossier-kicker">01 · Signature system</p>
+        <h2 id="level-up-title">An operating layer for a mortgage brokerage.</h2>
+      </div>
+      <p class="dossier-section__lede">
+        The interesting part is not that it uses AI. The interesting part is that
+        people can trust it with real work.
+      </p>
+    </header>
+
+    <article class="case-file">
+      <div class="case-file__masthead">
+        <div>
+          <p class="case-file__eyebrow">Professional engagement · private team system</p>
+          <h3>{LEVEL_UP_CASE_STUDY.organization}</h3>
+        </div>
+        <dl>
+          <div>
+            <dt>Official role</dt>
+            <dd>{LEVEL_UP_CASE_STUDY.officialRole}</dd>
+          </div>
+          <div>
+            <dt>Working scope</dt>
+            <dd>{LEVEL_UP_CASE_STUDY.scope}</dd>
+          </div>
+          <div>
+            <dt>Period</dt>
+            <dd>{LEVEL_UP_CASE_STUDY.period}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="case-file__brief">
+        <div>
+          <p class="dossier-annotation">The environment</p>
+          <p>{LEVEL_UP_CASE_STUDY.context}</p>
+        </div>
+        <div>
+          <p class="dossier-annotation">My contribution</p>
+          <p>{LEVEL_UP_CASE_STUDY.mandate}</p>
+        </div>
+      </div>
+
+      <div class="case-file__systems" aria-label="Connected operating systems">
+        <p class="dossier-annotation">Connected operating environment</p>
+        <ul>
+          {LEVEL_UP_CASE_STUDY.systems.map((system) => <li>{system}</li>)}
+        </ul>
+      </div>
+
+      <div class="case-file__capabilities">
+        {LEVEL_UP_CASE_STUDY.capabilities.map((capability, index) => (
+          <section>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <h4>{capability.title}</h4>
+            <p>{capability.description}</p>
+          </section>
+        ))}
+      </div>
+
+      <div class="case-file__trust">
+        <div class="case-file__trust-intro">
+          <p class="dossier-annotation">Designed for consequence</p>
+          <h4>AI proposes. People stay in control.</h4>
+          <p>
+            Mortgage operations involve private information and decisions people
+            depend on. Reliability is part of the product, not a cleanup task.
+          </p>
+        </div>
+
+        <ul class="case-file__controls">
+          {LEVEL_UP_CASE_STUDY.trustControls.map((control) => (
+            <li>
+              <span aria-hidden="true">✓</span>
+              {control}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <details class="case-file__technical">
+        <summary>
+          <span>Technical foundation</span>
+          <small>For the engineering-minded</small>
+        </summary>
+        <div>
+          <p>
+            A TypeScript application on Cloudflare, built around explicit data
+            contracts, durable workflows, production tests, and observable actions.
+          </p>
+          <ul>
+            {LEVEL_UP_CASE_STUDY.stack.map((item) => <li>{item}</li>)}
+          </ul>
+        </div>
+      </details>
+    </article>
+  </div>
+</section>

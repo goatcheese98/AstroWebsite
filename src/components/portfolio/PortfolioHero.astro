@@ -1,0 +1,64 @@
+---
+import { POSITIONING } from "../../lib/portfolio-content";
+---
+
+<section class="dossier-hero" aria-labelledby="portfolio-title">
+  <div class="dossier-shell">
+    <div class="dossier-hero__status">
+      <p>{POSITIONING.role} · {POSITIONING.location}</p>
+      <p class="dossier-hero__status-note">
+        <span aria-hidden="true"></span>
+        Open to the right problem
+      </p>
+    </div>
+
+    <div class="dossier-hero__grid">
+      <div class="dossier-hero__main">
+        <p class="dossier-kicker">Business judgment × AI-enabled delivery</p>
+        <h1 id="portfolio-title">{POSITIONING.headline}</h1>
+        <p class="dossier-hero__summary">{POSITIONING.summary}</p>
+
+        <div class="dossier-actions" aria-label="Portfolio shortcuts">
+          <a class="dossier-action dossier-action--primary" href="#level-up">
+            See the Level Up system
+            <span aria-hidden="true">↓</span>
+          </a>
+          <a class="dossier-action" href="#selected-work">
+            View selected work
+            <span aria-hidden="true">↘</span>
+          </a>
+        </div>
+      </div>
+
+      <aside class="dossier-hero__model" aria-label="How I create value">
+        <p class="dossier-annotation">My working loop</p>
+        <ol>
+          <li>
+            <span>01</span>
+            <strong>Find the friction</strong>
+            <small>Understand the work before reaching for a tool.</small>
+          </li>
+          <li>
+            <span>02</span>
+            <strong>Build the system</strong>
+            <small>Connect data, decisions, software, and safeguards.</small>
+          </li>
+          <li>
+            <span>03</span>
+            <strong>Earn adoption</strong>
+            <small>Train, listen, measure, maintain, and improve.</small>
+          </li>
+        </ol>
+      </aside>
+    </div>
+
+    <div class="dossier-proof" aria-label="Current areas of practice">
+      {POSITIONING.proof.map((item, index) => (
+        <div class="dossier-proof__item">
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <p>{item}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
