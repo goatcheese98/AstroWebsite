@@ -8,9 +8,10 @@ interface Props {
   title: string;
   description?: string;
   ogImage?: string;
+  showFooter?: boolean;
 }
 
-const { title, description, ogImage } = Astro.props;
+const { title, description, ogImage, showFooter = true } = Astro.props;
 
 ---
 
@@ -20,7 +21,7 @@ const { title, description, ogImage } = Astro.props;
   <main id="main-content">
     <slot />
   </main>
-  <Footer />
+  {showFooter && <Footer />}
 </BaseLayout>
 
 <style>

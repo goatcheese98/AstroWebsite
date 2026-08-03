@@ -9,11 +9,11 @@ import type {
 export const SITE: SiteMetadata = {
   title: "Rohan Jasani",
   description:
-    "Personal portfolio of Rohan Jasani — Business Analyst | Data-Driven Problem Solver | UBC MBAN Candidate",
+    "Rohan Jasani is an AI product and systems builder who turns operational friction into reliable systems teams actually use.",
   author: "Rohan Jasani",
-  siteUrl: "https://rohanjasani.dev",
+  siteUrl: "https://rohanjasani.com",
   socialLinks: {
-    github: "https://github.com/rohanjasani",
+    github: "https://github.com/goatcheese98",
     linkedin: "https://www.linkedin.com/in/rohan-jasani-dev/",
     email: "mailto:jasani.rohan@gmail.com",
   },

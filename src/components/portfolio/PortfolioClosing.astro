@@ -1,0 +1,35 @@
+---
+import { POSITIONING } from "../../lib/portfolio-content";
+import { SITE } from "../../lib/constants";
+---
+
+<footer class="dossier-closing" id="contact">
+  <div class="dossier-shell">
+    <p class="dossier-kicker">05 · What comes next</p>
+    <div class="dossier-closing__grid">
+      <div>
+        <h2>Give me a messy, consequential workflow.</h2>
+        <p>
+          I am at my best where business context, product judgment, and technical
+          execution have to meet in one person.
+        </p>
+      </div>
+      <div class="dossier-closing__actions">
+        <p>{POSITIONING.availability}</p>
+        <a class="dossier-closing__primary" href={SITE.socialLinks.email}>
+          Start a conversation <span aria-hidden="true">↗</span>
+        </a>
+        <div>
+          <a href={SITE.socialLinks.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href={SITE.socialLinks.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="/blog">Notes</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="dossier-closing__base">
+      <p>Rohan Jasani · AI Product &amp; Systems Builder</p>
+      <p>Vancouver, Canada · {new Date().getFullYear()}</p>
+    </div>
+  </div>
+</footer>

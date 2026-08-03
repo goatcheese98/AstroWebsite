@@ -1,18 +1,25 @@
 ---
 import PageLayout from "../layouts/PageLayout.astro";
+import CareerTimeline from "../components/portfolio/CareerTimeline.astro";
 import LevelUpCaseStudy from "../components/portfolio/LevelUpCaseStudy.astro";
 import OperatingApproach from "../components/portfolio/OperatingApproach.astro";
+import PortfolioClosing from "../components/portfolio/PortfolioClosing.astro";
 import PortfolioHero from "../components/portfolio/PortfolioHero.astro";
+import SelectedWork from "../components/portfolio/SelectedWork.astro";
 import "../styles/portfolio-reboot.css";
 ---
 
 <PageLayout
   title="AI Product & Systems Builder"
   description="Rohan Jasani turns operational friction into reliable AI systems teams actually use, from workflow discovery and product delivery through adoption and operation."
+  showFooter={false}
 >
   <div class="portfolio-reboot">
     <PortfolioHero />
     <LevelUpCaseStudy />
     <OperatingApproach />
+    <SelectedWork />
+    <CareerTimeline />
+    <PortfolioClosing />
   </div>
 </PageLayout>
