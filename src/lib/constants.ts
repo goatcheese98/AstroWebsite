@@ -33,47 +33,69 @@ export const CANVAS_NAV_LINKS: NavLink[] = [
 
 export const PROJECTS: Project[] = [
   {
-    title: "ALGS Esports Performance Dashboard",
+    title: "RoopStudio",
     description:
-      "Interactive dashboard for ALGS player and team performance, powered by a Python data pipeline for clean, queryable tournament analytics.",
-    tags: ["Python", "Data Visualization", "Web Scraping", "Analytics"],
-    codeUrl: "https://github.com/goatcheese98/algs-championship-viz",
-    demoUrl: "/projects/esportsdashboard",
+      "An AI-native visual workspace for diagramming, structured notes, image generation, and editable AI-assisted refinement.",
+    tags: ["Product Engineering", "Structured AI", "Canvas Systems"],
+    demoUrl: "https://canvas.rohanjasani.com/",
     featured: true,
     fillColor: "var(--color-fill-1)",
     accentColor: "#3b82f6",
   },
   {
-    title: "AI-Powered SVG Generation Tool",
+    title: "Promptfolio",
     description:
-      "Full-stack application converting natural language prompts into complex, layered SVG files. Features a reactive Vue.js interface with real-time SVG rendering and Tailwind CSS styling.",
-    tags: ["Vue.js", "Tailwind CSS", "AI/ML", "Full-Stack"],
-    codeUrl: "https://github.com/goatcheese98/ai-2-svg-tools",
+      "A prompt operations workspace for organizing experiments, comparing outputs, and turning one-off prompting into a repeatable evaluation loop.",
+    tags: ["Evaluation", "Workflow Design", "Applied AI"],
+    demoUrl: "https://promptfolio.jasani-rohan.workers.dev/",
     fillColor: "var(--color-fill-2)",
+    accentColor: "#f97316",
+  },
+  {
+    title: "Methanex Career Constellation",
+    description:
+      "A hackathon-built job taxonomy that turns inconsistent role data into an explorable view of workforce structure and career movement.",
+    tags: ["Embeddings", "Clustering", "Data Storytelling"],
+    demoUrl: "https://career-constellation.pages.dev/dashboard",
+    fillColor: "var(--color-fill-3)",
     accentColor: "#10b981",
+  },
+  {
+    title: "ALGS Performance Dashboard",
+    description:
+      "An interactive performance dashboard for professional Apex Legends players and teams, backed by a reusable Python data pipeline.",
+    tags: ["Python", "Data Pipeline", "Visualization"],
+    codeUrl: "https://github.com/goatcheese98/algs-championship-viz",
+    fillColor: "var(--color-fill-4)",
+    accentColor: "#8b5cf6",
   },
   {
     title: "AstroWeb Portfolio",
     description:
-      "This very site — an Excalidraw-inspired portfolio built with Astro, rough.js, and hand-drawn aesthetics.",
-    tags: ["Astro", "TypeScript", "rough.js", "CSS"],
+      "This site: an evolving personal workspace built with Astro, rough.js, and an Excalidraw-inspired visual language.",
+    tags: ["Astro", "TypeScript", "rough.js", "Design Systems"],
     codeUrl: "https://github.com/goatcheese98/AstroWebsite",
-    fillColor: "var(--color-fill-3)",
+    fillColor: "var(--color-fill-5)",
     accentColor: "#f59e0b",
-  },
-  {
-    title: "Methanex HR Dashboard",
-    description:
-      "An interactive HR dashboard built for the MBAN Hackathon to analyze and visualize employee data, helping drive strategic workforce decisions.",
-    tags: ["Data Analytics", "Dashboard", "Hackathon"],
-    codeUrl: "https://github.com/goatcheese98/MBANHackathon1",
-    demoUrl: "/projects/constellation",
-    fillColor: "var(--color-fill-4)",
-    accentColor: "#8b5cf6",
   },
 ];
 
 export const EXPERIENCES: Experience[] = [
+  {
+    company: "Level Up Mortgages",
+    role: "AI Automation & Operations Associate",
+    period: "2026 — Present",
+    description:
+      "Partnering with leadership and frontline staff to turn mortgage-operations bottlenecks into reliable AI-enabled systems the team can actually adopt.",
+    highlights: [
+      "Translate workflow discovery into product requirements, decision boundaries, and practical implementation plans",
+      "Contribute hands-on to a production TypeScript and Cloudflare system connecting CRM, email, documents, meetings, and internal tools",
+      "Build for trust with schema-grounded outputs, human approval gates, audit trails, repeat-safe operations, tests, and monitoring",
+      "Support rollout through consultation, training, documentation, feedback, and continuous improvement",
+    ],
+    current: true,
+    accentColor: "#f59e0b",
+  },
   {
     company: "UBC Sauder School of Business",
     role: "Master of Business Analytics Candidate",

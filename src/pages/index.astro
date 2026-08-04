@@ -1,25 +1,122 @@
 ---
 import PageLayout from "../layouts/PageLayout.astro";
-import CareerTimeline from "../components/portfolio/CareerTimeline.astro";
-import LevelUpCaseStudy from "../components/portfolio/LevelUpCaseStudy.astro";
-import OperatingApproach from "../components/portfolio/OperatingApproach.astro";
-import PortfolioClosing from "../components/portfolio/PortfolioClosing.astro";
-import PortfolioHero from "../components/portfolio/PortfolioHero.astro";
-import SelectedWork from "../components/portfolio/SelectedWork.astro";
-import "../styles/portfolio-reboot.css";
+import Hero from "../components/sections/Hero.astro";
+import Projects from "../components/sections/Projects.astro";
+import Experience from "../components/sections/Experience.astro";
+import BentoSkills from "../components/islands/BentoSkills.svelte";
+import SectionHeader from "../components/ui/SectionHeader.astro";
+import { PROJECTS, SKILLS } from "../lib/constants";
+
+const marqueeItems = [
+  ...new Set([
+    "Applied AI",
+    "Product Systems",
+    "Workflow Discovery",
+    "Human Approval",
+    "Team Enablement",
+    ...SKILLS.map((skill) => skill.category),
+    ...PROJECTS.flatMap((project) => project.tags),
+  ]),
+].slice(0, 16);
 ---
 
 <PageLayout
   title="AI Product & Systems Builder"
   description="Rohan Jasani turns operational friction into reliable AI systems teams actually use, from workflow discovery and product delivery through adoption and operation."
-  showFooter={false}
 >
-  <div class="portfolio-reboot">
-    <PortfolioHero />
-    <LevelUpCaseStudy />
-    <OperatingApproach />
-    <SelectedWork />
-    <CareerTimeline />
-    <PortfolioClosing />
+  <div class="landing-page">
+    <Hero />
+    <Experience />
+    <Projects />
+
+    <section class="skills section-gap" id="skills" aria-label="Skills">
+      <div class="container">
+        <SectionHeader
+          title="Skills & Systems"
+          subtitle="The toolkit behind the work—from discovery and product judgment to implementation and adoption."
+        />
+        <BentoSkills client:load />
+      </div>
+    </section>
+
+    <section class="landing-marquee" aria-label="Portfolio capabilities">
+      <div class="landing-marquee__track">
+        <ul class="landing-marquee__list">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
+        <ul class="landing-marquee__list" aria-hidden="true">
+          {marqueeItems.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+    </section>
   </div>
 </PageLayout>
+
+<style>
+  .landing-page {
+    position: relative;
+    background: transparent;
+  }
+
+  .landing-page :global(.gradient-text) {
+    color: var(--color-text);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .landing-page :global(.section-header__line) {
+    background: #ffd600;
+  }
+
+  .landing-page :global(.section-gap) {
+    padding-block: clamp(1.5rem, 4vw, 2.75rem);
+  }
+
+  .landing-marquee {
+    position: relative;
+    overflow: hidden;
+    color: #ffd600;
+    background: #0d0d12;
+  }
+
+  .landing-marquee__track {
+    display: flex;
+    width: max-content;
+    animation: landing-marquee 36s linear infinite;
+  }
+
+  .landing-marquee__list {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .landing-marquee__list li {
+    padding-inline: 1rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .landing-marquee__list li::after {
+    margin-left: 2rem;
+    color: #ff5c3a;
+    content: "✦";
+  }
+
+  @keyframes landing-marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-marquee__track {
+      animation: none;
+    }
+  }
+</style>
