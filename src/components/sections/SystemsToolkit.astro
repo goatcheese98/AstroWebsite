@@ -50,20 +50,19 @@ import SectionHeader from "../ui/SectionHeader.astro";
   .toolkit-board {
     position: relative;
     isolation: isolate;
-    border: 1px solid var(--color-stroke-muted);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-surface) 95%, #ffd600 5%);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 10px 28px rgba(15, 23, 42, 0.07);
   }
 
-  .toolkit-board::before {
-    position: absolute;
-    z-index: -1;
-    inset: -2px;
-    border: 2px solid var(--color-stroke);
-    border-radius: inherit;
-    content: "";
-    filter: url(#sketch-filter);
-    pointer-events: none;
+  :global([data-theme="dark"]) .toolkit-board {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 12px 30px rgba(0, 0, 0, 0.35);
   }
 
   .toolkit-board__label {
@@ -72,7 +71,7 @@ import SectionHeader from "../ui/SectionHeader.astro";
     justify-content: space-between;
     gap: 1rem;
     padding: 0.85rem clamp(1rem, 3vw, 1.5rem);
-    border-bottom: 1px solid var(--color-stroke-muted);
+    border-bottom: 1px solid var(--color-border);
     color: var(--color-text-muted);
     font-family: var(--font-mono);
     font-size: 0.68rem;
@@ -82,7 +81,21 @@ import SectionHeader from "../ui/SectionHeader.astro";
   }
 
   .toolkit-board__label span:first-child {
-    color: #b58b00;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--marvin-amber);
+  }
+
+  /* Marvin's chest indicator lights, machined into the board header. */
+  .toolkit-board__label span:first-child::before {
+    content: "";
+    width: 31px;
+    height: 7px;
+    background:
+      radial-gradient(circle 3.5px at 3.5px 50%, #22c55e 60%, transparent 62%),
+      radial-gradient(circle 3.5px at 15.5px 50%, #3b82f6 60%, transparent 62%),
+      radial-gradient(circle 3.5px at 27.5px 50%, var(--marvin-amber) 60%, transparent 62%);
   }
 
   .toolkit-row {
@@ -90,18 +103,31 @@ import SectionHeader from "../ui/SectionHeader.astro";
     grid-template-columns: 2.2rem minmax(0, 1fr);
     gap: 1rem;
     padding: clamp(1.15rem, 3vw, 1.75rem);
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .toolkit-row:hover {
+    background: color-mix(in srgb, var(--color-surface-hover) 55%, transparent);
+    box-shadow: inset 2px 0 0 var(--marvin-amber);
   }
 
   .toolkit-row + .toolkit-row {
-    border-top: 1px solid var(--color-stroke-muted);
+    border-top: 1px solid var(--color-border);
   }
 
+  /* Machined index plates instead of floating numbers. */
   .toolkit-row__number {
-    color: var(--toolkit-accent);
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid color-mix(in srgb, var(--marvin-amber) 40%, var(--color-border));
+    border-radius: 8px;
+    color: var(--marvin-amber);
     font-family: var(--font-mono);
     font-size: 0.72rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
   }
 
   .toolkit-row__copy {
@@ -133,13 +159,18 @@ import SectionHeader from "../ui/SectionHeader.astro";
 
   .toolkit-row__items li {
     padding: 0.34rem 0.58rem;
-    border: 1px solid var(--color-stroke-muted);
+    border: 1px solid var(--color-border);
     border-radius: 999px;
     color: var(--color-text-secondary);
     background: var(--color-bg);
     font-family: var(--font-mono);
     font-size: 0.68rem;
     line-height: 1.2;
+    transition: border-color 150ms ease;
+  }
+
+  .toolkit-row:hover .toolkit-row__items li {
+    border-color: color-mix(in srgb, var(--marvin-amber) 30%, var(--color-border));
   }
 
   @media (min-width: 800px) {

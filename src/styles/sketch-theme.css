@@ -49,6 +49,17 @@
   --shadow-sketch-lg: var(--shadow-lg);
 }
 
+/* Marvin accent — the mascot's amber, shared by the card chrome */
+:root {
+  --marvin-amber: #d97706;
+  --marvin-amber-soft: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="dark"] {
+  --marvin-amber: #ffb83d;
+  --marvin-amber-soft: rgba(255, 184, 61, 0.32);
+}
+
 /* Light theme - clean white aesthetic matching Excalidraw */
 [data-theme="light"] {
   --color-bg: #ffffff;
@@ -80,19 +91,19 @@
   color-scheme: light;
 }
 
-/* Dark theme - clean dark aesthetic */
+/* Dark theme - slate machine-room dark, tuned to the Marvin stage */
 [data-theme="dark"] {
-  --color-bg: #121212;
-  --color-surface: #1e1e1e;
-  --color-surface-elevated: #2a2a2a;
-  --color-surface-hover: #333333;
-  --color-text: #e5e5e5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-muted: #737373;
-  --color-stroke: #e5e5e5;
-  --color-stroke-muted: #404040;
-  --color-border: #404040;
-  --color-border-hover: #525252;
+  --color-bg: #101418;
+  --color-surface: #161b22;
+  --color-surface-elevated: #1d242d;
+  --color-surface-hover: #242c37;
+  --color-text: #e8ebef;
+  --color-text-secondary: #a8b2bc;
+  --color-text-muted: #7d8791;
+  --color-stroke: #e8ebef;
+  --color-stroke-muted: rgba(255, 255, 255, 0.08);
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-border-hover: rgba(255, 255, 255, 0.18);
   --color-accent: #3b82f6;
   --color-accent-hover: #60a5fa;
   --color-accent-light: rgba(59, 130, 246, 0.2);
@@ -104,10 +115,10 @@
   --color-fill-5: rgba(55, 48, 163, 0.4);
   --color-gradient-start: #3b82f6;
   --color-gradient-end: #60a5fa;
-  --dot-color-rgb: 100, 100, 100;
-  --dot-opacity: 0.15;
+  --dot-color-rgb: 112, 124, 138;
+  --dot-opacity: 0.14;
   --glow-opacity: 0.4;
-  --color-bg-rgb: 18, 18, 18;
+  --color-bg-rgb: 16, 20, 24;
   color-scheme: dark;
 }
 

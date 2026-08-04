@@ -1,6 +1,5 @@
 ---
 import SectionHeader from "../ui/SectionHeader.astro";
-import SketchHighlight from "../sketch/SketchHighlight.astro";
 import { EXPERIENCES } from "../../lib/constants";
 
 const LOGO_FILES: Record<string, string> = {
@@ -32,9 +31,7 @@ const totalCards = EXPERIENCES.length;
             <div class="experience-card__content">
               <div class="experience-card__header">
                 <div class="experience-card__title-group">
-                  <h3 class="experience-card__role">
-                    {exp.current ? <SketchHighlight>{exp.role}</SketchHighlight> : exp.role}
-                  </h3>
+                  <h3 class="experience-card__role">{exp.role}</h3>
                   <div class="experience-card__company-row">
                     {exp.logo && (
                       <span class="experience-card__logo-wrapper">
@@ -135,18 +132,30 @@ const totalCards = EXPERIENCES.length;
     content: "";
     position: absolute;
     inset: 0;
-    border: 2px solid var(--color-stroke);
-    border-radius: var(--radius-md);
-    filter: url(#sketch-filter);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
     pointer-events: none;
     z-index: 0;
+    transition: border-color 300ms ease;
   }
 
   .experience-card.is-focused {
     top: calc((var(--stack-count) - 1) * 140px);
     z-index: 30;
-    box-shadow: 8px 8px 0 var(--color-stroke);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.06),
+      0 20px 48px rgba(15, 23, 42, 0.12);
     opacity: 1;
+  }
+
+  .experience-card.is-focused::before {
+    border-color: color-mix(in srgb, var(--marvin-amber) 45%, var(--color-border));
+  }
+
+  :global([data-theme="dark"]) .experience-card.is-focused {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 20px 48px rgba(0, 0, 0, 0.45);
   }
 
   .experience-card__content {
@@ -214,13 +223,15 @@ const totalCards = EXPERIENCES.length;
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
-    font-size: var(--text-sm);
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
     font-family: var(--font-mono);
     background: var(--color-bg);
     padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-stroke-muted);
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -258,11 +269,11 @@ const totalCards = EXPERIENCES.length;
   .highlight__bullet {
     flex-shrink: 0;
     margin-top: 0.44em;
-    width: 8px;
-    height: 8px;
-    background: var(--hover-accent, var(--color-accent));
+    width: 7px;
+    height: 7px;
+    background: var(--hover-accent, var(--marvin-amber));
     border-radius: 50%;
-    filter: url(#sketch-filter);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--hover-accent, var(--marvin-amber)) 55%, transparent);
     transition: transform 0.15s ease;
   }
 

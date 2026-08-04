@@ -524,30 +524,19 @@ img[loading] {
 }
 
 .section-header__subtitle {
-  font-family: var(--font-hand);
-  font-size: var(--text-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: var(--space-md);
 }
 
 .section-header__line {
-  width: 60px;
-  height: 4px;
-  background: linear-gradient(
-    90deg,
-    var(--color-accent),
-    var(--color-gradient-end)
-  );
-  border-radius: 2px;
-  filter: url(#sketch-filter);
-}
-
-/* Mobile: Disable filter for performance */
-@media (hover: none) and (pointer: coarse) {
-  .section-header__line {
-    filter: none;
-    border-radius: 3px 1px 3px 1px;
-  }
+  width: 56px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--marvin-amber), transparent);
+  border-radius: 1px;
 }
 
 /* ============================================================================
@@ -558,31 +547,53 @@ img[loading] {
 
 .sketch-card {
   position: relative;
-  background: var(--color-surface);
-  border: 2px solid var(--color-stroke);
-  border-radius: var(--radius-md);
-  filter: url(#sketch-filter);
+  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
   transition:
     transform 0.2s ease,
+    border-color 0.2s ease,
     box-shadow 0.2s ease;
   overflow: hidden;
-  box-shadow: 4px 4px 0 var(--color-stroke);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 10px 28px rgba(15, 23, 42, 0.07);
+}
+
+/* Dark depth comes from surface steps and a machined top edge, not shadow. */
+[data-theme="dark"] .sketch-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .sketch-card__accent {
   position: absolute;
   top: 0;
   left: 0;
-  width: 4px;
+  width: 3px;
   height: 100%;
-  background: var(--hover-accent, var(--color-accent));
+  background: var(--hover-accent, var(--marvin-amber));
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 .sketch-card:hover {
-  transform: translate(-3px, -3px);
-  box-shadow: 7px 7px 0 var(--color-stroke);
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--marvin-amber) 45%, var(--color-border));
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 16px 40px rgba(15, 23, 42, 0.1),
+    0 0 0 1px var(--marvin-amber-soft);
+}
+
+[data-theme="dark"] .sketch-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 18px 44px rgba(0, 0, 0, 0.45),
+    0 0 0 1px var(--marvin-amber-soft);
 }
 
 .sketch-card:hover .sketch-card__accent {
@@ -598,13 +609,5 @@ img[loading] {
 @media (max-width: 640px) {
   .sketch-card:hover {
     transform: none;
-  }
-}
-
-/* Touch devices: Disable filter */
-@media (hover: none) and (pointer: coarse) {
-  .sketch-card {
-    filter: none;
-    border-radius: 10px 8px 12px 9px;
   }
 }

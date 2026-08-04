@@ -31,29 +31,18 @@ const { title, subtitle, highlight = true } = Astro.props;
   }
 
   .section-header__subtitle {
-    font-family: var(--font-hand);
-    font-size: var(--text-lg);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
     margin-bottom: var(--space-md);
   }
 
   .section-header__line {
-    width: 60px;
-    height: 4px;
-    background: linear-gradient(
-      90deg,
-      var(--color-accent),
-      var(--color-gradient-end)
-    );
-    border-radius: 2px;
-    filter: url(#sketch-filter);
-  }
-
-  /* Mobile: Disable filter for performance */
-  @media (hover: none) and (pointer: coarse) {
-    .section-header__line {
-      filter: none;
-      border-radius: 3px 1px 3px 1px;
-    }
+    width: 56px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--marvin-amber), transparent);
+    border-radius: 1px;
   }
 </style>

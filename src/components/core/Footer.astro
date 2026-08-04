@@ -109,9 +109,9 @@ import { SITE } from '../../lib/constants';
     bottom: 0.08em;
     left: -0.08em;
     height: 0.34em;
-    background: #ffd600;
+    background: var(--marvin-amber);
+    opacity: 0.45;
     content: "";
-    transform: rotate(-1deg);
   }
 
   /* ── Right: sub + links ── */
@@ -143,19 +143,20 @@ import { SITE } from '../../lib/constants';
     font-weight: 700;
     font-size: 0.9rem;
     text-decoration: none;
-    border: 2px solid #0d0d12;
-    box-shadow: 3px 3px 0 #0d0d12;
+    border: 1px solid rgba(13, 13, 18, 0.65);
+    box-shadow: 0 1px 2px rgba(13, 13, 18, 0.1), 0 6px 16px rgba(13, 13, 18, 0.12);
     transition: transform 140ms ease, box-shadow 140ms ease;
   }
 
   .footer__link:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 5px 5px 0 #0d0d12;
+    transform: translateY(-2px);
+    box-shadow: 0 1px 2px rgba(13, 13, 18, 0.1), 0 10px 24px rgba(13, 13, 18, 0.18);
   }
 
   .footer__link--primary {
-    background: #0d0d12;
-    color: #ffd600;
+    background: var(--marvin-amber);
+    color: #14181f;
+    border-color: var(--marvin-amber);
   }
 
   .footer__link--ghost {
@@ -171,7 +172,7 @@ import { SITE } from '../../lib/constants';
     flex-wrap: wrap;
     gap: var(--space-sm);
     padding-top: var(--space-md);
-    border-top: 2px solid rgba(13, 13, 18, 0.18);
+    border-top: 1px solid rgba(13, 13, 18, 0.14);
   }
 
   .footer__brand {
@@ -185,13 +186,14 @@ import { SITE } from '../../lib/constants';
     place-items: center;
     width: 2rem;
     height: 2rem;
-    background: #0d0d12;
-    color: #ffd600;
+    background: var(--marvin-amber);
+    color: #14181f;
     font-family: var(--font-ui);
     font-weight: 900;
     font-size: 0.85rem;
-    border-radius: 5px;
+    border-radius: 8px;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px var(--marvin-amber-soft);
   }
 
   .footer__tagline {
@@ -216,6 +218,56 @@ import { SITE } from '../../lib/constants';
 
   .footer__copyright a:hover {
     opacity: 0.65;
+  }
+
+  /* ── Dark mode: slate band, amber accents ── */
+  :global([data-theme="dark"]) .footer {
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+
+  :global([data-theme="dark"]) .footer__overline,
+  :global([data-theme="dark"]) .footer__sub,
+  :global([data-theme="dark"]) .footer__tagline,
+  :global([data-theme="dark"]) .footer__copyright {
+    color: var(--color-text-muted);
+  }
+
+  :global([data-theme="dark"]) .footer__headline {
+    color: var(--color-text);
+  }
+
+  :global([data-theme="dark"]) .footer__headline-mark::after {
+    background: var(--marvin-amber);
+    opacity: 0.4;
+  }
+
+  :global([data-theme="dark"]) .footer__link {
+    border-color: var(--color-border-hover);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  :global([data-theme="dark"]) .footer__link--primary {
+    background: var(--marvin-amber);
+    color: #14181f;
+    border-color: var(--marvin-amber);
+  }
+
+  :global([data-theme="dark"]) .footer__link--ghost {
+    color: var(--color-text);
+  }
+
+  :global([data-theme="dark"]) .footer__bottom {
+    border-top-color: var(--color-border);
+  }
+
+  :global([data-theme="dark"]) .footer__logo-block {
+    background: var(--marvin-amber);
+    color: #14181f;
+  }
+
+  :global([data-theme="dark"]) .footer__copyright a {
+    color: var(--color-text-secondary);
   }
 
   @media (max-width: 700px) {

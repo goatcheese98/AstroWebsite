@@ -27,24 +27,24 @@ export const NAV_LINKS: NavLink[] = [
 
 export const PORTFOLIO_TOOLKIT = [
   {
-    title: "Applied AI systems",
+    title: "Discovery & product judgment",
     description:
-      "Model-assisted workflows with explicit boundaries, evaluation, and a human in the loop where judgment matters.",
-    items: ["Agentic workflows", "Tool use", "Structured outputs", "Evals", "Human approval"],
+      "I start where the friction is: sitting with the people doing the work, mapping how it actually flows, and deciding what is worth building — and what isn't.",
+    items: ["Workflow mapping", "Requirements", "Decision boundaries", "Prioritization", "Stakeholder alignment"],
     accentColor: "#3b82f6",
   },
   {
-    title: "Product delivery",
+    title: "AI systems design",
     description:
-      "From an ambiguous operating problem to requirements, rollout, training, and a feedback loop people will use.",
-    items: ["Workflow discovery", "Requirements", "Decision boundaries", "Rollout", "Adoption"],
+      "Then I shape AI around the workflow, not the other way around: agents with clear guardrails, measurable output quality, and a human in the loop where judgment matters.",
+    items: ["Agentic workflows", "Tool use", "Structured outputs", "Evals & guardrails", "Human-in-the-loop"],
     accentColor: "#f59e0b",
   },
   {
-    title: "Reliable implementation",
+    title: "Delivery & adoption",
     description:
-      "Small, observable systems built for repeat-safe operation instead of impressive demos that fall apart in practice.",
-    items: ["TypeScript", "Cloudflare", "Hono", "D1 / KV / R2", "Tests & monitoring"],
+      "And I ship it for real: small, observable systems, then the unglamorous part — rollout, training, and iteration until the team relies on it without thinking.",
+    items: ["TypeScript", "Full-stack delivery", "Tests & monitoring", "Rollout & training", "Feedback loops"],
     accentColor: "#10b981",
   },
 ] as const;

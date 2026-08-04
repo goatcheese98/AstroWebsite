@@ -110,45 +110,112 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
     gap: 1.25rem;
     min-width: 0;
     padding: clamp(1.15rem, 3vw, 1.75rem);
-    border: 1px solid color-mix(in srgb, var(--color-stroke-muted) 72%, transparent);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
     color: var(--color-text);
-    background: color-mix(in srgb, var(--color-surface) 96%, var(--project-accent) 4%);
+    background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 10px 28px rgba(15, 23, 42, 0.07);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
 
-  .project-card::before {
-    position: absolute;
-    z-index: -1;
-    inset: -2px;
-    border: 2px solid var(--color-stroke);
-    border-radius: inherit;
-    content: "";
-    filter: url(#sketch-filter);
-    pointer-events: none;
+  .project-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--marvin-amber) 45%, var(--color-border));
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 16px 40px rgba(15, 23, 42, 0.1),
+      0 0 0 1px var(--marvin-amber-soft);
   }
 
+  :global([data-theme="dark"]) .project-card {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  :global([data-theme="dark"]) .project-card:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 18px 44px rgba(0, 0, 0, 0.45),
+      0 0 0 1px var(--marvin-amber-soft);
+  }
+
+  /* The accent spine only wakes on hover, like the experience cards. */
   .project-card::after {
     position: absolute;
     z-index: -1;
     top: 0;
     bottom: 0;
     left: 0;
-    width: 5px;
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
-    background: var(--project-accent);
+    width: 3px;
+    border-radius: 14px 0 0 14px;
+    background: var(--marvin-amber);
+    opacity: 0;
+    transition: opacity 0.3s ease;
     content: "";
   }
 
+  .project-card:hover::after {
+    opacity: 1;
+  }
+
+  /* The flagship build gets the Marvin stage treatment: a faint engineering
+     grid, a warm amber wash, and the lab's corner brackets. */
   .project-card--featured {
     margin-bottom: 1rem;
     padding: clamp(1.35rem, 4vw, 2.25rem);
     background:
-      linear-gradient(
-        105deg,
-        color-mix(in srgb, var(--project-accent) 11%, var(--color-surface)),
-        var(--color-surface) 58%
-      );
-    box-shadow: 7px 7px 0 color-mix(in srgb, var(--color-stroke) 90%, transparent);
+      linear-gradient(105deg, color-mix(in srgb, var(--marvin-amber) 7%, transparent), transparent 55%),
+      linear-gradient(color-mix(in srgb, var(--color-stroke) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--color-stroke) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
+    background-size: auto, 48px 48px, 48px 48px, auto;
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.06),
+      0 20px 48px rgba(15, 23, 42, 0.1);
+  }
+
+  .project-card--featured::before,
+  .project-card--featured::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    width: 22px;
+    height: 22px;
+    border-color: var(--marvin-amber);
+    border-style: solid;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  .project-card--featured::before {
+    top: 12px;
+    left: 12px;
+    border-width: 1px 0 0 1px;
+    border-radius: 0;
+    background: none;
+  }
+
+  /* Featured trades the hover spine for the second corner bracket. */
+  .project-card--featured::after {
+    top: auto;
+    left: auto;
+    right: 12px;
+    bottom: 12px;
+    width: 22px;
+    height: 22px;
+    border-width: 0 1px 1px 0;
+    border-radius: 0;
+    background: none;
+    opacity: 0.75;
+  }
+
+  .project-card--featured:hover::after {
+    opacity: 1;
   }
 
   .project-card__marker {
@@ -167,7 +234,7 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
   }
 
   .project-card__marker span:first-child {
-    color: var(--project-accent);
+    color: var(--marvin-amber);
   }
 
   .project-card__body,
@@ -184,7 +251,7 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
 
   .project-card__eyebrow {
     margin-bottom: 0.55rem;
-    color: var(--project-accent);
+    color: var(--marvin-amber);
     font-family: var(--font-mono);
     font-size: 0.72rem;
     font-weight: 700;
@@ -220,13 +287,18 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
 
   .project-card__tags li {
     padding: 0.35rem 0.62rem;
-    border: 1px solid var(--color-stroke-muted);
+    border: 1px solid var(--color-border);
     border-radius: 999px;
     color: var(--color-text-secondary);
     background: color-mix(in srgb, var(--color-bg) 80%, transparent);
     font-family: var(--font-mono);
     font-size: 0.69rem;
     line-height: 1.2;
+    transition: border-color 150ms ease, color 150ms ease;
+  }
+
+  .project-card:hover .project-card__tags li {
+    border-color: color-mix(in srgb, var(--marvin-amber) 30%, var(--color-border));
   }
 
   .project-action {
@@ -236,36 +308,42 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
     align-self: flex-start;
     gap: 0.55rem;
     min-height: 44px;
-    padding: 0.68rem 0.9rem;
-    border: 2px solid var(--color-stroke);
-    border-radius: 0.45rem;
+    padding: 0.68rem 0.95rem;
+    border: 1px solid var(--color-border-hover);
+    border-radius: 9px;
     color: var(--color-text);
     background: var(--color-bg);
-    box-shadow: 3px 3px 0 var(--color-stroke);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
     font-family: var(--font-ui);
     font-size: 0.88rem;
     font-weight: 750;
     line-height: 1;
     text-decoration: none;
-    transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+    transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
   }
 
   .project-action:hover {
     color: #0d0d12;
-    background: #ffd600;
-    box-shadow: 1px 1px 0 var(--color-stroke);
+    background: var(--marvin-amber);
+    border-color: var(--marvin-amber);
+    box-shadow: 0 4px 14px var(--marvin-amber-soft);
     text-decoration: none;
-    transform: translate(2px, 2px);
+    transform: translateY(-1px);
   }
 
   .project-action:focus-visible {
-    outline: 3px solid var(--project-accent);
+    outline: 2px solid var(--marvin-amber);
     outline-offset: 4px;
   }
 
   .project-action--primary {
-    color: #ffd600;
-    background: #0d0d12;
+    color: #14181f;
+    background: var(--marvin-amber);
+    border-color: var(--marvin-amber);
+  }
+
+  .project-action--primary:hover {
+    box-shadow: 0 6px 18px var(--marvin-amber-soft);
   }
 
   .project-list {

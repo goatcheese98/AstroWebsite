@@ -53,9 +53,9 @@ describe("sketch portfolio content", () => {
 
   it("groups the working toolkit around three relevant capabilities", () => {
     expect(PORTFOLIO_TOOLKIT.map((group) => group.title)).toEqual([
-      "Applied AI systems",
-      "Product delivery",
-      "Reliable implementation",
+      "Discovery & product judgment",
+      "AI systems design",
+      "Delivery & adoption",
     ]);
   });
 
