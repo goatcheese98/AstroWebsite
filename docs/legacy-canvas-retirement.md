@@ -15,6 +15,7 @@ The old `/canvas`, `/ai-canvas`, `/dashboard`, `/login`, and `/signup` URLs perm
 ## What was retired here
 
 - The Canvas-only Cloudflare deployment workflow and Wrangler target
+- Canvas D1, KV, R2, and migration bindings from the portfolio deployment
 - Canvas build/preview/deploy scripts
 - Legacy Canvas, assistant, user, image-generation, and database-health API routes
 - Portfolio-wide Clerk middleware and Astro integration

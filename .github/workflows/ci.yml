@@ -31,6 +31,3 @@ jobs:
 
       - name: Build web target
         run: bun run build
-
-      - name: Build canvas target
-        run: bun run build:canvas

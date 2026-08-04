@@ -89,8 +89,8 @@
     width: 36px;
     height: 36px;
     flex-shrink: 0;
-    background: none;
-    border: 2px solid var(--color-stroke);
+    background: var(--color-surface-elevated);
+    border: 0;
     border-radius: var(--radius-md);
     color: var(--color-text);
     cursor: pointer;
@@ -98,10 +98,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    filter: url(#sketch-filter);
     transition: transform 0.15s ease;
     position: relative;
     box-shadow: var(--shadow-sm);
+  }
+
+  .theme-toggle::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--color-stroke);
+    border-radius: inherit;
+    filter: url(#sketch-filter);
+    pointer-events: none;
   }
 
   .theme-toggle:hover {
@@ -195,7 +204,7 @@
   }
 
   @media (hover: none) and (pointer: coarse) {
-    .theme-toggle {
+    .theme-toggle::before {
       filter: none;
     }
   }

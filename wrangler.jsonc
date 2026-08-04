@@ -5,35 +5,5 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "pages_build_output_dir": "./dist",
-  "migrations_dir": "./db/migrations",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "astroweb-db",
-      "database_id": "1daa4434-4ec6-472d-8bf9-ab6e71c11dbf",
-      "migrations_dir": "./db/migrations"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "SESSION_KV",
-      "id": "2e40b52270bb4622873e0ba5c545a922"
-    },
-    {
-      "binding": "RATE_LIMIT_KV",
-      "id": "598df9d2488549df9929db888147772f"
-    },
-    {
-      "binding": "CANVAS_KV",
-      "id": "bdd03f9666c84ae7be21826775442318"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "CANVAS_STORAGE",
-      "bucket_name": "astroweb-canvases",
-      "preview_bucket_name": "astroweb-canvases-preview"
-    }
-  ]
+  "pages_build_output_dir": "./dist"
 }
