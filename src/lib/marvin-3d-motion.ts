@@ -79,9 +79,9 @@ export function getMarvin3DGrapplePose(
     return {
       ...SETTLED_POSE,
       root: {
-        x: lerp(4.2, 2.5, progress),
-        y: lerp(6.4, 4.4, progress),
-        z: lerp(-2, 0.2, progress),
+        x: lerp(3.2, 2.1, progress),
+        y: lerp(4.5, 2.6, progress),
+        z: lerp(-1.4, 0.2, progress),
         rotationZ: lerp(-0.48, 0.24, progress),
         rotationY: lerp(-0.55, 0.18, progress),
       },
@@ -103,8 +103,8 @@ export function getMarvin3DGrapplePose(
     return {
       ...SETTLED_POSE,
       root: {
-        x: lerp(2.5, 0, progress),
-        y: lerp(4.4, 0.72, progress) + Math.sin(progress * Math.PI) * 0.45,
+        x: lerp(2.1, 0, progress),
+        y: lerp(2.6, 0.72, progress) + Math.sin(progress * Math.PI) * 0.36,
         z: lerp(0.2, 0, progress),
         rotationZ: Math.sin(progress * Math.PI) * 0.34 - 0.08,
         rotationY: lerp(0.18, -0.08, progress),

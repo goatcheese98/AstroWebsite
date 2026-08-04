@@ -1,0 +1,11 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import MarvinLab from "../components/marvin-3d/MarvinLab.svelte";
+---
+
+<BaseLayout
+  title="Marvin 3D Lab"
+  description="An isolated three-dimensional motion study for Rohan Jasani's Marvin mascot."
+>
+  <MarvinLab client:only="svelte" />
+</BaseLayout>

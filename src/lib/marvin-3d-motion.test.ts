@@ -17,6 +17,8 @@ describe("Marvin 3D motion", () => {
     expect(launch.cableVisible).toBe(true);
     expect(launch.root.y).toBeGreaterThan(swing.root.y);
     expect(swing.phase).toBe("swing");
+    expect(swing.root.y).toBeLessThan(2.6);
+    expect(Math.abs(swing.root.x)).toBeLessThan(2.5);
     expect(landing.phase).toBe("landing");
     expect(settled).toMatchObject({ phase: "online", cableVisible: false });
     expect(settled.root).toEqual({ x: 0, y: 0, z: 0, rotationZ: 0, rotationY: 0 });

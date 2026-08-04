@@ -131,3 +131,12 @@ unlabelled mesh-only controls.
 The lab is eligible to replace the SVG mascot only if it is visibly more convincing in still frames
 and motion, preserves the mascot's personality, meets the performance budget, supports accessible
 interaction, and does not degrade the homepage's mobile experience.
+
+## Prototype Result
+
+- Production build: passing
+- Lab JavaScript: 205.75 KB gzip
+- Reused game interface: 8.89 KB gzip
+- Lab CSS: 2.54 KB gzip
+- Responsive checks: no horizontal overflow at 320px, 768px, 1024px, or 1440px
+- Homepage integration: intentionally deferred; the SVG mascot remains unchanged
