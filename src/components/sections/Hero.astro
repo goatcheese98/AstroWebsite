@@ -1,5 +1,5 @@
 ---
-import MarvinBot from "../islands/MarvinBot.svelte";
+import MarvinHero from "../islands/MarvinHero.svelte";
 import { SITE } from "../../lib/constants";
 
 const TITLES = [
@@ -37,7 +37,7 @@ const TITLES = [
       </div>
 
       <div class="hero__deco">
-        <MarvinBot client:load />
+        <MarvinHero client:only="svelte" />
       </div>
     </div>
   </div>
@@ -133,26 +133,35 @@ const TITLES = [
     padding-block: clamp(0.5rem, 2vw, 1.25rem) clamp(0.75rem, 2vw, 1.5rem);
   }
 
-  /* ── Sticker ── */
+  /* ── Status chip ── */
   .hero__sticker {
     display: inline-flex;
     align-items: center;
-    padding: 0.38rem 0.9rem;
+    gap: 0.5rem;
+    padding: 0.42rem 0.95rem;
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 700;
     font-family: var(--font-mono);
-    letter-spacing: 0.06em;
-    background: #ffd600;
-    border: 2px solid #0d0d12;
-    box-shadow: 3px 3px 0 #0d0d12;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--color-surface-elevated);
+    border: 1px solid color-mix(in srgb, var(--marvin-amber) 55%, var(--color-border));
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.06),
+      0 6px 18px var(--marvin-amber-soft);
     margin-top: var(--space-md);
     width: fit-content;
-    color: #0d0d12;
+    color: var(--color-text);
   }
 
-  :global([data-theme="dark"]) .hero__sticker {
-    background: #e6c000;
+  .hero__sticker::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--marvin-amber);
+    box-shadow: 0 0 10px var(--marvin-amber);
   }
 
   .hero__content {
@@ -216,7 +225,7 @@ const TITLES = [
   .hero__title-text::after {
     content: "|";
     margin-left: 0.08em;
-    color: #ffd600;
+    color: var(--marvin-amber);
     font-weight: 600;
     animation: blink 1s step-end infinite;
   }
@@ -245,7 +254,8 @@ const TITLES = [
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 340px;
+    min-width: 380px;
+    min-height: 580px;
     padding-top: 20px;
   }
 
