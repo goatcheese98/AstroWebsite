@@ -1,13 +1,8 @@
 ---
 import ThemeToggle from "./ThemeToggle.astro";
-import { UserMenu } from "../auth/UserMenu";
-import { NAV_LINKS, CANVAS_NAV_LINKS } from "../../lib/constants";
+import { NAV_LINKS } from "../../lib/constants";
 
 const currentPath = Astro.url.pathname;
-const hostname = Astro.url.hostname;
-const isCanvasOnly =
-  hostname === "canvas.rohanjasani.com" || hostname.startsWith("canvas.");
-const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
 ---
 
 <header class="header">
@@ -17,7 +12,7 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     </a>
 
     <ul class="header__links" role="list">
-      {links.map((link) => (
+      {NAV_LINKS.map((link) => (
         <li>
           <a
             href={link.href}
@@ -37,7 +32,6 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     </ul>
 
     <div class="header__actions">
-      <UserMenu client:only="react" />
       <ThemeToggle />
     </div>
   </nav>
@@ -52,10 +46,8 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     width: 100%;
     border-bottom: 1px solid
       color-mix(in srgb, var(--color-stroke-muted) 55%, transparent);
-    background: rgba(var(--color-bg-rgb), 0.46);
-    box-shadow: 0 10px 24px -22px rgba(13, 13, 18, 0.32);
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+    box-shadow: 0 8px 22px -22px rgba(13, 13, 18, 0.5);
   }
 
   .header__nav {
@@ -112,9 +104,7 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
     border: 1px solid
       color-mix(in srgb, var(--color-stroke-muted) 70%, transparent);
     border-radius: var(--radius-lg);
-    background: rgba(var(--color-bg-rgb), 0.5);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: var(--color-surface);
   }
 
   .header__link {
@@ -131,7 +121,7 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
 
   .header__link:hover {
     color: var(--color-text);
-    background: rgba(var(--color-bg-rgb), 0.58);
+    background: var(--color-bg);
     text-decoration: none;
   }
 
@@ -148,6 +138,11 @@ const links = isCanvasOnly ? CANVAS_NAV_LINKS : NAV_LINKS;
 
     .header__links {
       gap: 0;
+    }
+
+    .header__links li:nth-child(2),
+    .header__links li:nth-child(4) {
+      display: none;
     }
 
     .header__link {

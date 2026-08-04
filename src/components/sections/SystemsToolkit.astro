@@ -1,0 +1,162 @@
+---
+import { PORTFOLIO_TOOLKIT } from "../../lib/constants";
+import SectionHeader from "../ui/SectionHeader.astro";
+---
+
+<section class="toolkit section-gap" id="skills" aria-label="Working toolkit">
+  <div class="container toolkit__container">
+    <SectionHeader
+      title="Working Toolkit"
+      subtitle="The capabilities I reach for when the work has to survive contact with reality."
+    />
+
+    <div class="toolkit-board">
+      <div class="toolkit-board__label" aria-hidden="true">
+        <span>System notes</span>
+        <span>Three layers, one delivery loop</span>
+      </div>
+
+      <div class="toolkit-board__rows">
+        {PORTFOLIO_TOOLKIT.map((group, index) => (
+          <article class="toolkit-row" style={`--toolkit-accent: ${group.accentColor}`}>
+            <div class="toolkit-row__number" aria-hidden="true">
+              {String(index + 1).padStart(2, "0")}
+            </div>
+
+            <div class="toolkit-row__copy">
+              <h3>{group.title}</h3>
+              <p>{group.description}</p>
+            </div>
+
+            <ul class="toolkit-row__items" aria-label={`${group.title} capabilities`}>
+              {group.items.map((item) => <li>{item}</li>)}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .toolkit__container {
+    max-width: 1120px;
+  }
+
+  .toolkit :global(.section-header) {
+    margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+  }
+
+  .toolkit-board {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid var(--color-stroke-muted);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-surface) 95%, #ffd600 5%);
+  }
+
+  .toolkit-board::before {
+    position: absolute;
+    z-index: -1;
+    inset: -2px;
+    border: 2px solid var(--color-stroke);
+    border-radius: inherit;
+    content: "";
+    filter: url(#sketch-filter);
+    pointer-events: none;
+  }
+
+  .toolkit-board__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem clamp(1rem, 3vw, 1.5rem);
+    border-bottom: 1px solid var(--color-stroke-muted);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .toolkit-board__label span:first-child {
+    color: #b58b00;
+  }
+
+  .toolkit-row {
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+    gap: 1rem;
+    padding: clamp(1.15rem, 3vw, 1.75rem);
+  }
+
+  .toolkit-row + .toolkit-row {
+    border-top: 1px solid var(--color-stroke-muted);
+  }
+
+  .toolkit-row__number {
+    color: var(--toolkit-accent);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .toolkit-row__copy {
+    min-width: 0;
+  }
+
+  .toolkit-row h3 {
+    margin-bottom: 0.45rem;
+    color: var(--color-text);
+    font-family: var(--font-hand);
+    font-size: clamp(1.25rem, 3vw, 1.65rem);
+    line-height: 1.2;
+  }
+
+  .toolkit-row p {
+    max-width: 57ch;
+    color: var(--color-text-muted);
+    font-size: 0.94rem;
+    line-height: 1.6;
+  }
+
+  .toolkit-row__items {
+    display: flex;
+    grid-column: 2;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-content: start;
+  }
+
+  .toolkit-row__items li {
+    padding: 0.34rem 0.58rem;
+    border: 1px solid var(--color-stroke-muted);
+    border-radius: 999px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.2;
+  }
+
+  @media (min-width: 800px) {
+    .toolkit-row {
+      grid-template-columns: 2.2rem minmax(16rem, 0.9fr) minmax(18rem, 1.1fr);
+      align-items: start;
+      gap: clamp(1rem, 3vw, 2rem);
+    }
+
+    .toolkit-row__items {
+      grid-column: auto;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .toolkit-board__label span:last-child {
+      display: none;
+    }
+  }
+</style>

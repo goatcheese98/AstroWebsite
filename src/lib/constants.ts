@@ -20,9 +20,10 @@ export const SITE: SiteMetadata = {
 };
 
 export const NAV_LINKS: NavLink[] = [
-  { label: "Home", href: "/" },
-  { label: "AI Canvas", href: "/canvas" },
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Work", href: "/#projects" },
+  { label: "Experience", href: "/#experience" },
+  { label: "Notes", href: "/blog" },
+  { label: "Contact", href: "mailto:jasani.rohan@gmail.com" },
 ];
 
 // Canvas-only navigation (no home/blog)
@@ -30,6 +31,30 @@ export const CANVAS_NAV_LINKS: NavLink[] = [
   { label: "AI Canvas", href: "/" },
   { label: "Dashboard", href: "/dashboard" },
 ];
+
+export const PORTFOLIO_TOOLKIT = [
+  {
+    title: "Applied AI systems",
+    description:
+      "Model-assisted workflows with explicit boundaries, evaluation, and a human in the loop where judgment matters.",
+    items: ["Agentic workflows", "Tool use", "Structured outputs", "Evals", "Human approval"],
+    accentColor: "#3b82f6",
+  },
+  {
+    title: "Product delivery",
+    description:
+      "From an ambiguous operating problem to requirements, rollout, training, and a feedback loop people will use.",
+    items: ["Workflow discovery", "Requirements", "Decision boundaries", "Rollout", "Adoption"],
+    accentColor: "#f59e0b",
+  },
+  {
+    title: "Reliable implementation",
+    description:
+      "Small, observable systems built for repeat-safe operation instead of impressive demos that fall apart in practice.",
+    items: ["TypeScript", "Cloudflare", "Hono", "D1 / KV / R2", "Tests & monitoring"],
+    accentColor: "#10b981",
+  },
+] as const;
 
 export const PROJECTS: Project[] = [
   {

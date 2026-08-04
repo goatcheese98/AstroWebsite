@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { EXPERIENCES, PROJECTS, SITE } from "./constants";
+import {
+  EXPERIENCES,
+  NAV_LINKS,
+  PORTFOLIO_TOOLKIT,
+  PROJECTS,
+  SITE,
+} from "./constants";
 
 describe("sketch portfolio content", () => {
   it("keeps the current AI product and systems positioning", () => {
@@ -20,7 +26,7 @@ describe("sketch portfolio content", () => {
     );
   });
 
-  it("fills the existing project carousel with current public work", () => {
+  it("keeps the selected work current and directly accessible", () => {
     expect(PROJECTS).toHaveLength(5);
     expect(PROJECTS.map((project) => project.title)).toEqual([
       "RoopStudio",
@@ -33,5 +39,22 @@ describe("sketch portfolio content", () => {
     for (const project of PROJECTS) {
       expect(project.demoUrl || project.codeUrl).toMatch(/^https:\/\//);
     }
+  });
+
+  it("keeps portfolio navigation focused on the public site", () => {
+    expect(NAV_LINKS).toEqual([
+      { label: "Work", href: "/#projects" },
+      { label: "Experience", href: "/#experience" },
+      { label: "Notes", href: "/blog" },
+      { label: "Contact", href: "mailto:jasani.rohan@gmail.com" },
+    ]);
+  });
+
+  it("groups the working toolkit around three relevant capabilities", () => {
+    expect(PORTFOLIO_TOOLKIT.map((group) => group.title)).toEqual([
+      "Applied AI systems",
+      "Product delivery",
+      "Reliable implementation",
+    ]);
   });
 });

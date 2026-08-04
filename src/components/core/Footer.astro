@@ -7,15 +7,15 @@ import { SITE } from '../../lib/constants';
 
     <div class="footer__main">
       <div class="footer__left">
-        <p class="footer__overline">Open to opportunities</p>
+        <p class="footer__overline">Vancouver · open to the right problem</p>
         <h2 class="footer__headline">
-          Let's build something <span class="footer__headline-outline">unforgettable.</span>
+          Let's make the complicated <span class="footer__headline-mark">usable.</span>
         </h2>
       </div>
 
       <div class="footer__right">
         <p class="footer__sub">
-          Internships, full-time analytics roles, ambitious side projects — I'm in.
+          If you're building AI tools that need to survive real workflows, I'd like to hear about it.
         </p>
         <div class="footer__links">
           {SITE.socialLinks.email && (
@@ -37,10 +37,10 @@ import { SITE } from '../../lib/constants';
       </div>
     </div>
 
-    <div class="footer__bottom">
+    <div class="footer__bottom" id="contact">
       <div class="footer__brand">
         <span class="footer__logo-block">RJ</span>
-        <p class="footer__tagline">Data-driven insights &amp; analytics</p>
+        <p class="footer__tagline">Applied AI · product systems · delivery</p>
       </div>
       <p class="footer__copyright">
         &copy; {new Date().getFullYear()} {SITE.author} &mdash; Built with
@@ -96,9 +96,22 @@ import { SITE } from '../../lib/constants';
     margin: 0;
   }
 
-  .footer__headline-outline {
-    -webkit-text-stroke: 2px #0d0d12;
-    color: transparent;
+  .footer__headline-mark {
+    position: relative;
+    z-index: 0;
+    white-space: nowrap;
+  }
+
+  .footer__headline-mark::after {
+    position: absolute;
+    z-index: -1;
+    right: -0.08em;
+    bottom: 0.08em;
+    left: -0.08em;
+    height: 0.34em;
+    background: #ffd600;
+    content: "";
+    transform: rotate(-1deg);
   }
 
   /* ── Right: sub + links ── */
