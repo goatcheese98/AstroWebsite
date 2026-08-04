@@ -97,20 +97,6 @@ export const EXPERIENCES: Experience[] = [
     accentColor: "#f59e0b",
   },
   {
-    company: "UBC Sauder School of Business",
-    role: "Master of Business Analytics Candidate",
-    period: "Aug 2025 — Present",
-    description:
-      "Pursuing advanced training in business analytics, data science, and strategic decision-making at one of Canada's top business schools.",
-    highlights: [
-      "Expected graduation: August 2026",
-      "Coursework: ML for Business, Data Modernization, Optimal Decision Making, Modeling Uncertainty",
-    ],
-    current: true,
-    accentColor: "#1e3a5f",
-    logo: "ubc",
-  },
-  {
     company: "Goldman Sachs",
     role: "Consumer Wealth Management Analyst",
     period: "June 2022 — Feb 2023",

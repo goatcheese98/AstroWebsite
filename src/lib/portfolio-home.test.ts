@@ -15,6 +15,9 @@ describe("sketch portfolio content", () => {
       current: true,
     });
     expect(EXPERIENCES[0].highlights.join(" ")).toContain("human approval");
+    expect(EXPERIENCES.map((experience) => experience.company)).not.toContain(
+      "UBC Sauder School of Business",
+    );
   });
 
   it("fills the existing project carousel with current public work", () => {
