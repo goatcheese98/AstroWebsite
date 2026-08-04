@@ -7,6 +7,7 @@ import {
   PROJECTS,
   SITE,
 } from "./constants";
+import { LEGACY_PRODUCT_REDIRECTS } from "./legacy-product-redirects";
 
 describe("sketch portfolio content", () => {
   it("keeps the current AI product and systems positioning", () => {
@@ -56,5 +57,14 @@ describe("sketch portfolio content", () => {
       "Product delivery",
       "Reliable implementation",
     ]);
+  });
+
+  it("hands retired Canvas routes to the migrated RoopStudio product", () => {
+    expect(LEGACY_PRODUCT_REDIRECTS).toEqual({
+      canvas: "https://canvas.rohanjasani.com/",
+      dashboard: "https://canvas.rohanjasani.com/dashboard",
+      login: "https://canvas.rohanjasani.com/login",
+      signup: "https://canvas.rohanjasani.com/signup",
+    });
   });
 });

@@ -26,12 +26,6 @@ export const NAV_LINKS: NavLink[] = [
   { label: "Contact", href: "mailto:jasani.rohan@gmail.com" },
 ];
 
-// Canvas-only navigation (no home/blog)
-export const CANVAS_NAV_LINKS: NavLink[] = [
-  { label: "AI Canvas", href: "/" },
-  { label: "Dashboard", href: "/dashboard" },
-];
-
 export const PORTFOLIO_TOOLKIT = [
   {
     title: "Applied AI systems",
