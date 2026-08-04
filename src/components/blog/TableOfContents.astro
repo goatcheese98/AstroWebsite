@@ -30,12 +30,11 @@ const toc = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 
 <style>
   .toc {
-    border: 2px solid var(--color-stroke-muted);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
     padding: var(--space-md);
     margin-bottom: var(--space-lg);
-    filter: url(#sketch-filter);
-    background: var(--color-surface);
+    background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
   }
 
   .toc__title {

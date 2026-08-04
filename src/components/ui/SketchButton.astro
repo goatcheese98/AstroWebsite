@@ -24,20 +24,21 @@ const Tag = href ? 'a' : 'button';
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
-    font-family: var(--font-hand);
+    font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: none;
-    border: 2px solid var(--color-stroke);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-hover);
+    border-radius: 9px;
     cursor: pointer;
-    filter: url(#sketch-filter);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
   }
 
   .sketch-btn:hover {
-    transform: translate(-1px, -2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: var(--marvin-amber);
+    box-shadow: 0 4px 14px var(--marvin-amber-soft);
     text-decoration: none;
   }
 
@@ -47,13 +48,14 @@ const Tag = href ? 'a' : 'button';
   }
 
   .sketch-btn:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--marvin-amber);
     outline-offset: 2px;
   }
 
   .sketch-btn--primary {
-    background: var(--color-fill-1);
-    color: var(--color-text);
+    background: var(--marvin-amber);
+    border-color: var(--marvin-amber);
+    color: #14181f;
   }
 
   .sketch-btn--secondary {
@@ -70,11 +72,4 @@ const Tag = href ? 'a' : 'button';
     font-size: var(--text-sm);
   }
 
-  /* Mobile/Touch: Disable expensive filter */
-  @media (hover: none) and (pointer: coarse) {
-    .sketch-btn {
-      filter: none;
-      border-radius: var(--radius-md) var(--radius-sm) var(--radius-lg) var(--radius-md);
-    }
-  }
 </style>

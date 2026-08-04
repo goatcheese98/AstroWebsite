@@ -3,11 +3,9 @@
 <div class="theme-toggle-wrap">
   <button
     class="theme-toggle"
-    aria-label="Toggle dark mode (long press for style options)"
-    title="Toggle dark mode (long press for style options)"
+    aria-label="Toggle dark mode"
+    title="Toggle dark mode"
     type="button"
-    aria-haspopup="menu"
-    aria-expanded="false"
   >
     <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <circle cx="12" cy="12" r="5" />
@@ -24,57 +22,6 @@
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   </button>
-
-  <div class="theme-style-dropdown" role="menu" hidden>
-    <div class="theme-style-dropdown__header">
-      <span>Style Settings</span>
-      <button type="button" class="theme-style-dropdown__reset" data-style-reset>
-        Reset
-      </button>
-    </div>
-
-    <div class="theme-style-dropdown__row">
-      <span class="theme-style-dropdown__label">Roughness</span>
-      <output data-style-value="baseFrequency" class="theme-style-dropdown__value"></output>
-    </div>
-    <input
-      class="theme-style-dropdown__range"
-      type="range"
-      data-style-control="baseFrequency"
-      min="0"
-      max="0.1"
-      step="0.005"
-      aria-label="Outline roughness"
-    />
-
-    <div class="theme-style-dropdown__row">
-      <span class="theme-style-dropdown__label">Wobble</span>
-      <output data-style-value="displacementScale" class="theme-style-dropdown__value"></output>
-    </div>
-    <input
-      class="theme-style-dropdown__range"
-      type="range"
-      data-style-control="displacementScale"
-      min="0"
-      max="10"
-      step="0.5"
-      aria-label="Outline wobble"
-    />
-
-    <div class="theme-style-dropdown__row">
-      <span class="theme-style-dropdown__label">Roundness</span>
-      <output data-style-value="borderRadius" class="theme-style-dropdown__value"></output>
-    </div>
-    <input
-      class="theme-style-dropdown__range"
-      type="range"
-      data-style-control="borderRadius"
-      min="2"
-      max="20"
-      step="1"
-      aria-label="Corner roundness"
-    />
-  </div>
 </div>
 
 <style>
@@ -90,35 +37,26 @@
     height: 36px;
     flex-shrink: 0;
     background: var(--color-surface-elevated);
-    border: 0;
-    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
     color: var(--color-text);
     cursor: pointer;
     padding: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.15s ease;
-    position: relative;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .theme-toggle::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border: 2px solid var(--color-stroke);
-    border-radius: inherit;
-    filter: url(#sketch-filter);
-    pointer-events: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   }
 
   .theme-toggle:hover {
-    transform: rotate(10deg);
+    border-color: color-mix(in srgb, var(--marvin-amber) 55%, var(--color-border));
+    box-shadow: 0 2px 10px var(--marvin-amber-soft);
+    transform: translateY(-1px);
   }
 
   .theme-toggle:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--marvin-amber);
     outline-offset: 2px;
   }
 
@@ -130,238 +68,27 @@
   [data-theme="light"] .icon-moon { display: block; }
   [data-theme="dark"] .icon-sun { display: block; }
   [data-theme="dark"] .icon-moon { display: none; }
-
-  .theme-style-dropdown {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 240px;
-    max-width: calc(100vw - 24px);
-    background: var(--color-surface-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    padding: 10px;
-    z-index: 240;
-    display: grid;
-    gap: 8px;
-    transform: translate3d(var(--overlay-x, -9999px), var(--overlay-y, -9999px), 0);
-  }
-
-  .theme-style-dropdown[hidden] {
-    display: none;
-  }
-
-  .theme-style-dropdown__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--color-border);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--color-text);
-  }
-
-  .theme-style-dropdown__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .theme-style-dropdown__label {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .theme-style-dropdown__value {
-    font-size: var(--text-xs);
-    font-family: var(--font-mono);
-    color: var(--color-text);
-  }
-
-  .theme-style-dropdown__range {
-    width: 100%;
-    margin: 0;
-  }
-
-  .theme-style-dropdown__reset {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-bg);
-    color: var(--color-text);
-    padding: 6px 8px;
-    font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .theme-style-dropdown__reset:hover {
-    background: var(--color-surface-hover);
-  }
-
-  @media (hover: none) and (pointer: coarse) {
-    .theme-toggle::before {
-      filter: none;
-    }
-  }
 </style>
 
 <script is:inline>
   (function() {
-    var LONG_PRESS_MS = 520;
-    var STYLE_STORAGE_KEY = "themeStyleSettings";
-    var DEFAULT_STYLE = {
-      baseFrequency: 0.07,
-      displacementScale: 2.5,
-      borderRadius: 12
-    };
-
-    function parseStyleSettings() {
-      try {
-        var raw = localStorage.getItem(STYLE_STORAGE_KEY);
-        if (!raw) return { ...DEFAULT_STYLE };
-        var parsed = JSON.parse(raw);
-        return {
-          baseFrequency: Number.isFinite(parsed.baseFrequency)
-            ? Math.min(0.1, Math.max(0, Number(parsed.baseFrequency)))
-            : DEFAULT_STYLE.baseFrequency,
-          displacementScale: Number.isFinite(parsed.displacementScale)
-            ? Math.min(10, Math.max(0, Number(parsed.displacementScale)))
-            : DEFAULT_STYLE.displacementScale,
-          borderRadius: Number.isFinite(parsed.borderRadius)
-            ? Math.min(20, Math.max(2, Number(parsed.borderRadius)))
-            : DEFAULT_STYLE.borderRadius
-        };
-      } catch {
-        return { ...DEFAULT_STYLE };
-      }
-    }
-
-    function persistStyleSettings(styleSettings) {
-      localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(styleSettings));
-    }
-
-    function applyStyleSettings(styleSettings) {
-      var root = document.documentElement;
-      var turbulence = document.getElementById("sketch-turbulence");
-      var displacement = document.getElementById("sketch-displacement");
-
-      if (turbulence) turbulence.setAttribute("baseFrequency", String(styleSettings.baseFrequency));
-      if (displacement) displacement.setAttribute("scale", String(styleSettings.displacementScale));
-
-      var base = Number(styleSettings.borderRadius);
-      root.style.setProperty("--radius-sm", Math.max(2, base - 2) + "px");
-      root.style.setProperty("--radius-md", base + "px");
-      root.style.setProperty("--radius-lg", base + 2 + "px");
-      root.style.setProperty("--radius-xl", base + 6 + "px");
-    }
-
-    function syncDropdownUI(dropdown, styleSettings) {
-      var baseFrequencyInput = dropdown.querySelector('[data-style-control="baseFrequency"]');
-      var displacementInput = dropdown.querySelector('[data-style-control="displacementScale"]');
-      var borderRadiusInput = dropdown.querySelector('[data-style-control="borderRadius"]');
-      var baseFrequencyValue = dropdown.querySelector('[data-style-value="baseFrequency"]');
-      var displacementValue = dropdown.querySelector('[data-style-value="displacementScale"]');
-      var borderRadiusValue = dropdown.querySelector('[data-style-value="borderRadius"]');
-
-      if (baseFrequencyInput) baseFrequencyInput.value = String(styleSettings.baseFrequency);
-      if (displacementInput) displacementInput.value = String(styleSettings.displacementScale);
-      if (borderRadiusInput) borderRadiusInput.value = String(styleSettings.borderRadius);
-      if (baseFrequencyValue) baseFrequencyValue.textContent = Number(styleSettings.baseFrequency).toFixed(3);
-      if (displacementValue) displacementValue.textContent = String(styleSettings.displacementScale);
-      if (borderRadiusValue) borderRadiusValue.textContent = styleSettings.borderRadius + "px";
-    }
-
     function initThemeToggle() {
       var toggleWrap = document.querySelector(".theme-toggle-wrap");
       if (!toggleWrap) return;
 
       var themeToggle = toggleWrap.querySelector(".theme-toggle");
-      var dropdown = toggleWrap.querySelector(".theme-style-dropdown");
-      if (!themeToggle || !dropdown) return;
+      if (!themeToggle) return;
 
       if (themeToggle.dataset.initialized === "true") return;
       themeToggle.dataset.initialized = "true";
 
       var hostname = window.location.hostname;
-      var isCanvas = hostname.includes("canvas.");
-      if (isCanvas) {
+      if (hostname.includes("canvas.")) {
         toggleWrap.style.display = "none";
         return;
       }
 
-      var styleSettings = parseStyleSettings();
-      applyStyleSettings(styleSettings);
-      syncDropdownUI(dropdown, styleSettings);
-
-      var longPressTimer = null;
-      var suppressNextClick = false;
-      var resizeRaf = 0;
-
-      function positionDropdown() {
-        var rect = themeToggle.getBoundingClientRect();
-        var dropdownWidth = Math.min(240, window.innerWidth - 24);
-        var x = Math.round(rect.right - dropdownWidth);
-        var y = Math.round(rect.bottom + 8);
-
-        x = Math.max(12, Math.min(x, window.innerWidth - dropdownWidth - 12));
-        y = Math.max(12, Math.min(y, window.innerHeight - 220));
-
-        dropdown.style.setProperty("--overlay-x", x + "px");
-        dropdown.style.setProperty("--overlay-y", y + "px");
-      }
-
-      function openDropdown() {
-        positionDropdown();
-        dropdown.hidden = false;
-        themeToggle.setAttribute("aria-expanded", "true");
-      }
-
-      function closeDropdown() {
-        dropdown.hidden = true;
-        themeToggle.setAttribute("aria-expanded", "false");
-      }
-
-      function startLongPress(event) {
-        if (event.button !== undefined && event.button !== 0) return;
-        clearTimeout(longPressTimer);
-        longPressTimer = setTimeout(function() {
-          suppressNextClick = true;
-          openDropdown();
-          if (navigator.vibrate) navigator.vibrate(10);
-        }, LONG_PRESS_MS);
-      }
-
-      function cancelLongPress() {
-        clearTimeout(longPressTimer);
-      }
-
-      function onDocumentPointerDown(event) {
-        if (toggleWrap.contains(event.target)) return;
-        closeDropdown();
-      }
-
-      function onWindowResize() {
-        if (dropdown.hidden) return;
-        if (resizeRaf) cancelAnimationFrame(resizeRaf);
-        resizeRaf = window.requestAnimationFrame(function() {
-          positionDropdown();
-          resizeRaf = 0;
-        });
-      }
-
       function onThemeToggleClick(event) {
-        if (suppressNextClick) {
-          suppressNextClick = false;
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-
         var html = document.documentElement;
         var current = html.getAttribute("data-theme");
         var next = current === "dark" ? "light" : "dark";
@@ -378,54 +105,11 @@
         }, 1000);
       }
 
-      function updateStyle(partial) {
-        styleSettings = {
-          ...styleSettings,
-          ...partial
-        };
-        applyStyleSettings(styleSettings);
-        syncDropdownUI(dropdown, styleSettings);
-        persistStyleSettings(styleSettings);
-      }
-
-      dropdown.querySelectorAll("[data-style-control]").forEach(function(control) {
-        control.addEventListener("input", function() {
-          var key = control.getAttribute("data-style-control");
-          var value = Number(control.value);
-          if (key === "baseFrequency") updateStyle({ baseFrequency: value });
-          if (key === "displacementScale") updateStyle({ displacementScale: value });
-          if (key === "borderRadius") updateStyle({ borderRadius: value });
-        });
-      });
-
-      var resetButton = dropdown.querySelector("[data-style-reset]");
-      if (resetButton) {
-        resetButton.addEventListener("click", function() {
-          updateStyle({ ...DEFAULT_STYLE });
-        });
-      }
-
-      themeToggle.addEventListener("pointerdown", startLongPress);
-      themeToggle.addEventListener("pointerup", cancelLongPress);
-      themeToggle.addEventListener("pointerleave", cancelLongPress);
-      themeToggle.addEventListener("pointercancel", cancelLongPress);
       themeToggle.addEventListener("click", onThemeToggleClick);
-      document.addEventListener("pointerdown", onDocumentPointerDown);
-      window.addEventListener("resize", onWindowResize);
-      window.addEventListener("scroll", onWindowResize, true);
 
       (window.__themeToggleCleanup || function() {})();
       window.__themeToggleCleanup = function() {
-        clearTimeout(longPressTimer);
-        themeToggle.removeEventListener("pointerdown", startLongPress);
-        themeToggle.removeEventListener("pointerup", cancelLongPress);
-        themeToggle.removeEventListener("pointerleave", cancelLongPress);
-        themeToggle.removeEventListener("pointercancel", cancelLongPress);
         themeToggle.removeEventListener("click", onThemeToggleClick);
-        document.removeEventListener("pointerdown", onDocumentPointerDown);
-        window.removeEventListener("resize", onWindowResize);
-        window.removeEventListener("scroll", onWindowResize, true);
-        if (resizeRaf) cancelAnimationFrame(resizeRaf);
       };
     }
 
