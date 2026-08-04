@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
-  import { PCFShadowMap } from "three";
+  import { NeutralToneMapping, PCFShadowMap } from "three";
   import type { Marvin3DAction, Marvin3DGrapplePhase } from "../../lib/marvin-3d-motion";
   import MarvinScene from "./MarvinScene.svelte";
 
@@ -12,6 +12,7 @@
     pointerY,
     viewYaw,
     viewPitch,
+    stageTheme,
     onReady,
     onPhaseChange,
   }: {
@@ -22,15 +23,19 @@
     pointerY: number;
     viewYaw: number;
     viewPitch: number;
+    stageTheme: "light" | "dark";
     onReady: () => void;
     onPhaseChange: (phase: Marvin3DGrapplePhase) => void;
   } = $props();
+
+  const dpr = Math.min(globalThis.devicePixelRatio ?? 1.5, 2);
 </script>
 
 <Canvas
-  dpr={1.5}
+  {dpr}
   renderMode="on-demand"
   shadows={PCFShadowMap}
+  toneMapping={NeutralToneMapping}
   colorManagementEnabled
 >
   <MarvinScene
@@ -41,6 +46,7 @@
     {pointerY}
     {viewYaw}
     {viewPitch}
+    {stageTheme}
     {onReady}
     {onPhaseChange}
   />

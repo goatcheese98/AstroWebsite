@@ -20,6 +20,10 @@ export default defineConfig({
     assets: "assets",
   },
   vite: {
+    // Keep a single three.js instance across core and examples/jsm imports.
+    resolve: {
+      dedupe: ["three"],
+    },
     build: {
       minify: "esbuild",
       assetsInlineLimit: 4096,

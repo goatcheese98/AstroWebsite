@@ -13,7 +13,7 @@
 
   let action = $state<Marvin3DAction>("idle");
   let actionToken = $state(0);
-  let phase = $state<Marvin3DGrapplePhase>("launch");
+  let phase = $state<Marvin3DGrapplePhase>("aim");
   let ready = $state(false);
   let mounted = $state(false);
   let webglSupported = $state(true);
@@ -28,13 +28,14 @@
   let dragStartYaw = 0;
   let dragStartPitch = 0;
   let consoleOpen = $state(false);
+  let stageTheme = $state<"light" | "dark">("light");
   let chestButton = $state<HTMLButtonElement>();
   let chestFacingViewer = $derived(Math.abs(viewYaw) < 0.7 && Math.abs(viewPitch) < 0.45);
 
   onMount(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     reducedMotion = media.matches;
-    phase = reducedMotion ? "online" : "launch";
+    phase = reducedMotion ? "online" : "aim";
 
     const probe = document.createElement("canvas");
     const context = probe.getContext("webgl2") ?? probe.getContext("webgl");
@@ -113,6 +114,7 @@
 <main class="lab-shell">
   <header class="lab-nav">
     <a href="/" aria-label="Return to Rohan Jasani's homepage">← Back to portfolio</a>
+    <a class="lab-nav__rig" href="/marvin-rig">RIG CONSOLE ↗</a>
     <span><i></i> PRIVATE PROTOTYPE / 03</span>
   </header>
 
@@ -128,7 +130,7 @@
   </section>
 
   <section
-    class="stage"
+    class="stage stage--{stageTheme}"
     class:stage--dragging={dragging}
     aria-label="Interactive three-dimensional Marvin demonstration"
     onpointerdown={startRotation}
@@ -154,6 +156,7 @@
           {pointerY}
           {viewYaw}
           {viewPitch}
+          {stageTheme}
           onReady={() => (ready = true)}
           onPhaseChange={(nextPhase) => (phase = nextPhase)}
         />
@@ -182,6 +185,13 @@
         <button type="button" onclick={() => rotateView(-Math.PI / 6)} aria-label="Rotate Marvin left">←</button>
         <button type="button" onclick={resetView}>RESET VIEW</button>
         <button type="button" onclick={() => rotateView(Math.PI / 6)} aria-label="Rotate Marvin right">→</button>
+        <button
+          type="button"
+          onclick={() => (stageTheme = stageTheme === "light" ? "dark" : "light")}
+          aria-label="Toggle stage backdrop between light and dark"
+        >
+          {stageTheme === "light" ? "◐ LIGHT" : "◑ DARK"}
+        </button>
       </div>
     {/if}
 
@@ -249,6 +259,7 @@
   }
 
   .lab-nav a { color: #f4f0e7; }
+  .lab-nav__rig { color: var(--amber) !important; }
   .lab-nav span { display: flex; align-items: center; gap: 8px; color: #8d98a5; }
   .lab-nav i { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 15px var(--amber); }
 
@@ -287,22 +298,38 @@
     line-height: 1.6;
   }
 
+  /* The stage previews the exact homepage backgrounds: #ffffff and #101418. */
   .stage {
     position: relative;
     height: min(68vw, 720px);
     min-height: 560px;
     overflow: hidden;
     background:
-      radial-gradient(circle at 50% 54%, rgba(54, 117, 139, 0.22), transparent 32%),
-      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-      #0e141b;
-    background-size: auto, 48px 48px, 48px 48px, auto;
+      linear-gradient(var(--stage-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--stage-grid) 1px, transparent 1px),
+      var(--stage-bg);
+    background-size: 48px 48px, 48px 48px, auto;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 8px;
-    box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.45);
     cursor: grab;
     touch-action: pan-y;
+    transition: background-color 200ms ease-out;
+  }
+
+  .stage--light {
+    --stage-bg: #ffffff;
+    --stage-grid: rgba(29, 29, 29, 0.05);
+    --stage-ink: #1d1d1d;
+    --stage-muted: #6b7280;
+    --stage-scanline: rgba(0, 0, 0, 0.045);
+  }
+
+  .stage--dark {
+    --stage-bg: #101418;
+    --stage-grid: rgba(255, 255, 255, 0.045);
+    --stage-ink: #e5e5e5;
+    --stage-muted: #a3a3a3;
+    --stage-scanline: rgba(255, 255, 255, 0.04);
   }
 
   .stage--dragging { cursor: grabbing; }
@@ -338,7 +365,7 @@
 
   .stage__meta--left { left: 34px; }
   .stage__meta--right { right: 34px; text-align: right; }
-  .stage__meta strong { font-size: 0.72rem; letter-spacing: 0.08em; color: #d7dee5; }
+  .stage__meta strong { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--stage-ink); }
 
   .stage__scanline {
     position: absolute;
@@ -346,7 +373,7 @@
     inset: 0;
     pointer-events: none;
     opacity: 0.16;
-    background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.04) 4px);
+    background: repeating-linear-gradient(0deg, transparent 0 3px, var(--stage-scanline) 4px);
   }
 
   .view-controls {
@@ -397,8 +424,8 @@
     font-family: var(--font-mono);
   }
 
-  .loading { color: #b8c2cc; font-size: 0.72rem; letter-spacing: 0.13em; }
-  .loading i { width: 38px; height: 38px; border: 2px solid rgba(255,255,255,.14); border-top-color: var(--amber); border-radius: 50%; animation: spin 800ms linear infinite; }
+  .loading { color: var(--stage-muted, #b8c2cc); font-size: 0.72rem; letter-spacing: 0.13em; }
+  .loading i { width: 38px; height: 38px; border: 2px solid rgba(128, 128, 128, 0.25); border-top-color: var(--amber); border-radius: 50%; animation: spin 800ms linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .fallback { max-width: 520px; margin: auto; padding: 28px; }
