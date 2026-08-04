@@ -1,0 +1,11 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import MarvinRigLab from "../components/marvin-3d/MarvinRigLab.svelte";
+---
+
+<BaseLayout
+  title="Marvin Rig Console"
+  description="A posable joint-by-joint console for Rohan Jasani's Marvin rig."
+>
+  <MarvinRigLab client:only="svelte" />
+</BaseLayout>
