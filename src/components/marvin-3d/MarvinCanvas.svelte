@@ -10,6 +10,8 @@
     reducedMotion,
     pointerX,
     pointerY,
+    viewYaw,
+    viewPitch,
     onReady,
     onPhaseChange,
   }: {
@@ -18,6 +20,8 @@
     reducedMotion: boolean;
     pointerX: number;
     pointerY: number;
+    viewYaw: number;
+    viewPitch: number;
     onReady: () => void;
     onPhaseChange: (phase: Marvin3DGrapplePhase) => void;
   } = $props();
@@ -35,6 +39,8 @@
     {reducedMotion}
     {pointerX}
     {pointerY}
+    {viewYaw}
+    {viewPitch}
     {onReady}
     {onPhaseChange}
   />

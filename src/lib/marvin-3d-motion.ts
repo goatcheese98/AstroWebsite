@@ -27,7 +27,8 @@ export interface Marvin3DGrapplePose extends Marvin3DPose {
   cableTension: number;
 }
 
-export const MARVIN_3D_GRAPPLE_DURATION = 3.2;
+export const MARVIN_3D_GRAPPLE_DURATION = 1.95;
+export const MARVIN_3D_ACTION_DURATION = 1.25;
 
 const SETTLED_POSE: Marvin3DPose = {
   root: { x: 0, y: 0, z: 0, rotationZ: 0, rotationY: 0 },
@@ -74,8 +75,8 @@ export function getMarvin3DGrapplePose(
 
   const elapsed = Math.max(0, elapsedSeconds);
 
-  if (elapsed < 0.8) {
-    const progress = smoothstep(elapsed / 0.8);
+  if (elapsed < 0.36) {
+    const progress = smoothstep(elapsed / 0.36);
     return {
       ...SETTLED_POSE,
       root: {
@@ -98,8 +99,8 @@ export function getMarvin3DGrapplePose(
     };
   }
 
-  if (elapsed < 1.9) {
-    const progress = smoothstep((elapsed - 0.8) / 1.1);
+  if (elapsed < 1.05) {
+    const progress = smoothstep((elapsed - 0.36) / 0.69);
     return {
       ...SETTLED_POSE,
       root: {
@@ -123,8 +124,8 @@ export function getMarvin3DGrapplePose(
     };
   }
 
-  if (elapsed < 2.65) {
-    const progress = smoothstep((elapsed - 1.9) / 0.75);
+  if (elapsed < 1.62) {
+    const progress = smoothstep((elapsed - 1.05) / 0.57);
     const bounce = Math.sin(progress * Math.PI * 2) * 0.24 * (1 - progress);
     return {
       ...SETTLED_POSE,
@@ -144,12 +145,12 @@ export function getMarvin3DGrapplePose(
       kneeBend: Math.sin(progress * Math.PI) * 0.72,
       headTiltZ: Math.sin(progress * Math.PI) * 0.1,
       phase: "landing",
-      cableVisible: elapsed < 2.18,
-      cableTension: clamp01(1 - (elapsed - 1.9) / 0.28),
+      cableVisible: elapsed < 1.28,
+      cableTension: clamp01(1 - (elapsed - 1.05) / 0.23),
     };
   }
 
-  const recovery = smoothstep((elapsed - 2.65) / 0.55);
+  const recovery = smoothstep((elapsed - 1.62) / 0.33);
   return {
     ...SETTLED_POSE,
     root: {

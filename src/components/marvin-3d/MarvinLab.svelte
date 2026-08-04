@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Marvin3DAction, Marvin3DGrapplePhase } from "../../lib/marvin-3d-motion";
+  import { rotateMarvinFromDrag, wrapMarvinYaw } from "../../lib/marvin-3d-view";
   import MarvinCanvas from "./MarvinCanvas.svelte";
   import MarvinScreen from "./MarvinScreen.svelte";
 
@@ -19,8 +20,16 @@
   let reducedMotion = $state(false);
   let pointerX = $state(0);
   let pointerY = $state(0);
+  let viewYaw = $state(0);
+  let viewPitch = $state(0);
+  let dragging = $state(false);
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartYaw = 0;
+  let dragStartPitch = 0;
   let consoleOpen = $state(false);
   let chestButton = $state<HTMLButtonElement>();
+  let chestFacingViewer = $derived(Math.abs(viewYaw) < 0.7 && Math.abs(viewPitch) < 0.45);
 
   onMount(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -46,11 +55,49 @@
     actionToken += 1;
   }
 
-  function handlePointer(event: PointerEvent) {
+  function updatePointerLook(event: PointerEvent) {
     const rect = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : null;
     if (!rect) return;
     pointerX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointerY = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  }
+
+  function startRotation(event: PointerEvent) {
+    if (event.button !== 0 || event.target instanceof Element && event.target.closest("button, a")) return;
+    const stage = event.currentTarget as HTMLElement;
+    dragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    dragStartYaw = viewYaw;
+    dragStartPitch = viewPitch;
+    stage.setPointerCapture(event.pointerId);
+  }
+
+  function movePointer(event: PointerEvent) {
+    updatePointerLook(event);
+    if (!dragging) return;
+    const rotation = rotateMarvinFromDrag(
+      { yaw: dragStartYaw, pitch: dragStartPitch },
+      event.clientX - dragStartX,
+      event.clientY - dragStartY,
+    );
+    viewYaw = rotation.yaw;
+    viewPitch = rotation.pitch;
+  }
+
+  function stopRotation(event: PointerEvent) {
+    dragging = false;
+    const stage = event.currentTarget as HTMLElement;
+    if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
+  }
+
+  function rotateView(delta: number) {
+    viewYaw = wrapMarvinYaw(viewYaw + delta);
+  }
+
+  function resetView() {
+    viewYaw = 0;
+    viewPitch = 0;
   }
 
   function closeConsole() {
@@ -82,9 +129,13 @@
 
   <section
     class="stage"
+    class:stage--dragging={dragging}
     aria-label="Interactive three-dimensional Marvin demonstration"
-    onpointermove={handlePointer}
-    onpointerleave={() => { pointerX = 0; pointerY = 0; }}
+    onpointerdown={startRotation}
+    onpointermove={movePointer}
+    onpointerup={stopRotation}
+    onpointercancel={stopRotation}
+    onpointerleave={() => { if (!dragging) { pointerX = 0; pointerY = 0; } }}
   >
     <div class="stage__meta stage__meta--left" aria-hidden="true">
       <span>MODEL</span><strong>MRVN-RJ/01</strong>
@@ -101,6 +152,8 @@
           {reducedMotion}
           {pointerX}
           {pointerY}
+          {viewYaw}
+          {viewPitch}
           onReady={() => (ready = true)}
           onPhaseChange={(nextPhase) => (phase = nextPhase)}
         />
@@ -117,10 +170,19 @@
       <div class="loading" role="status"><i></i><span>ASSEMBLING MARVIN</span></div>
     {/if}
 
-    {#if ready}
+    {#if ready && chestFacingViewer}
       <button bind:this={chestButton} class="chest-target" type="button" onclick={() => (consoleOpen = true)}>
         <span>Open field console</span>
       </button>
+    {/if}
+
+    {#if ready}
+      <div class="view-controls" aria-label="3D model view controls">
+        <span aria-hidden="true">DRAG MODEL</span>
+        <button type="button" onclick={() => rotateView(-Math.PI / 6)} aria-label="Rotate Marvin left">←</button>
+        <button type="button" onclick={resetView}>RESET VIEW</button>
+        <button type="button" onclick={() => rotateView(Math.PI / 6)} aria-label="Rotate Marvin right">→</button>
+      </div>
     {/if}
 
     <div class="stage__scanline" aria-hidden="true"></div>
@@ -239,7 +301,11 @@
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 8px;
     box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.45);
+    cursor: grab;
+    touch-action: pan-y;
   }
+
+  .stage--dragging { cursor: grabbing; }
 
   .stage::before,
   .stage::after {
@@ -283,6 +349,41 @@
     background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.04) 4px);
   }
 
+  .view-controls {
+    position: absolute;
+    z-index: 8;
+    left: 50%;
+    bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translateX(-50%);
+    padding: 6px;
+    color: #8997a2;
+    background: rgba(11, 15, 20, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    font: 0.62rem/1 var(--font-mono);
+    letter-spacing: 0.09em;
+    backdrop-filter: blur(10px);
+  }
+
+  .view-controls > span { padding: 0 8px; }
+  .view-controls button {
+    min-width: 38px;
+    min-height: 34px;
+    padding: 0 10px;
+    color: #dce5e8;
+    background: #151d24;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+  .view-controls button:hover,
+  .view-controls button:focus-visible { color: #fff; border-color: var(--amber); outline: none; }
+
   .loading,
   .fallback {
     position: absolute;
@@ -309,9 +410,9 @@
     position: absolute;
     z-index: 6;
     left: 50%;
-    top: 69%;
-    width: 108px;
-    height: 86px;
+    top: 48%;
+    width: 120px;
+    height: 104px;
     transform: translate(-50%, -50%);
     color: transparent;
     background: transparent;
@@ -386,13 +487,14 @@
     .control-deck { grid-template-columns: 1fr; }
     .control-deck__actions { grid-template-columns: 1fr; }
     .lab-footer { flex-direction: column; }
+    .view-controls > span { display: none; }
   }
 
   @media (max-width: 380px) {
     .lab-shell { padding-inline: 10px; }
     .stage { min-height: 470px; }
     .stage__meta--right { display: none; }
-    .chest-target { top: 68%; width: 88px; height: 76px; }
+    .chest-target { top: 48%; width: 94px; height: 82px; }
   }
 
   @media (prefers-reduced-motion: reduce) {

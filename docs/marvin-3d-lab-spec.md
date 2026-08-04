@@ -18,6 +18,8 @@ technically superior.
 - The first entrance uses one coordinated 3D sequence: cable deployment, hand attachment, swing,
   braking, landing, and idle recovery.
 - Visitors can trigger at least three authored actions after landing.
+- Visitors can inspect the complete model with pointer drag, left/right controls, and a reset control.
+- The entrance completes within 2.05 seconds and authored actions within 1.4 seconds.
 - The chest is a keyboard-accessible interaction that opens a reusable game interface.
 - Reduced-motion visitors see Marvin already landed with continuous motion disabled.
 - The experience has a visible loading state and a no-WebGL fallback.
@@ -44,14 +46,20 @@ technically superior.
 
 ```text
 src/components/marvin-3d/
+  MarvinArm.svelte         Shoulder yoke, arm bones, pistons, hands, and grapple hardware
   MarvinLab.svelte          Route-level interactive experience and accessible controls
   MarvinCanvas.svelte       Threlte Canvas, loading, and renderer boundary
+  MarvinHead.svelte         Compact sensor pod, optic, antenna, and neck
+  MarvinLeg.svelte          Hip/knee rig, hydraulics, and split stabilizing feet
   MarvinScene.svelte        Camera, lights, environment, and scene orchestration
-  MarvinModel.svelte        Articulated robot hierarchy and material system
+  MarvinModel.svelte        Motion orchestration and articulated group references
   MarvinScreen.svelte       Reusable chest-screen/game surface
+  MarvinTorso.svelte        Chest display, pelvis, rear spine, and cable routing
+  marvin-materials.ts       Shared industrial material palette
 src/lib/
   marvin-3d-motion.ts       Pure phase, pose, and action-selection logic
   marvin-3d-motion.test.ts  Deterministic behavior tests
+  marvin-3d-view.ts         Pure yaw wrapping, pitch clamping, and drag mapping
 src/pages/
   marvin-lab.astro          Hidden prototype route
 docs/
@@ -94,6 +102,21 @@ unlabelled mesh-only controls.
 - Keep the lab route code-split so the homepage does not download Three.js.
 - Target less than 250 KB gzip for the complete lab-only JavaScript payload in this first prototype.
 
+## Reference Translation
+
+The refinement pass uses the official Pathfinder profile and multiple production-model views as
+proportion and mechanism references, plus MRVN maintenance-robot references for the utilitarian
+spine and exposed hydraulic language. The implementation translates only high-level traits:
+
+- a broad body-mounted emotional display and compact sensor head;
+- long actuator-driven limbs with visible joints, pistons, cables, hands, and stabilizing feet;
+- a rear service spine that stays legible in side and back views;
+- cool blue-grey metal, graphite structure, and restrained safety-yellow markings;
+- fast athletic motion with a compressed landing and quick recovery.
+
+No external character mesh, texture, animation, insignia, or game asset is included. Marvin remains
+an original procedural model assembled from reusable primitives.
+
 ## Boundaries
 
 ### Always
@@ -135,8 +158,8 @@ interaction, and does not degrade the homepage's mobile experience.
 ## Prototype Result
 
 - Production build: passing
-- Lab JavaScript: 205.75 KB gzip
-- Reused game interface: 8.89 KB gzip
-- Lab CSS: 2.54 KB gzip
+- Lab JavaScript: 207.95 KB gzip
+- Reused game interface: 8.92 KB gzip
+- Lab CSS: 2.70 KB gzip
 - Responsive checks: no horizontal overflow at 320px, 768px, 1024px, or 1440px
 - Homepage integration: intentionally deferred; the SVG mascot remains unchanged
