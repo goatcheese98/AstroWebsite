@@ -20,10 +20,13 @@
     "@astrojs/rss": "^4.0.15",
     "@astrojs/sitemap": "^3.7.0",
     "@astrojs/svelte": "^7.2.5",
+    "@threlte/core": "^8.5.16",
     "astro": "^5.16.15",
-    "svelte": "^5.56.8"
+    "svelte": "^5.56.8",
+    "three": "^0.185.1"
   },
   "devDependencies": {
+    "@types/three": "^0.185.3",
     "vitest": "^4.0.18"
   }
 }
