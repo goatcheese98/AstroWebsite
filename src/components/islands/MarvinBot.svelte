@@ -1,21 +1,14 @@
 <script lang="ts">
   import Screen from "./Screen.svelte";
+  import {
+    createMarvinIntroPlan,
+    pickMarvinMove,
+    type MarvinIntroPhase,
+    type MarvinMove,
+  } from "../../lib/marvin-motion";
 
   type RobotState = "idle" | "waving" | "happy" | "excited" | "love" | "sleeping";
   type ScreenMessage = "smile" | "hi" | "stars" | "zzz" | "games";
-  type ClickAnimation =
-    | "right-arm"
-    | "left-arm"
-    | "left-leg"
-    | "right-leg"
-    | "head-bang"
-    | "dance"
-    | "jump"
-    | "floss"
-    | "orange-justice"
-    | "hype"
-    | "sprinkler"
-    | "shuffle";
   type TetrisMode = "closed" | "menu" | "playing" | "paused" | "gameover";
   type TetrisAction = "left" | "right" | "down" | "rotate" | "drop" | "pause";
   type WhacMode = "closed" | "menu" | "playing" | "gameover";
@@ -27,21 +20,6 @@
   type TetrisCell = [number, number];
 
   const MESSAGES: ScreenMessage[] = ["smile", "hi", "stars"];
-  const CLICK_ANIMATIONS: ClickAnimation[] = [
-    "right-arm",
-    "left-arm",
-    "left-leg",
-    "right-leg",
-    "head-bang",
-    "dance",
-    "jump",
-    "floss",
-    "orange-justice",
-    "hype",
-    "sprinkler",
-    "shuffle",
-  ];
-
   const COLORS = {
     body: "#e2e8f0",
     bodyLight: "#f1f5f9",
@@ -273,7 +251,7 @@
   let isHovering = $state(false);
   let mouseOffset = $state({ x: 0, y: 0 });
   let containerRef: HTMLDivElement;
-  let clickAnimation = $state<ClickAnimation | null>(null);
+  let clickAnimation = $state<MarvinMove | null>(null);
   let breathPhase = $state(0);
   let idleTime = $state(0);
   let gameView = $state<GameView>("list");
@@ -290,6 +268,7 @@
   let whacActiveSlot = $state<number | null>(null);
   let lastWhacSlot = $state<number | null>(null);
   let whacDifficulty = $state<WhacDifficulty>("medium");
+  let introPhase = $state<MarvinIntroPhase>("grappling");
 
   // Refs for timers
   let waveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -301,6 +280,7 @@
   let whacCountdownTimer: ReturnType<typeof setInterval> | null = null;
   let whacSpawnTimer: ReturnType<typeof setTimeout> | null = null;
   let whacHideTimer: ReturnType<typeof setTimeout> | null = null;
+  let introTimers: ReturnType<typeof setTimeout>[] = [];
   const tetrisKeyListenerOptions: AddEventListenerOptions = { capture: true };
 
   function createEmptyTetrisBoard() {
@@ -868,6 +848,37 @@
     }, delay);
   }
 
+  function clearIntroTimers() {
+    for (const timer of introTimers) clearTimeout(timer);
+    introTimers = [];
+  }
+
+  function runIntro(reducedMotion: boolean) {
+    clearIntroTimers();
+    for (const step of createMarvinIntroPlan(reducedMotion)) {
+      if (step.at === 0) {
+        introPhase = step.phase;
+        continue;
+      }
+
+      introTimers.push(setTimeout(() => {
+        introPhase = step.phase;
+      }, step.at));
+    }
+  }
+
+  $effect(() => {
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleMotionPreference = () => runIntro(motionPreference.matches);
+    handleMotionPreference();
+    motionPreference.addEventListener("change", handleMotionPreference);
+
+    return () => {
+      motionPreference.removeEventListener("change", handleMotionPreference);
+      clearIntroTimers();
+    };
+  });
+
   $effect(() => {
     window.addEventListener("mousemove", handleGlobalMouseMove, { passive: true });
     window.addEventListener("keydown", handleTetrisKeydown, tetrisKeyListenerOptions);
@@ -927,8 +938,8 @@
   });
 
   function handleClick() {
-    if (screenMessage === "games") return;
-    const randomAnim = CLICK_ANIMATIONS[Math.floor(Math.random() * CLICK_ANIMATIONS.length)];
+    if (screenMessage === "games" || introPhase !== "online") return;
+    const randomAnim = pickMarvinMove();
     clickAnimation = randomAnim;
     idleTime = 0;
     robotState = "excited";
@@ -940,7 +951,14 @@
       if (screenMessage !== "games") screenMessage = "smile";
     }, 6000);
     if (clickAnimationTimeout) clearTimeout(clickAnimationTimeout);
-    clickAnimationTimeout = setTimeout(() => { clickAnimation = null; }, 2000);
+    const animationDuration = randomAnim === "grapple" ? 2600 : 2200;
+    clickAnimationTimeout = setTimeout(() => { clickAnimation = null; }, animationDuration);
+  }
+
+  function handleBotKeydown(event: KeyboardEvent) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    handleClick();
   }
 
   function handleMouseEnter() {
@@ -1014,14 +1032,52 @@
 </script>
 
 <div bind:this={containerRef} class="container">
+  <svg
+    class="grapple-rig"
+    class:grapple-rig--active={introPhase !== "online" || clickAnimation === "grapple"}
+    width="360"
+    height="504"
+    viewBox="0 -40 300 420"
+    aria-hidden="true"
+  >
+    <defs>
+      <filter id="cableGlow" x="-80%" y="-40%" width="260%" height="180%">
+        <feGaussianBlur stdDeviation="1.8" result="cable-blur" />
+        <feMerge>
+          <feMergeNode in="cable-blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    <path class="grapple-cable-shadow" d="M 292 -28 C 277 18 269 67 238 125 C 226 147 214 163 202 181" />
+    <path class="grapple-cable" d="M 292 -28 C 277 18 269 67 238 125 C 226 147 214 163 202 181" />
+    <g class="grapple-anchor" transform="translate(291 -27) rotate(20)">
+      <path d="M -9 -7 L 9 -7 L 6 2 L 2 7 L -2 7 L -6 2 Z" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+      <path d="M -5 -4 L 5 -4" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+      <circle cx="0" cy="2" r="2.2" fill="#94a3b8" />
+    </g>
+    <g class="landing-fx">
+      <ellipse class="impact-ring impact-ring--one" cx="150" cy="369" rx="25" ry="5" />
+      <ellipse class="impact-ring impact-ring--two" cx="150" cy="369" rx="25" ry="5" />
+      <circle class="dust dust--one" cx="112" cy="361" r="5" />
+      <circle class="dust dust--two" cx="188" cy="361" r="5" />
+      <circle class="dust dust--three" cx="128" cy="365" r="3" />
+      <circle class="dust dust--four" cx="172" cy="365" r="3" />
+    </g>
+  </svg>
+
   <div
     role="button"
     tabindex="0"
+    aria-label="Marvin, interactive AI robot mascot. Activate for a surprise move."
+    aria-disabled={introPhase !== "online"}
+    data-intro-phase={introPhase}
     onclick={handleClick}
-    onkeydown={(e) => e.key === "Enter" && screenMessage !== "games" && handleClick()}
+    onkeydown={handleBotKeydown}
     onmouseenter={handleMouseEnter}
     onmouseleave={handleMouseLeave}
     class="bot"
+    class:intro-sequence={introPhase !== "online"}
     class:hovering={isHovering}
     class:sleeping={isSleeping}
     class:state-waving={isWaving}
@@ -1040,6 +1096,9 @@
     class:anim-hype={clickAnimation === "hype"}
     class:anim-sprinkler={clickAnimation === "sprinkler"}
     class:anim-shuffle={clickAnimation === "shuffle"}
+    class:anim-grapple={clickAnimation === "grapple"}
+    class:anim-moonwalk={clickAnimation === "moonwalk"}
+    class:anim-victory={clickAnimation === "victory"}
   >
     <svg width="360" height="504" viewBox="0 -40 300 420" style="overflow: visible;">
       <defs>
@@ -1055,6 +1114,21 @@
           <stop offset="0%" stop-color={COLORS.body} />
           <stop offset="100%" stop-color="#cbd5e1" />
         </linearGradient>
+        <linearGradient id="panelDepthGrad" x1="0" y1="0" x2="1" y2="0.7">
+          <stop offset="0%" stop-color="#334155" />
+          <stop offset="55%" stop-color="#1e293b" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+        <radialGradient id="lensCoreGrad" cx="38%" cy="32%" r="70%">
+          <stop offset="0%" stop-color="#fde68a" />
+          <stop offset="28%" stop-color="#f59e0b" />
+          <stop offset="72%" stop-color="#b45309" />
+          <stop offset="100%" stop-color="#78350f" />
+        </radialGradient>
+        <pattern id="carbonWeave" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="6" height="6" fill="#1e293b" />
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#475569" stroke-width="2" opacity="0.35" />
+        </pattern>
         <filter id="eyeGlow" x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
           <feMerge>
@@ -1129,6 +1203,8 @@
             <circle cx="100" cy="348" r="6" fill={COLORS.joint} stroke={COLORS.jointDark} stroke-width="1.5" />
             <circle cx="100" cy="348" r="2.5" fill={COLORS.jointDark} />
             <rect x="78" y="348" width="44" height="22" rx="7" fill={COLORS.bodyStroke} />
+            <path d="M 78 358 L 86 348 L 114 348 L 122 358 L 116 363 L 84 363 Z" fill="url(#carbonWeave)" opacity="0.7" />
+            <path d="M 82 351 L 94 351" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.85" />
             <rect x="80" y="364" width="40" height="5" rx="3" fill={COLORS.jointDark} opacity="0.4" />
             <line x1="86" y1="357" x2="114" y2="357" stroke={COLORS.joint} stroke-width="1.5" stroke-linecap="round" opacity="0.5" />
             <line x1="88" y1="352" x2="112" y2="352" stroke={COLORS.joint} stroke-width="1" stroke-linecap="round" opacity="0.4" />
@@ -1154,6 +1230,8 @@
             <circle cx="200" cy="348" r="6" fill={COLORS.joint} stroke={COLORS.jointDark} stroke-width="1.5" />
             <circle cx="200" cy="348" r="2.5" fill={COLORS.jointDark} />
             <rect x="178" y="348" width="44" height="22" rx="7" fill={COLORS.bodyStroke} />
+            <path d="M 178 358 L 186 348 L 214 348 L 222 358 L 216 363 L 184 363 Z" fill="url(#carbonWeave)" opacity="0.7" />
+            <path d="M 206 351 L 218 351" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.85" />
             <rect x="180" y="364" width="40" height="5" rx="3" fill={COLORS.jointDark} opacity="0.4" />
             <line x1="186" y1="357" x2="214" y2="357" stroke={COLORS.joint} stroke-width="1.5" stroke-linecap="round" opacity="0.5" />
             <line x1="188" y1="352" x2="212" y2="352" stroke={COLORS.joint} stroke-width="1" stroke-linecap="round" opacity="0.4" />
@@ -1164,6 +1242,13 @@
         </g>
 
         <!-- ===== BODY ===== -->
+
+        <!-- offset rear shell creates a subtle side plane -->
+        <path
+          d="M 96 154 L 213 164 Q 222 166 223 177 L 223 276 Q 223 286 214 294 L 99 288 Z"
+          fill="url(#panelDepthGrad)"
+          opacity="0.48"
+        />
 
         <rect
           x="85"
@@ -1179,6 +1264,15 @@
         />
 
         <rect x="90" y="165" width="120" height="3" rx="2" fill="white" opacity="0.4" />
+
+        <!-- segmented armor and orange load-bearing rails -->
+        <path d="M 87 181 L 95 174 L 95 267 L 87 259 Z" fill="#1e293b" opacity="0.75" />
+        <path d="M 213 181 L 205 174 L 205 267 L 213 259 Z" fill="#1e293b" opacity="0.75" />
+        <path d="M 92 180 L 101 171" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+        <path d="M 208 180 L 199 171" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+        <path d="M 92 258 L 101 269" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+        <path d="M 208 258 L 199 269" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+        <path d="M 105 160 L 195 160" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.55" />
 
         <line x1="85" y1="195" x2="97" y2="195" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.25" />
         <line x1="203" y1="195" x2="215" y2="195" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.25" />
@@ -1642,6 +1736,10 @@
         <circle cx="162" cy="280" r="2.5" fill="white" opacity="0.7">
           <animate attributeName="opacity" values="0.7;0.3;0.7" dur="1.8s" repeatCount="indefinite" begin="1.2s" />
         </circle>
+        <rect x="107" y="275" width="16" height="8" rx="2" fill="url(#carbonWeave)" stroke="#64748b" stroke-width="0.8" />
+        <text x="115" y="281" text-anchor="middle" fill="#cbd5e1" font-size="3.8" font-family="monospace">MRVN</text>
+        <path d="M 181 276 L 194 276 L 194 284 L 181 284 Z" fill="#334155" stroke="#64748b" stroke-width="0.8" />
+        <path d="M 184 280 L 191 280" stroke="#22c55e" stroke-width="1.3" stroke-linecap="round" />
 
         <!-- ===== LEFT ARM ===== -->
         <g class="left-arm-group">
@@ -1653,6 +1751,8 @@
           <line x1="68" y1="183" x2="75" y2="183" stroke={COLORS.jointDark} stroke-width="1.5" stroke-linecap="round" opacity="0.3" />
           <rect x="60" y="184" width="25" height="42" rx="10" fill="url(#bodyGrad)" stroke={COLORS.bodyStroke} stroke-width="2.5" />
           <rect x="63" y="192" width="19" height="16" rx="4" fill={COLORS.bodyStroke} opacity="0.08" />
+          <line x1="65" y1="189" x2="80" y2="219" stroke="#64748b" stroke-width="2.4" stroke-linecap="round" />
+          <line x1="67" y1="190" x2="81" y2="218" stroke="#cbd5e1" stroke-width="0.8" stroke-linecap="round" />
           <circle cx="72" cy="226" r="9" fill={COLORS.joint} stroke={COLORS.jointDark} stroke-width="2" />
           <circle cx="72" cy="226" r="4" fill={COLORS.jointDark} />
           <circle cx="72" cy="226" r="1.5" fill={COLORS.joint} />
@@ -1678,11 +1778,20 @@
           <line x1="225" y1="183" x2="232" y2="183" stroke={COLORS.jointDark} stroke-width="1.5" stroke-linecap="round" opacity="0.3" />
           <rect x="215" y="184" width="25" height="42" rx="10" fill="url(#bodyGrad)" stroke={COLORS.bodyStroke} stroke-width="2.5" />
           <rect x="218" y="192" width="19" height="16" rx="4" fill={COLORS.bodyStroke} opacity="0.08" />
+          <line x1="235" y1="189" x2="220" y2="219" stroke="#64748b" stroke-width="2.4" stroke-linecap="round" />
+          <line x1="233" y1="190" x2="219" y2="218" stroke="#cbd5e1" stroke-width="0.8" stroke-linecap="round" />
           <circle cx="228" cy="226" r="9" fill={COLORS.joint} stroke={COLORS.jointDark} stroke-width="2" />
           <circle cx="228" cy="226" r="4" fill={COLORS.jointDark} />
           <circle cx="228" cy="226" r="1.5" fill={COLORS.joint} />
           <g class="right-forearm-group">
             <rect x="217" y="229" width="22" height="34" rx="9" fill="url(#bodyGrad)" stroke={COLORS.bodyStroke} stroke-width="2" />
+            <g class="grapple-winch">
+              <circle cx="241" cy="242" r="10" fill="url(#panelDepthGrad)" stroke="#0f172a" stroke-width="1.5" />
+              <circle cx="241" cy="242" r="6.5" fill="none" stroke="#f59e0b" stroke-width="2" />
+              <circle cx="241" cy="242" r="2.5" fill="#94a3b8" />
+              <path d="M 247 235 L 254 229 L 258 233 L 251 240" fill="#334155" stroke="#0f172a" stroke-width="1" />
+              <path d="M 252 230 L 257 235" stroke="#fbbf24" stroke-width="1.4" />
+            </g>
             <circle cx="228" cy="261" r="7" fill={COLORS.joint} stroke={COLORS.jointDark} stroke-width="1.5" />
             <circle cx="228" cy="261" r="3" fill={COLORS.jointDark} />
             <rect x="211" y="257" width="32" height="24" rx="7" fill={COLORS.bodyStroke} />
@@ -1706,6 +1815,8 @@
           style="transform-origin: 150px 100px; transform: translate({headTranslateX}px, {headTranslateY}px) rotate({headRotate}deg) scale(0.93); transition: transform 0.1s ease-out;"
         >
           <g class="head-motion-group">
+            <path d="M 99 60 Q 113 32 145 27 L 145 149 Q 111 146 95 116 Z" fill="#cbd5e1" opacity="0.48" />
+            <path d="M 155 27 Q 188 33 202 60 L 207 112 Q 193 143 155 149 Z" fill="url(#panelDepthGrad)" opacity="0.42" />
             <circle
               cx="150"
               cy="88"
@@ -1719,6 +1830,10 @@
             <path d="M 100 74 Q 110 62 128 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
             <path d="M 200 74 Q 190 62 172 60" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.15" />
             <path d="M 100 110 Q 150 116 200 110" fill="none" stroke={COLORS.bodyStroke} stroke-width="1" opacity="0.1" />
+            <path d="M 112 47 L 124 39 L 133 42" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+            <path d="M 188 47 L 176 39 L 167 42" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+            <path d="M 104 122 L 119 136" stroke="#64748b" stroke-width="2" stroke-linecap="round" />
+            <path d="M 196 122 L 181 136" stroke="#64748b" stroke-width="2" stroke-linecap="round" />
 
             <!-- Ear panels -->
             <g class="left-ear">
@@ -1744,9 +1859,11 @@
               class:pulsing={isHovering}
               style="transform-origin: 150px 88px;"
             />
+            <circle cx="150" cy="88" r="45" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="2 8" opacity="0.8" />
             <circle cx="150" cy="88" r="42" fill="none" stroke={COLORS.eyeRing} stroke-width="1" opacity="0.25" />
             <circle cx="150" cy="88" r="40" fill={COLORS.bodyStroke} />
             <circle cx="150" cy="88" r="35" fill="none" stroke="#334155" stroke-width="1" opacity="0.4" />
+            <path d="M 150 49 L 150 57 M 150 119 L 150 127 M 111 88 L 119 88 M 181 88 L 189 88" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
 
             {#if isSleeping}
               <circle cx="150" cy="88" r="39" fill="#3d4f62" />
@@ -1757,7 +1874,7 @@
                 cx="150"
                 cy="88"
                 r={eyeSize}
-                fill={eyeGlow}
+                fill="url(#lensCoreGrad)"
                 filter="url(#eyeGlow)"
                 style="transition: all 0.3s ease;"
               >
@@ -1765,6 +1882,9 @@
                   <animate attributeName="opacity" values="1;0.85;1" dur="0.4s" repeatCount="indefinite" />
                 {/if}
               </circle>
+              <circle cx="150" cy="88" r={eyeSize - 5} fill="none" stroke={eyeGlow} stroke-width="1.5" opacity="0.8" />
+              <circle cx="150" cy="88" r="13" fill="#451a03" opacity="0.24" />
+              <circle cx="150" cy="88" r="5" fill="#1e293b" opacity="0.32" />
               <circle
                 cx={150 + mouseOffset.x * 0.5}
                 cy={88 + mouseOffset.y * 0.3}
@@ -1776,6 +1896,7 @@
               <circle cx="139" cy="74" r="9" fill="white" opacity="0.85" />
               <circle cx="162" cy="98" r="3.5" fill="white" opacity="0.45" />
               <circle cx="135" cy="82" r="2" fill="white" opacity="0.3" />
+              <path d="M 128 107 Q 150 116 172 107" fill="none" stroke="#fbbf24" stroke-width="1.2" opacity="0.45" />
             {/if}
           </g>
         </g>
@@ -1841,6 +1962,7 @@
     height: 504px;
     position: relative;
     user-select: none;
+    isolation: isolate;
   }
 
   .bot {
@@ -1850,11 +1972,176 @@
     cursor: pointer;
     transition: transform 0.2s ease;
     touch-action: pan-y;
+    z-index: 2;
   }
 
-  .bot:focus,
-  .bot:focus-visible {
+  .bot:focus {
     outline: none;
+  }
+
+  .bot:focus-visible {
+    outline: 3px dashed #f59e0b;
+    outline-offset: -8px;
+    border-radius: 45% 45% 18% 18%;
+  }
+
+  .grapple-rig {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: visible;
+    opacity: 0;
+  }
+
+  .grapple-rig--active {
+    animation: grapple-rig-visibility 2.6s linear both;
+  }
+
+  .grapple-cable-shadow,
+  .grapple-cable {
+    fill: none;
+    stroke-linecap: round;
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+  }
+
+  .grapple-cable-shadow {
+    stroke: rgba(15, 23, 42, 0.28);
+    stroke-width: 5;
+    transform: translate(1.5px, 1.5px);
+  }
+
+  .grapple-cable {
+    stroke: #64748b;
+    stroke-width: 2.4;
+    filter: url(#cableGlow);
+  }
+
+  .grapple-rig--active .grapple-cable,
+  .grapple-rig--active .grapple-cable-shadow {
+    animation: grapple-cable-cycle 2.6s cubic-bezier(0.22, 0.8, 0.25, 1) both;
+  }
+
+  .grapple-rig--active .grapple-anchor {
+    transform-origin: 291px -27px;
+    animation: grapple-anchor-lock 2.6s ease-out both;
+  }
+
+  .impact-ring {
+    fill: none;
+    stroke: #f59e0b;
+    stroke-width: 1.4;
+    opacity: 0;
+    transform-origin: 150px 369px;
+  }
+
+  .dust {
+    fill: #94a3b8;
+    opacity: 0;
+    transform-origin: center;
+  }
+
+  .grapple-rig--active .impact-ring--one {
+    animation: impact-ring 2.6s ease-out both;
+  }
+
+  .grapple-rig--active .impact-ring--two {
+    animation: impact-ring 2.6s ease-out 0.08s both;
+  }
+
+  .grapple-rig--active .dust--one,
+  .grapple-rig--active .dust--three {
+    animation: dust-left 2.6s ease-out both;
+  }
+
+  .grapple-rig--active .dust--two,
+  .grapple-rig--active .dust--four {
+    animation: dust-right 2.6s ease-out both;
+  }
+
+  .bot.intro-sequence {
+    animation: grapple-entry 2.6s cubic-bezier(0.22, 0.75, 0.18, 1) both !important;
+    cursor: default;
+    will-change: transform, filter;
+  }
+
+  .bot.intro-sequence :global(.right-arm-group) {
+    animation: grapple-intro-right-arm 2.6s ease-in-out both !important;
+  }
+
+  .bot.intro-sequence :global(.left-arm-group) {
+    animation: grapple-intro-left-arm 2.6s ease-in-out both !important;
+  }
+
+  .bot.intro-sequence :global(.left-leg-group),
+  .bot.intro-sequence :global(.right-leg-group) {
+    animation: grapple-intro-legs 2.6s ease-in-out both !important;
+  }
+
+  @keyframes grapple-entry {
+    0% { transform: translate3d(118px, -205px, 100px) rotate(-17deg) scale(0.76); opacity: 0; filter: blur(2px) drop-shadow(-16px 28px 18px rgba(15, 23, 42, 0.08)); }
+    9% { opacity: 1; }
+    31% { transform: translate3d(55px, -124px, 72px) rotate(13deg) scale(0.84); filter: blur(0) drop-shadow(-12px 22px 14px rgba(15, 23, 42, 0.12)); }
+    55% { transform: translate3d(-22px, -52px, 28px) rotate(-8deg) scale(0.95); }
+    70% { transform: translate3d(3px, 8px, 0) rotate(2.5deg) scale(1.025); }
+    79% { transform: translate3d(0, -19px, 16px) rotate(-1.5deg) scale(1.01); }
+    91% { transform: translate3d(0, 5px, 0) rotate(0.6deg) scaleX(1.025) scaleY(0.972); }
+    100% { transform: translate3d(0, 0, 0) rotate(0) scale(1); opacity: 1; filter: none; }
+  }
+
+  @keyframes grapple-intro-right-arm {
+    0%, 58% { transform: rotate(-128deg); }
+    72% { transform: rotate(-42deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  @keyframes grapple-intro-left-arm {
+    0%, 34% { transform: rotate(38deg); }
+    58% { transform: rotate(-18deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  @keyframes grapple-intro-legs {
+    0%, 58% { transform: rotate(-16deg) translateY(-8px); }
+    72% { transform: rotate(7deg) translateY(5px); }
+    100% { transform: rotate(0deg) translateY(0); }
+  }
+
+  @keyframes grapple-rig-visibility {
+    0%, 68% { opacity: 1; }
+    82%, 100% { opacity: 0; }
+  }
+
+  @keyframes grapple-cable-cycle {
+    0% { stroke-dashoffset: 300; }
+    12%, 48% { stroke-dashoffset: 0; }
+    68% { stroke-dashoffset: 210; opacity: 1; }
+    78%, 100% { stroke-dashoffset: 300; opacity: 0; }
+  }
+
+  @keyframes grapple-anchor-lock {
+    0% { opacity: 0; transform: translate(291px, -27px) rotate(20deg) scale(1.7); }
+    9%, 54% { opacity: 1; transform: translate(291px, -27px) rotate(0deg) scale(1); }
+    72%, 100% { opacity: 0; transform: translate(291px, -27px) rotate(-15deg) scale(0.75); }
+  }
+
+  @keyframes impact-ring {
+    0%, 70% { opacity: 0; transform: scale(0.35); }
+    72% { opacity: 0.85; }
+    94%, 100% { opacity: 0; transform: scale(2.5); }
+  }
+
+  @keyframes dust-left {
+    0%, 70% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+    73% { opacity: 0.55; }
+    100% { opacity: 0; transform: translate(-30px, -18px) scale(1.7); }
+  }
+
+  @keyframes dust-right {
+    0%, 70% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+    73% { opacity: 0.55; }
+    100% { opacity: 0; transform: translate(30px, -18px) scale(1.7); }
   }
 
   .bot:not(.anim-dance):not(.anim-jump):not(.anim-floss):not(.anim-orange-justice):not(.anim-hype):not(.anim-sprinkler):not(.anim-shuffle) {
@@ -2602,6 +2889,153 @@
     0%, 100% { transform: translateY(0); }
     25% { transform: translateY(-2px); }
     75% { transform: translateY(-3px); }
+  }
+
+  /* Grapple rebound: a compact replay of the arrival move. */
+  .bot.anim-grapple {
+    animation: grapple-rebound 2.6s cubic-bezier(0.22, 0.75, 0.18, 1) both !important;
+  }
+
+  .bot.anim-grapple :global(.right-arm-group) {
+    animation: grapple-rebound-arm 2.6s ease-in-out both !important;
+  }
+
+  .bot.anim-grapple :global(.left-leg-group),
+  .bot.anim-grapple :global(.right-leg-group) {
+    animation: grapple-rebound-legs 2.6s ease-in-out both !important;
+  }
+
+  @keyframes grapple-rebound {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+    16% { transform: translate3d(5px, 8px, 0) rotate(1deg) scaleY(0.98); }
+    42% { transform: translate3d(42px, -82px, 42px) rotate(12deg) scale(0.92); filter: drop-shadow(-10px 18px 12px rgba(15, 23, 42, 0.12)); }
+    66% { transform: translate3d(-16px, -30px, 18px) rotate(-6deg) scale(0.98); }
+    84% { transform: translate3d(0, 5px, 0) rotate(1deg) scaleY(0.975); filter: none; }
+  }
+
+  @keyframes grapple-rebound-arm {
+    0%, 12%, 100% { transform: rotate(0deg); }
+    28%, 58% { transform: rotate(-128deg); }
+    78% { transform: rotate(-30deg); }
+  }
+
+  @keyframes grapple-rebound-legs {
+    0%, 12%, 100% { transform: rotate(0deg) translateY(0); }
+    38%, 62% { transform: rotate(-17deg) translateY(-7px); }
+    82% { transform: rotate(7deg) translateY(5px); }
+  }
+
+  /* A grounded mechanical moonwalk with counter-rotating joints. */
+  .bot.anim-moonwalk :global(.body-group) {
+    animation: moonwalk-body 0.44s cubic-bezier(0.5, 0, 0.3, 1) 5 !important;
+  }
+
+  .bot.anim-moonwalk :global(.left-leg-group) {
+    animation: moonwalk-left-leg 0.88s ease-in-out 2.5 !important;
+  }
+
+  .bot.anim-moonwalk :global(.right-leg-group) {
+    animation: moonwalk-right-leg 0.88s ease-in-out 2.5 !important;
+  }
+
+  .bot.anim-moonwalk :global(.left-shin-group) {
+    animation: moonwalk-left-shin 0.88s ease-in-out 2.5 !important;
+  }
+
+  .bot.anim-moonwalk :global(.right-shin-group) {
+    animation: moonwalk-right-shin 0.88s ease-in-out 2.5 !important;
+  }
+
+  .bot.anim-moonwalk :global(.left-arm-group),
+  .bot.anim-moonwalk :global(.right-arm-group) {
+    animation: moonwalk-arms 0.88s ease-in-out 2.5 !important;
+  }
+
+  @keyframes moonwalk-body {
+    0%, 100% { transform: translateX(0) translateY(0) rotate(0deg); }
+    50% { transform: translateX(-7px) translateY(-3px) rotate(-1.5deg); }
+  }
+
+  @keyframes moonwalk-left-leg {
+    0%, 100% { transform: translateX(7px) rotate(-5deg); }
+    50% { transform: translateX(-9px) rotate(8deg); }
+  }
+
+  @keyframes moonwalk-right-leg {
+    0%, 100% { transform: translateX(-8px) rotate(7deg); }
+    50% { transform: translateX(8px) rotate(-6deg); }
+  }
+
+  @keyframes moonwalk-left-shin {
+    0%, 100% { transform: rotate(-14deg) translateY(-3px); }
+    50% { transform: rotate(10deg) translateY(2px); }
+  }
+
+  @keyframes moonwalk-right-shin {
+    0%, 100% { transform: rotate(12deg) translateY(2px); }
+    50% { transform: rotate(-14deg) translateY(-3px); }
+  }
+
+  @keyframes moonwalk-arms {
+    0%, 100% { transform: rotate(-13deg); }
+    50% { transform: rotate(15deg); }
+  }
+
+  /* Pathfinder-style victory beat: compress, launch, hold, and land. */
+  .bot.anim-victory {
+    animation: victory-hop 2.2s cubic-bezier(0.2, 0.75, 0.25, 1) both !important;
+  }
+
+  .bot.anim-victory :global(.left-arm-group) {
+    animation: victory-left-arm 2.2s ease-in-out both !important;
+  }
+
+  .bot.anim-victory :global(.right-arm-group) {
+    animation: victory-right-arm 2.2s ease-in-out both !important;
+  }
+
+  .bot.anim-victory :global(.left-leg-group),
+  .bot.anim-victory :global(.right-leg-group) {
+    animation: victory-legs 2.2s ease-in-out both !important;
+  }
+
+  @keyframes victory-hop {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    14% { transform: translateY(7px) rotate(0deg) scaleX(1.03) scaleY(0.97); }
+    36%, 62% { transform: translateY(-38px) rotate(-2deg) scale(1.02); }
+    82% { transform: translateY(4px) rotate(1deg) scaleX(1.025) scaleY(0.975); }
+  }
+
+  @keyframes victory-left-arm {
+    0%, 100% { transform: rotate(0deg); }
+    28%, 70% { transform: rotate(142deg); }
+    84% { transform: rotate(24deg); }
+  }
+
+  @keyframes victory-right-arm {
+    0%, 100% { transform: rotate(0deg); }
+    28%, 70% { transform: rotate(-142deg); }
+    84% { transform: rotate(-24deg); }
+  }
+
+  @keyframes victory-legs {
+    0%, 100% { transform: rotate(0deg); }
+    32%, 64% { transform: rotate(-13deg) translateY(-5px); }
+    82% { transform: rotate(6deg) translateY(4px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bot,
+    .bot :global(*),
+    .grapple-rig,
+    .grapple-rig :global(*) {
+      animation: none !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .grapple-rig {
+      display: none;
+    }
   }
 
 </style>
