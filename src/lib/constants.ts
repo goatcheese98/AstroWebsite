@@ -2,7 +2,6 @@ import type {
   SiteMetadata,
   Project,
   Experience,
-  Skill,
   NavLink,
 } from "../types";
 
@@ -141,80 +140,5 @@ export const EXPERIENCES: Experience[] = [
     ],
     accentColor: "#6B2C91",
     logo: "megaplex",
-  },
-];
-
-export const SKILLS: Skill[] = [
-  {
-    name: "Python",
-    level: 90,
-    category: "Programming",
-    fillColor: "var(--color-fill-1)",
-  },
-  {
-    name: "SQL",
-    level: 85,
-    category: "Programming",
-    fillColor: "var(--color-fill-2)",
-  },
-  {
-    name: "JavaScript",
-    level: 80,
-    category: "Programming",
-    fillColor: "var(--color-fill-3)",
-  },
-  {
-    name: "R",
-    level: 75,
-    category: "Programming",
-    fillColor: "var(--color-fill-4)",
-  },
-  {
-    name: "Tableau",
-    level: 85,
-    category: "Analytics",
-    fillColor: "var(--color-fill-1)",
-  },
-  {
-    name: "Looker Studio",
-    level: 80,
-    category: "Analytics",
-    fillColor: "var(--color-fill-2)",
-  },
-  {
-    name: "D3.js",
-    level: 75,
-    category: "Visualization",
-    fillColor: "var(--color-fill-3)",
-  },
-  {
-    name: "PostgreSQL / MongoDB",
-    level: 80,
-    category: "Database",
-    fillColor: "var(--color-fill-4)",
-  },
-  {
-    name: "Next.js / Nuxt",
-    level: 75,
-    category: "Frameworks",
-    fillColor: "var(--color-fill-5)",
-  },
-  {
-    name: "FastAPI / Node.js",
-    level: 75,
-    category: "Backend",
-    fillColor: "var(--color-fill-1)",
-  },
-  {
-    name: "LangChain",
-    level: 70,
-    category: "AI/ML",
-    fillColor: "var(--color-fill-2)",
-  },
-  {
-    name: "Figma / Miro",
-    level: 80,
-    category: "Design",
-    fillColor: "var(--color-fill-3)",
   },
 ];

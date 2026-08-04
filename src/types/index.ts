@@ -17,14 +17,7 @@ export interface Experience {
   highlights: string[];
   current?: boolean;
   accentColor?: string;
-  logo?: 'ubc' | 'goldman' | 'megaplex';
-}
-
-export interface Skill {
-  name: string;
-  level: number; // 0-100
-  category: string;
-  fillColor?: string;
+  logo?: 'goldman' | 'megaplex';
 }
 
 export interface SiteMetadata {
