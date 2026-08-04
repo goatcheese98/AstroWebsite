@@ -18,11 +18,8 @@
 </script>
 
 {#if isOpen}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div
-    class="overlay"
-    onclick={(e) => e.target === e.currentTarget && onClose()}
-  >
+  <div class="overlay">
+    <button class="overlay-dismiss" type="button" onclick={onClose} aria-label="Close game"></button>
     <div class="panel">
       <div class="screw screw-tl"></div>
       <div class="screw screw-tr"></div>
@@ -60,6 +57,7 @@
 
   .panel {
     position: relative;
+    z-index: 1;
     background: linear-gradient(150deg, #fffbeb 0%, #fef3c7 60%, #fde68a 100%);
     border: 2.5px solid #d97706;
     border-radius: 20px;
@@ -71,6 +69,17 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.75);
     animation: panel-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     min-width: 360px;
+  }
+
+  .overlay-dismiss {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    cursor: default;
   }
 
   @keyframes panel-in {
