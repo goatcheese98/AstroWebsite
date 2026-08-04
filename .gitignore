@@ -37,3 +37,6 @@ package-lock.json
 files.txt
 line_counts.txt
 projects_list.txt
+
+# Claude Code local settings
+.claude/settings.local.json
