@@ -91,8 +91,8 @@ export const PROJECTS: Project[] = [
   {
     title: "AstroWeb Portfolio",
     description:
-      "This site: an evolving personal workspace built with Astro, rough.js, and an Excalidraw-inspired visual language.",
-    tags: ["Astro", "TypeScript", "rough.js", "Design Systems"],
+      "This site: an evolving personal workspace built with Astro, Svelte, and a hand-drawn visual language.",
+    tags: ["Astro", "TypeScript", "Svelte", "Design Systems"],
     codeUrl: "https://github.com/goatcheese98/AstroWebsite",
     fillColor: "var(--color-fill-5)",
     accentColor: "#f59e0b",

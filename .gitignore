@@ -25,14 +25,13 @@ pnpm-debug.log*
 .idea/
 .dev.vars
 
-# canvas build temp files
-.temp-pages-backup/
-.canvas-build-state.json
-wrangler.backup.toml
+# Cloudflare local files
 wrangler.toml
 .wrangler/
-.partykit/
 package-lock.json
+
+# Retired Canvas local state (kept out of portfolio commits)
+.partykit/
 
 # local analysis artifacts
 files.txt

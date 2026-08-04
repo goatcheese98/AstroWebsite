@@ -20,9 +20,6 @@ The old `/canvas`, `/ai-canvas`, `/dashboard`, `/login`, and `/signup` URLs perm
 - Legacy Canvas, assistant, user, image-generation, and database-health API routes
 - Portfolio-wide Clerk middleware and Astro integration
 - Canvas-specific theme and navigation behavior
+- The remaining Canvas components, editors, collaboration server, assistant backend, database layer, storage utilities, tests, generated assets, and dedicated dependencies
 
-## Source archive boundary
-
-Legacy Canvas components and supporting libraries remain under `src/` temporarily as a source archive. There is uncommitted `new-lex` editor work in this checkout, so moving or deleting that tree would risk losing work. None of this source is reachable from a public Astro route or included as a homepage client island.
-
-After the uncommitted editor work has been reconciled with RoopStudio, the remaining legacy component/library tree and its dedicated dependencies can be removed in one clean follow-up.
+The retired implementation remains available in Git history. AstroWeb now contains only the portfolio-facing product link and permanent redirects to RoopStudio.

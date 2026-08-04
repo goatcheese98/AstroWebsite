@@ -1,7 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
-import react from "@astrojs/react";
 import svelte from "@astrojs/svelte";
 import cloudflare from "@astrojs/cloudflare";
 
@@ -16,7 +15,7 @@ export default defineConfig({
       configPath: "./wrangler.jsonc",
     },
   }),
-  integrations: [sitemap(), react(), svelte()],
+  integrations: [sitemap(), svelte()],
   build: {
     assets: "assets",
   },
