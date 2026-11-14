@@ -5,6 +5,8 @@ export interface Project {
   demoUrl?: string;
   codeUrl?: string;
   featured?: boolean;
+  /** Short label above the featured card's title. */
+  eyebrow?: string;
   fillColor?: string;
   accentColor?: string;
 }

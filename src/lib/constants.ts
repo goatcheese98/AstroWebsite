@@ -51,23 +51,15 @@ export const PORTFOLIO_TOOLKIT = [
 
 export const PROJECTS: Project[] = [
   {
-    title: "RoopStudio",
+    // Internal to Level Up Mortgages, so there is no public link to show.
+    title: "LumBrain",
+    eyebrow: "AI operations platform",
     description:
-      "An AI-native visual workspace for diagramming, structured notes, image generation, and editable AI-assisted refinement.",
-    tags: ["Product Engineering", "Structured AI", "Canvas Systems"],
-    demoUrl: "https://canvas.rohanjasani.com/",
+      "Level Up Mortgages' internal AI operations platform. It connects CRM, email, documents, and meetings, reads incoming mortgage documents with human review for uncertain cases, and keeps approval gates and an audit trail on the actions it takes for the team.",
+    tags: ["Agentic Workflows", "Document AI", "Human-in-the-loop", "TypeScript", "Cloudflare"],
     featured: true,
     fillColor: "var(--color-fill-1)",
     accentColor: "#3b82f6",
-  },
-  {
-    title: "Promptfolio",
-    description:
-      "A prompt operations workspace for organizing experiments, comparing outputs, and turning one-off prompting into a repeatable evaluation loop.",
-    tags: ["Evaluation", "Workflow Design", "Applied AI"],
-    demoUrl: "https://promptfolio.jasani-rohan.workers.dev/",
-    fillColor: "var(--color-fill-2)",
-    accentColor: "#f97316",
   },
   {
     title: "Methanex Career Constellation",
@@ -83,18 +75,9 @@ export const PROJECTS: Project[] = [
     description:
       "An interactive performance dashboard for professional Apex Legends players and teams, backed by a reusable Python data pipeline.",
     tags: ["Python", "Data Pipeline", "Visualization"],
-    codeUrl: "https://github.com/goatcheese98/algs-championship-viz",
+    demoUrl: "https://algs-championship-viz.pages.dev/",
     fillColor: "var(--color-fill-4)",
     accentColor: "#8b5cf6",
-  },
-  {
-    title: "AstroWeb Portfolio",
-    description:
-      "This site: an evolving personal workspace built with Astro, Svelte, and a hand-drawn visual language.",
-    tags: ["Astro", "TypeScript", "Svelte", "Design Systems"],
-    codeUrl: "https://github.com/goatcheese98/AstroWebsite",
-    fillColor: "var(--color-fill-5)",
-    accentColor: "#f59e0b",
   },
 ];
 

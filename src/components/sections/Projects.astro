@@ -28,7 +28,7 @@ const projectAction = (project: Project) => project.demoUrl ? "View project" : "
 
       <div class="project-card__body">
         <div class="project-card__copy">
-          <p class="project-card__eyebrow">AI-native workspace</p>
+          {featuredProject.eyebrow && <p class="project-card__eyebrow">{featuredProject.eyebrow}</p>}
           <h3>{featuredProject.title}</h3>
           <p class="project-card__description">{featuredProject.description}</p>
         </div>

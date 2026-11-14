@@ -28,18 +28,20 @@ describe("sketch portfolio content", () => {
   });
 
   it("keeps the selected work current and directly accessible", () => {
-    expect(PROJECTS).toHaveLength(5);
     expect(PROJECTS.map((project) => project.title)).toEqual([
-      "RoopStudio",
-      "Promptfolio",
+      "LumBrain",
       "Methanex Career Constellation",
       "ALGS Performance Dashboard",
-      "AstroWeb Portfolio",
     ]);
+    expect(PROJECTS.find((project) => project.featured)?.title).toBe("LumBrain");
 
-    for (const project of PROJECTS) {
-      expect(project.demoUrl || project.codeUrl).toMatch(/^https:\/\//);
+    // LumBrain is internal to Level Up, so it is the one card without a link.
+    for (const project of PROJECTS.filter((p) => p.title !== "LumBrain")) {
+      expect(project.demoUrl).toMatch(/^https:\/\//);
     }
+    expect(PROJECTS.find((p) => p.title === "ALGS Performance Dashboard")?.demoUrl).toBe(
+      "https://algs-championship-viz.pages.dev/",
+    );
   });
 
   it("keeps portfolio navigation focused on the public site", () => {
